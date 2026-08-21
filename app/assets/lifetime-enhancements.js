@@ -6349,6 +6349,12 @@
      Does NOT touch height/minHeight to avoid collapsing flex children.
      Returns true on success, false when DOM isn't ready yet.              */
   function applyTimerZoom() {
+    /* Disabled — the Timer tab now uses plain normal scroll, same as
+       every other tab, instead of this custom zoom-to-fit/no-scroll
+       system. Kept as a no-op (rather than deleted) so the few remaining
+       call sites below don't need to be touched. */
+    return false;
+    // eslint-disable-next-line no-unreachable
     var main = document.querySelector("main.overflow-y-auto") || document.querySelector("main");
     if (!main) return false;
 
@@ -6370,10 +6376,29 @@
 
     if (naturalH <= 50) return false; /* content not rendered yet */
 
-    var scale = Math.max(0.68, Math.min(1.35, containerH / naturalH));
+    var rawScale = containerH / naturalH;
+    var scale    = Math.max(0.68, Math.min(1.35, rawScale));
+
+    /* If content is so tall that even the smallest allowed shrink (0.68x)
+       still doesn't make it fit, don't keep clamping — that's what was
+       cutting content off with no way to reach it. Fall back to normal
+       scroll at the minimum readable scale instead, so everything is
+       still reachable by scrolling down. */
+    var stillOverflows = (naturalH * scale) > containerH + 1;
+
     main.style.zoom = String(scale);
 
-    /* Lock outer document scroll */
+    if (stillOverflows) {
+      /* Let the page scroll instead of hiding the overflow. */
+      document.documentElement.style.overflowY = "";
+      document.body.style.overflowY             = "";
+      main.style.overflowY               = "auto";
+      main.style.webkitOverflowScrolling = "touch";
+      main.style.paddingBottom           = "24px";
+      return true;
+    }
+
+    /* Content fits at this scale — lock scroll as before. */
     document.documentElement.style.overflowY = "hidden";
     document.body.style.overflowY             = "hidden";
     window.scrollTo(0, 0);
@@ -6394,37 +6419,35 @@
   }
 
   function lockTimerPageScroll() {
+    /* The Timer tab used to have its own custom "auto-zoom to fit, no
+       scroll" system (applyTimerZoom) that behaved completely differently
+       from every other tab and was unreliable (mismeasurement, retries,
+       content getting cut off/glitching depending on list length, keyboard,
+       etc). That whole system is now disabled — the Timer tab just scrolls
+       normally like every other tab, so this function unconditionally
+       restores normal scroll everywhere. */
     var main = document.querySelector("main.overflow-y-auto") || document.querySelector("main");
     if (!main) return;
 
-    var onTimerPage   = location.pathname === "/";
-    var onActivityTab = (_activeSubTab === "activity");
-
-    if (onTimerPage && !onActivityTab) {
-      applyTimerZoom();
-
-    } else if (onTimerPage && onActivityTab) {
-      /* Activity sub-tab — restore full scroll so the list is scrollable */
-      document.documentElement.style.overflowY = "";
-      document.body.style.overflowY             = "";
-      main.style.overflowY               = "";
-      main.style.minHeight               = "";
-      main.style.height                  = "";
-      main.style.zoom                    = "1";
-      main.style.paddingBottom           = "";
-      main.style.webkitOverflowScrolling = "touch";
-
-    } else {
-      /* All other pages — fully restore scroll */
-      document.documentElement.style.overflowY = "";
-      document.body.style.overflowY             = "";
-      main.style.overflowY               = "";
-      main.style.minHeight               = "";
-      main.style.height                  = "";
-      main.style.zoom                    = "1";
-      main.style.paddingBottom           = "";
-      main.style.webkitOverflowScrolling = "";
-    }
+    document.documentElement.style.overflowY = "";
+    document.body.style.overflowY             = "";
+    main.style.overflowY               = "";
+    main.style.minHeight               = "";
+    main.style.height                  = "";
+    /* Do NOT touch main.style.zoom here (even resetting it to "1" every
+       pass). This function re-runs on every DOM mutation, and on the
+       Timer tab that happens roughly once a second while a countdown is
+       live (pollRunningTimer updates text -> MutationObserver -> this
+       runs again). Repeatedly writing to the non-standard `zoom` property
+       forces a layout reflow on `main` on every pass; on real mobile
+       Chrome that reflow can cancel an in-progress touch-scroll gesture
+       on that exact element, which is what made the Timer tab specifically
+       feel "stuck" while every other (static) tab scrolled fine. Clear it
+       once, only if some stale value is still lingering, instead of
+       stomping it unconditionally every pass. */
+    if (main.style.zoom && main.style.zoom !== "1") main.style.zoom = "1";
+    main.style.paddingBottom           = "";
+    main.style.webkitOverflowScrolling = "touch";
   }
 
   /* Keep every user-facing duration on the same unit spelling. The native
