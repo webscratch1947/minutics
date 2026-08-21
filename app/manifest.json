@@ -1,0 +1,13 @@
+{
+  "name": "Minutics",
+  "short_name": "Minutics",
+  "description": "Minutics — Make every minute count.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a2140",
+  "icons": [
+    { "src": "./assets/icons/time-value.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "minutics-website",
+  "private": true,
+  "dependencies": {
+    "@vercel/functions": "^1.0.0"
+  }
+}
