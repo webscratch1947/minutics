@@ -1529,6 +1529,18 @@
       if (t === "\u270F\uFE0F" || t === "\u270F\uFE0F ") {
         var oldBtn = node.parentElement;
         if (!oldBtn || oldBtn.getAttribute("data-lt-edit-replaced")) continue;
+        /* The emoji picker can be filtered down to a single pencil.  In that
+           state its row contains only one button, so a button-count check
+           cannot distinguish it from the activity edit control.  Only the
+           real control (which the app marks title="Edit") may be relabeled;
+           never rewrite a selectable emoji in a picker/popover. */
+        var realEditButton = oldBtn.closest("button");
+        var inEmojiPicker = oldBtn.closest(
+          '[role="dialog"],[role="listbox"],[role="menu"],' +
+          '[data-radix-popper-content-wrapper],[data-emoji-picker],' +
+          'input[placeholder*="earch"]'
+        );
+        if (!realEditButton || realEditButton.getAttribute("title") !== "Edit" || inEmojiPicker) continue;
         /* Guard against the emoji picker: it also contains a pencil emoji
            as one of many selectable options in a dense grid/row of emoji
            buttons. A real "edit activity" pencil button sits alone next
@@ -4713,8 +4725,13 @@
       }
       if (row.button.getAttribute("data-lt-fv-injected") === "1") return;
       row.button.setAttribute("data-lt-fv-injected", "1");
-      var rightSide = row.button.lastElementChild; /* duration + arrow wrapper */
-      var host = rightSide || row.button;
+      /* Keep this control anchored to the date, not to the optional
+         duration/arrow group.  The latter changes width when a journal day
+         has no time or a short duration, which made Full view visibly jump
+         between rows. */
+      var dateSpan = Array.prototype.slice.call(row.button.querySelectorAll("span"))
+        .filter(function (s) { return (s.textContent || "").trim() === row.dateText; })[0];
+      var host = dateSpan && dateSpan.parentElement ? dateSpan.parentElement : row.button;
       var btn = document.createElement("span");
       btn.className = "lt-fv-btn";
       btn.setAttribute("role", "button");
@@ -4728,7 +4745,8 @@
           fvOpenReportModal(dateText, activities);
         });
       });
-      host.insertBefore(btn, host.firstChild);
+      if (dateSpan && dateSpan.nextSibling) host.insertBefore(btn, dateSpan.nextSibling);
+      else host.appendChild(btn);
     });
     /* Journal Pro-lock notice removed — journal history is no longer gated in-UI. */
   }
