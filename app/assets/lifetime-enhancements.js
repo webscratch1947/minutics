@@ -1770,10 +1770,10 @@
       ".lt-tasks-empty-title{font-size:17px;font-weight:700;margin:0 0 6px;color:hsl(var(--foreground))}",
       ".lt-tasks-empty-sub{font-size:13px;margin:0}",
       /* FAB */
-      ".lt-tasks-fab{position:absolute;bottom:28px;right:20px;width:56px;height:56px;border-radius:50%;background:hsl(var(--primary));color:white;font-size:30px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:10;-webkit-tap-highlight-color:transparent;line-height:1}",
+      ".lt-tasks-fab{position:fixed;bottom:calc(28px + env(safe-area-inset-bottom, 0px));right:20px;width:56px;height:56px;border-radius:50%;background:hsl(var(--primary));color:white;font-size:30px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:2147483000;-webkit-tap-highlight-color:transparent;line-height:1}",
       ".lt-tasks-fab:active{opacity:.85;transform:scale(.96)}",
       /* Add-task bottom sheet */
-      ".lt-tasks-sheet{position:absolute;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:22px 22px 0 0;padding:14px 18px 24px;box-shadow:0 -4px 28px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:30;box-sizing:border-box}",
+      ".lt-tasks-sheet{position:fixed;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:22px 22px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom, 0px));box-shadow:0 -4px 28px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:2147483100;box-sizing:border-box;max-width:480px;margin:0 auto}",
       ".lt-tasks-sheet-handle{width:36px;height:4px;background:hsl(var(--border));border-radius:2px;margin:0 auto 14px}",
       ".lt-tasks-sheet-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:hsl(var(--muted-foreground));margin:0 0 10px}",
       ".lt-tasks-sheet-main{font-size:17px;width:100%;border:none;background:transparent;color:hsl(var(--foreground));font-family:inherit;font-weight:500;padding:0;outline:none;caret-color:hsl(var(--primary));margin-bottom:14px}",
@@ -2821,6 +2821,14 @@
        closes the overlay instead of closing the app or going back in SPA. */
     history.pushState({ ltOverlay: true }, "");
     var root = getOverlayRoot();
+    /* Mobile browsers/WebViews sometimes replay a "ghost click" ~300ms
+       after the tap that opened this overlay, landing on whatever now
+       sits at the same screen coordinates. If that happens to be the
+       Tasks FAB (bottom-right, a common spot for a Life Hub tile too),
+       the "New Task" sheet appears to open on its own. Tools can check
+       this timestamp to ignore clicks that land suspiciously soon after
+       opening. */
+    root.dataset.openedAt = String(Date.now());
     document.body.style.overflow = "hidden";
     activeOverlay = root;
     root.addEventListener("click", function (e) {
@@ -3639,7 +3647,7 @@
     }
 
     activeOverlay.innerHTML = (
-      '<div class="lt-tool-shell" style="position:relative;min-height:calc(100% + 90px);padding-bottom:170px">' +
+      '<div class="lt-tool-shell" style="padding-bottom:110px">' +
         '<div class="lt-tool-top">' +
           '<div>' +
             '<p class="lt-tool-kicker">Life Hub</p>' +
@@ -3714,6 +3722,10 @@
       }
       /* FAB */
       if (e.target.id === "lt-tasks-fab") {
+        /* Guard against the ghost-click-on-open issue described in
+           openOverlay() above — ignore a tap on the FAB that lands within
+           400ms of this tool having opened. */
+        if (Date.now() - Number(overlay.dataset.openedAt || 0) < 400) return;
         var sheet = document.getElementById("lt-tasks-sheet");
         if (sheet) sheet.style.transform = "translateY(0)";
         setTimeout(function () { var n = document.getElementById("lt-task-name"); if (n) n.focus(); }, 100);
