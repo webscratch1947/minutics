@@ -218,15 +218,15 @@
      infographic images live in. Every device reads+writes those two files,
      so a like or comment made on one phone shows up on all of them.
 
-     Reads go straight to GitHub's public API (no token needed, the repo
-     is public). Writes go through our own /api/gram-write serverless
-     function instead of api.github.com directly — the token lives ONLY
-     as a server-side env var there (GITHUB_TOKEN), so it never ships in
-     this file and can't be extracted from the site. ── */
+     SETUP REQUIRED: put a GitHub fine-grained Personal Access Token below,
+     scoped ONLY to the "infographics" repo, with Contents: Read and write
+     permission. Anyone who decompiles this APK can extract this token and
+     use it to write to that repo — keep its scope limited to this one repo
+     and nothing else, since it ships inside the app. ── */
   var GH_OWNER = "webscratch1947";
   var GH_REPO  = "infographics";
+  var GH_TOKEN = "PUT_YOUR_GITHUB_FINE_GRAINED_TOKEN_HERE";
   var GH_API   = "https://api.github.com/repos/" + GH_OWNER + "/" + GH_REPO + "/contents/";
-  var GRAM_WRITE_ENDPOINT = "/api/gram-write";
   var GRAM_REMOTE_TTL = 30 * 1000; /* re-fetch from GitHub at most every 30s */
 
   var GRAM_DEVICE_ID       = null;
@@ -258,6 +258,10 @@
   function b64EncodeUtf8(str) { return btoa(unescape(encodeURIComponent(str))); }
   function b64DecodeUtf8(str) { return decodeURIComponent(escape(atob(str.replace(/\n/g, "")))); }
 
+  function ghHeaders() {
+    return { "Authorization": "Bearer " + GH_TOKEN, "Accept": "application/vnd.github+json" };
+  }
+
   function ghGetFile(path, cb) {
     /* Public repo — no token needed to read, so this works even if this
        device's GH_TOKEN is missing/wrong. Only writes need the token. */
@@ -276,10 +280,12 @@
   }
 
   function ghPutFile(path, obj, sha, message, cb, retried) {
-    fetch(GRAM_WRITE_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: path, obj: obj, sha: sha, message: message })
+    var body = { message: message, content: b64EncodeUtf8(JSON.stringify(obj)) };
+    if (sha) body.sha = sha;
+    fetch(GH_API + path, {
+      method: "PUT",
+      headers: Object.assign({ "Content-Type": "application/json" }, ghHeaders()),
+      body: JSON.stringify(body)
     })
       .then(function (r) {
         if (r.status === 409 && !retried) {
@@ -1222,38 +1228,21 @@
       "#lt-frog-card .lt-frog-row:first-of-type{border-top:none}",
       "#lt-frog-card .lt-frog-check{width:22px;height:22px;flex-shrink:0;border-radius:50%;border:2px solid hsl(var(--border));background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;-webkit-tap-highlight-color:transparent}",
       "#lt-frog-card .lt-frog-check.lt-frog-done{background:#16A34A;border-color:#16A34A}",
-      "#lt-frog-card .lt-frog-check.lt-frog-check-empty{opacity:.35;cursor:default}",
       "#lt-frog-card .lt-frog-input{flex:1;border:none;background:transparent;font-size:14px;color:hsl(var(--foreground));outline:none;min-width:0}",
       "#lt-frog-card .lt-frog-input.lt-frog-done-text{text-decoration:line-through;opacity:.5}",
-      "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}",
-      "#lt-frog-card .lt-frog-unstar{background:none;border:none;color:#f5a623;cursor:pointer;padding:4px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
-      "#lt-frog-card .lt-frog-unstar:active{transform:scale(.9)}",
-      "#lt-frog-card .lt-frog-empty{font-size:13px;color:hsl(var(--muted-foreground));margin:4px 0 0}"
+      "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}"
     ].join("\n");
     document.head.appendChild(s);
   }
 
-  /* Eat the Frog always shows exactly MAX_STARRED_TASKS (3) rows.
-     - Filled rows are a view onto whichever tasks (from My Tasks) are
-       starred — starring a task in My Tasks, editing its title here or
-       there, and checking it off here or there all read/write the SAME
-       task object in TASKS_KEY, so every surface stays in sync automatically.
-     - Empty rows (when fewer than 3 tasks are starred) are directly
-       editable right here: typing into one creates a brand-new starred
-       task in that slot on the spot — no need to go add it in My Tasks
-       first. Because it's created already-starred, it can never push the
-       total past MAX_STARRED_TASKS: as soon as all 3 slots are filled
-       (whether typed here or starred over in My Tasks), starring a 4th
-       task from My Tasks hits the normal "Eat the Frog is full" cap in
-       toggleTaskStar(). And if only some slots are filled, starring a
-       task from My Tasks simply lands in the next empty slot, since
-       filled slots always render first (index 0..starred.length-1) and
-       empty slots fill the remainder — there's nothing to "replace",
-       it just naturally shows up there. */
-  var _frogLastSignature = null; /* used to skip rebuilds when nothing changed */
-
-  function frogSignature(tasks) {
-    return tasks.map(function (t) { return t.id + ":" + t.title + ":" + (t.completed ? 1 : 0); }).join("|");
+  function eatFrogToday() {
+    var stored = readJson(EAT_FROG_KEY, null);
+    var todayStr = today();
+    if (!stored || stored.date !== todayStr || !Array.isArray(stored.tasks) || stored.tasks.length !== 3) {
+      stored = { date: todayStr, tasks: [{ text: "", done: false }, { text: "", done: false }, { text: "", done: false }] };
+      writeJson(EAT_FROG_KEY, stored);
+    }
+    return stored;
   }
 
   function buildEatTheFrogCard() {
@@ -1261,160 +1250,55 @@
     var existing = document.getElementById("lt-frog-card");
     if (!onTimerTab) {
       if (existing) existing.remove();
-      _frogLastSignature = null;
       return;
     }
-
-    var starred = getStarredTasks().slice(0, MAX_STARRED_TASKS);
-    var sig = frogSignature(starred);
-
-    if (existing) {
-      /* Only skip rebuilding when nothing actually changed. (We deliberately
-         do NOT also check "is focus inside this card" here — every local
-         edit path below updates _frogLastSignature itself right after the
-         mutation, so the signature check alone already prevents typing from
-         being interrupted. An extra focus check was here before and it
-         caused a real bug: clicking the checkbox/star button focuses that
-         very button, which sits inside `existing`, so the check blocked
-         the button's own click handler from ever seeing its update take
-         effect — the buttons looked broken even though the data underneath
-         was saving correctly.) */
-      if (sig === _frogLastSignature) return;
-    }
+    if (existing) return; /* already built for this visit — inputs manage their own state */
 
     addStyleFrog();
     var anchor = document.getElementById("lt-glance-section") || document.getElementById("lt-life-progress");
     if (!anchor || !anchor.parentNode) return; /* not mounted yet — try again next tick */
 
-    _frogLastSignature = sig;
+    var data = eatFrogToday();
 
-    var card = existing || document.createElement("div");
+    var card = document.createElement("div");
     card.id = "lt-frog-card";
     card.setAttribute("data-lt-enhancement", "1");
-
-    var rowsHtml = "";
-    for (var i = 0; i < MAX_STARRED_TASKS; i++) {
-      var t = starred[i];
-      if (t) {
-        rowsHtml +=
-          '<div class="lt-frog-row">' +
-            '<button type="button" class="lt-frog-check' + (t.completed ? " lt-frog-done" : "") + '" data-lt-frog-check="' + t.id + '">' + (t.completed ? "\u2713" : "") + '</button>' +
-            '<input type="text" class="lt-frog-input' + (t.completed ? " lt-frog-done-text" : "") + '" data-lt-frog-input="' + t.id + '" placeholder="Task name" value="' + escapeHtml(t.title) + '" />' +
-            '<button type="button" class="lt-frog-unstar" data-lt-frog-unstar="' + t.id + '" title="Remove from Eat the Frog">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
-            '</button>' +
-          '</div>';
-      } else {
-        /* Empty slot — nothing starred here yet. Renders a live, editable
-           row anyway; typing into it creates the task (see the delegated
-           "input" handler below). The check/unstar controls stay inert
-           (no id to act on) until that happens. */
-        rowsHtml +=
-          '<div class="lt-frog-row">' +
-            '<button type="button" class="lt-frog-check lt-frog-check-empty" data-lt-frog-check="" disabled></button>' +
-            '<input type="text" class="lt-frog-input" data-lt-frog-input="" placeholder="Add an important task\u2026" value="" />' +
-            '<button type="button" class="lt-frog-unstar" data-lt-frog-unstar="" style="visibility:hidden" title="Remove from Eat the Frog">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
-            '</button>' +
-          '</div>';
-      }
-    }
-
     card.innerHTML =
       '<p class="lt-frog-title">\uD83D\uDC38 Eat the Frog</p>' +
       '<p class="lt-frog-sub">Your 3 most important tasks today</p>' +
-      rowsHtml;
+      data.tasks.map(function (t, i) {
+        return '<div class="lt-frog-row">' +
+          '<button type="button" class="lt-frog-check' + (t.done ? " lt-frog-done" : "") + '" data-lt-frog-check="' + i + '">' + (t.done ? "\u2713" : "") + '</button>' +
+          '<input type="text" class="lt-frog-input' + (t.done ? " lt-frog-done-text" : "") + '" data-lt-frog-input="' + i + '" placeholder="Task ' + (i + 1) + '" value="' + escapeHtml(t.text) + '" />' +
+          '</div>';
+      }).join("");
 
-    if (!existing) anchor.parentNode.insertBefore(card, anchor.nextSibling);
+    anchor.parentNode.insertBefore(card, anchor.nextSibling);
 
-    /* Delegated listeners, wired once on the card itself rather than per-row
-       on every rebuild — a row's underlying task id can change (an empty
-       slot becomes a real task the moment someone types into it) without
-       needing to re-attach anything, since delegation always reads the
-       current data-* attribute at click/input time. */
-    if (!card.dataset.frogWired) {
-      card.dataset.frogWired = "1";
-
-      card.addEventListener("click", function (e) {
-        var checkBtn = e.target.closest("[data-lt-frog-check]");
-        if (checkBtn) {
-          var cid = checkBtn.getAttribute("data-lt-frog-check");
-          if (!cid) return; /* empty slot — nothing to toggle yet */
-          var task = getAllTasks().find(function (tk) { return tk.id === cid; });
-          if (!task) return;
-          task.completed = !task.completed;
-          upsertTask(task);
-          checkBtn.classList.toggle("lt-frog-done", task.completed);
-          checkBtn.textContent = task.completed ? "\u2713" : "";
-          var rowInput = checkBtn.parentElement.querySelector("[data-lt-frog-input]");
-          if (rowInput) rowInput.classList.toggle("lt-frog-done-text", task.completed);
-          _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
-          return;
-        }
-        var unstarBtn = e.target.closest("[data-lt-frog-unstar]");
-        if (unstarBtn) {
-          var uid = unstarBtn.getAttribute("data-lt-frog-unstar");
-          if (!uid) return; /* empty slot — nothing to unstar */
-          toggleTaskStar(uid);
-          buildEatTheFrogCard();
-        }
-      });
-
-      card.addEventListener("input", function (e) {
-        var input = e.target.closest("[data-lt-frog-input]");
-        if (!input) return;
-        var id = input.getAttribute("data-lt-frog-input");
-
-        if (!id) {
-          /* Empty slot — first keystroke creates the task right here,
-             already starred, so it stays pinned in this exact slot. */
-          var val = input.value;
-          if (!val.trim()) return; /* whitespace-only — not a task yet */
-          if (getStarredTasks().length >= MAX_STARRED_TASKS) return; /* safety net; slot shouldn't exist if full */
-          var newTask = { id: genId(), title: val, date: null, time: null, notes: "", completed: false, starred: true, createdAt: Date.now() };
-          upsertTask(newTask);
-          input.setAttribute("data-lt-frog-input", newTask.id);
-          var row = input.closest(".lt-frog-row");
-          if (row) {
-            var checkBtn2 = row.querySelector("[data-lt-frog-check]");
-            if (checkBtn2) {
-              checkBtn2.setAttribute("data-lt-frog-check", newTask.id);
-              checkBtn2.removeAttribute("disabled");
-              checkBtn2.classList.remove("lt-frog-check-empty");
-            }
-            var unstarBtn2 = row.querySelector("[data-lt-frog-unstar]");
-            if (unstarBtn2) {
-              unstarBtn2.setAttribute("data-lt-frog-unstar", newTask.id);
-              unstarBtn2.style.visibility = "";
-            }
-          }
-          _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
-          return;
-        }
-
-        var task2 = getAllTasks().find(function (tk) { return tk.id === id; });
-        if (!task2) return;
-        task2.title = input.value;
-        upsertTask(task2);
-        _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
-      });
-
-      /* focusout (unlike blur) bubbles, so it works with delegation.
-         If a slot was created here and typed back down to empty, clean the
-         title-less task up instead of leaving an orphaned starred task
-         behind — the slot just goes back to being empty. */
-      card.addEventListener("focusout", function (e) {
-        var input = e.target.closest && e.target.closest("[data-lt-frog-input]");
-        if (!input) return;
-        var id = input.getAttribute("data-lt-frog-input");
-        if (!id) return;
-        var task3 = getAllTasks().find(function (tk) { return tk.id === id; });
-        if (task3 && !task3.title.trim()) {
-          removeTask(id);
-          buildEatTheFrogCard();
-        }
-      });
+    function saveFrog(mutator) {
+      var cur = eatFrogToday();
+      mutator(cur.tasks);
+      writeJson(EAT_FROG_KEY, cur);
     }
+
+    Array.prototype.slice.call(card.querySelectorAll("[data-lt-frog-check]")).forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = Number(btn.getAttribute("data-lt-frog-check"));
+        var nowDone = !btn.classList.contains("lt-frog-done");
+        btn.classList.toggle("lt-frog-done", nowDone);
+        btn.textContent = nowDone ? "\u2713" : "";
+        var input = card.querySelector('[data-lt-frog-input="' + idx + '"]');
+        if (input) input.classList.toggle("lt-frog-done-text", nowDone);
+        saveFrog(function (tasks) { tasks[idx].done = nowDone; });
+      });
+    });
+
+    Array.prototype.slice.call(card.querySelectorAll("[data-lt-frog-input]")).forEach(function (input) {
+      input.addEventListener("input", function () {
+        var idx = Number(input.getAttribute("data-lt-frog-input"));
+        saveFrog(function (tasks) { tasks[idx].text = input.value; });
+      });
+    });
   }
 
 
@@ -1519,22 +1403,54 @@
       if (t.indexOf("Retire date") !== -1) node.nodeValue = t.replace(/Retire date/g, goal.dateLabel);
       if (t.indexOf("Remaining Retirement Time") !== -1) node.nodeValue = t.replace(/Remaining Retirement Time/g, "Remaining " + goal.word + " Time");
       if (t.indexOf("date of birth and retire date") !== -1) node.nodeValue = t.replace(/date of birth and retire date/g, "date of birth and " + goal.dateLabel.toLowerCase());
-      /* NOTE: pencil-emoji ("\u270F\uFE0F") text nodes are intentionally NOT
-         turned into an "Edit" button here anymore. That used to be done by
-         walking every text node in the page and guessing whether a given
-         pencil was the real "edit activity" button (vs. one of the many
-         pencil options inside the emoji picker's search grid) by counting
-         how many buttons sat in the same row. That guess broke as soon as
-         the emoji picker was filtered down to a handful of results (e.g.
-         searching "pe" or "pencil", since the pencil's own keywords are
-         "pencil write edit") — few results in the grid look exactly like
-         the lone real edit button to that heuristic, so the picker's pencil
-         option itself got replaced with a text "Edit" button.
-         The real edit button doesn't need guessing at all: it's the only
-         pencil button in the whole app that natively carries title="Edit"
-         (see the button[title="Edit"] pass right below), so that pass alone
-         reliably finds and relabels it — leaving every pencil emoji inside
-         the emoji picker exactly as a plain, pickable emoji. */
+      if (t === "\u270F\uFE0F" || t === "\u270F\uFE0F ") {
+        var oldBtn = node.parentElement;
+        if (!oldBtn || oldBtn.getAttribute("data-lt-edit-replaced")) continue;
+        /* Guard against the emoji picker: it also contains a pencil emoji
+           as one of many selectable options in a dense grid/row of emoji
+           buttons. A real "edit activity" pencil button sits alone next
+           to a name label — not packed among 6+ other emoji buttons in
+           the same row, like a palette is. */
+        var pencilRow = oldBtn.closest("button") ? oldBtn.closest("button").parentElement : oldBtn.parentElement;
+        var rowButtonCount = pencilRow ? pencilRow.querySelectorAll("button").length : 0;
+        if (rowButtonCount > 5) continue;
+        /* Skip rows rendered in a compact/mini context (e.g. the timer's
+           activity-name suggestion strip) where the name label isn't
+           actually visible — showing a bare "Edit" button with no
+           attached label there looks broken, so just hide it instead. */
+        var nameLbl = oldBtn.previousElementSibling;
+        var rowEl = oldBtn.closest('[role="button"]') || oldBtn.parentElement;
+        /* If the button (or its row) isn't actually laid out yet — e.g. the
+           page just mounted or a tab panel is mid-transition — offsetWidth/
+           getBoundingClientRect() can read 0 even for a perfectly normal
+           row. Don't make a permanent decision on unreliable data; just
+           skip this pass and let the next 1.5s run re-check once layout
+           has settled. */
+        if (oldBtn.offsetParent === null) continue;
+        var nameLblMissing = !nameLbl || !nameLbl.textContent.trim();
+        var nameLblHidden  = nameLbl && nameLbl.offsetParent !== null && nameLbl.offsetWidth === 0;
+        var rowWidth = rowEl ? rowEl.getBoundingClientRect().width : 0;
+        var isCompact = nameLblMissing || nameLblHidden || (rowWidth > 0 && rowWidth < 120);
+        if (isCompact) {
+          oldBtn.style.cssText = "display:none!important";
+          oldBtn.setAttribute("data-lt-edit-replaced", "1");
+          continue;
+        }
+        var newBtn = document.createElement("button");
+        newBtn.type = "button";
+        newBtn.textContent = "Edit";
+        newBtn.className = "lt-edit-button";
+        newBtn.setAttribute("aria-label", "Edit");
+        newBtn.setAttribute("data-lt-edit-replaced", "1");
+        /* Forward clicks to the original hidden button so React handlers fire */
+        newBtn.addEventListener("click", function (orig) {
+          return function (e) { e.stopPropagation(); orig.click(); };
+        }(oldBtn));
+        oldBtn.style.cssText = "display:none!important";
+        oldBtn.setAttribute("data-lt-edit-replaced", "1");
+        oldBtn.parentNode.insertBefore(newBtn, oldBtn);
+        continue;
+      }
       if (/\b\d+[sm]\b/.test(t)) {
         node.nodeValue = t.replace(/\b(\d+)s\b/g, "$1sec").replace(/\b(\d+)m\b/g, "$1min");
       }
@@ -1664,6 +1580,16 @@
     injectedStyle = true;
     var s = document.createElement("style");
     s.textContent = [
+      /* Our injected cards (life-progress, glance, Eat the Frog, etc.) sit
+         as siblings BEFORE the native app's own root wrapper, which has a
+         min-height of one full screen (100dvh) so its own nav bar stays
+         pinned to the bottom of the screen when there's little content.
+         Once our extra cards push total page height past one screen, that
+         min-height became pure dead space below the real content and above
+         the nav bar (a huge blank gap that looked like broken/endless
+         scroll). Removing the min-height lets that wrapper size itself to
+         its actual content — nav bar just follows directly after it. */
+      ".lt-authed .min-h-\\[100dvh\\]{min-height:auto!important}",
       /* ── New bottom-nav highlight system (replaces the old grey/bg-primary/5
          tap state, which stuck visibly on mobile after tapping a tab because
          it relied on a real CSS :hover rule that touch browsers keep applied
@@ -1835,9 +1761,6 @@
       ".lt-task-date{display:block;font-size:11px;margin-top:2px;color:#8e8e93}",
       ".lt-task-date.lt-overdue{color:#ff3b30}",
       ".lt-task-notes{display:block;font-size:11px;color:hsl(var(--muted-foreground));margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-      ".lt-task-star{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:6px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
-      ".lt-task-star.lt-task-starred{color:#f5a623}",
-      ".lt-task-star:active{transform:scale(.9)}",
       ".lt-task-del{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:6px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
       ".lt-task-del:active{color:hsl(var(--destructive))}",
       ".lt-tasks-section-card{background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:14px;margin-bottom:12px;overflow:hidden}",
@@ -1847,10 +1770,10 @@
       ".lt-tasks-empty-title{font-size:17px;font-weight:700;margin:0 0 6px;color:hsl(var(--foreground))}",
       ".lt-tasks-empty-sub{font-size:13px;margin:0}",
       /* FAB */
-      ".lt-tasks-fab{position:fixed;bottom:calc(28px + env(safe-area-inset-bottom, 0px));right:20px;width:56px;height:56px;border-radius:50%;background:hsl(var(--primary));color:white;font-size:30px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:2147483000;-webkit-tap-highlight-color:transparent;line-height:1}",
+      ".lt-tasks-fab{position:absolute;bottom:28px;right:20px;width:56px;height:56px;border-radius:50%;background:hsl(var(--primary));color:white;font-size:30px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:10;-webkit-tap-highlight-color:transparent;line-height:1}",
       ".lt-tasks-fab:active{opacity:.85;transform:scale(.96)}",
       /* Add-task bottom sheet */
-      ".lt-tasks-sheet{position:fixed;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:22px 22px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom, 0px));box-shadow:0 -4px 28px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:2147483100;box-sizing:border-box;max-width:480px;margin:0 auto}",
+      ".lt-tasks-sheet{position:absolute;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:22px 22px 0 0;padding:14px 18px 24px;box-shadow:0 -4px 28px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:30;box-sizing:border-box}",
       ".lt-tasks-sheet-handle{width:36px;height:4px;background:hsl(var(--border));border-radius:2px;margin:0 auto 14px}",
       ".lt-tasks-sheet-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:hsl(var(--muted-foreground));margin:0 0 10px}",
       ".lt-tasks-sheet-main{font-size:17px;width:100%;border:none;background:transparent;color:hsl(var(--foreground));font-family:inherit;font-weight:500;padding:0;outline:none;caret-color:hsl(var(--primary));margin-bottom:14px}",
@@ -2898,13 +2821,6 @@
        closes the overlay instead of closing the app or going back in SPA. */
     history.pushState({ ltOverlay: true }, "");
     var root = getOverlayRoot();
-    /* Mobile browsers sometimes replay a "ghost click" ~300ms after the tap
-       that opened this overlay, landing on whatever now sits at the same
-       screen coordinates. If that happens to be the Tasks FAB (bottom-right,
-       a common spot for a Life Hub tile too), it looked like the "New Task"
-       sheet opened on its own. Tools can check this timestamp to ignore
-       clicks that land suspiciously soon after opening. */
-    root.dataset.openedAt = String(Date.now());
     document.body.style.overflow = "hidden";
     activeOverlay = root;
     root.addEventListener("click", function (e) {
@@ -3636,14 +3552,7 @@
    * All data stored in localStorage. Organized by date sections.
    * ══════════════════════════════════════════════════════════════════════════ */
 
-  var MAX_STARRED_TASKS = 3; /* cap on how many tasks can sit in Eat the Frog at once */
-  var _taskEditingId = null; /* set while the sheet is open in "edit" mode, null while adding */
-
   function getAllTasks()   { var t = readJson(TASKS_KEY, []); return Array.isArray(t) ? t : []; }
-
-  function getStarredTasks() {
-    return getAllTasks().filter(function (t) { return !!t.starred; });
-  }
 
   function upsertTask(task) {
     var tasks = getAllTasks();
@@ -3654,22 +3563,6 @@
 
   function removeTask(id) {
     writeJson(TASKS_KEY, getAllTasks().filter(function (t) { return t.id !== id; }));
-  }
-
-  /* Toggling a star is the one place the 3-task cap is enforced — both
-     the Tasks app star button and (indirectly, via the same function)
-     anything else that stars a task go through here, so the cap can never
-     be bypassed. Returns false (and leaves the task untouched) if the cap
-     would be exceeded. */
-  function toggleTaskStar(id) {
-    var task = getAllTasks().find(function (t) { return t.id === id; });
-    if (!task) return true;
-    if (!task.starred && getStarredTasks().length >= MAX_STARRED_TASKS) {
-      return false;
-    }
-    task.starred = !task.starred;
-    upsertTask(task);
-    return true;
   }
 
   function sectionFor(task) {
@@ -3690,19 +3583,14 @@
     var checkIcon = t.completed
       ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
       : '';
-    var starFill = t.starred ? "#f5a623" : "none";
-    var starStroke = t.starred ? "#f5a623" : "currentColor";
     return (
       '<div class="lt-task-item">' +
         '<button class="lt-task-check' + (t.completed ? ' lt-task-checked' : '') + '" data-task-toggle="' + t.id + '">' + checkIcon + '</button>' +
-        '<div class="lt-task-body" data-task-edit="' + t.id + '">' +
+        '<div class="lt-task-body">' +
           '<span class="lt-task-title' + (t.completed ? ' lt-task-done' : '') + '">' + escapeHtml(t.title) + '</span>' +
           (dl ? '<span class="lt-task-date' + (overdue ? ' lt-overdue' : '') + '">' + escapeHtml(dl) + '</span>' : '') +
           (t.notes ? '<span class="lt-task-notes">' + escapeHtml(t.notes) + '</span>' : '') +
         '</div>' +
-        '<button class="lt-task-star' + (t.starred ? ' lt-task-starred' : '') + '" data-task-star="' + t.id + '" title="' + (t.starred ? "Remove from Eat the Frog" : "Add to Eat the Frog") + '">' +
-          '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + starFill + '" stroke="' + starStroke + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
-        '</button>' +
         '<button class="lt-task-del" data-task-del="' + t.id + '">' +
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>' +
@@ -3751,7 +3639,7 @@
     }
 
     activeOverlay.innerHTML = (
-      '<div class="lt-tool-shell" style="padding-bottom:110px">' +
+      '<div class="lt-tool-shell" style="position:relative;min-height:calc(100% + 90px);padding-bottom:170px">' +
         '<div class="lt-tool-top">' +
           '<div>' +
             '<p class="lt-tool-kicker">Life Hub</p>' +
@@ -3816,17 +3704,6 @@
         if (task) { task.completed = !task.completed; upsertTask(task); renderTasks(); }
         return;
       }
-      /* Star (add/remove from Eat the Frog, max 3) */
-      var starBtn = e.target.closest("[data-task-star]");
-      if (starBtn) {
-        var starId = starBtn.getAttribute("data-task-star");
-        var ok = toggleTaskStar(starId);
-        if (!ok) {
-          showSimpleToast("Eat the Frog is full", "Only 3 tasks can be starred at once — unstar one first.");
-        }
-        renderTasks();
-        return;
-      }
       /* Delete */
       var delBtn = e.target.closest("[data-task-del]");
       if (delBtn) {
@@ -3835,40 +3712,8 @@
         renderTasks();
         return;
       }
-      /* Edit (tap the task's title/body area, not the check/star/del buttons) */
-      var editBody = e.target.closest("[data-task-edit]");
-      if (editBody) {
-        var editId = editBody.getAttribute("data-task-edit");
-        var editTask = getAllTasks().find(function (t) { return t.id === editId; });
-        if (editTask) {
-          _taskEditingId = editId;
-          var title2 = document.querySelector("#lt-tasks-sheet .lt-tasks-sheet-title");
-          var submit2 = document.getElementById("lt-task-submit");
-          var name2 = document.getElementById("lt-task-name");
-          var date2 = document.getElementById("lt-task-date");
-          var time2 = document.getElementById("lt-task-time");
-          var notes2 = document.getElementById("lt-task-notes");
-          if (title2) title2.textContent = "Edit Task";
-          if (submit2) submit2.textContent = "Save Changes";
-          if (name2) name2.value = editTask.title || "";
-          if (date2) date2.value = editTask.date || "";
-          if (time2) time2.value = editTask.time || "";
-          if (notes2) notes2.value = editTask.notes || "";
-          var sheet2 = document.getElementById("lt-tasks-sheet");
-          if (sheet2) sheet2.style.transform = "translateY(0)";
-          setTimeout(function () { if (name2) name2.focus(); }, 100);
-        }
-        return;
-      }
-      /* FAB (always starts a fresh "add" — clear any leftover edit state) */
+      /* FAB */
       if (e.target.id === "lt-tasks-fab") {
-        /* Guard against the ghost-click-on-open issue described above. */
-        if (Date.now() - Number(overlay.dataset.openedAt || 0) < 400) return;
-        _taskEditingId = null;
-        var titleFab = document.querySelector("#lt-tasks-sheet .lt-tasks-sheet-title");
-        var submitFab = document.getElementById("lt-task-submit");
-        if (titleFab) titleFab.textContent = "New Task";
-        if (submitFab) submitFab.textContent = "Add Task";
         var sheet = document.getElementById("lt-tasks-sheet");
         if (sheet) sheet.style.transform = "translateY(0)";
         setTimeout(function () { var n = document.getElementById("lt-task-name"); if (n) n.focus(); }, 100);
@@ -3883,32 +3728,15 @@
         var dateEl  = document.getElementById("lt-task-date");
         var timeEl  = document.getElementById("lt-task-time");
         var notesEl = document.getElementById("lt-task-notes");
-        if (_taskEditingId) {
-          /* Editing an existing task — keep its id, completed/starred/
-             createdAt, only the fields in the sheet change. This is the
-             same object the Eat the Frog card reads, so the change shows
-             up there immediately too. */
-          var existingTask = getAllTasks().find(function (t) { return t.id === _taskEditingId; });
-          if (existingTask) {
-            existingTask.title = title;
-            existingTask.date  = (dateEl && dateEl.value) ? dateEl.value : null;
-            existingTask.time  = (timeEl && timeEl.value) ? timeEl.value : null;
-            existingTask.notes = (notesEl && notesEl.value.trim()) || "";
-            upsertTask(existingTask);
-          }
-          _taskEditingId = null;
-        } else {
-          upsertTask({
-            id: genId(), title: title,
-            date:  (dateEl && dateEl.value) ? dateEl.value : null,
-            time:  (timeEl && timeEl.value) ? timeEl.value : null,
-            notes: (notesEl && notesEl.value.trim()) || "",
-            completed: false,
-            starred: false,
-            createdAt: new Date().toISOString()
-          });
-        }
-        renderTasks(); /* re-renders with the change and closes sheet */
+        upsertTask({
+          id: genId(), title: title,
+          date:  (dateEl && dateEl.value) ? dateEl.value : null,
+          time:  (timeEl && timeEl.value) ? timeEl.value : null,
+          notes: (notesEl && notesEl.value.trim()) || "",
+          completed: false,
+          createdAt: new Date().toISOString()
+        });
+        renderTasks(); /* re-renders with new task and closes sheet */
         return;
       }
       /* Collapse/expand completed */
@@ -6616,18 +6444,7 @@
     main.style.overflowY               = "";
     main.style.minHeight               = "";
     main.style.height                  = "";
-    /* Do NOT touch main.style.zoom here (even resetting it to "1" every
-       pass). This function re-runs on every DOM mutation, and on the
-       Timer tab that happens roughly once a second while a countdown is
-       live (pollRunningTimer updates text -> MutationObserver -> this
-       runs again). Repeatedly writing to the non-standard `zoom` property
-       forces a layout reflow on `main` on every pass; on real mobile
-       Chrome that reflow can cancel an in-progress touch-scroll gesture
-       on that exact element, which is what made the Timer tab specifically
-       feel "stuck" while every other (static) tab scrolled fine. Clear it
-       once, only if some stale value is still lingering, instead of
-       stomping it unconditionally every pass. */
-    if (main.style.zoom && main.style.zoom !== "1") main.style.zoom = "1";
+    main.style.zoom                    = "1";
     main.style.paddingBottom           = "";
     main.style.webkitOverflowScrolling = "touch";
   }
