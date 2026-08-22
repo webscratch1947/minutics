@@ -72,7 +72,6 @@
   var WASTE_BUDGET_KEY = "lt_waste_budget_v1";   /* { minutes: 45 } */
   var FOCUS_STATE_KEY  = "lt_focus_state_v1";     /* { endsAt, running } */
   var TASKS_KEY         = "lt_tasks_v1";
-  var EAT_FROG_KEY      = "lt_eat_frog_v1";        /* { date: "YYYY-MM-DD", tasks: [{text, done}] } */
   var CATLOG_KEY        = "lt_category_log_v1";
   var TIMEVALUE_KEY     = "lt_time_value_v1";
   var STREAK_KEY        = "lt_selfdev_streak_v1";   /* { lastDate, count, badgeEarned } */
@@ -1228,21 +1227,38 @@
       "#lt-frog-card .lt-frog-row:first-of-type{border-top:none}",
       "#lt-frog-card .lt-frog-check{width:22px;height:22px;flex-shrink:0;border-radius:50%;border:2px solid hsl(var(--border));background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;-webkit-tap-highlight-color:transparent}",
       "#lt-frog-card .lt-frog-check.lt-frog-done{background:#16A34A;border-color:#16A34A}",
+      "#lt-frog-card .lt-frog-check.lt-frog-check-empty{opacity:.35;cursor:default}",
       "#lt-frog-card .lt-frog-input{flex:1;border:none;background:transparent;font-size:14px;color:hsl(var(--foreground));outline:none;min-width:0}",
       "#lt-frog-card .lt-frog-input.lt-frog-done-text{text-decoration:line-through;opacity:.5}",
-      "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}"
+      "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}",
+      "#lt-frog-card .lt-frog-unstar{background:none;border:none;color:#f5a623;cursor:pointer;padding:4px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
+      "#lt-frog-card .lt-frog-unstar:active{transform:scale(.9)}",
+      "#lt-frog-card .lt-frog-empty{font-size:13px;color:hsl(var(--muted-foreground));margin:4px 0 0}"
     ].join("\n");
     document.head.appendChild(s);
   }
 
-  function eatFrogToday() {
-    var stored = readJson(EAT_FROG_KEY, null);
-    var todayStr = today();
-    if (!stored || stored.date !== todayStr || !Array.isArray(stored.tasks) || stored.tasks.length !== 3) {
-      stored = { date: todayStr, tasks: [{ text: "", done: false }, { text: "", done: false }, { text: "", done: false }] };
-      writeJson(EAT_FROG_KEY, stored);
-    }
-    return stored;
+  /* Eat the Frog always shows exactly MAX_STARRED_TASKS (3) rows.
+     - Filled rows are a view onto whichever tasks (from My Tasks) are
+       starred — starring a task in My Tasks, editing its title here or
+       there, and checking it off here or there all read/write the SAME
+       task object in TASKS_KEY, so every surface stays in sync automatically.
+     - Empty rows (when fewer than 3 tasks are starred) are directly
+       editable right here: typing into one creates a brand-new starred
+       task in that slot on the spot — no need to go add it in My Tasks
+       first. Because it's created already-starred, it can never push the
+       total past MAX_STARRED_TASKS: as soon as all 3 slots are filled
+       (whether typed here or starred over in My Tasks), starring a 4th
+       task from My Tasks hits the normal "Eat the Frog is full" cap in
+       toggleTaskStar(). And if only some slots are filled, starring a
+       task from My Tasks simply lands in the next empty slot, since
+       filled slots always render first (index 0..starred.length-1) and
+       empty slots fill the remainder — there's nothing to "replace",
+       it just naturally shows up there. */
+  var _frogLastSignature = null; /* used to skip rebuilds when nothing changed */
+
+  function frogSignature(tasks) {
+    return tasks.map(function (t) { return t.id + ":" + t.title + ":" + (t.completed ? 1 : 0); }).join("|");
   }
 
   function buildEatTheFrogCard() {
@@ -1250,56 +1266,163 @@
     var existing = document.getElementById("lt-frog-card");
     if (!onTimerTab) {
       if (existing) existing.remove();
+      _frogLastSignature = null;
       return;
     }
-    if (existing) return; /* already built for this visit — inputs manage their own state */
+
+    var starred = getStarredTasks().slice(0, MAX_STARRED_TASKS);
+    var sig = frogSignature(starred);
+
+    if (existing) {
+      /* Only skip rebuilding when nothing actually changed. (We deliberately
+         do NOT also check "is focus inside this card" here — every local
+         edit path below updates _frogLastSignature itself right after the
+         mutation, so the signature check alone already prevents typing from
+         being interrupted. An extra focus check was here before and it
+         caused a real bug: clicking the checkbox/star button focuses that
+         very button, which sits inside `existing`, so the check blocked
+         the button's own click handler from ever seeing its update take
+         effect — the buttons looked broken even though the data underneath
+         was saving correctly.) */
+      if (sig === _frogLastSignature) return;
+    }
 
     addStyleFrog();
     var anchor = document.getElementById("lt-glance-section") || document.getElementById("lt-life-progress");
     if (!anchor || !anchor.parentNode) return; /* not mounted yet — try again next tick */
 
-    var data = eatFrogToday();
+    _frogLastSignature = sig;
 
-    var card = document.createElement("div");
+    var card = existing || document.createElement("div");
     card.id = "lt-frog-card";
     card.setAttribute("data-lt-enhancement", "1");
+
+    var rowsHtml = "";
+    for (var i = 0; i < MAX_STARRED_TASKS; i++) {
+      var t = starred[i];
+      if (t) {
+        rowsHtml +=
+          '<div class="lt-frog-row">' +
+            '<button type="button" class="lt-frog-check' + (t.completed ? " lt-frog-done" : "") + '" data-lt-frog-check="' + t.id + '">' + (t.completed ? "\u2713" : "") + '</button>' +
+            '<input type="text" class="lt-frog-input' + (t.completed ? " lt-frog-done-text" : "") + '" data-lt-frog-input="' + t.id + '" placeholder="Task name" value="' + escapeHtml(t.title) + '" />' +
+            '<button type="button" class="lt-frog-unstar" data-lt-frog-unstar="' + t.id + '" title="Remove from Eat the Frog">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
+            '</button>' +
+          '</div>';
+      } else {
+        /* Empty slot — nothing starred here yet. Renders a live, editable
+           row anyway; typing into it creates the task (see the delegated
+           "input" handler below). The check/unstar controls stay inert
+           (no id to act on) until that happens. */
+        rowsHtml +=
+          '<div class="lt-frog-row">' +
+            '<button type="button" class="lt-frog-check lt-frog-check-empty" data-lt-frog-check="" disabled></button>' +
+            '<input type="text" class="lt-frog-input" data-lt-frog-input="" placeholder="Add an important task\u2026" value="" />' +
+            '<button type="button" class="lt-frog-unstar" data-lt-frog-unstar="" style="visibility:hidden" title="Remove from Eat the Frog">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
+            '</button>' +
+          '</div>';
+      }
+    }
+
     card.innerHTML =
       '<p class="lt-frog-title">\uD83D\uDC38 Eat the Frog</p>' +
       '<p class="lt-frog-sub">Your 3 most important tasks today</p>' +
-      data.tasks.map(function (t, i) {
-        return '<div class="lt-frog-row">' +
-          '<button type="button" class="lt-frog-check' + (t.done ? " lt-frog-done" : "") + '" data-lt-frog-check="' + i + '">' + (t.done ? "\u2713" : "") + '</button>' +
-          '<input type="text" class="lt-frog-input' + (t.done ? " lt-frog-done-text" : "") + '" data-lt-frog-input="' + i + '" placeholder="Task ' + (i + 1) + '" value="' + escapeHtml(t.text) + '" />' +
-          '</div>';
-      }).join("");
+      rowsHtml;
 
-    anchor.parentNode.insertBefore(card, anchor.nextSibling);
+    if (!existing) anchor.parentNode.insertBefore(card, anchor.nextSibling);
 
-    function saveFrog(mutator) {
-      var cur = eatFrogToday();
-      mutator(cur.tasks);
-      writeJson(EAT_FROG_KEY, cur);
+    /* Delegated listeners, wired once on the card itself rather than per-row
+       on every rebuild — a row's underlying task id can change (an empty
+       slot becomes a real task the moment someone types into it) without
+       needing to re-attach anything, since delegation always reads the
+       current data-* attribute at click/input time. */
+    if (!card.dataset.frogWired) {
+      card.dataset.frogWired = "1";
+
+      card.addEventListener("click", function (e) {
+        var checkBtn = e.target.closest("[data-lt-frog-check]");
+        if (checkBtn) {
+          var cid = checkBtn.getAttribute("data-lt-frog-check");
+          if (!cid) return; /* empty slot — nothing to toggle yet */
+          var task = getAllTasks().find(function (tk) { return tk.id === cid; });
+          if (!task) return;
+          task.completed = !task.completed;
+          upsertTask(task);
+          checkBtn.classList.toggle("lt-frog-done", task.completed);
+          checkBtn.textContent = task.completed ? "\u2713" : "";
+          var rowInput = checkBtn.parentElement.querySelector("[data-lt-frog-input]");
+          if (rowInput) rowInput.classList.toggle("lt-frog-done-text", task.completed);
+          _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
+          return;
+        }
+        var unstarBtn = e.target.closest("[data-lt-frog-unstar]");
+        if (unstarBtn) {
+          var uid = unstarBtn.getAttribute("data-lt-frog-unstar");
+          if (!uid) return; /* empty slot — nothing to unstar */
+          toggleTaskStar(uid);
+          buildEatTheFrogCard();
+        }
+      });
+
+      card.addEventListener("input", function (e) {
+        var input = e.target.closest("[data-lt-frog-input]");
+        if (!input) return;
+        var id = input.getAttribute("data-lt-frog-input");
+
+        if (!id) {
+          /* Empty slot — first keystroke creates the task right here,
+             already starred, so it stays pinned in this exact slot. */
+          var val = input.value;
+          if (!val.trim()) return; /* whitespace-only — not a task yet */
+          if (getStarredTasks().length >= MAX_STARRED_TASKS) return; /* safety net; slot shouldn't exist if full */
+          var newTask = { id: genId(), title: val, date: null, time: null, notes: "", completed: false, starred: true, createdAt: Date.now() };
+          upsertTask(newTask);
+          input.setAttribute("data-lt-frog-input", newTask.id);
+          var row = input.closest(".lt-frog-row");
+          if (row) {
+            var checkBtn2 = row.querySelector("[data-lt-frog-check]");
+            if (checkBtn2) {
+              checkBtn2.setAttribute("data-lt-frog-check", newTask.id);
+              checkBtn2.removeAttribute("disabled");
+              checkBtn2.classList.remove("lt-frog-check-empty");
+            }
+            var unstarBtn2 = row.querySelector("[data-lt-frog-unstar]");
+            if (unstarBtn2) {
+              unstarBtn2.setAttribute("data-lt-frog-unstar", newTask.id);
+              unstarBtn2.style.visibility = "";
+            }
+          }
+          _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
+          return;
+        }
+
+        var task2 = getAllTasks().find(function (tk) { return tk.id === id; });
+        if (!task2) return;
+        task2.title = input.value;
+        upsertTask(task2);
+        _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
+      });
+
+      /* focusout (unlike blur) bubbles, so it works with delegation.
+         If a slot was created here and typed back down to empty, clean the
+         title-less task up instead of leaving an orphaned starred task
+         behind — the slot just goes back to being empty. */
+      card.addEventListener("focusout", function (e) {
+        var input = e.target.closest && e.target.closest("[data-lt-frog-input]");
+        if (!input) return;
+        var id = input.getAttribute("data-lt-frog-input");
+        if (!id) return;
+        var task3 = getAllTasks().find(function (tk) { return tk.id === id; });
+        if (task3 && !task3.title.trim()) {
+          removeTask(id);
+          buildEatTheFrogCard();
+        }
+      });
     }
-
-    Array.prototype.slice.call(card.querySelectorAll("[data-lt-frog-check]")).forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var idx = Number(btn.getAttribute("data-lt-frog-check"));
-        var nowDone = !btn.classList.contains("lt-frog-done");
-        btn.classList.toggle("lt-frog-done", nowDone);
-        btn.textContent = nowDone ? "\u2713" : "";
-        var input = card.querySelector('[data-lt-frog-input="' + idx + '"]');
-        if (input) input.classList.toggle("lt-frog-done-text", nowDone);
-        saveFrog(function (tasks) { tasks[idx].done = nowDone; });
-      });
-    });
-
-    Array.prototype.slice.call(card.querySelectorAll("[data-lt-frog-input]")).forEach(function (input) {
-      input.addEventListener("input", function () {
-        var idx = Number(input.getAttribute("data-lt-frog-input"));
-        saveFrog(function (tasks) { tasks[idx].text = input.value; });
-      });
-    });
   }
+
+
 
 
   function escapeHtml(v) {
@@ -1761,6 +1884,9 @@
       ".lt-task-date{display:block;font-size:11px;margin-top:2px;color:#8e8e93}",
       ".lt-task-date.lt-overdue{color:#ff3b30}",
       ".lt-task-notes{display:block;font-size:11px;color:hsl(var(--muted-foreground));margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      ".lt-task-star{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:6px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
+      ".lt-task-star.lt-task-starred{color:#f5a623}",
+      ".lt-task-star:active{transform:scale(.9)}",
       ".lt-task-del{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:6px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
       ".lt-task-del:active{color:hsl(var(--destructive))}",
       ".lt-tasks-section-card{background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:14px;margin-bottom:12px;overflow:hidden}",
@@ -3573,6 +3699,39 @@
     writeJson(TASKS_KEY, getAllTasks().filter(function (t) { return t.id !== id; }));
   }
 
+  var MAX_STARRED_TASKS = 3;
+
+  function getStarredTasks() {
+    return getAllTasks().filter(function (t) { return !!t.starred; });
+  }
+
+  /* Toggling a star is the one place the 3-task cap is enforced — both
+     the Tasks app star button and (indirectly, via the same function)
+     anything else that stars a task go through here, so the cap can never
+     be bypassed.
+     When the cap is already hit AND at least one of the 3 starred tasks
+     is already completed, starring a new task auto-unstars that finished
+     one to make room instead of blocking — a completed frog has already
+     been "eaten", so it makes way for the next one automatically. Only
+     when all 3 are still active does this return false (and leave the
+     task untouched) so the caller can show the "full" warning. */
+  function toggleTaskStar(id) {
+    var task = getAllTasks().find(function (t) { return t.id === id; });
+    if (!task) return true;
+    if (!task.starred && getStarredTasks().length >= MAX_STARRED_TASKS) {
+      var completedStarred = getStarredTasks().filter(function (t) { return t.completed; });
+      if (completedStarred.length) {
+        completedStarred[0].starred = false;
+        upsertTask(completedStarred[0]);
+      } else {
+        return false;
+      }
+    }
+    task.starred = !task.starred;
+    upsertTask(task);
+    return true;
+  }
+
   function sectionFor(task) {
     if (task.completed) return "done";
     if (!task.date)     return "nodate";
@@ -3591,6 +3750,8 @@
     var checkIcon = t.completed
       ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
       : '';
+    var starFill = t.starred ? "#f5a623" : "none";
+    var starStroke = t.starred ? "#f5a623" : "currentColor";
     return (
       '<div class="lt-task-item">' +
         '<button class="lt-task-check' + (t.completed ? ' lt-task-checked' : '') + '" data-task-toggle="' + t.id + '">' + checkIcon + '</button>' +
@@ -3599,6 +3760,9 @@
           (dl ? '<span class="lt-task-date' + (overdue ? ' lt-overdue' : '') + '">' + escapeHtml(dl) + '</span>' : '') +
           (t.notes ? '<span class="lt-task-notes">' + escapeHtml(t.notes) + '</span>' : '') +
         '</div>' +
+        '<button class="lt-task-star' + (t.starred ? ' lt-task-starred' : '') + '" data-task-star="' + t.id + '" title="' + (t.starred ? "Remove from Eat the Frog" : "Add to Eat the Frog") + '">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + starFill + '" stroke="' + starStroke + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
+        '</button>' +
         '<button class="lt-task-del" data-task-del="' + t.id + '">' +
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>' +
@@ -3710,6 +3874,17 @@
         var id = toggleBtn.getAttribute("data-task-toggle");
         var task = getAllTasks().find(function (t) { return t.id === id; });
         if (task) { task.completed = !task.completed; upsertTask(task); renderTasks(); }
+        return;
+      }
+      /* Star (add/remove from Eat the Frog, max 3) */
+      var starBtn = e.target.closest("[data-task-star]");
+      if (starBtn) {
+        var starId = starBtn.getAttribute("data-task-star");
+        var ok = toggleTaskStar(starId);
+        if (!ok) {
+          showSimpleToast("Eat the Frog is full", "Only 3 tasks can be starred at once — unstar one first.");
+        }
+        renderTasks();
         return;
       }
       /* Delete */
