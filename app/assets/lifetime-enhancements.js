@@ -218,15 +218,15 @@
      infographic images live in. Every device reads+writes those two files,
      so a like or comment made on one phone shows up on all of them.
 
-     SETUP REQUIRED: put a GitHub fine-grained Personal Access Token below,
-     scoped ONLY to the "infographics" repo, with Contents: Read and write
-     permission. Anyone who decompiles this APK can extract this token and
-     use it to write to that repo — keep its scope limited to this one repo
-     and nothing else, since it ships inside the app. ── */
+     Reads go straight to GitHub's public API (no token needed, the repo
+     is public). Writes go through our own /api/gram-write serverless
+     function instead of api.github.com directly — the token lives ONLY
+     as a server-side env var there (GITHUB_TOKEN), so it never ships in
+     this file and can't be extracted from the site. ── */
   var GH_OWNER = "webscratch1947";
   var GH_REPO  = "infographics";
-  var GH_TOKEN = "PUT_YOUR_GITHUB_FINE_GRAINED_TOKEN_HERE";
   var GH_API   = "https://api.github.com/repos/" + GH_OWNER + "/" + GH_REPO + "/contents/";
+  var GRAM_WRITE_ENDPOINT = "/api/gram-write";
   var GRAM_REMOTE_TTL = 30 * 1000; /* re-fetch from GitHub at most every 30s */
 
   var GRAM_DEVICE_ID       = null;
@@ -258,10 +258,6 @@
   function b64EncodeUtf8(str) { return btoa(unescape(encodeURIComponent(str))); }
   function b64DecodeUtf8(str) { return decodeURIComponent(escape(atob(str.replace(/\n/g, "")))); }
 
-  function ghHeaders() {
-    return { "Authorization": "Bearer " + GH_TOKEN, "Accept": "application/vnd.github+json" };
-  }
-
   function ghGetFile(path, cb) {
     /* Public repo — no token needed to read, so this works even if this
        device's GH_TOKEN is missing/wrong. Only writes need the token. */
@@ -280,12 +276,10 @@
   }
 
   function ghPutFile(path, obj, sha, message, cb, retried) {
-    var body = { message: message, content: b64EncodeUtf8(JSON.stringify(obj)) };
-    if (sha) body.sha = sha;
-    fetch(GH_API + path, {
-      method: "PUT",
-      headers: Object.assign({ "Content-Type": "application/json" }, ghHeaders()),
-      body: JSON.stringify(body)
+    fetch(GRAM_WRITE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: path, obj: obj, sha: sha, message: message })
     })
       .then(function (r) {
         if (r.status === 409 && !retried) {
@@ -1230,19 +1224,22 @@
       "#lt-frog-card .lt-frog-check.lt-frog-done{background:#16A34A;border-color:#16A34A}",
       "#lt-frog-card .lt-frog-input{flex:1;border:none;background:transparent;font-size:14px;color:hsl(var(--foreground));outline:none;min-width:0}",
       "#lt-frog-card .lt-frog-input.lt-frog-done-text{text-decoration:line-through;opacity:.5}",
-      "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}"
+      "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}",
+      "#lt-frog-card .lt-frog-unstar{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:4px;flex-shrink:0;font-size:12px;-webkit-tap-highlight-color:transparent}",
+      "#lt-frog-card .lt-frog-empty{font-size:13px;color:hsl(var(--muted-foreground));margin:4px 0 0}"
     ].join("\n");
     document.head.appendChild(s);
   }
 
-  function eatFrogToday() {
-    var stored = readJson(EAT_FROG_KEY, null);
-    var todayStr = today();
-    if (!stored || stored.date !== todayStr || !Array.isArray(stored.tasks) || stored.tasks.length !== 3) {
-      stored = { date: todayStr, tasks: [{ text: "", done: false }, { text: "", done: false }, { text: "", done: false }] };
-      writeJson(EAT_FROG_KEY, stored);
-    }
-    return stored;
+  /* Eat the Frog is now just a view onto whichever tasks (from My Tasks)
+     are starred — there's no separate frog-only data anymore. Starring a
+     task in My Tasks, editing its title here or there, and checking it
+     off here or there all read/write the SAME task object in TASKS_KEY,
+     so every surface stays in sync automatically. */
+  var _frogLastSignature = null; /* used to skip rebuilds when nothing changed */
+
+  function frogSignature(tasks) {
+    return tasks.map(function (t) { return t.id + ":" + t.title + ":" + (t.completed ? 1 : 0); }).join("|");
   }
 
   function buildEatTheFrogCard() {
@@ -1250,53 +1247,76 @@
     var existing = document.getElementById("lt-frog-card");
     if (!onTimerTab) {
       if (existing) existing.remove();
+      _frogLastSignature = null;
       return;
     }
-    if (existing) return; /* already built for this visit — inputs manage their own state */
+
+    var starred = getStarredTasks().slice(0, MAX_STARRED_TASKS);
+    var sig = frogSignature(starred);
+
+    if (existing) {
+      /* Never blow away the card while the user has focus inside it —
+         that's what made typing feel broken elsewhere in this app. Only
+         rebuild when the data actually changed AND nothing here is
+         focused right now. */
+      if (sig === _frogLastSignature) return;
+      if (existing.contains(document.activeElement)) return;
+    }
 
     addStyleFrog();
     var anchor = document.getElementById("lt-glance-section") || document.getElementById("lt-life-progress");
     if (!anchor || !anchor.parentNode) return; /* not mounted yet — try again next tick */
 
-    var data = eatFrogToday();
+    _frogLastSignature = sig;
 
-    var card = document.createElement("div");
+    var card = existing || document.createElement("div");
     card.id = "lt-frog-card";
     card.setAttribute("data-lt-enhancement", "1");
     card.innerHTML =
       '<p class="lt-frog-title">\uD83D\uDC38 Eat the Frog</p>' +
       '<p class="lt-frog-sub">Your 3 most important tasks today</p>' +
-      data.tasks.map(function (t, i) {
-        return '<div class="lt-frog-row">' +
-          '<button type="button" class="lt-frog-check' + (t.done ? " lt-frog-done" : "") + '" data-lt-frog-check="' + i + '">' + (t.done ? "\u2713" : "") + '</button>' +
-          '<input type="text" class="lt-frog-input' + (t.done ? " lt-frog-done-text" : "") + '" data-lt-frog-input="' + i + '" placeholder="Task ' + (i + 1) + '" value="' + escapeHtml(t.text) + '" />' +
-          '</div>';
-      }).join("");
+      (starred.length
+        ? starred.map(function (t) {
+            return '<div class="lt-frog-row">' +
+              '<button type="button" class="lt-frog-check' + (t.completed ? " lt-frog-done" : "") + '" data-lt-frog-check="' + t.id + '">' + (t.completed ? "\u2713" : "") + '</button>' +
+              '<input type="text" class="lt-frog-input' + (t.completed ? " lt-frog-done-text" : "") + '" data-lt-frog-input="' + t.id + '" placeholder="Task name" value="' + escapeHtml(t.title) + '" />' +
+              '<button type="button" class="lt-frog-unstar" data-lt-frog-unstar="' + t.id + '" title="Remove from Eat the Frog">\u2715</button>' +
+              '</div>';
+          }).join("")
+        : '<p class="lt-frog-empty">Star up to 3 tasks in My Tasks to pin them here.</p>');
 
-    anchor.parentNode.insertBefore(card, anchor.nextSibling);
-
-    function saveFrog(mutator) {
-      var cur = eatFrogToday();
-      mutator(cur.tasks);
-      writeJson(EAT_FROG_KEY, cur);
-    }
+    if (!existing) anchor.parentNode.insertBefore(card, anchor.nextSibling);
 
     Array.prototype.slice.call(card.querySelectorAll("[data-lt-frog-check]")).forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var idx = Number(btn.getAttribute("data-lt-frog-check"));
-        var nowDone = !btn.classList.contains("lt-frog-done");
-        btn.classList.toggle("lt-frog-done", nowDone);
-        btn.textContent = nowDone ? "\u2713" : "";
-        var input = card.querySelector('[data-lt-frog-input="' + idx + '"]');
-        if (input) input.classList.toggle("lt-frog-done-text", nowDone);
-        saveFrog(function (tasks) { tasks[idx].done = nowDone; });
+        var id = btn.getAttribute("data-lt-frog-check");
+        var task = getAllTasks().find(function (t) { return t.id === id; });
+        if (!task) return;
+        task.completed = !task.completed;
+        upsertTask(task);
+        btn.classList.toggle("lt-frog-done", task.completed);
+        btn.textContent = task.completed ? "\u2713" : "";
+        var input = card.querySelector('[data-lt-frog-input="' + id + '"]');
+        if (input) input.classList.toggle("lt-frog-done-text", task.completed);
+        _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
       });
     });
 
     Array.prototype.slice.call(card.querySelectorAll("[data-lt-frog-input]")).forEach(function (input) {
       input.addEventListener("input", function () {
-        var idx = Number(input.getAttribute("data-lt-frog-input"));
-        saveFrog(function (tasks) { tasks[idx].text = input.value; });
+        var id = input.getAttribute("data-lt-frog-input");
+        var task = getAllTasks().find(function (t) { return t.id === id; });
+        if (!task) return;
+        task.title = input.value;
+        upsertTask(task);
+        _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
+      });
+    });
+
+    Array.prototype.slice.call(card.querySelectorAll("[data-lt-frog-unstar]")).forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        toggleTaskStar(btn.getAttribute("data-lt-frog-unstar"));
+        buildEatTheFrogCard();
       });
     });
   }
@@ -1751,6 +1771,9 @@
       ".lt-task-date{display:block;font-size:11px;margin-top:2px;color:#8e8e93}",
       ".lt-task-date.lt-overdue{color:#ff3b30}",
       ".lt-task-notes{display:block;font-size:11px;color:hsl(var(--muted-foreground));margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      ".lt-task-star{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:6px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
+      ".lt-task-star.lt-task-starred{color:#f5a623}",
+      ".lt-task-star:active{transform:scale(.9)}",
       ".lt-task-del{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:6px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
       ".lt-task-del:active{color:hsl(var(--destructive))}",
       ".lt-tasks-section-card{background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:14px;margin-bottom:12px;overflow:hidden}",
@@ -3542,7 +3565,14 @@
    * All data stored in localStorage. Organized by date sections.
    * ══════════════════════════════════════════════════════════════════════════ */
 
+  var MAX_STARRED_TASKS = 3; /* cap on how many tasks can sit in Eat the Frog at once */
+  var _taskEditingId = null; /* set while the sheet is open in "edit" mode, null while adding */
+
   function getAllTasks()   { var t = readJson(TASKS_KEY, []); return Array.isArray(t) ? t : []; }
+
+  function getStarredTasks() {
+    return getAllTasks().filter(function (t) { return !!t.starred; });
+  }
 
   function upsertTask(task) {
     var tasks = getAllTasks();
@@ -3553,6 +3583,22 @@
 
   function removeTask(id) {
     writeJson(TASKS_KEY, getAllTasks().filter(function (t) { return t.id !== id; }));
+  }
+
+  /* Toggling a star is the one place the 3-task cap is enforced — both
+     the Tasks app star button and (indirectly, via the same function)
+     anything else that stars a task go through here, so the cap can never
+     be bypassed. Returns false (and leaves the task untouched) if the cap
+     would be exceeded. */
+  function toggleTaskStar(id) {
+    var task = getAllTasks().find(function (t) { return t.id === id; });
+    if (!task) return true;
+    if (!task.starred && getStarredTasks().length >= MAX_STARRED_TASKS) {
+      return false;
+    }
+    task.starred = !task.starred;
+    upsertTask(task);
+    return true;
   }
 
   function sectionFor(task) {
@@ -3573,14 +3619,19 @@
     var checkIcon = t.completed
       ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
       : '';
+    var starFill = t.starred ? "#f5a623" : "none";
+    var starStroke = t.starred ? "#f5a623" : "currentColor";
     return (
       '<div class="lt-task-item">' +
         '<button class="lt-task-check' + (t.completed ? ' lt-task-checked' : '') + '" data-task-toggle="' + t.id + '">' + checkIcon + '</button>' +
-        '<div class="lt-task-body">' +
+        '<div class="lt-task-body" data-task-edit="' + t.id + '">' +
           '<span class="lt-task-title' + (t.completed ? ' lt-task-done' : '') + '">' + escapeHtml(t.title) + '</span>' +
           (dl ? '<span class="lt-task-date' + (overdue ? ' lt-overdue' : '') + '">' + escapeHtml(dl) + '</span>' : '') +
           (t.notes ? '<span class="lt-task-notes">' + escapeHtml(t.notes) + '</span>' : '') +
         '</div>' +
+        '<button class="lt-task-star' + (t.starred ? ' lt-task-starred' : '') + '" data-task-star="' + t.id + '" title="' + (t.starred ? "Remove from Eat the Frog" : "Add to Eat the Frog") + '">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + starFill + '" stroke="' + starStroke + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
+        '</button>' +
         '<button class="lt-task-del" data-task-del="' + t.id + '">' +
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>' +
@@ -3694,6 +3745,17 @@
         if (task) { task.completed = !task.completed; upsertTask(task); renderTasks(); }
         return;
       }
+      /* Star (add/remove from Eat the Frog, max 3) */
+      var starBtn = e.target.closest("[data-task-star]");
+      if (starBtn) {
+        var starId = starBtn.getAttribute("data-task-star");
+        var ok = toggleTaskStar(starId);
+        if (!ok) {
+          showSimpleToast("Eat the Frog is full", "Only 3 tasks can be starred at once — unstar one first.");
+        }
+        renderTasks();
+        return;
+      }
       /* Delete */
       var delBtn = e.target.closest("[data-task-del]");
       if (delBtn) {
@@ -3702,8 +3764,38 @@
         renderTasks();
         return;
       }
-      /* FAB */
+      /* Edit (tap the task's title/body area, not the check/star/del buttons) */
+      var editBody = e.target.closest("[data-task-edit]");
+      if (editBody) {
+        var editId = editBody.getAttribute("data-task-edit");
+        var editTask = getAllTasks().find(function (t) { return t.id === editId; });
+        if (editTask) {
+          _taskEditingId = editId;
+          var title2 = document.querySelector("#lt-tasks-sheet .lt-tasks-sheet-title");
+          var submit2 = document.getElementById("lt-task-submit");
+          var name2 = document.getElementById("lt-task-name");
+          var date2 = document.getElementById("lt-task-date");
+          var time2 = document.getElementById("lt-task-time");
+          var notes2 = document.getElementById("lt-task-notes");
+          if (title2) title2.textContent = "Edit Task";
+          if (submit2) submit2.textContent = "Save Changes";
+          if (name2) name2.value = editTask.title || "";
+          if (date2) date2.value = editTask.date || "";
+          if (time2) time2.value = editTask.time || "";
+          if (notes2) notes2.value = editTask.notes || "";
+          var sheet2 = document.getElementById("lt-tasks-sheet");
+          if (sheet2) sheet2.style.transform = "translateY(0)";
+          setTimeout(function () { if (name2) name2.focus(); }, 100);
+        }
+        return;
+      }
+      /* FAB (always starts a fresh "add" — clear any leftover edit state) */
       if (e.target.id === "lt-tasks-fab") {
+        _taskEditingId = null;
+        var titleFab = document.querySelector("#lt-tasks-sheet .lt-tasks-sheet-title");
+        var submitFab = document.getElementById("lt-task-submit");
+        if (titleFab) titleFab.textContent = "New Task";
+        if (submitFab) submitFab.textContent = "Add Task";
         var sheet = document.getElementById("lt-tasks-sheet");
         if (sheet) sheet.style.transform = "translateY(0)";
         setTimeout(function () { var n = document.getElementById("lt-task-name"); if (n) n.focus(); }, 100);
@@ -3718,15 +3810,32 @@
         var dateEl  = document.getElementById("lt-task-date");
         var timeEl  = document.getElementById("lt-task-time");
         var notesEl = document.getElementById("lt-task-notes");
-        upsertTask({
-          id: genId(), title: title,
-          date:  (dateEl && dateEl.value) ? dateEl.value : null,
-          time:  (timeEl && timeEl.value) ? timeEl.value : null,
-          notes: (notesEl && notesEl.value.trim()) || "",
-          completed: false,
-          createdAt: new Date().toISOString()
-        });
-        renderTasks(); /* re-renders with new task and closes sheet */
+        if (_taskEditingId) {
+          /* Editing an existing task — keep its id, completed/starred/
+             createdAt, only the fields in the sheet change. This is the
+             same object the Eat the Frog card reads, so the change shows
+             up there immediately too. */
+          var existingTask = getAllTasks().find(function (t) { return t.id === _taskEditingId; });
+          if (existingTask) {
+            existingTask.title = title;
+            existingTask.date  = (dateEl && dateEl.value) ? dateEl.value : null;
+            existingTask.time  = (timeEl && timeEl.value) ? timeEl.value : null;
+            existingTask.notes = (notesEl && notesEl.value.trim()) || "";
+            upsertTask(existingTask);
+          }
+          _taskEditingId = null;
+        } else {
+          upsertTask({
+            id: genId(), title: title,
+            date:  (dateEl && dateEl.value) ? dateEl.value : null,
+            time:  (timeEl && timeEl.value) ? timeEl.value : null,
+            notes: (notesEl && notesEl.value.trim()) || "",
+            completed: false,
+            starred: false,
+            createdAt: new Date().toISOString()
+          });
+        }
+        renderTasks(); /* re-renders with the change and closes sheet */
         return;
       }
       /* Collapse/expand completed */
