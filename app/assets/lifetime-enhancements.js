@@ -1225,7 +1225,8 @@
       "#lt-frog-card .lt-frog-input{flex:1;border:none;background:transparent;font-size:14px;color:hsl(var(--foreground));outline:none;min-width:0}",
       "#lt-frog-card .lt-frog-input.lt-frog-done-text{text-decoration:line-through;opacity:.5}",
       "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}",
-      "#lt-frog-card .lt-frog-unstar{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:4px;flex-shrink:0;font-size:12px;-webkit-tap-highlight-color:transparent}",
+      "#lt-frog-card .lt-frog-unstar{background:none;border:none;color:#f5a623;cursor:pointer;padding:4px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
+      "#lt-frog-card .lt-frog-unstar:active{transform:scale(.9)}",
       "#lt-frog-card .lt-frog-empty{font-size:13px;color:hsl(var(--muted-foreground));margin:4px 0 0}"
     ].join("\n");
     document.head.appendChild(s);
@@ -1255,12 +1256,17 @@
     var sig = frogSignature(starred);
 
     if (existing) {
-      /* Never blow away the card while the user has focus inside it —
-         that's what made typing feel broken elsewhere in this app. Only
-         rebuild when the data actually changed AND nothing here is
-         focused right now. */
+      /* Only skip rebuilding when nothing actually changed. (We deliberately
+         do NOT also check "is focus inside this card" here — every local
+         edit path below updates _frogLastSignature itself right after the
+         mutation, so the signature check alone already prevents typing from
+         being interrupted. An extra focus check was here before and it
+         caused a real bug: clicking the checkbox/star button focuses that
+         very button, which sits inside `existing`, so the check blocked
+         the button's own click handler from ever seeing its update take
+         effect — the buttons looked broken even though the data underneath
+         was saving correctly.) */
       if (sig === _frogLastSignature) return;
-      if (existing.contains(document.activeElement)) return;
     }
 
     addStyleFrog();
@@ -1280,7 +1286,9 @@
             return '<div class="lt-frog-row">' +
               '<button type="button" class="lt-frog-check' + (t.completed ? " lt-frog-done" : "") + '" data-lt-frog-check="' + t.id + '">' + (t.completed ? "\u2713" : "") + '</button>' +
               '<input type="text" class="lt-frog-input' + (t.completed ? " lt-frog-done-text" : "") + '" data-lt-frog-input="' + t.id + '" placeholder="Task name" value="' + escapeHtml(t.title) + '" />' +
-              '<button type="button" class="lt-frog-unstar" data-lt-frog-unstar="' + t.id + '" title="Remove from Eat the Frog">\u2715</button>' +
+              '<button type="button" class="lt-frog-unstar" data-lt-frog-unstar="' + t.id + '" title="Remove from Eat the Frog">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
+              '</button>' +
               '</div>';
           }).join("")
         : '<p class="lt-frog-empty">Star up to 3 tasks in My Tasks to pin them here.</p>');
@@ -1783,10 +1791,10 @@
       ".lt-tasks-empty-title{font-size:17px;font-weight:700;margin:0 0 6px;color:hsl(var(--foreground))}",
       ".lt-tasks-empty-sub{font-size:13px;margin:0}",
       /* FAB */
-      ".lt-tasks-fab{position:absolute;bottom:28px;right:20px;width:56px;height:56px;border-radius:50%;background:hsl(var(--primary));color:white;font-size:30px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:10;-webkit-tap-highlight-color:transparent;line-height:1}",
+      ".lt-tasks-fab{position:fixed;bottom:calc(28px + env(safe-area-inset-bottom, 0px));right:20px;width:56px;height:56px;border-radius:50%;background:hsl(var(--primary));color:white;font-size:30px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:2147483000;-webkit-tap-highlight-color:transparent;line-height:1}",
       ".lt-tasks-fab:active{opacity:.85;transform:scale(.96)}",
       /* Add-task bottom sheet */
-      ".lt-tasks-sheet{position:absolute;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:22px 22px 0 0;padding:14px 18px 24px;box-shadow:0 -4px 28px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:30;box-sizing:border-box}",
+      ".lt-tasks-sheet{position:fixed;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:22px 22px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom, 0px));box-shadow:0 -4px 28px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:2147483100;box-sizing:border-box;max-width:480px;margin:0 auto}",
       ".lt-tasks-sheet-handle{width:36px;height:4px;background:hsl(var(--border));border-radius:2px;margin:0 auto 14px}",
       ".lt-tasks-sheet-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:hsl(var(--muted-foreground));margin:0 0 10px}",
       ".lt-tasks-sheet-main{font-size:17px;width:100%;border:none;background:transparent;color:hsl(var(--foreground));font-family:inherit;font-weight:500;padding:0;outline:none;caret-color:hsl(var(--primary));margin-bottom:14px}",
@@ -2834,6 +2842,13 @@
        closes the overlay instead of closing the app or going back in SPA. */
     history.pushState({ ltOverlay: true }, "");
     var root = getOverlayRoot();
+    /* Mobile browsers sometimes replay a "ghost click" ~300ms after the tap
+       that opened this overlay, landing on whatever now sits at the same
+       screen coordinates. If that happens to be the Tasks FAB (bottom-right,
+       a common spot for a Life Hub tile too), it looked like the "New Task"
+       sheet opened on its own. Tools can check this timestamp to ignore
+       clicks that land suspiciously soon after opening. */
+    root.dataset.openedAt = String(Date.now());
     document.body.style.overflow = "hidden";
     activeOverlay = root;
     root.addEventListener("click", function (e) {
@@ -3680,7 +3695,7 @@
     }
 
     activeOverlay.innerHTML = (
-      '<div class="lt-tool-shell" style="position:relative;min-height:calc(100% + 90px);padding-bottom:170px">' +
+      '<div class="lt-tool-shell" style="padding-bottom:110px">' +
         '<div class="lt-tool-top">' +
           '<div>' +
             '<p class="lt-tool-kicker">Life Hub</p>' +
@@ -3791,6 +3806,8 @@
       }
       /* FAB (always starts a fresh "add" — clear any leftover edit state) */
       if (e.target.id === "lt-tasks-fab") {
+        /* Guard against the ghost-click-on-open issue described above. */
+        if (Date.now() - Number(overlay.dataset.openedAt || 0) < 400) return;
         _taskEditingId = null;
         var titleFab = document.querySelector("#lt-tasks-sheet .lt-tasks-sheet-title");
         var submitFab = document.getElementById("lt-task-submit");
