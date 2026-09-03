@@ -1,6 +1,19 @@
 {
   "outputDirectory": "app/dist",
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/app/index.html",
+      "has": [{ "type": "host", "value": "app.minutics.com" }]
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/piapp/index.html",
+      "has": [{ "type": "host", "value": "piapp.minutics.com" }]
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
