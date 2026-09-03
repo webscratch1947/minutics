@@ -1,0 +1,21 @@
+{
+  "name": "minutics-website",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@vercel/functions": "^1.0.0",
+    "firebase-admin": "^13.0.0",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "vite": "^8.2.2"
+  },
+  "scripts": {
+    "dev": "node node_modules/vite/bin/vite.js",
+    "build": "node node_modules/vite/bin/vite.js build",
+    "postbuild": "node scripts/postbuild.mjs"
+  }
+}

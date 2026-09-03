@@ -1,0 +1,54 @@
+@import './components.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand-dark: #1a2140;
+    --brand-darker: #0f1529;
+    --brand-accent: #6366f1;
+    --bg-cream: #f5f2eb;
+    --bg-light: #ffffff;
+    --navy-blue: #082E5C;
+    --navy-deep: #081E3D;
+    --background: 42 40% 95%;
+    --foreground: 230 40% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 230 40% 12%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 230 40% 12%;
+    --primary: 230 40% 16%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 94%;
+    --secondary-foreground: 230 40% 12%;
+    --muted: 220 15% 94%;
+    --muted-foreground: 220 10% 48%;
+    --accent: 172 100% 38%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+  }
+
+  body {
+    @apply font-inter;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  #root {
+    @apply min-h-screen;
+    background-color: hsl(var(--background));
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
