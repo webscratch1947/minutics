@@ -15,7 +15,7 @@
   },
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js",
-    "build": "node node_modules/vite/bin/vite.js build",
+    "build": "node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js build --config vite.piapp.config.mjs && node scripts/postbuild.mjs piapp",
     "build:piapp": "node node_modules/vite/bin/vite.js build --config vite.piapp.config.mjs",
     "postbuild": "node scripts/postbuild.mjs",
     "postbuild:piapp": "node scripts/postbuild.mjs piapp"
