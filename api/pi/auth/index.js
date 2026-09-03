@@ -62,10 +62,10 @@ export default async function handler(req, res) {
 
   try {
     // Validate the access token with Pi's server
-    const piRes = await fetch(PI_API_BASE + "/users/me", {
+    const piRes = await fetch(PI_API_BASE + "/me", {
       method: "GET",
       headers: {
-        "Authorization": `Key ${accessToken}`,
+        "Authorization": `Bearer ${accessToken}`,
       },
     });
 
