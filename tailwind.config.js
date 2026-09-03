@@ -2,6 +2,7 @@
 export default {
   content: [
     "./app/**/*.{js,html,jsx}",
+    "./piapp/**/*.{js,html,jsx}",
   ],
   theme: {
     extend: {

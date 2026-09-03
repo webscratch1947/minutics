@@ -1,0 +1,321 @@
+/* Component styles for Minutics app - matching compiled version */
+
+/* Timer Screen Components */
+.timer-greeting {
+  @apply text-2xl font-bold text-foreground mb-2;
+}
+
+.timer-quote {
+  @apply text-sm text-muted-foreground mb-6;
+}
+
+.life-progress-circle {
+  @apply relative w-48 h-48 mx-auto mb-6;
+}
+
+.life-progress-text {
+  @apply absolute inset-0 flex items-center justify-center text-3xl font-bold text-foreground;
+}
+
+.retirement-card {
+  @apply bg-background text-foreground rounded-2xl p-6 mb-6 border border-border;
+}
+
+.retirement-title {
+  @apply text-lg font-semibold mb-4;
+}
+
+.retirement-countdown {
+  @apply grid grid-cols-5 gap-2 text-center;
+}
+
+.countdown-item {
+  @apply bg-background rounded-lg p-2 border border-border;
+}
+
+.countdown-value {
+  @apply text-xl font-bold text-foreground;
+}
+
+.countdown-label {
+  @apply text-xs text-muted-foreground;
+}
+
+/* Timer Box Styling */
+.timer-box {
+  @apply bg-background rounded-2xl p-6 border-2 border-border;
+}
+
+.timer-digits {
+  @apply text-foreground text-4xl font-bold;
+}
+
+.timer-text {
+  @apply text-foreground text-lg;
+}
+
+/* Good Morning Box */
+.good-morning-box {
+  @apply bg-background rounded-2xl p-6 mb-4 border-2 border-border;
+}
+
+.good-morning-text {
+  @apply text-foreground text-xl font-bold;
+}
+
+/* Today Glance Section */
+.today-glance-section {
+  @apply bg-background rounded-2xl p-4 mb-4 border border-border;
+}
+
+.today-glance-item {
+  @apply bg-background rounded-xl p-3 mb-2 border border-border;
+}
+
+.today-glance-title {
+  @apply text-foreground font-semibold mb-1;
+}
+
+.today-glance-text {
+  @apply text-muted-foreground text-sm;
+}
+
+/* Eat the Frog Section */
+.eat-the-frog-section {
+  @apply bg-background rounded-2xl p-4 mb-4 border-2 border-border;
+}
+
+.eat-the-frog-title {
+  @apply text-foreground font-bold text-lg mb-3;
+}
+
+.eat-the-frog-card {
+  @apply bg-background rounded-xl p-4 border border-border;
+}
+
+/* Activity Screen Components */
+.activity-card {
+  @apply bg-background rounded-xl p-4 mb-3 border border-border;
+}
+
+.activity-icon {
+  @apply w-10 h-10 rounded-full flex items-center justify-center mb-2 bg-background;
+}
+
+.activity-name {
+  @apply font-semibold text-foreground;
+}
+
+.activity-time {
+  @apply text-sm text-muted-foreground;
+}
+
+/* Activity Add Button */
+.activity-add-button {
+  @apply bg-black bg-opacity-50 text-foreground px-4 py-2 rounded-lg transition-all;
+}
+
+.activity-add-button.has-text {
+  @apply bg-black bg-opacity-100;
+}
+
+/* Life Hub Components */
+.tool-grid {
+  @apply grid grid-cols-2 gap-4;
+}
+
+.tool-card {
+  @apply bg-background rounded-2xl p-4 border border-border hover:shadow-md transition-shadow;
+}
+
+.tool-icon {
+  @apply w-12 h-12 rounded-full flex items-center justify-center mb-3 bg-background;
+}
+
+.tool-title {
+  @apply font-semibold text-foreground mb-1;
+}
+
+.tool-description {
+  @apply text-xs text-muted-foreground leading-relaxed;
+}
+
+.tool-lock {
+  @apply absolute top-2 right-2 text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded-full;
+}
+
+/* Life Hub Filters */
+.life-hub-filters {
+  @apply flex gap-2 mb-4;
+}
+
+.filter-button {
+  @apply bg-white text-foreground px-4 py-2 rounded-lg border border-border hover:bg-muted transition-colors;
+}
+
+.filter-button.active {
+  @apply bg-primary text-primary-foreground border-primary;
+}
+
+/* Search Box */
+.search-box {
+  @apply bg-white border-2 border-border rounded-xl px-4 py-3 text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary;
+}
+
+/* Journal Components */
+.journal-streak-card {
+  @apply bg-background rounded-xl p-4 mb-4 border border-border;
+}
+
+.journal-week-card {
+  @apply bg-background rounded-xl p-4 mb-4 border border-border;
+}
+
+.calendar-day {
+  @apply text-center text-sm text-foreground;
+}
+
+.calendar-date {
+  @apply text-center text-xs mb-1 text-muted-foreground;
+}
+
+.calendar-day.active {
+  @apply text-primary font-bold;
+}
+
+.calendar-date.active {
+  @apply bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center mx-auto;
+}
+
+.daily-summary {
+  @apply bg-background text-foreground rounded-xl p-4 mb-4 border border-border;
+}
+
+.month-entry {
+  @apply bg-background rounded-xl p-4 mb-3 border border-border;
+}
+
+/* Navigation Components */
+.bottom-nav {
+  @apply fixed bottom-0 left-0 right-0 bg-background border-t border-border safe-bottom;
+}
+
+.nav-container {
+  @apply flex justify-around items-center h-16;
+}
+
+.nav-label {
+  @apply text-xs mt-1 text-foreground;
+}
+
+/* Modal Components */
+.modal-backdrop {
+  @apply fixed inset-0 bg-black bg-opacity-50 z-50;
+}
+
+.modal-container {
+  @apply absolute bottom-0 left-0 right-0 bg-background rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto border-t border-border;
+}
+
+.modal-header {
+  @apply flex justify-between items-center mb-4;
+}
+
+.modal-title {
+  @apply text-xl font-bold text-foreground;
+}
+
+.modal-close {
+  @apply text-muted-foreground hover:text-foreground;
+}
+
+.share-card {
+  @apply bg-background text-foreground rounded-2xl p-6 text-center border border-border;
+}
+
+.share-graph {
+  @apply w-32 h-32 mx-auto mb-4 rounded-full border-4 border-primary flex items-center justify-center bg-background;
+}
+
+.share-stats {
+  @apply grid grid-cols-3 gap-4 mt-4;
+}
+
+.share-stat {
+  @apply text-center;
+}
+
+.share-stat-value {
+  @apply text-lg font-bold text-foreground;
+}
+
+.share-stat-label {
+  @apply text-xs text-muted-foreground;
+}
+
+/* General Button Styling */
+.btn-primary {
+  @apply bg-primary text-primary-foreground px-6 py-3 rounded-full font-semibold transition-all hover:bg-primary/90;
+}
+
+.btn-secondary {
+  @apply bg-background text-foreground px-6 py-3 rounded-full font-semibold transition-all hover:bg-muted border border-border;
+}
+
+/* Tool Inner Content Fix */
+.tool-inner-content {
+  @apply bg-background rounded-xl p-4 border border-border;
+}
+
+.tool-background-fix {
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+}
+
+/* Tool UI Bug Fixes */
+.lt-tool-top {
+  @apply bg-background border-b border-border;
+}
+
+.lt-tool-kicker {
+  @apply text-muted-foreground text-sm mb-1;
+}
+
+.lt-tool-heading {
+  @apply text-foreground text-2xl font-bold;
+}
+
+.lt-tool-description {
+  @apply text-muted-foreground text-sm;
+}
+
+.lt-tool-close {
+  @apply text-foreground bg-background px-4 py-2 rounded-lg border border-border hover:bg-muted transition-colors;
+}
+
+/* Fix tool background mixing */
+.lt-tool-content {
+  @apply bg-background min-h-screen;
+}
+
+.lt-tool-inner {
+  @apply bg-background rounded-xl p-4 border border-border;
+}
+
+/* Fix tool display issues */
+.tool-view-container {
+  @apply bg-background min-h-screen;
+}
+
+.tool-back-button {
+  @apply text-foreground bg-background px-4 py-2 rounded-lg border border-border hover:bg-muted transition-colors;
+}
+
+/* Prevent tool UI from showing during transitions */
+.tool-transition-fix {
+  @apply opacity-0 transition-opacity duration-200;
+}
+
+.tool-transition-fix.visible {
+  @apply opacity-100;
+}

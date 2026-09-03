@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+    <style>
+      body { padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box; background: hsl(230 40% 16%); }
+      .fixed.bottom-0 { padding-bottom: env(safe-area-inset-bottom, 0px) !important; }
+      #root { display: none; }
+      body.lt-authed #root { display: block; }
+    </style>
+    <title>Minutics</title>
+    <meta name="description" content="Minutics — Make every minute count." />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="Minutics" />
+    <meta property="og:description" content="Minutics — Make every minute count." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Minutics" />
+    <meta name="twitter:description" content="Minutics — Make every minute count." />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <link rel="apple-touch-icon" href="./assets/icons/logo-192.png" />
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#1a2140" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <script type="module" src="./src/enhancements.js"></script>
+    <script type="module" src="./src/auth.js"></script>
+    <script type="module" crossorigin src="./src/main.js"></script>
+    <link rel="stylesheet" href="./src/styles/main.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
