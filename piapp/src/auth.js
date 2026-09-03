@@ -94,21 +94,6 @@ function injectStyles() {
       text-align: center;
     }
     .lt-auth-disclaimer b { font-weight: 600; color: #374151; }
-    .lt-auth-new {
-      text-align: center; margin-top: 20px; padding-top: 20px;
-      border-top: 1px solid #E5E7EB;
-    }
-    .lt-auth-new-label { font-size: 13px; color: #6B7280; margin: 0 0 2px; }
-    .lt-auth-new-hint { font-size: 12px; color: #9CA3AF; margin: 0 0 12px; }
-    .lt-auth-new-link {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: none; border: 1px solid #D1D5DB; border-radius: 10px;
-      color: #374151; font-size: 14px; font-weight: 500;
-      padding: 10px 20px; cursor: pointer; text-decoration: none;
-      font-family: 'Geist', sans-serif; transition: border-color .15s, color .15s;
-    }
-    .lt-auth-new-link:hover { border-color: #111827; color: #111827; }
-    .lt-auth-new-link svg { width: 16px; height: 16px; }
     .lt-auth-pi-badge {
       display: flex; align-items: center; justify-content: center; gap: 8px;
       margin-top: 16px; padding: 10px 16px; border-radius: 12px;
@@ -162,7 +147,7 @@ function renderGate() {
     '<main class="lt-auth-card">' +
       '<div class="lt-auth-head">' +
         '<h1 class="lt-auth-title">Welcome to Minutics</h1>' +
-        '<p class="lt-auth-sub">Sign in with your Pi Network account</p>' +
+        '<p class="lt-auth-sub">Login or register with your Pi Network account</p>' +
       '</div>' +
       '<div class="lt-auth-error" id="lt-auth-error"></div>' +
       '<div class="lt-auth-submit-wrap">' +
@@ -170,14 +155,6 @@ function renderGate() {
           '<span class="lt-auth-spinner"></span>' +
           '<span id="lt-auth-submit-label">Continue with Pi</span>' +
         '</button>' +
-      '</div>' +
-      '<div class="lt-auth-new">' +
-        '<p class="lt-auth-new-label">New to Pi Network?</p>' +
-        '<p class="lt-auth-new-hint">Create your Pi Network account to get started.</p>' +
-        '<a class="lt-auth-new-link" href="https://minepi.com/" target="_blank" rel="noopener">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>' +
-          'Create Pi account' +
-        '</a>' +
       '</div>' +
       '<div class="lt-auth-pi-badge">' +
         '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>' +
