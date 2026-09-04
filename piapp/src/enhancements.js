@@ -7190,7 +7190,7 @@
 
   function fetchPiPrice(callback) {
     var apiOrigin = getApiOrigin();
-    fetch(apiOrigin + "/api/pi/price")
+    fetch(apiOrigin + "/api/price")
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.piUsdPrice) {
@@ -7229,7 +7229,7 @@
 
     var planDefs = [
       { id: "basic",    name: "Basic",    usd: 1,  period: "/month", desc: "Essential premium access for one month." },
-      { id: "yearly",   name: "1 Year",   usd: 12, period: "/year",  desc: "Full premium access for 12 months with one payment." },
+      { id: "yearly",   name: "1 Year",   usd: 9,  period: "/year",  desc: "Full premium access for 12 months with one payment." },
       { id: "lifetime", name: "Lifetime", usd: 99, period: "",       desc: "Premium access with no expiration." },
     ];
 
@@ -7238,8 +7238,8 @@
       return (usd / _plansPiUsdPrice).toFixed(4);
     }
 
-    function highlightPlan(planId, container) {
-      container.querySelectorAll(".lt-plan-card").forEach(function (card) {
+    function highlightPlan(planId, listEl) {
+      listEl.querySelectorAll(".lt-plan-card").forEach(function (card) {
         var isActive = card.getAttribute("data-plan") === planId;
         card.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)";
         card.style.boxShadow = isActive ? "0 0 0 1px hsl(230 40% 16%), 0 4px 12px rgba(0,0,0,.08)" : "none";
@@ -7254,8 +7254,39 @@
 
     var selectedPlan = "yearly";
 
+    var modal = document.createElement("div");
+    modal.id = "lt-plans-modal";
+    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
+    modal.innerHTML =
+      '<div style="width:100%;max-width:520px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);display:flex;flex-direction:column;max-height:90vh" id="lt-plans-card">' +
+        '<div style="text-align:center;margin-bottom:16px;padding:32px 28px 0;flex-shrink:0">' +
+          '<p style="color:hsl(230 40% 16%);font-size:22px;font-weight:800;margin:0 0 4px">Choose your plan</p>' +
+          '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Unlock all Minutics premium features</p>' +
+        '</div>' +
+        '<div id="lt-plans-timer-wrap" style="padding:0 28px;flex-shrink:0"></div>' +
+        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:12px;padding:0 28px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0"></div>' +
+        '<div style="flex-shrink:0;padding:20px 28px 28px;border-top:1px solid hsl(220 13% 92%);margin-top:16px">' +
+          '<div id="lt-plans-cta-wrap" style="text-align:center">' +
+            '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with 1 Year</button>' +
+          '</div>' +
+          '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:4px;font-family:inherit">Close</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+
+    function closeModal() {
+      modal.remove();
+      if (_plansPriceTimer) { clearInterval(_plansPriceTimer); _plansPriceTimer = null; }
+    }
+
+    document.getElementById("lt-plans-close").addEventListener("click", closeModal);
+    modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+
     function renderCards(piData) {
       var features = ["Premium features", "All Minutics tools"];
+      var listEl = document.getElementById("lt-plans-list");
+      if (!listEl) return;
+
       var planCards = planDefs.map(function (p, i) {
         var piAmt = piAmount(p.usd);
         var periodFeatures = p.id === "basic" ? ["1 month access"] : p.id === "yearly" ? ["12 months access", "One payment"] : ["Lifetime access", "No expiration"];
@@ -7277,96 +7308,51 @@
         '</div>';
       }).join("");
 
-      var timerText = "";
-      if (piData && piData.expiresAt) {
-        var remaining = Math.max(0, piData.expiresAt - Date.now());
-        var mins = Math.floor(remaining / 60000);
-        var secs = Math.floor((remaining % 60000) / 1000);
-        timerText = "Price updates in " + mins + ":" + (secs < 10 ? "0" : "") + secs;
+      listEl.innerHTML = planCards;
+
+      var timerWrap = document.getElementById("lt-plans-timer-wrap");
+      if (timerWrap) {
+        if (piData && piData.expiresAt) {
+          var remaining = Math.max(0, piData.expiresAt - Date.now());
+          var mins = Math.floor(remaining / 60000);
+          var secs = Math.floor((remaining % 60000) / 1000);
+          timerWrap.innerHTML = '<p id="lt-plans-timer" style="color:hsl(220 10% 68%);font-size:11px;margin:0 0 16px;text-align:center;font-variant-numeric:tabular-nums">Price updates in ' + mins + ':' + (secs < 10 ? '0' : '') + secs + '</p>';
+          startPriceCountdown(document.getElementById("lt-plans-timer"), piData.expiresAt);
+        } else {
+          timerWrap.innerHTML = '';
+        }
       }
+
+      highlightPlan(selectedPlan, listEl);
 
       var piP = planDefs.find(function (x) { return x.id === selectedPlan; });
-      var piLabel = piP ? piP.name : "1 Year";
-      var piUsd = piP ? "$" + piP.usd : "$12";
+      var cta = document.getElementById("lt-plans-cta");
+      if (cta) cta.textContent = "Continue with " + (piP ? piP.name : selectedPlan);
 
-      modal.innerHTML =
-        '<div style="width:100%;max-width:520px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;padding:32px 28px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto" id="lt-plans-card">' +
-          '<div style="text-align:center;margin-bottom:16px">' +
-            '<p style="color:hsl(230 40% 16%);font-size:22px;font-weight:800;margin:0 0 4px">Choose your plan</p>' +
-            '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Unlock all Minutics premium features</p>' +
-          '</div>' +
-          (timerText ? '<p id="lt-plans-timer" style="color:hsl(220 10% 68%);font-size:11px;margin:0 0 16px;text-align:center;font-variant-numeric:tabular-nums">' + timerText + '</p>' : '<p id="lt-plans-timer" style="color:hsl(220 10% 68%);font-size:11px;margin:0 0 16px;text-align:center"></p>') +
-          '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:12px">' + planCards + '</div>' +
-          '<div id="lt-plans-cta-wrap" style="margin-top:20px;text-align:center">' +
-            '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with ' + piLabel + '</button>' +
-          '</div>' +
-          '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:4px;font-family:inherit">Cancel</button>' +
-        '</div>';
-
-      /* Start countdown */
-      if (piData && piData.expiresAt) {
-        startPriceCountdown(document.getElementById("lt-plans-timer"), piData.expiresAt);
-      }
-
-      highlightPlan(selectedPlan, modal);
-
-      /* Single click handler per card */
-      modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
+      listEl.querySelectorAll(".lt-plan-card").forEach(function (card) {
         card.addEventListener("click", function () {
           var planId = card.getAttribute("data-plan");
           if (selectedPlan === planId) {
-            modal.remove();
-            if (_plansPriceTimer) { clearInterval(_plansPriceTimer); _plansPriceTimer = null; }
+            closeModal();
             showPiCheckout(planId);
           } else {
             selectedPlan = planId;
-            highlightPlan(planId, modal);
+            highlightPlan(planId, listEl);
             var p = planDefs.find(function (x) { return x.id === planId; });
-            var cta = document.getElementById("lt-plans-cta");
             if (cta) cta.textContent = "Continue with " + (p ? p.name : planId);
           }
         });
       });
 
-      /* CTA button proceeds to checkout */
       var ctaBtn = document.getElementById("lt-plans-cta");
       if (ctaBtn) {
         ctaBtn.addEventListener("click", function () {
-          modal.remove();
-          if (_plansPriceTimer) { clearInterval(_plansPriceTimer); _plansPriceTimer = null; }
+          closeModal();
           showPiCheckout(selectedPlan);
         });
       }
     }
 
-    /* Set innerHTML BEFORE appending to DOM */
-    var modal = document.createElement("div");
-    modal.id = "lt-plans-modal";
-    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;overflow-y:auto;-webkit-overflow-scrolling:touch;";
-    modal.innerHTML =
-      '<div style="width:100%;max-width:520px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;padding:32px 28px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto" id="lt-plans-card">' +
-        '<div style="text-align:center;margin-bottom:24px">' +
-          '<p style="color:hsl(230 40% 16%);font-size:22px;font-weight:800;margin:0 0 4px">Choose your plan</p>' +
-          '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Loading prices\u2026</p>' +
-        '</div>' +
-        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:12px"></div>' +
-        '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:12px;font-family:inherit">Cancel</button>' +
-      '</div>';
-    document.body.appendChild(modal);
-
-    /* Now innerHTML exists, so these elements are safely accessible */
-    document.getElementById("lt-plans-close").addEventListener("click", function () {
-      modal.remove();
-      if (_plansPriceTimer) { clearInterval(_plansPriceTimer); _plansPriceTimer = null; }
-    });
-    modal.addEventListener("click", function (e) {
-      if (e.target === modal) {
-        modal.remove();
-        if (_plansPriceTimer) { clearInterval(_plansPriceTimer); _plansPriceTimer = null; }
-      }
-    });
-
-    /* Fetch price and render full cards */
     if (_plansPiUsdPrice && Date.now() < _plansPriceExpiresAt) {
       renderCards({ piUsdPrice: _plansPiUsdPrice, expiresAt: _plansPriceExpiresAt });
     } else {
@@ -7379,7 +7365,7 @@
 
   /* Pi Network payment checkout for a specific plan */
   function showPiCheckout(planId) {
-    var planDefs = { basic: { name: "Basic", usd: 1, period: "/month" }, yearly: { name: "1 Year", usd: 12, period: "/year" }, lifetime: { name: "Lifetime", usd: 99, period: "" } };
+    var planDefs = { basic: { name: "Basic", usd: 1, period: "/month" }, yearly: { name: "1 Year", usd: 9, period: "/year" }, lifetime: { name: "Lifetime", usd: 99, period: "" } };
     var plan = planDefs[planId] || planDefs.yearly;
 
     addStyle3();

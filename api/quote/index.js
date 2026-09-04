@@ -9,7 +9,7 @@ import crypto from "crypto";
 
 const PLANS = {
   basic:    { usdPrice: 1,   label: "Basic" },
-  yearly:   { usdPrice: 12,  label: "1 Year" },
+  yearly:   { usdPrice: 9,  label: "1 Year" },
   lifetime: { usdPrice: 99,  label: "Lifetime" },
 };
 
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   try {
     const proto = req.headers["x-forwarded-proto"] || "https";
     const host = req.headers.host || "piapp.minutics.com";
-    const priceUrl = proto + "://" + host + "/api/pi/price";
+    const priceUrl = proto + "://" + host + "/api/price";
     const priceRes = await fetch(priceUrl);
     if (priceRes.ok) {
       const priceData = await priceRes.json();

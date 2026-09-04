@@ -7183,7 +7183,7 @@
 
     var plans = [
       { id: "basic",    name: "Basic",    price: "$1",  period: "/month", desc: "Essential premium access for one month.", features: ["Premium features", "All Minutics tools", "1 month access"] },
-      { id: "yearly",   name: "1 Year",   price: "$12", period: "/year",  desc: "Full premium access for 12 months with one payment.", features: ["Premium features", "All Minutics tools", "12 months access", "One payment"] },
+      { id: "yearly",   name: "1 Year",   price: "$9",  period: "/year",  desc: "Full premium access for 12 months with one payment.", features: ["Premium features", "All Minutics tools", "12 months access", "One payment"] },
       { id: "lifetime", name: "Lifetime", price: "$99", period: "",       desc: "Premium access with no expiration.", features: ["Premium features", "All Minutics tools", "Lifetime access", "No expiration"] },
     ];
 
@@ -7207,19 +7207,21 @@
 
     var modal = document.createElement("div");
     modal.id = "lt-plans-modal";
-    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
     modal.innerHTML =
-      '<div style="width:100%;max-width:520px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;padding:32px 28px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto" id="lt-plans-card">' +
-        '<div style="text-align:center;margin-bottom:24px">' +
+      '<div style="width:100%;max-width:520px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);display:flex;flex-direction:column;max-height:90vh" id="lt-plans-card">' +
+        '<div style="text-align:center;margin-bottom:16px;padding:32px 28px 0;flex-shrink:0">' +
           '<p style="color:hsl(230 40% 16%);font-size:22px;font-weight:800;margin:0 0 4px">Choose your plan</p>' +
           '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Unlock all Minutics premium features</p>' +
         '</div>' +
-        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:12px">' + planCards + '</div>' +
-        '<div id="lt-plans-cta-wrap" style="margin-top:20px;text-align:center">' +
-          '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with 1 Year</button>' +
+        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:12px;padding:0 28px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0">' + planCards + '</div>' +
+        '<div style="flex-shrink:0;padding:20px 28px 28px;border-top:1px solid hsl(220 13% 92%);margin-top:16px">' +
+          '<div id="lt-plans-cta-wrap" style="text-align:center">' +
+            '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with 1 Year</button>' +
+          '</div>' +
+          '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:4px;font-family:inherit">Close</button>' +
+          '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
-        '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:4px;font-family:inherit">Cancel</button>' +
-        '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">Test mode \u2014 no real payment will be taken</p>' +
       '</div>';
     document.body.appendChild(modal);
 
@@ -7275,7 +7277,7 @@
   }
 
   function showDummyCheckoutForPlan(planId) {
-    var plans = { basic: { label: "Basic", price: "$1", sub: "/month" }, yearly: { label: "1 Year", price: "$12", sub: "/year" }, lifetime: { label: "Lifetime", price: "$99", sub: "" } };
+    var plans = { basic: { label: "Basic", price: "$1", sub: "/month" }, yearly: { label: "1 Year", price: "$9", sub: "/year" }, lifetime: { label: "Lifetime", price: "$99", sub: "" } };
     var plan = plans[planId] || plans.yearly;
     addStyle3();
     var existing = document.getElementById("lt-checkout-modal");
