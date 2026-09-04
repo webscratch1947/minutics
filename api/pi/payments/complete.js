@@ -8,7 +8,7 @@ const PI_API_BASE = "https://api.minepi.com/v2";
 
 const PLANS = {
   basic:    { usdPrice: 1,   label: "Basic",    durationDays: 30 },
-  yearly:   { usdPrice: 12,  label: "1 Year",   durationDays: 365 },
+  yearly:   { usdPrice: 9,   label: "1 Year",   durationDays: 365 },
   lifetime: { usdPrice: 99,  label: "Lifetime", durationDays: null },
 };
 

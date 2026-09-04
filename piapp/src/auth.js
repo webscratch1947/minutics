@@ -201,7 +201,7 @@ function handlePiLogin() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ paymentId: payment.identifier }),
+      body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken }),
     }).catch(function (err) {
       console.error("Failed to complete incomplete payment:", err);
     });
@@ -279,6 +279,23 @@ function cleanupEnhancementVisuals() {
   }
 }
 
+/* ── Ensure the Pi SDK is authenticated (required for createPayment) ── */
+function ensurePiSdkAuthed() {
+  if (typeof Pi === "undefined") return;
+  try {
+    Pi.init({ appId: PI_APP_ID, version: "2.0" });
+  } catch (e) { return; }
+  Pi.authenticate(["username"], function (payment) {
+    var apiOrigin = getApiOrigin();
+    fetch(apiOrigin + "/api/pi/payments/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken }),
+    }).catch(function () {});
+  }).catch(function () {});
+}
+
 /* ── Check for existing session on page load ─────────────────────────── */
 (function checkSession() {
   var apiOrigin = getApiOrigin();
@@ -294,6 +311,7 @@ function cleanupEnhancementVisuals() {
       if (data && data.user) {
         _piUser = data.user;
         document.body.classList.add("lt-authed");
+        ensurePiSdkAuthed();
       } else {
         renderGate();
       }

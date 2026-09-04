@@ -7241,13 +7241,14 @@
     function highlightPlan(planId, listEl) {
       listEl.querySelectorAll(".lt-plan-card").forEach(function (card) {
         var isActive = card.getAttribute("data-plan") === planId;
-        card.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)";
-        card.style.boxShadow = isActive ? "0 0 0 1px hsl(230 40% 16%), 0 4px 12px rgba(0,0,0,.08)" : "none";
+        card.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 90%)";
+        card.style.boxShadow = isActive ? "0 0 0 1px hsl(230 40% 16%), 0 4px 16px rgba(20,24,45,.1)" : (card.getAttribute("data-plan") === "yearly" ? "0 2px 12px rgba(0,0,0,.06)" : "0 1px 3px rgba(0,0,0,.03)");
+        card.style.background = isActive ? "hsl(230 40% 97%)" : "#fff";
         var check = card.querySelector(".lt-plan-check");
         if (check) {
           check.style.background = isActive ? "hsl(230 40% 16%)" : "transparent";
-          check.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)";
-          check.innerHTML = isActive ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
+          check.style.borderColor = isActive ? "hsl(230 40% 16%)" : (card.getAttribute("data-plan") === "yearly" ? "hsl(230 40% 16%)" : "hsl(220 13% 82%)");
+          check.innerHTML = isActive ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
         }
       });
     }
@@ -7259,17 +7260,17 @@
     modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
     modal.innerHTML =
       '<div style="width:100%;max-width:520px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);display:flex;flex-direction:column;max-height:90vh" id="lt-plans-card">' +
-        '<div style="text-align:center;margin-bottom:16px;padding:32px 28px 0;flex-shrink:0">' +
-          '<p style="color:hsl(230 40% 16%);font-size:22px;font-weight:800;margin:0 0 4px">Choose your plan</p>' +
+        '<div style="text-align:center;padding:28px 28px 0;flex-shrink:0">' +
+          '<p style="color:hsl(230 40% 16%);font-size:20px;font-weight:800;margin:0 0 4px;letter-spacing:-.01em">Choose your plan</p>' +
           '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Unlock all Minutics premium features</p>' +
         '</div>' +
         '<div id="lt-plans-timer-wrap" style="padding:0 28px;flex-shrink:0"></div>' +
-        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:12px;padding:0 28px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0"></div>' +
+        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:14px;padding:16px 28px 0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0"></div>' +
         '<div style="flex-shrink:0;padding:20px 28px 28px;border-top:1px solid hsl(220 13% 92%);margin-top:16px">' +
           '<div id="lt-plans-cta-wrap" style="text-align:center">' +
-            '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with 1 Year</button>' +
+            '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with 1 Year</button>' +
           '</div>' +
-          '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:4px;font-family:inherit">Close</button>' +
+          '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:2px;font-family:inherit">Close</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(modal);
@@ -7290,20 +7291,27 @@
       var planCards = planDefs.map(function (p, i) {
         var piAmt = piAmount(p.usd);
         var periodFeatures = p.id === "basic" ? ["1 month access"] : p.id === "yearly" ? ["12 months access", "One payment"] : ["Lifetime access", "No expiration"];
-        return '<div class="lt-plan-card" data-plan="' + p.id + '" style="background:#fff;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)") + ';border-radius:14px;padding:20px;cursor:pointer;transition:border-color .2s,box-shadow .2s;position:relative">' +
-          '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">' +
-            '<div>' +
-              '<p style="color:hsl(230 40% 16%);font-size:18px;font-weight:800;margin:0">' + p.name + '</p>' +
-              '<p style="color:hsl(230 40% 16%);font-size:28px;font-weight:800;margin:4px 0 0;letter-spacing:-.02em">$' + p.usd + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + p.period + '</span></p>' +
-              (piAmt ? '<p style="color:hsl(220 10% 50%);font-size:12px;margin:2px 0 0">\u2248 ' + piAmt + ' PI</p>' : '<p style="color:hsl(220 10% 68%);font-size:12px;margin:2px 0 0">Loading price\u2026</p>') +
+        var isPopular = p.id === "yearly";
+        return '<div class="lt-plan-card" data-plan="' + p.id + '" style="background:#fff;border:2px solid ' + (isPopular ? "hsl(230 40% 16%)" : "hsl(220 13% 90%)") + ';border-radius:16px;padding:22px 22px 20px;cursor:pointer;transition:border-color .2s,box-shadow .2s;position:relative;box-shadow:' + (isPopular ? "0 2px 12px rgba(0,0,0,.06)" : "0 1px 3px rgba(0,0,0,.03)") + '">' +
+          (isPopular ? '<div style="position:absolute;top:-11px;left:22px;background:hsl(230 40% 16%);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:6px;letter-spacing:.03em">MOST POPULAR</div>' : '') +
+          '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">' +
+            '<div style="flex:1">' +
+              '<p style="color:hsl(220 10% 50%);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:0 0 2px">' + p.name + '</p>' +
+              '<div style="display:flex;align-items:baseline;gap:2px;margin:0 0 3px">' +
+                '<span style="color:hsl(230 40% 16%);font-size:32px;font-weight:800;letter-spacing:-.03em;line-height:1">$' + p.usd + '</span>' +
+                (p.period ? '<span style="color:hsl(220 10% 55%);font-size:13px;font-weight:600">' + p.period + '</span>' : '') +
+              '</div>' +
+              (piAmt ? '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0">\u2248 ' + piAmt + ' PI</p>' : '<p style="color:hsl(220 10% 68%);font-size:12px;margin:0">Loading price\u2026</p>') +
             '</div>' +
-            '<div class="lt-plan-check" style="width:26px;height:26px;border-radius:50%;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)") + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:4px;transition:all .2s"></div>' +
+            '<div class="lt-plan-check" style="width:24px;height:24px;border-radius:50%;border:2px solid ' + (isPopular ? "hsl(230 40% 16%)" : "hsl(220 13% 82%)") + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;transition:all .2s"></div>' +
           '</div>' +
-          '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0 0 12px;line-height:1.4">' + p.desc + '</p>' +
-          '<div style="display:flex;flex-direction:column;gap:6px">' +
-            features.concat(periodFeatures).map(function (f) {
-              return '<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:hsl(220 10% 40%)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(152 60% 45%)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' + f + '</div>';
-            }).join("") +
+          '<div style="border-top:1px solid hsl(220 13% 94%);padding-top:14px;margin-top:2px">' +
+            '<p style="color:hsl(220 10% 45%);font-size:12.5px;margin:0 0 10px;line-height:1.45">' + p.desc + '</p>' +
+            '<div style="display:flex;flex-direction:column;gap:7px">' +
+              features.concat(periodFeatures).map(function (f) {
+                return '<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:hsl(220 10% 38%);line-height:1.3"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="hsl(152 55% 42%)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' + f + '</div>';
+              }).join("") +
+            '</div>' +
           '</div>' +
         '</div>';
       }).join("");
@@ -7445,14 +7453,35 @@
         }).catch(function () {});
       }
 
-      try { Pi.init({ appId: "minutics", version: "2.0" }); } catch (e) {}
+      var createPaymentPromise;
+      try {
+        createPaymentPromise = Pi.createPayment({
+          amount: currentQuote.piAmount,
+          currency: "Pi",
+          metadata: { purpose: "minutics_" + planId + "_upgrade", orderId: currentQuote.orderId },
+        }, onIncompletePaymentFound);
+      } catch (e) {
+        console.error("Pi.createPayment threw:", e);
+        btn.disabled = false;
+        btn.textContent = "\uD83D\uDFE3 Pay with Pi";
+        var body = document.getElementById("lt-checkout-body");
+        if (body) body.querySelector("p").textContent = "Failed to start payment. Please try again.";
+        return;
+      }
 
-      Pi.createPayment({
-        amount: currentQuote.piAmount,
-        currency: "Pi",
-        metadata: { purpose: "minutics_" + planId + "_upgrade", orderId: currentQuote.orderId },
-      }, onIncompletePaymentFound)
+      var paymentTimedOut = false;
+      var timeoutId = setTimeout(function () {
+        paymentTimedOut = true;
+        btn.disabled = false;
+        btn.textContent = "\uD83D\uDFE3 Pay with Pi";
+        var body = document.getElementById("lt-checkout-body");
+        if (body) body.querySelector("p").textContent = "Payment timed out. Please try again.";
+      }, 45000);
+
+      createPaymentPromise
         .then(function (payment) {
+          clearTimeout(timeoutId);
+          if (paymentTimedOut) return;
           var body = document.getElementById("lt-checkout-body");
           body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:#7C3AED;border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Processing payment...</p></div>';
           if (!document.getElementById("lt-spin-kf")) {
@@ -7467,7 +7496,10 @@
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken, orderId: currentQuote.orderId, amount: currentQuote.piAmount }),
-          }).then(function () { return payment; });
+          }).then(function (r) {
+            if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "Payment approval failed"); });
+            return payment;
+          });
         })
         .then(function (payment) {
           return Pi.completePayment(payment.identifier);
@@ -7482,6 +7514,7 @@
           }).then(function (r) { return r.json(); }).then(function (d) { return { payment: payment, data: d }; });
         })
         .then(function (result) {
+          clearTimeout(timeoutId);
           var body2 = document.getElementById("lt-checkout-body");
           if (!body2) return;
           var label = (result.data && result.data.plan && result.data.plan.label) || plan.name;
@@ -7499,6 +7532,7 @@
           });
         })
         .catch(function (err) {
+          clearTimeout(timeoutId);
           console.error("Pi payment error:", err);
           var body3 = document.getElementById("lt-checkout-body");
           if (!body3) return;

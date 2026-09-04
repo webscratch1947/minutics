@@ -15,7 +15,7 @@ const PRICE_TOLERANCE = 0.05; // Allow 5% price drift between quote and live
 
 const PLANS = {
   basic:    { usdPrice: 1 },
-  yearly:   { usdPrice: 12 },
+  yearly:   { usdPrice: 9 },
   lifetime: { usdPrice: 99 },
 };
 
