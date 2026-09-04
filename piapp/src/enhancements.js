@@ -7497,10 +7497,20 @@
         });
       }
 
+      var piAmount = currentQuote.piAmount;
+      if (!Number.isFinite(piAmount) || piAmount <= 0) {
+        showPayError("Invalid payment amount. Please try again.");
+        return;
+      }
+
+      var planNames = { basic: "Minutics Basic", yearly: "Minutics 1 Year", lifetime: "Minutics Lifetime" };
+      var memo = planNames[planId] || "Minutics Subscription";
+
       try {
         Pi.createPayment({
-          amount: currentQuote.piAmount,
-          metadata: { purpose: "minutics_" + planId + "_upgrade", orderId: currentQuote.orderId },
+          amount: piAmount,
+          memo: memo,
+          metadata: { plan: planId, orderId: currentQuote.orderId },
         }, {
           onReadyForServerApproval: function (paymentId) {
             showProcessing();
