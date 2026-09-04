@@ -190,7 +190,7 @@ function handlePiLogin() {
   }
 
   try {
-    Pi.init({ appId: PI_APP_ID, version: "2.0" });
+    Pi.init({ appId: PI_APP_ID, version: "2.0", sandbox: false });
   } catch (e) {
     showError("Failed to initialize Pi SDK. Please try again.");
     submitBtn.disabled = false;
@@ -290,7 +290,7 @@ function cleanupEnhancementVisuals() {
 function ensurePiSdkAuthed() {
   if (typeof Pi === "undefined") return;
   try {
-    Pi.init({ appId: PI_APP_ID, version: "2.0" });
+    Pi.init({ appId: PI_APP_ID, version: "2.0", sandbox: false });
   } catch (e) { return; }
   Pi.authenticate(["payments", "username"], function (payment) {
     var apiOrigin = getApiOrigin();

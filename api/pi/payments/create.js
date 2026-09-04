@@ -1,17 +1,8 @@
-// POST /api/pi/payments/create — Approve a Pi Network payment.
-//
-// Pi Payment flow:
-// 1. Client gets a quote from /api/quote (client stores it)
-// 2. Client creates a payment via Pi SDK → gets a paymentId
-// 3. Client POSTs { paymentId, quote } here
-// 4. Server validates the quote against live CoinGecko price
-// 5. Server calls Pi's API to approve the payment using PI_API_KEY
-// 6. Client completes the payment via Pi SDK
-// 7. Server verifies completion via /api/pi/payments/complete
-
 const PI_API_BASE = "https://api.minepi.com/v2";
 const CG_BASE = "https://api.coingecko.com/api/v3";
-const PRICE_TOLERANCE = 0.05; // Allow 5% price drift between quote and live
+const PRICE_TOLERANCE = 0.05;
+const CG_TIMEOUT_MS = 4000;
+const PI_TIMEOUT_MS = 12000;
 
 const PLANS = {
   basic:    { usdPrice: 1 },
@@ -23,9 +14,13 @@ async function getPiUsdPrice() {
   const apiKey = process.env.CG_API_KEY;
   if (!apiKey) return null;
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(function () { controller.abort(); }, CG_TIMEOUT_MS);
     const res = await fetch(CG_BASE + "/simple/price?ids=pi-network&vs_currencies=usd", {
       headers: { "x-cg-demo-api-key": apiKey },
+      signal: controller.signal,
     });
+    clearTimeout(timer);
     if (!res.ok) return null;
     const data = await res.json();
     return data && data["pi-network"] && data["pi-network"].usd;
@@ -34,7 +29,33 @@ async function getPiUsdPrice() {
   }
 }
 
+async function piApiPost(path, body, apiKey) {
+  var controller = new AbortController();
+  var timer = setTimeout(function () { controller.abort(); }, PI_TIMEOUT_MS);
+  try {
+    var res = await fetch(PI_API_BASE + path, {
+      method: "POST",
+      headers: {
+        "Authorization": "Key " + apiKey,
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    var text = await res.text().catch(function () { return ""; });
+    var parsed = null;
+    try { parsed = JSON.parse(text); } catch (e) { parsed = text; }
+    return { status: res.status, ok: res.ok, body: parsed, raw: text };
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
 export default async function handler(req, res) {
+  console.log("[create] request received method=" + req.method);
+
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -49,49 +70,47 @@ export default async function handler(req, res) {
     return;
   }
 
-  const piApiKey = process.env.PI_API_KEY;
+  var piApiKey = process.env.PI_API_KEY;
+  console.log("[create] PI_API_KEY configured=" + Boolean(piApiKey));
   if (!piApiKey) {
-    console.error("PI_API_KEY environment variable is not configured");
-    res.status(500).json({ error: "Payment service not configured" });
+    res.status(500).json({
+      error: "Payment service not configured",
+      diagnostic: "PI_API_KEY is missing in the Vercel environment variables. Go to Vercel Dashboard > Settings > Environment Variables and add PI_API_KEY from the Pi Developer Portal.",
+    });
     return;
   }
 
-  let body = req.body;
+  var body = req.body;
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch (e) { body = null; }
   }
-  const { paymentId, quote } = body || {};
+  var paymentId = body && body.paymentId;
+  var quote = body && body.quote;
 
-  if (!paymentId) {
-    res.status(400).json({ error: "Missing paymentId" });
+  console.log("[create] paymentId type=" + typeof paymentId + " len=" + (paymentId ? paymentId.length : 0));
+
+  if (!paymentId || typeof paymentId !== "string") {
+    res.status(400).json({ error: "Missing or invalid paymentId" });
     return;
   }
 
-  // Validate quote if provided
   if (quote) {
-    // Check quote expiry
     if (!quote.expiresAt || Date.now() > quote.expiresAt) {
       res.status(400).json({ error: "Quote has expired. Please get a new price." });
       return;
     }
-
-    // Check plan exists
-    const plan = PLANS[quote.planId];
+    var plan = PLANS[quote.planId];
     if (!plan) {
       res.status(400).json({ error: "Invalid plan in quote" });
       return;
     }
-
-    // Validate USD price matches plan
     if (quote.usdPrice !== plan.usdPrice) {
       res.status(400).json({ error: "Invalid USD price in quote" });
       return;
     }
-
-    // Cross-check Pi amount against live price (allow tolerance for price drift)
-    const livePrice = await getPiUsdPrice();
+    var livePrice = await getPiUsdPrice();
     if (livePrice && quote.piUsdPrice) {
-      const expectedPiAmount = parseFloat((plan.usdPrice / livePrice).toFixed(8));
+      var expectedPiAmount = parseFloat((plan.usdPrice / livePrice).toFixed(8));
       if (Math.abs(expectedPiAmount - quote.piAmount) / quote.piAmount > PRICE_TOLERANCE) {
         res.status(400).json({ error: "Quote amount no longer matches market price. Please get a new quote." });
         return;
@@ -100,28 +119,42 @@ export default async function handler(req, res) {
   }
 
   try {
-    const approveUrl = PI_API_BASE + "/payments/" + encodeURIComponent(paymentId) + "/approve";
-    const piRes = await fetch(approveUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": `Key ${piApiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
+    var approvePath = "/payments/" + encodeURIComponent(paymentId) + "/approve";
+    console.log("[create] calling Pi approve path=" + approvePath);
+    var piResult = await piApiPost(approvePath, {}, piApiKey);
+    console.log("[create] Pi approve status=" + piResult.status);
 
-    const piResText = await piRes.text().catch(() => "");
-
-    if (!piRes.ok) {
-      console.error("Pi payment approve failed:", piRes.status, "paymentId:", paymentId, "piResponse:", piResText);
-      res.status(piRes.status).json({ error: "Failed to approve payment", details: "Pi API returned " + piRes.status });
+    if (piResult.ok) {
+      res.status(200).json({ payment: piResult.body, quote: quote || null, ok: true });
       return;
     }
 
-    let payment;
-    try { payment = JSON.parse(piResText); } catch (e) { payment = piResText; }
-    res.status(200).json({ payment, quote: quote || null });
+    var piMsg = "";
+    if (piResult.body && typeof piResult.body === "object") {
+      piMsg = piResult.body.error || piResult.body.message || JSON.stringify(piResult.body);
+    } else {
+      piMsg = String(piResult.body || "");
+    }
+    console.error("[create] Pi approve failed status=" + piResult.status + " msg=" + piMsg.substring(0, 300));
+
+    if (piResult.status === 400 && /already/i.test(piMsg)) {
+      res.status(200).json({ payment: piResult.body, quote: quote || null, ok: true, alreadyApproved: true });
+      return;
+    }
+
+    res.status(piResult.status).json({
+      error: "Failed to approve payment on Pi Network",
+      piStatus: piResult.status,
+      piMessage: piMsg.substring(0, 500),
+    });
   } catch (err) {
-    console.error("Pi payment approval error:", err.message || err);
-    res.status(500).json({ error: "Payment approval failed" });
+    console.error("[create] exception:", err.name, err.message || err);
+    var detail = "";
+    if (err.name === "AbortError") {
+      detail = "Pi API request timed out";
+    } else {
+      detail = err.message || String(err);
+    }
+    res.status(500).json({ error: "Payment approval failed", detail: detail });
   }
 }

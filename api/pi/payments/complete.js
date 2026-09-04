@@ -1,10 +1,5 @@
-// POST /api/pi/payments/complete — Complete a Pi Network payment.
-//
-// This is called after the client has completed the payment via Pi SDK.
-// Server-side verification ensures the payment was genuinely completed.
-// Returns the plan info so the client can activate the correct subscription.
-
 const PI_API_BASE = "https://api.minepi.com/v2";
+const PI_TIMEOUT_MS = 12000;
 
 const PLANS = {
   basic:    { usdPrice: 1,   label: "Basic",    durationDays: 30 },
@@ -12,7 +7,33 @@ const PLANS = {
   lifetime: { usdPrice: 99,  label: "Lifetime", durationDays: null },
 };
 
+async function piApiPost(path, body, apiKey) {
+  var controller = new AbortController();
+  var timer = setTimeout(function () { controller.abort(); }, PI_TIMEOUT_MS);
+  try {
+    var res = await fetch(PI_API_BASE + path, {
+      method: "POST",
+      headers: {
+        "Authorization": "Key " + apiKey,
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    var text = await res.text().catch(function () { return ""; });
+    var parsed = null;
+    try { parsed = JSON.parse(text); } catch (e) { parsed = text; }
+    return { status: res.status, ok: res.ok, body: parsed, raw: text };
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
 export default async function handler(req, res) {
+  console.log("[complete] request received method=" + req.method);
+
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -27,65 +48,99 @@ export default async function handler(req, res) {
     return;
   }
 
-  const piApiKey = process.env.PI_API_KEY;
+  var piApiKey = process.env.PI_API_KEY;
+  console.log("[complete] PI_API_KEY configured=" + Boolean(piApiKey));
   if (!piApiKey) {
-    console.error("PI_API_KEY environment variable is not configured");
-    res.status(500).json({ error: "Payment service not configured" });
+    res.status(500).json({
+      error: "Payment service not configured",
+      diagnostic: "PI_API_KEY is missing in the Vercel environment variables.",
+    });
     return;
   }
 
-  let body = req.body;
+  var body = req.body;
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch (e) { body = null; }
   }
-  const { paymentId, txid, quote } = body || {};
+  var paymentId = body && body.paymentId;
+  var txid = body && body.txid;
+  var quote = body && body.quote;
 
-  if (!paymentId) {
-    res.status(400).json({ error: "Missing paymentId" });
+  console.log("[complete] paymentId type=" + typeof paymentId + " len=" + (paymentId ? paymentId.length : 0) + " txid=" + (txid ? "present" : "missing"));
+
+  if (!paymentId || typeof paymentId !== "string") {
+    res.status(400).json({ error: "Missing or invalid paymentId" });
     return;
   }
 
   try {
-    const completeUrl = PI_API_BASE + "/payments/" + encodeURIComponent(paymentId) + "/complete";
-    const piRes = await fetch(completeUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": `Key ${piApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ txid: txid || undefined }),
-    });
+    var completePath = "/payments/" + encodeURIComponent(paymentId) + "/complete";
+    var completeBody = {};
+    if (txid) completeBody.txid = txid;
 
-    const piResText = await piRes.text().catch(() => "");
+    console.log("[complete] calling Pi complete path=" + completePath + " hasTxid=" + Boolean(txid));
+    var piResult = await piApiPost(completePath, completeBody, piApiKey);
+    console.log("[complete] Pi complete status=" + piResult.status);
 
-    if (!piRes.ok) {
-      console.error("Pi payment complete failed:", piRes.status, "paymentId:", paymentId, "piResponse:", piResText);
-      res.status(piRes.status).json({ error: "Failed to complete payment", details: "Pi API returned " + piRes.status });
+    if (piResult.ok) {
+      var planInfo = null;
+      if (quote && quote.planId) {
+        var plan = PLANS[quote.planId];
+        if (plan) {
+          var activatedAt = Date.now();
+          planInfo = {
+            planId: quote.planId,
+            label: plan.label,
+            durationDays: plan.durationDays,
+            activatedAt: activatedAt,
+            expiresAt: plan.durationDays ? activatedAt + plan.durationDays * 86400000 : null,
+          };
+        }
+      }
+      res.status(200).json({ payment: piResult.body, ok: true, plan: planInfo });
       return;
     }
 
-    let payment;
-    try { payment = JSON.parse(piResText); } catch (e) { payment = piResText; }
+    var piMsg = "";
+    if (piResult.body && typeof piResult.body === "object") {
+      piMsg = piResult.body.error || piResult.body.message || JSON.stringify(piResult.body);
+    } else {
+      piMsg = String(piResult.body || "");
+    }
+    console.error("[complete] Pi complete failed status=" + piResult.status + " msg=" + piMsg.substring(0, 300));
 
-    // Determine the plan from the quote passed by the client
-    let planInfo = null;
-    if (quote && quote.planId) {
-      const plan = PLANS[quote.planId];
-      if (plan) {
-        const activatedAt = Date.now();
-        planInfo = {
-          planId: quote.planId,
-          label: plan.label,
-          durationDays: plan.durationDays,
-          activatedAt,
-          expiresAt: plan.durationDays ? activatedAt + plan.durationDays * 86400000 : null,
-        };
+    if (piResult.status === 400 && /already/i.test(piMsg)) {
+      var planInfo2 = null;
+      if (quote && quote.planId) {
+        var plan2 = PLANS[quote.planId];
+        if (plan2) {
+          var activatedAt2 = Date.now();
+          planInfo2 = {
+            planId: quote.planId,
+            label: plan2.label,
+            durationDays: plan2.durationDays,
+            activatedAt: activatedAt2,
+            expiresAt: plan2.durationDays ? activatedAt2 + plan2.durationDays * 86400000 : null,
+          };
+        }
       }
+      res.status(200).json({ payment: piResult.body, ok: true, plan: planInfo2, alreadyCompleted: true });
+      return;
     }
 
-    res.status(200).json({ payment, ok: true, plan: planInfo });
+    res.status(piResult.status).json({
+      error: "Failed to complete payment on Pi Network",
+      piStatus: piResult.status,
+      piMessage: piMsg.substring(0, 500),
+    });
   } catch (err) {
-    console.error("Pi payment completion error:", err.message || err);
-    res.status(500).json({ error: "Payment completion failed" });
+    console.error("[complete] exception:", err.name, err.message || err);
+    var detail = "";
+    if (err.name === "AbortError") {
+      detail = "Pi API request timed out";
+    } else {
+      detail = err.message || String(err);
+    }
+    res.status(500).json({ error: "Payment completion failed", detail: detail });
   }
 }

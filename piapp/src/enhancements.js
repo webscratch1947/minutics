@@ -7513,21 +7513,31 @@
           metadata: { plan: planId, orderId: currentQuote.orderId },
         }, {
           onReadyForServerApproval: function (paymentId) {
+            console.log("[Minutics] onReadyForServerApproval paymentId type=" + typeof paymentId + " len=" + (paymentId ? paymentId.length : 0));
             showProcessing();
             var apiOrigin = getApiOrigin();
+            console.log("[Minutics] posting to " + apiOrigin + "/api/pi/payments/create");
             fetch(apiOrigin + "/api/pi/payments/create", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
               body: JSON.stringify({ paymentId: paymentId, quote: currentQuote }),
             }).then(function (r) {
-              if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "Payment approval failed"); });
+              console.log("[Minutics] approve response status=" + r.status + " ok=" + r.ok);
+              if (!r.ok) return r.json().then(function (d) {
+                console.error("[Minutics] approve error body:", JSON.stringify(d));
+                throw new Error(d.error || d.piMessage || "Payment approval failed");
+              });
+              return r.json().then(function (d) {
+                console.log("[Minutics] approve success:", JSON.stringify(d).substring(0, 200));
+              });
             }).catch(function (err) {
               console.error("Server approve failed:", err);
               showErrorRetry();
             });
           },
           onReadyForServerCompletion: function (paymentId, txid) {
+            console.log("[Minutics] onReadyForServerCompletion paymentId len=" + (paymentId ? paymentId.length : 0) + " txid=" + (txid ? "present" : "missing"));
             var apiOrigin = getApiOrigin();
             fetch(apiOrigin + "/api/pi/payments/complete", {
               method: "POST",
