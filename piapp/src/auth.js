@@ -107,6 +107,7 @@ function injectStyles() {
 /* ── Expose interface for Settings page logout ───────────────────────── */
 var _piUser = null;
 var _piAuthToken = null;
+var _piSdkAccessToken = null;
 
 window.LTAuth = {
   logout: function () {
@@ -118,11 +119,15 @@ window.LTAuth = {
     }).catch(function () {});
     _piUser = null;
     _piAuthToken = null;
+    _piSdkAccessToken = null;
     document.body.classList.remove("lt-authed");
     renderGate();
   },
   currentUser: function () {
     return _piUser;
+  },
+  getAccessToken: function () {
+    return _piSdkAccessToken;
   },
 };
 
@@ -207,7 +212,7 @@ function handlePiLogin() {
     });
   }
 
-  Pi.authenticate(["username"], onIncompletePaymentFound)
+  Pi.authenticate(["payments", "username"], onIncompletePaymentFound)
     .then(function (authResult) {
       submitLabel.textContent = "Verifying...";
       var apiOrigin = getApiOrigin();
@@ -216,9 +221,10 @@ function handlePiLogin() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ accessToken: authResult.accessToken }),
+      }).then(function (res) {
+        return res.json().then(function (data) { return { ok: res.ok, data: data, accessToken: authResult.accessToken }; });
       });
     })
-    .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
     .then(function (result) {
       submitBtn.disabled = false;
       submitBtn.classList.remove("lt-auth-loading");
@@ -231,6 +237,7 @@ function handlePiLogin() {
 
       _piUser = result.data.user;
       _piAuthToken = result.data.sessionToken || null;
+      _piSdkAccessToken = result.accessToken || null;
 
       var gate = document.getElementById("lt-auth-gate");
       if (gate) gate.remove();
@@ -285,14 +292,18 @@ function ensurePiSdkAuthed() {
   try {
     Pi.init({ appId: PI_APP_ID, version: "2.0" });
   } catch (e) { return; }
-  Pi.authenticate(["username"], function (payment) {
+  Pi.authenticate(["payments", "username"], function (payment) {
     var apiOrigin = getApiOrigin();
     fetch(apiOrigin + "/api/pi/payments/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken }),
+      body: JSON.stringify({ paymentId: payment.identifier }),
     }).catch(function () {});
+  }).then(function (result) {
+    if (result && result.accessToken) {
+      _piSdkAccessToken = result.accessToken;
+    }
   }).catch(function () {});
 }
 

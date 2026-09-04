@@ -7390,7 +7390,7 @@
         '<div id="lt-checkout-body">' +
           '<p style="color:hsl(220 10% 68%);font-size:11px;text-align:center;margin:0 0 12px">Fetching price and creating quote...</p>' +
           '<button id="lt-checkout-pay-btn" style="width:100%;background:#7C3AED;border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:none;align-items:center;justify-content:center;gap:8px">\uD83D\uDFE3 Pay with Pi</button>' +
-          '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>' +
+          '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Close</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(modal);
@@ -7441,115 +7441,118 @@
       }
       var btn = document.getElementById("lt-checkout-pay-btn");
       btn.disabled = true;
-      btn.textContent = "Connecting...";
+      btn.textContent = "Starting payment...";
 
-      function onIncompletePaymentFound(payment) {
-        var apiOrigin = getApiOrigin();
-        fetch(apiOrigin + "/api/pi/payments/complete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken, quote: currentQuote }),
-        }).catch(function () {});
+      function showPayError(msg) {
+        btn.disabled = false;
+        btn.textContent = "\uD83D\uDFE3 Pay with Pi";
+        var body = document.getElementById("lt-checkout-body");
+        if (body && body.querySelector("p")) body.querySelector("p").textContent = msg;
       }
 
-      var createPaymentPromise;
+      function showProcessing() {
+        var body = document.getElementById("lt-checkout-body");
+        if (!body) return;
+        body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:#7C3AED;border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Processing payment...</p></div>';
+        if (!document.getElementById("lt-spin-kf")) {
+          var kf = document.createElement("style");
+          kf.id = "lt-spin-kf";
+          kf.textContent = "@keyframes lt-spin{to{transform:rotate(360deg)}}";
+          document.head.appendChild(kf);
+        }
+      }
+
+      function showSuccess(label) {
+        var body2 = document.getElementById("lt-checkout-body");
+        if (!body2) return;
+        body2.innerHTML =
+          '<div style="text-align:center;padding:16px 0">' +
+            '<div style="font-size:38px;margin-bottom:10px">\u2705</div>' +
+            '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment successful</p>' +
+            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics ' + label + '</p>' +
+            '<button id="lt-checkout-done-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Done</button>' +
+          '</div>';
+        document.getElementById("lt-checkout-done-btn").addEventListener("click", function () {
+          modal.remove();
+          setPlan("pro");
+          refreshPlanGatedUI();
+        });
+      }
+
+      function showErrorRetry() {
+        var body3 = document.getElementById("lt-checkout-body");
+        if (!body3) return;
+        body3.innerHTML =
+          '<div style="text-align:center;padding:16px 0">' +
+            '<div style="font-size:38px;margin-bottom:10px">\u274C</div>' +
+            '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment failed</p>' +
+            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">Please try again or check your Pi balance.</p>' +
+            '<button id="lt-checkout-retry-btn" style="width:100%;background:#7C3AED;border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">\uD83D\uDFE3 Try again</button>' +
+            '<button id="lt-checkout-close2-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Close</button>' +
+          '</div>';
+        document.getElementById("lt-checkout-close2-btn").addEventListener("click", function () { modal.remove(); });
+        document.getElementById("lt-checkout-retry-btn").addEventListener("click", function () {
+          modal.remove();
+          showPiCheckout(planId);
+        });
+      }
+
       try {
-        createPaymentPromise = Pi.createPayment({
+        Pi.createPayment({
           amount: currentQuote.piAmount,
-          currency: "Pi",
           metadata: { purpose: "minutics_" + planId + "_upgrade", orderId: currentQuote.orderId },
-        }, onIncompletePaymentFound);
+        }, {
+          onReadyForServerApproval: function (paymentId) {
+            showProcessing();
+            var apiOrigin = getApiOrigin();
+            var piToken = (window.LTAuth && window.LTAuth.getAccessToken && window.LTAuth.getAccessToken()) || null;
+            fetch(apiOrigin + "/api/pi/payments/create", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ paymentId: paymentId, accessToken: piToken, quote: currentQuote }),
+            }).then(function (r) {
+              if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "Payment approval failed"); });
+            }).catch(function (err) {
+              console.error("Server approve failed:", err);
+              showErrorRetry();
+            });
+          },
+          onReadyForServerCompletion: function (paymentId, txid) {
+            var apiOrigin = getApiOrigin();
+            var piToken = (window.LTAuth && window.LTAuth.getAccessToken && window.LTAuth.getAccessToken()) || null;
+            fetch(apiOrigin + "/api/pi/payments/complete", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ paymentId: paymentId, accessToken: piToken, txid: txid, quote: currentQuote }),
+            }).then(function (r) { return r.json(); }).then(function (d) {
+              var label = (d && d.plan && d.plan.label) || plan.name;
+              showSuccess(label);
+            }).catch(function (err) {
+              console.error("Server complete failed:", err);
+              showErrorRetry();
+            });
+          },
+          onError: function (error) {
+            console.error("Pi payment error:", error);
+            showPayError("Payment error: " + (error.message || "Please try again."));
+          },
+          onCancel: function (paymentId) {
+            console.log("Pi payment cancelled:", paymentId);
+            btn.disabled = false;
+            btn.textContent = "\uD83D\uDFE3 Pay with Pi";
+            var body = document.getElementById("lt-checkout-body");
+            if (body && body.querySelector("p")) {
+              var piAmt = currentQuote.piAmount ? currentQuote.piAmount.toFixed(4) : "?";
+              body.querySelector("p").textContent = "\u2248 " + piAmt + " PI ($" + currentQuote.usdPrice + ")";
+            }
+          },
+        });
       } catch (e) {
         console.error("Pi.createPayment threw:", e);
-        btn.disabled = false;
-        btn.textContent = "\uD83D\uDFE3 Pay with Pi";
-        var body = document.getElementById("lt-checkout-body");
-        if (body) body.querySelector("p").textContent = "Failed to start payment. Please try again.";
-        return;
+        showPayError("Could not start payment: " + (e.message || "Please try again."));
       }
-
-      var paymentTimedOut = false;
-      var timeoutId = setTimeout(function () {
-        paymentTimedOut = true;
-        btn.disabled = false;
-        btn.textContent = "\uD83D\uDFE3 Pay with Pi";
-        var body = document.getElementById("lt-checkout-body");
-        if (body) body.querySelector("p").textContent = "Payment timed out. Please try again.";
-      }, 45000);
-
-      createPaymentPromise
-        .then(function (payment) {
-          clearTimeout(timeoutId);
-          if (paymentTimedOut) return;
-          var body = document.getElementById("lt-checkout-body");
-          body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:#7C3AED;border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Processing payment...</p></div>';
-          if (!document.getElementById("lt-spin-kf")) {
-            var kf = document.createElement("style");
-            kf.id = "lt-spin-kf";
-            kf.textContent = "@keyframes lt-spin{to{transform:rotate(360deg)}}";
-            document.head.appendChild(kf);
-          }
-          var apiOrigin2 = getApiOrigin();
-          return fetch(apiOrigin2 + "/api/pi/payments/create", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken, orderId: currentQuote.orderId, amount: currentQuote.piAmount }),
-          }).then(function (r) {
-            if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "Payment approval failed"); });
-            return payment;
-          });
-        })
-        .then(function (payment) {
-          return Pi.completePayment(payment.identifier);
-        })
-        .then(function (payment) {
-          var apiOrigin3 = getApiOrigin();
-          return fetch(apiOrigin3 + "/api/pi/payments/complete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken, quote: currentQuote }),
-          }).then(function (r) { return r.json(); }).then(function (d) { return { payment: payment, data: d }; });
-        })
-        .then(function (result) {
-          clearTimeout(timeoutId);
-          var body2 = document.getElementById("lt-checkout-body");
-          if (!body2) return;
-          var label = (result.data && result.data.plan && result.data.plan.label) || plan.name;
-          body2.innerHTML =
-            '<div style="text-align:center;padding:16px 0">' +
-              '<div style="font-size:38px;margin-bottom:10px">\u2705</div>' +
-              '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment successful</p>' +
-              '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics ' + label + '</p>' +
-              '<button id="lt-checkout-done-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Done</button>' +
-            '</div>';
-          document.getElementById("lt-checkout-done-btn").addEventListener("click", function () {
-            modal.remove();
-            setPlan("pro");
-            refreshPlanGatedUI();
-          });
-        })
-        .catch(function (err) {
-          clearTimeout(timeoutId);
-          console.error("Pi payment error:", err);
-          var body3 = document.getElementById("lt-checkout-body");
-          if (!body3) return;
-          body3.innerHTML =
-            '<div style="text-align:center;padding:16px 0">' +
-              '<div style="font-size:38px;margin-bottom:10px">\u274C</div>' +
-              '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment failed</p>' +
-              '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">Please try again or check your Pi balance.</p>' +
-              '<button id="lt-checkout-retry-btn" style="width:100%;background:#7C3AED;border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">\uD83D\uDFE3 Try again</button>' +
-              '<button id="lt-checkout-cancel2-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>' +
-            '</div>';
-          document.getElementById("lt-checkout-cancel2-btn").addEventListener("click", function () { modal.remove(); });
-          document.getElementById("lt-checkout-retry-btn").addEventListener("click", function () {
-            modal.remove();
-            showPiCheckout(planId);
-          });
-        });
     });
   }
 
