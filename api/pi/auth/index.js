@@ -36,9 +36,11 @@ function setSessionCookie(res, token) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  var origin = req.headers.origin || "*";
+  res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (req.method === "OPTIONS") {
     res.status(204).end();

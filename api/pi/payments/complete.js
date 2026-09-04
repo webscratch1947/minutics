@@ -34,9 +34,11 @@ async function piApiPost(path, body, apiKey) {
 export default async function handler(req, res) {
   console.log("[complete] request received method=" + req.method);
 
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  var origin = req.headers.origin || "*";
+  res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (req.method === "OPTIONS") {
     res.status(204).end();

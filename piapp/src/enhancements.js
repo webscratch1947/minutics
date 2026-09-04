@@ -7183,7 +7183,7 @@
   function getApiOrigin() {
     if (typeof window !== "undefined" && window.location) {
       var h = window.location.hostname;
-      if (h === "piapp.minutics.com" || h === "localhost") return "";
+      if (h === "piapp.minutics.com" || h === "localhost" || (h && h.indexOf(".pinet.com") !== -1)) return "";
     }
     return "https://piapp.minutics.com";
   }
