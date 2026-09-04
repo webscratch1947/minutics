@@ -5111,7 +5111,7 @@
     if (tool === "sixjars")   openOverlay(renderSixJars);
   }, true);
 
-  /* ── Upgrade prompt (shown when a free-plan user hits a Pro-gated feature) ── */
+  /* ── Upgrade prompt (shown when a free-plan user hits a gated feature) ── */
   function showUpgradePrompt(message) {
     addStyle3();
     var existing = document.getElementById("lt-upgrade-modal");
@@ -5125,7 +5125,7 @@
         '<div style="font-size:30px;margin-bottom:10px;color:' + (isActivityLimit ? "#d94264" : "hsl(230 40% 16%)") + '">' + (isActivityLimit ? "\u00D7" : "\u2B50") + '</div>' +
         '<p style="color:hsl(230 40% 16%);font-size:16px;font-weight:800;margin:0 0 6px">' + (isActivityLimit ? "Limit reached" : "Pro feature") + '</p>' +
         '<p style="color:hsl(220 10% 45%);font-size:13px;margin:0 0 20px;line-height:1.4">' + escapeHtml(message || "This is a Pro feature.") + '</p>' +
-        '<button id="lt-upgrade-cta" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;font-family:inherit">Upgrade to Pro</button>' +
+        '<button id="lt-upgrade-cta" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;font-family:inherit">View Plans</button>' +
         '<button id="lt-upgrade-close" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:hsl(220 10% 40%);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>' +
       '</div>';
     document.body.appendChild(modal);
@@ -5133,10 +5133,7 @@
     document.getElementById("lt-upgrade-close").addEventListener("click", function () { modal.remove(); });
     document.getElementById("lt-upgrade-cta").addEventListener("click", function () {
       modal.remove();
-      showDummyCheckout(function () {
-        setPlan("pro");
-        refreshPlanGatedUI();
-      });
+      showPlansScreen();
     });
   }
 
@@ -7080,7 +7077,7 @@
         rowLabel("Plan") +
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
           '<p style="color:hsl(230 40% 16%);font-size:14px;font-weight:700;margin:0">' + (isPro() ? "\u2B50 Pro" : "Free") + '</p>' +
-          '<button id="lt-plan-toggle-btn" style="flex-shrink:0;background:' + (isPro() ? "#fff" : "hsl(230 40% 16%)") + ';border:1px solid hsl(230 40% 16%);color:' + (isPro() ? "hsl(230 40% 16%)" : "#fff") + ';padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">' + (isPro() ? "Cancel Pro" : "Upgrade to Pro") + '</button>' +
+          '<button id="lt-plan-toggle-btn" style="flex-shrink:0;background:#fff;border:1px solid hsl(230 40% 16%);color:hsl(230 40% 16%);padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">View Plans</button>' +
         '</div>' +
       '</div>' +
       '<div style="padding:16px 20px">' +
@@ -7162,15 +7159,7 @@
     });
 
     document.getElementById("lt-plan-toggle-btn").addEventListener("click", function () {
-      if (isPro()) {
-        setPlan("free");
-        refreshPlanGatedUI();
-      } else {
-        showDummyCheckout(function () {
-          setPlan("pro");
-          refreshPlanGatedUI();
-        });
-      }
+      showPlansScreen();
     });
 
     document.getElementById("lt-curr-settings-btn").addEventListener("click", function () {
@@ -7186,10 +7175,88 @@
     });
   }
 
-  /* Dummy checkout — mimics a real payment sheet (Razorpay-style) but takes
-     no real card details and never contacts a payment gateway. Swap this
-     out for a real Razorpay Checkout call once payments are wired up. */
-  function showDummyCheckout(onSuccess) {
+  /* Subscription plans selection screen (normal app — dummy payment). */
+  function showPlansScreen() {
+    addStyle3();
+    var existing = document.getElementById("lt-plans-modal");
+    if (existing) existing.remove();
+    var modal = document.createElement("div");
+    modal.id = "lt-plans-modal";
+    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
+    var plans = [
+      { id: "basic",    name: "Basic",    price: "$1",   period: "/month", pi: null },
+      { id: "yearly",   name: "1 Year",   price: "$12",  period: "/year",  pi: null },
+      { id: "lifetime", name: "Lifetime", price: "$99",  period: "",       pi: null },
+    ];
+    var planRows = plans.map(function (p, i) {
+      var active = isPro();
+      return '<div class="lt-plan-card" data-plan="' + p.id + '" style="background:#fff;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)") + ';border-radius:12px;padding:18px;cursor:pointer;transition:border-color .15s,box-shadow .15s">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between">' +
+          '<div>' +
+            '<p style="color:hsl(230 40% 16%);font-size:16px;font-weight:800;margin:0">' + p.name + '</p>' +
+            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:2px 0 0">' + p.price + '<span style="color:hsl(220 10% 55%)">' + p.period + '</span></p>' +
+          '</div>' +
+          '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)") + ';display:flex;align-items:center;justify-content:center"></div>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+    modal.innerHTML =
+      '<div style="width:100%;max-width:360px;background:#fff;border:1px solid hsl(220 13% 88%);padding:26px;border-radius:16px" id="lt-plans-card">' +
+        '<p style="color:hsl(230 40% 16%);font-size:20px;font-weight:800;margin:0 0 4px;text-align:center">Choose your plan</p>' +
+        '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px;text-align:center">Unlock all Minutics features</p>' +
+        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:10px">' + planRows + '</div>' +
+        '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:14px 0 0">Test mode \u2014 no real payment will be taken</p>' +
+        '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:8px;font-family:inherit">Cancel</button>' +
+      '</div>';
+    document.body.appendChild(modal);
+
+    var selectedPlan = "yearly";
+    function highlightPlan(planId) {
+      selectedPlan = planId;
+      modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
+        var isActive = card.getAttribute("data-plan") === planId;
+        card.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)";
+        card.style.boxShadow = isActive ? "0 0 0 1px hsl(230 40% 16%)" : "none";
+        var dot = card.querySelector("div > div:last-child");
+        if (dot) {
+          dot.style.background = isActive ? "hsl(230 40% 16%)" : "transparent";
+          dot.innerHTML = isActive ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
+        }
+      });
+    }
+    highlightPlan("yearly");
+
+    modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
+      card.addEventListener("click", function () {
+        highlightPlan(card.getAttribute("data-plan"));
+      });
+    });
+
+    document.getElementById("lt-plans-close").addEventListener("click", function () { modal.remove(); });
+    modal.addEventListener("click", function (e) { if (e.target === modal) modal.remove(); });
+
+    modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
+      card.addEventListener("dblclick", function () {
+        var planId = card.getAttribute("data-plan");
+        modal.remove();
+        showDummyCheckoutForPlan(planId);
+      });
+    });
+
+    /* Clicking a selected plan again proceeds to checkout */
+    modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
+      card.addEventListener("click", function () {
+        if (selectedPlan === card.getAttribute("data-plan")) {
+          modal.remove();
+          showDummyCheckoutForPlan(selectedPlan);
+        }
+      });
+    });
+  }
+
+  function showDummyCheckoutForPlan(planId) {
+    var plans = { basic: { label: "Basic", price: "$1", sub: "/month" }, yearly: { label: "1 Year", price: "$12", sub: "/year" }, lifetime: { label: "Lifetime", price: "$99", sub: "" } };
+    var plan = plans[planId] || plans.yearly;
     addStyle3();
     var existing = document.getElementById("lt-checkout-modal");
     if (existing) existing.remove();
@@ -7198,8 +7265,8 @@
     modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
     modal.innerHTML =
       '<div style="width:100%;max-width:340px;background:#fff;border:1px solid hsl(220 13% 88%);padding:26px" id="lt-checkout-card">' +
-        '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px">Minutics Pro</p>' +
-        '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px">\u20B999<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">/month</span></p>' +
+        '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px">Minutics ' + plan.label + '</p>' +
+        '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px">' + plan.price + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + plan.sub + '</span></p>' +
         '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 22px">Budget Tracker, Telegram reports, full history & more</p>' +
         '<div id="lt-checkout-body">' +
           '<div style="background:hsl(220 15% 97%);border:1px solid hsl(220 13% 88%);padding:12px 14px;margin-bottom:10px">' +
@@ -7216,16 +7283,14 @@
               '<p style="color:hsl(230 40% 16%);font-size:14px;margin:0">\u2022\u2022\u2022</p>' +
             '</div>' +
           '</div>' +
-          '<button id="lt-checkout-pay-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Pay \u20B999</button>' +
+          '<button id="lt-checkout-pay-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Pay ' + plan.price + '</button>' +
           '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>' +
           '<p style="color:hsl(220 10% 68%);font-size:9px;text-align:center;margin:10px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
       '</div>';
     document.body.appendChild(modal);
-
     document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
     modal.addEventListener("click", function (e) { if (e.target === modal) modal.remove(); });
-
     document.getElementById("lt-checkout-pay-btn").addEventListener("click", function () {
       var body = document.getElementById("lt-checkout-body");
       body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:hsl(230 40% 16%);border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Processing payment...</p></div>';
@@ -7240,12 +7305,13 @@
           '<div style="text-align:center;padding:16px 0">' +
             '<div style="font-size:38px;margin-bottom:10px">\u2705</div>' +
             '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment successful</p>' +
-            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics Pro</p>' +
+            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics ' + plan.label + '</p>' +
             '<button id="lt-checkout-done-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Done</button>' +
           '</div>';
         document.getElementById("lt-checkout-done-btn").addEventListener("click", function () {
           modal.remove();
-          onSuccess();
+          setPlan("pro");
+          refreshPlanGatedUI();
         });
       }, 1400);
     });

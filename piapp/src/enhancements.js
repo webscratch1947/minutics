@@ -5111,7 +5111,7 @@
     if (tool === "sixjars")   openOverlay(renderSixJars);
   }, true);
 
-  /* ── Upgrade prompt (shown when a free-plan user hits a Pro-gated feature) ── */
+  /* ── Upgrade prompt (shown when a free-plan user hits a gated feature) ── */
   function showUpgradePrompt(message) {
     addStyle3();
     var existing = document.getElementById("lt-upgrade-modal");
@@ -5125,7 +5125,7 @@
         '<div style="font-size:30px;margin-bottom:10px;color:' + (isActivityLimit ? "#d94264" : "hsl(230 40% 16%)") + '">' + (isActivityLimit ? "\u00D7" : "\u2B50") + '</div>' +
         '<p style="color:hsl(230 40% 16%);font-size:16px;font-weight:800;margin:0 0 6px">' + (isActivityLimit ? "Limit reached" : "Pro feature") + '</p>' +
         '<p style="color:hsl(220 10% 45%);font-size:13px;margin:0 0 20px;line-height:1.4">' + escapeHtml(message || "This is a Pro feature.") + '</p>' +
-        '<button id="lt-upgrade-cta" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;font-family:inherit">Upgrade to Pro</button>' +
+        '<button id="lt-upgrade-cta" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;font-family:inherit">View Plans</button>' +
         '<button id="lt-upgrade-close" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:hsl(220 10% 40%);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>' +
       '</div>';
     document.body.appendChild(modal);
@@ -5133,10 +5133,7 @@
     document.getElementById("lt-upgrade-close").addEventListener("click", function () { modal.remove(); });
     document.getElementById("lt-upgrade-cta").addEventListener("click", function () {
       modal.remove();
-      showPiCheckout(function () {
-        setPlan("pro");
-        refreshPlanGatedUI();
-      });
+      showPlansScreen();
     });
   }
 
@@ -7080,7 +7077,7 @@
         rowLabel("Plan") +
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
           '<p style="color:hsl(230 40% 16%);font-size:14px;font-weight:700;margin:0">' + (isPro() ? "\u2B50 Pro" : "Free") + '</p>' +
-          '<button id="lt-plan-toggle-btn" style="flex-shrink:0;background:' + (isPro() ? "#fff" : "hsl(230 40% 16%)") + ';border:1px solid hsl(230 40% 16%);color:' + (isPro() ? "hsl(230 40% 16%)" : "#fff") + ';padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">' + (isPro() ? "Cancel Pro" : "Upgrade to Pro") + '</button>' +
+          '<button id="lt-plan-toggle-btn" style="flex-shrink:0;background:#fff;border:1px solid hsl(230 40% 16%);color:hsl(230 40% 16%);padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">View Plans</button>' +
         '</div>' +
       '</div>' +
       '<div style="padding:16px 20px">' +
@@ -7162,15 +7159,7 @@
     });
 
     document.getElementById("lt-plan-toggle-btn").addEventListener("click", function () {
-      if (isPro()) {
-        setPlan("free");
-        refreshPlanGatedUI();
-      } else {
-        showPiCheckout(function () {
-          setPlan("pro");
-          refreshPlanGatedUI();
-        });
-      }
+      showPlansScreen();
     });
 
     document.getElementById("lt-curr-settings-btn").addEventListener("click", function () {
@@ -7186,10 +7175,169 @@
     });
   }
 
-  /* Pi Network payment checkout — uses the official Pi SDK to create,
-     approve, and complete a payment for Minutics Pro. Payment verification
-     happens server-side via /api/pi/payments endpoints. */
-  function showPiCheckout(onSuccess) {
+  /* ── Subscription plans selection screen (Pi app — real Pi payments) ── */
+  var _plansPriceExpiresAt = 0;
+  var _plansPriceTimer = null;
+  var _plansPiUsdPrice = null;
+
+  function getApiOrigin() {
+    if (typeof window !== "undefined" && window.location) {
+      var h = window.location.hostname;
+      if (h === "piapp.minutics.com" || h === "localhost") return "";
+    }
+    return "https://piapp.minutics.com";
+  }
+
+  function fetchPiPrice(callback) {
+    var apiOrigin = getApiOrigin();
+    fetch(apiOrigin + "/api/pi/price")
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.piUsdPrice) {
+          _plansPiUsdPrice = data.piUsdPrice;
+          _plansPriceExpiresAt = data.expiresAt || 0;
+          if (callback) callback(null, data);
+        } else {
+          if (callback) callback(new Error("No price data"));
+        }
+      })
+      .catch(function (err) {
+        if (callback) callback(err);
+      });
+  }
+
+  function startPriceCountdown(el, expiresAt) {
+    if (_plansPriceTimer) clearInterval(_plansPriceTimer);
+    function tick() {
+      var remaining = Math.max(0, expiresAt - Date.now());
+      var mins = Math.floor(remaining / 60000);
+      var secs = Math.floor((remaining % 60000) / 1000);
+      if (el) el.textContent = "Price updates in " + mins + ":" + (secs < 10 ? "0" : "") + secs;
+      if (remaining <= 0) {
+        clearInterval(_plansPriceTimer);
+        _plansPriceTimer = null;
+      }
+    }
+    tick();
+    _plansPriceTimer = setInterval(tick, 1000);
+  }
+
+  function showPlansScreen() {
+    addStyle3();
+    var existing = document.getElementById("lt-plans-modal");
+    if (existing) existing.remove();
+
+    var modal = document.createElement("div");
+    modal.id = "lt-plans-modal";
+    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
+
+    var planDefs = [
+      { id: "basic",    name: "Basic",    usd: 1,  period: "/month" },
+      { id: "yearly",   name: "1 Year",   usd: 12, period: "/year" },
+      { id: "lifetime", name: "Lifetime", usd: 99, period: "" },
+    ];
+
+    function piAmount(usd) {
+      if (!_plansPiUsdPrice) return null;
+      return (usd / _plansPiUsdPrice).toFixed(4);
+    }
+
+    function renderCards(piData) {
+      var planRows = planDefs.map(function (p, i) {
+        var piAmt = piAmount(p.usd);
+        return '<div class="lt-plan-card" data-plan="' + p.id + '" style="background:#fff;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)") + ';border-radius:12px;padding:18px;cursor:pointer;transition:border-color .15s,box-shadow .15s">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between">' +
+            '<div>' +
+              '<p style="color:hsl(230 40% 16%);font-size:16px;font-weight:800;margin:0">' + p.name + '</p>' +
+              '<p style="color:hsl(220 10% 50%);font-size:12px;margin:2px 0 0">$' + p.usd + '<span style="color:hsl(220 10% 55%)">' + p.period + '</span></p>' +
+              (piAmt ? '<p style="color:hsl(220 10% 50%);font-size:11px;margin:2px 0 0">\u2248 ' + piAmt + ' PI</p>' : '<p style="color:hsl(220 10% 68%);font-size:11px;margin:2px 0 0">Loading price...</p>') +
+            '</div>' +
+            '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)") + ';display:flex;align-items:center;justify-content:center"></div>' +
+          '</div>' +
+        '</div>';
+      }).join("");
+
+      var timerText = "";
+      if (piData && piData.expiresAt) {
+        var remaining = Math.max(0, piData.expiresAt - Date.now());
+        var mins = Math.floor(remaining / 60000);
+        var secs = Math.floor((remaining % 60000) / 1000);
+        timerText = "Price updates in " + mins + ":" + (secs < 10 ? "0" : "") + secs;
+      }
+
+      modal.innerHTML =
+        '<div style="width:100%;max-width:360px;background:#fff;border:1px solid hsl(220 13% 88%);padding:26px;border-radius:16px" id="lt-plans-card">' +
+          '<p style="color:hsl(230 40% 16%);font-size:20px;font-weight:800;margin:0 0 4px;text-align:center">Choose your plan</p>' +
+          '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 6px;text-align:center">Unlock all Minutics features</p>' +
+          (timerText ? '<p id="lt-plans-timer" style="color:hsl(220 10% 68%);font-size:11px;margin:0 0 16px;text-align:center;font-variant-numeric:tabular-nums">' + timerText + '</p>' : '<p id="lt-plans-timer" style="color:hsl(220 10% 68%);font-size:11px;margin:0 0 16px;text-align:center"></p>') +
+          '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:10px">' + planRows + '</div>' +
+          '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:12px;font-family:inherit">Cancel</button>' +
+        '</div>';
+
+      /* Start countdown */
+      if (piData && piData.expiresAt) {
+        startPriceCountdown(document.getElementById("lt-plans-timer"), piData.expiresAt);
+      }
+
+      /* Plan selection */
+      var selectedPlan = "yearly";
+      function highlightPlan(planId) {
+        selectedPlan = planId;
+        modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
+          var isActive = card.getAttribute("data-plan") === planId;
+          card.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)";
+          card.style.boxShadow = isActive ? "0 0 0 1px hsl(230 40% 16%)" : "none";
+          var dot = card.querySelector("div > div:last-child");
+          if (dot) {
+            dot.style.background = isActive ? "hsl(230 40% 16%)" : "transparent";
+            dot.innerHTML = isActive ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
+          }
+        });
+      }
+      highlightPlan("yearly");
+
+      modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
+        card.addEventListener("click", function () {
+          var planId = card.getAttribute("data-plan");
+          if (selectedPlan === planId) {
+            modal.remove();
+            if (_plansPriceTimer) { clearInterval(_plansPriceTimer); _plansPriceTimer = null; }
+            showPiCheckout(planId);
+          } else {
+            highlightPlan(planId);
+          }
+        });
+      });
+    }
+
+    document.body.appendChild(modal);
+    document.getElementById("lt-plans-close").addEventListener("click", function () {
+      modal.remove();
+      if (_plansPriceTimer) { clearInterval(_plansPriceTimer); _plansPriceTimer = null; }
+    });
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) {
+        modal.remove();
+        if (_plansPriceTimer) { clearInterval(_plansPriceTimer); _plansPriceTimer = null; }
+      }
+    });
+
+    /* Fetch price and render */
+    if (_plansPiUsdPrice && Date.now() < _plansPriceExpiresAt) {
+      renderCards({ piUsdPrice: _plansPiUsdPrice, expiresAt: _plansPriceExpiresAt });
+    } else {
+      renderCards(null);
+      fetchPiPrice(function (err, data) {
+        if (!err && data) renderCards(data);
+      });
+    }
+  }
+
+  /* Pi Network payment checkout for a specific plan */
+  function showPiCheckout(planId) {
+    var planDefs = { basic: { name: "Basic", usd: 1, period: "/month" }, yearly: { name: "1 Year", usd: 12, period: "/year" }, lifetime: { name: "Lifetime", usd: 99, period: "" } };
+    var plan = planDefs[planId] || planDefs.yearly;
+
     addStyle3();
     var existing = document.getElementById("lt-checkout-modal");
     if (existing) existing.remove();
@@ -7198,11 +7346,12 @@
     modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
     modal.innerHTML =
       '<div style="width:100%;max-width:340px;background:#fff;border:1px solid hsl(220 13% 88%);padding:26px" id="lt-checkout-card">' +
-        '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px">Minutics Pro</p>' +
-        '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px">Pro Plan<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600"> \u00b7 One-time</span></p>' +
+        '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px">Minutics ' + plan.name + '</p>' +
+        '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px">$' + plan.usd + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + plan.period + '</span></p>' +
         '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 22px">Budget Tracker, full history & more</p>' +
         '<div id="lt-checkout-body">' +
-          '<button id="lt-checkout-pay-btn" style="width:100%;background:#7C3AED;border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">\uD83D\uDFE3 Pay with Pi</button>' +
+          '<p style="color:hsl(220 10% 68%);font-size:11px;text-align:center;margin:0 0 12px">Fetching price and creating quote...</p>' +
+          '<button id="lt-checkout-pay-btn" style="width:100%;background:#7C3AED;border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:none;align-items:center;justify-content:center;gap:8px">\uD83D\uDFE3 Pay with Pi</button>' +
           '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>' +
         '</div>' +
       '</div>';
@@ -7211,9 +7360,45 @@
     document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
     modal.addEventListener("click", function (e) { if (e.target === modal) modal.remove(); });
 
+    /* Fetch price, create quote, then enable pay button */
+    var currentQuote = null;
+    fetchPiPrice(function (err, priceData) {
+      if (err || !priceData) {
+        var body = document.getElementById("lt-checkout-body");
+        if (body) body.querySelector("p").textContent = "Unable to fetch Pi price. Please try again.";
+        return;
+      }
+      var apiOrigin = getApiOrigin();
+      fetch(apiOrigin + "/api/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ planId: planId }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (quote) {
+          currentQuote = quote;
+          var piAmt = quote.piAmount ? quote.piAmount.toFixed(4) : "?";
+          var body = document.getElementById("lt-checkout-body");
+          if (!body) return;
+          body.querySelector("p").textContent = "\u2248 " + piAmt + " PI ($" + quote.usdPrice + ")";
+          var payBtn = document.getElementById("lt-checkout-pay-btn");
+          payBtn.style.display = "flex";
+          payBtn.textContent = "\uD83D\uDFE3 Pay " + piAmt + " PI";
+        })
+        .catch(function () {
+          var body = document.getElementById("lt-checkout-body");
+          if (body) body.querySelector("p").textContent = "Failed to create quote. Please try again.";
+        });
+    });
+
     document.getElementById("lt-checkout-pay-btn").addEventListener("click", function () {
       if (typeof Pi === "undefined") {
         alert("Pi Network SDK not loaded. Please open this app inside the Pi Browser.");
+        return;
+      }
+      if (!currentQuote) {
+        alert("Quote not ready. Please wait for the price to load.");
         return;
       }
       var btn = document.getElementById("lt-checkout-pay-btn");
@@ -7221,22 +7406,21 @@
       btn.textContent = "Connecting...";
 
       function onIncompletePaymentFound(payment) {
-        var apiOrigin = (typeof window !== "undefined" && window.location) ?
-          ((window.location.hostname === "piapp.minutics.com" || window.location.hostname === "localhost") ? "" : "https://piapp.minutics.com") : "";
+        var apiOrigin = getApiOrigin();
         fetch(apiOrigin + "/api/pi/payments/complete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken }),
+          body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken, quote: currentQuote }),
         }).catch(function () {});
       }
 
       try { Pi.init({ appId: "minutics", version: "2.0" }); } catch (e) {}
 
       Pi.createPayment({
-        amount: 1,
+        amount: currentQuote.piAmount,
         currency: "Pi",
-        metadata: { purpose: "minutics_pro_upgrade" },
+        metadata: { purpose: "minutics_" + planId + "_upgrade", orderId: currentQuote.orderId },
       }, onIncompletePaymentFound)
         .then(function (payment) {
           var body = document.getElementById("lt-checkout-body");
@@ -7247,44 +7431,41 @@
             kf.textContent = "@keyframes lt-spin{to{transform:rotate(360deg)}}";
             document.head.appendChild(kf);
           }
-          // Approve payment server-side
-          var apiOrigin2 = (typeof window !== "undefined" && window.location) ?
-            ((window.location.hostname === "piapp.minutics.com" || window.location.hostname === "localhost") ? "" : "https://piapp.minutics.com") : "";
+          var apiOrigin2 = getApiOrigin();
           return fetch(apiOrigin2 + "/api/pi/payments/create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken }),
+            body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken, orderId: currentQuote.orderId, amount: currentQuote.piAmount }),
           }).then(function () { return payment; });
         })
         .then(function (payment) {
-          // Complete payment via Pi SDK
           return Pi.completePayment(payment.identifier);
         })
         .then(function (payment) {
-          // Notify server of completion
-          var apiOrigin3 = (typeof window !== "undefined" && window.location) ?
-            ((window.location.hostname === "piapp.minutics.com" || window.location.hostname === "localhost") ? "" : "https://piapp.minutics.com") : "";
+          var apiOrigin3 = getApiOrigin();
           return fetch(apiOrigin3 + "/api/pi/payments/complete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken }),
-          }).then(function () { return payment; });
+            body: JSON.stringify({ paymentId: payment.identifier, accessToken: payment.accessToken, quote: currentQuote }),
+          }).then(function (r) { return r.json(); }).then(function (d) { return { payment: payment, data: d }; });
         })
-        .then(function () {
+        .then(function (result) {
           var body2 = document.getElementById("lt-checkout-body");
           if (!body2) return;
+          var label = (result.data && result.data.plan && result.data.plan.label) || plan.name;
           body2.innerHTML =
             '<div style="text-align:center;padding:16px 0">' +
               '<div style="font-size:38px;margin-bottom:10px">\u2705</div>' +
               '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment successful</p>' +
-              '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics Pro</p>' +
+              '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics ' + label + '</p>' +
               '<button id="lt-checkout-done-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Done</button>' +
             '</div>';
           document.getElementById("lt-checkout-done-btn").addEventListener("click", function () {
             modal.remove();
-            onSuccess();
+            setPlan("pro");
+            refreshPlanGatedUI();
           });
         })
         .catch(function (err) {
@@ -7302,7 +7483,7 @@
           document.getElementById("lt-checkout-cancel2-btn").addEventListener("click", function () { modal.remove(); });
           document.getElementById("lt-checkout-retry-btn").addEventListener("click", function () {
             modal.remove();
-            showPiCheckout(onSuccess);
+            showPiCheckout(planId);
           });
         });
     });
