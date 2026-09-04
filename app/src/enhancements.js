@@ -7180,78 +7180,98 @@
     addStyle3();
     var existing = document.getElementById("lt-plans-modal");
     if (existing) existing.remove();
-    var modal = document.createElement("div");
-    modal.id = "lt-plans-modal";
-    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
+
     var plans = [
-      { id: "basic",    name: "Basic",    price: "$1",   period: "/month", pi: null },
-      { id: "yearly",   name: "1 Year",   price: "$12",  period: "/year",  pi: null },
-      { id: "lifetime", name: "Lifetime", price: "$99",  period: "",       pi: null },
+      { id: "basic",    name: "Basic",    price: "$1",  period: "/month", desc: "Essential premium access for one month.", features: ["Premium features", "All Minutics tools", "1 month access"] },
+      { id: "yearly",   name: "1 Year",   price: "$12", period: "/year",  desc: "Full premium access for 12 months with one payment.", features: ["Premium features", "All Minutics tools", "12 months access", "One payment"] },
+      { id: "lifetime", name: "Lifetime", price: "$99", period: "",       desc: "Premium access with no expiration.", features: ["Premium features", "All Minutics tools", "Lifetime access", "No expiration"] },
     ];
-    var planRows = plans.map(function (p, i) {
-      var active = isPro();
-      return '<div class="lt-plan-card" data-plan="' + p.id + '" style="background:#fff;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)") + ';border-radius:12px;padding:18px;cursor:pointer;transition:border-color .15s,box-shadow .15s">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between">' +
+
+    var planCards = plans.map(function (p, i) {
+      return '<div class="lt-plan-card" data-plan="' + p.id + '" style="background:#fff;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)") + ';border-radius:14px;padding:20px;cursor:pointer;transition:border-color .2s,box-shadow .2s;position:relative">' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">' +
           '<div>' +
-            '<p style="color:hsl(230 40% 16%);font-size:16px;font-weight:800;margin:0">' + p.name + '</p>' +
-            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:2px 0 0">' + p.price + '<span style="color:hsl(220 10% 55%)">' + p.period + '</span></p>' +
+            '<p style="color:hsl(230 40% 16%);font-size:18px;font-weight:800;margin:0">' + p.name + '</p>' +
+            '<p style="color:hsl(230 40% 16%);font-size:28px;font-weight:800;margin:4px 0 0;letter-spacing:-.02em">' + p.price + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + p.period + '</span></p>' +
           '</div>' +
-          '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)") + ';display:flex;align-items:center;justify-content:center"></div>' +
+          '<div class="lt-plan-check" style="width:26px;height:26px;border-radius:50%;border:2px solid ' + (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)") + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:4px;transition:all .2s"></div>' +
+        '</div>' +
+        '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0 0 12px;line-height:1.4">' + p.desc + '</p>' +
+        '<div style="display:flex;flex-direction:column;gap:6px">' +
+          p.features.map(function (f) {
+            return '<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:hsl(220 10% 40%)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(152 60% 45%)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' + f + '</div>';
+          }).join("") +
         '</div>' +
       '</div>';
     }).join("");
+
+    var modal = document.createElement("div");
+    modal.id = "lt-plans-modal";
+    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;overflow-y:auto;-webkit-overflow-scrolling:touch;";
     modal.innerHTML =
-      '<div style="width:100%;max-width:360px;background:#fff;border:1px solid hsl(220 13% 88%);padding:26px;border-radius:16px" id="lt-plans-card">' +
-        '<p style="color:hsl(230 40% 16%);font-size:20px;font-weight:800;margin:0 0 4px;text-align:center">Choose your plan</p>' +
-        '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px;text-align:center">Unlock all Minutics features</p>' +
-        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:10px">' + planRows + '</div>' +
-        '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:14px 0 0">Test mode \u2014 no real payment will be taken</p>' +
-        '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:8px;font-family:inherit">Cancel</button>' +
+      '<div style="width:100%;max-width:520px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;padding:32px 28px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto" id="lt-plans-card">' +
+        '<div style="text-align:center;margin-bottom:24px">' +
+          '<p style="color:hsl(230 40% 16%);font-size:22px;font-weight:800;margin:0 0 4px">Choose your plan</p>' +
+          '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Unlock all Minutics premium features</p>' +
+        '</div>' +
+        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:12px">' + planCards + '</div>' +
+        '<div id="lt-plans-cta-wrap" style="margin-top:20px;text-align:center">' +
+          '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with 1 Year</button>' +
+        '</div>' +
+        '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:4px;font-family:inherit">Cancel</button>' +
+        '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">Test mode \u2014 no real payment will be taken</p>' +
       '</div>';
     document.body.appendChild(modal);
 
     var selectedPlan = "yearly";
+
     function highlightPlan(planId) {
       selectedPlan = planId;
       modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
         var isActive = card.getAttribute("data-plan") === planId;
         card.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)";
-        card.style.boxShadow = isActive ? "0 0 0 1px hsl(230 40% 16%)" : "none";
-        var dot = card.querySelector("div > div:last-child");
-        if (dot) {
-          dot.style.background = isActive ? "hsl(230 40% 16%)" : "transparent";
-          dot.innerHTML = isActive ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
+        card.style.boxShadow = isActive ? "0 0 0 1px hsl(230 40% 16%), 0 4px 12px rgba(0,0,0,.08)" : "none";
+        var check = card.querySelector(".lt-plan-check");
+        if (check) {
+          check.style.background = isActive ? "hsl(230 40% 16%)" : "transparent";
+          check.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)";
+          check.innerHTML = isActive ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
         }
       });
+      var cta = document.getElementById("lt-plans-cta");
+      if (cta) {
+        var p = plans.find(function (x) { return x.id === planId; });
+        cta.textContent = "Continue with " + (p ? p.name : planId);
+      }
     }
+
     highlightPlan("yearly");
 
+    /* Single click handler per card */
     modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
       card.addEventListener("click", function () {
-        highlightPlan(card.getAttribute("data-plan"));
-      });
-    });
-
-    document.getElementById("lt-plans-close").addEventListener("click", function () { modal.remove(); });
-    modal.addEventListener("click", function (e) { if (e.target === modal) modal.remove(); });
-
-    modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
-      card.addEventListener("dblclick", function () {
         var planId = card.getAttribute("data-plan");
-        modal.remove();
-        showDummyCheckoutForPlan(planId);
-      });
-    });
-
-    /* Clicking a selected plan again proceeds to checkout */
-    modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
-      card.addEventListener("click", function () {
-        if (selectedPlan === card.getAttribute("data-plan")) {
+        if (selectedPlan === planId) {
           modal.remove();
           showDummyCheckoutForPlan(selectedPlan);
+        } else {
+          highlightPlan(planId);
         }
       });
     });
+
+    /* CTA button proceeds to checkout */
+    var ctaBtn = document.getElementById("lt-plans-cta");
+    if (ctaBtn) {
+      ctaBtn.addEventListener("click", function () {
+        modal.remove();
+        showDummyCheckoutForPlan(selectedPlan);
+      });
+    }
+
+    /* Close / backdrop */
+    document.getElementById("lt-plans-close").addEventListener("click", function () { modal.remove(); });
+    modal.addEventListener("click", function (e) { if (e.target === modal) modal.remove(); });
   }
 
   function showDummyCheckoutForPlan(planId) {
