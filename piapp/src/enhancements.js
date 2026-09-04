@@ -7515,12 +7515,11 @@
           onReadyForServerApproval: function (paymentId) {
             showProcessing();
             var apiOrigin = getApiOrigin();
-            var piToken = (window.LTAuth && window.LTAuth.getAccessToken && window.LTAuth.getAccessToken()) || null;
             fetch(apiOrigin + "/api/pi/payments/create", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
-              body: JSON.stringify({ paymentId: paymentId, accessToken: piToken, quote: currentQuote }),
+              body: JSON.stringify({ paymentId: paymentId, quote: currentQuote }),
             }).then(function (r) {
               if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "Payment approval failed"); });
             }).catch(function (err) {
@@ -7530,12 +7529,11 @@
           },
           onReadyForServerCompletion: function (paymentId, txid) {
             var apiOrigin = getApiOrigin();
-            var piToken = (window.LTAuth && window.LTAuth.getAccessToken && window.LTAuth.getAccessToken()) || null;
             fetch(apiOrigin + "/api/pi/payments/complete", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
-              body: JSON.stringify({ paymentId: paymentId, accessToken: piToken, txid: txid, quote: currentQuote }),
+              body: JSON.stringify({ paymentId: paymentId, txid: txid, quote: currentQuote }),
             }).then(function (r) { return r.json(); }).then(function (d) {
               var label = (d && d.plan && d.plan.label) || plan.name;
               showSuccess(label);

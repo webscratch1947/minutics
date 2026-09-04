@@ -3,9 +3,9 @@
 // Pi Payment flow:
 // 1. Client gets a quote from /api/quote (client stores it)
 // 2. Client creates a payment via Pi SDK → gets a paymentId
-// 3. Client POSTs { paymentId, accessToken, quote } here
+// 3. Client POSTs { paymentId, quote } here
 // 4. Server validates the quote against live CoinGecko price
-// 5. Server calls Pi's API to approve the payment
+// 5. Server calls Pi's API to approve the payment using PI_API_KEY
 // 6. Client completes the payment via Pi SDK
 // 7. Server verifies completion via /api/pi/payments/complete
 
@@ -49,19 +49,21 @@ export default async function handler(req, res) {
     return;
   }
 
+  const piApiKey = process.env.PI_API_KEY;
+  if (!piApiKey) {
+    console.error("PI_API_KEY environment variable is not configured");
+    res.status(500).json({ error: "Payment service not configured" });
+    return;
+  }
+
   let body = req.body;
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch (e) { body = null; }
   }
-  const { paymentId, accessToken, quote } = body || {};
+  const { paymentId, quote } = body || {};
 
   if (!paymentId) {
     res.status(400).json({ error: "Missing paymentId" });
-    return;
-  }
-
-  if (!accessToken) {
-    res.status(400).json({ error: "Missing accessToken" });
     return;
   }
 
@@ -98,26 +100,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Approve the payment on Pi's server
-    const piRes = await fetch(PI_API_BASE + "/payments/" + paymentId + "/approve", {
+    const approveUrl = PI_API_BASE + "/payments/" + encodeURIComponent(paymentId) + "/approve";
+    const piRes = await fetch(approveUrl, {
       method: "POST",
       headers: {
-        "Authorization": `Key ${accessToken}`,
+        "Authorization": `Key ${piApiKey}`,
         "Content-Type": "application/json",
       },
     });
 
+    const piResText = await piRes.text().catch(() => "");
+
     if (!piRes.ok) {
-      const errText = await piRes.text().catch(() => "");
-      console.error("Pi payment approve failed:", piRes.status, errText);
-      res.status(piRes.status).json({ error: "Failed to approve payment" });
+      console.error("Pi payment approve failed:", piRes.status, "paymentId:", paymentId, "piResponse:", piResText);
+      res.status(piRes.status).json({ error: "Failed to approve payment", details: "Pi API returned " + piRes.status });
       return;
     }
 
-    const payment = await piRes.json();
+    let payment;
+    try { payment = JSON.parse(piResText); } catch (e) { payment = piResText; }
     res.status(200).json({ payment, quote: quote || null });
   } catch (err) {
-    console.error("Pi payment approval error:", err);
+    console.error("Pi payment approval error:", err.message || err);
     res.status(500).json({ error: "Payment approval failed" });
   }
 }

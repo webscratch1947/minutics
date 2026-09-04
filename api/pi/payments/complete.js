@@ -27,40 +27,45 @@ export default async function handler(req, res) {
     return;
   }
 
+  const piApiKey = process.env.PI_API_KEY;
+  if (!piApiKey) {
+    console.error("PI_API_KEY environment variable is not configured");
+    res.status(500).json({ error: "Payment service not configured" });
+    return;
+  }
+
   let body = req.body;
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch (e) { body = null; }
   }
-  const { paymentId, accessToken, quote } = body || {};
+  const { paymentId, txid, quote } = body || {};
 
   if (!paymentId) {
     res.status(400).json({ error: "Missing paymentId" });
     return;
   }
 
-  if (!accessToken) {
-    res.status(400).json({ error: "Missing accessToken" });
-    return;
-  }
-
   try {
-    // Complete the payment on Pi's server
-    const piRes = await fetch(PI_API_BASE + "/payments/" + paymentId + "/complete", {
+    const completeUrl = PI_API_BASE + "/payments/" + encodeURIComponent(paymentId) + "/complete";
+    const piRes = await fetch(completeUrl, {
       method: "POST",
       headers: {
-        "Authorization": `Key ${accessToken}`,
+        "Authorization": `Key ${piApiKey}`,
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ txid: txid || undefined }),
     });
 
+    const piResText = await piRes.text().catch(() => "");
+
     if (!piRes.ok) {
-      const errText = await piRes.text().catch(() => "");
-      console.error("Pi payment complete failed:", piRes.status, errText);
-      res.status(piRes.status).json({ error: "Failed to complete payment" });
+      console.error("Pi payment complete failed:", piRes.status, "paymentId:", paymentId, "piResponse:", piResText);
+      res.status(piRes.status).json({ error: "Failed to complete payment", details: "Pi API returned " + piRes.status });
       return;
     }
 
-    const payment = await piRes.json();
+    let payment;
+    try { payment = JSON.parse(piResText); } catch (e) { payment = piResText; }
 
     // Determine the plan from the quote passed by the client
     let planInfo = null;
@@ -80,7 +85,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ payment, ok: true, plan: planInfo });
   } catch (err) {
-    console.error("Pi payment completion error:", err);
+    console.error("Pi payment completion error:", err.message || err);
     res.status(500).json({ error: "Payment completion failed" });
   }
 }
