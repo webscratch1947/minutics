@@ -48,6 +48,7 @@ if (target === "piapp") {
   copy(join(projectRoot, 'piapp', 'favicon.png'), join(piappOutDir, 'favicon.png'));
   copy(join(projectRoot, 'piapp', 'robots.txt'), join(piappOutDir, 'robots.txt'));
   copy(join(projectRoot, 'piapp', 'life_hub_banner.png'), join(piappOutDir, 'life_hub_banner.png'));
+  copy(join(projectRoot, 'piapp', 'validation-key.txt'), join(piappOutDir, 'validation-key.txt'));
 
   console.log('[postbuild] Pi app postbuild complete');
 } else {

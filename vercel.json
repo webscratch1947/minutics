@@ -2,6 +2,11 @@
   "outputDirectory": "app/dist",
   "rewrites": [
     {
+      "source": "/validation-key.txt",
+      "destination": "/piapp/validation-key.txt",
+      "has": [{ "type": "host", "value": "piapp.minutics.com" }]
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/app/index.html",
       "has": [{ "type": "host", "value": "app.minutics.com" }]
