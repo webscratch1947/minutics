@@ -2954,7 +2954,7 @@
     if (!isActuallyOnLifeHubScreen()) return null;
     /* Strategy 1: find the grid container by walking up from the native
        "Time Value" or "Screen Time" button — the grid is the nearest
-       ancestor whose computed display is "grid" or "inline-grid". */
+       ancestor whose computed display is "grid", "inline-grid", or "flex". */
     var spans = document.querySelectorAll("button span");
     for (var i = 0; i < spans.length; i++) {
       var t = (spans[i].textContent || "").trim();
@@ -2965,7 +2965,7 @@
       while (cur && cur !== document.body) {
         try {
           var ds = window.getComputedStyle(cur).display;
-          if (ds === "grid" || ds === "inline-grid") {
+          if (ds === "grid" || ds === "inline-grid" || ds === "flex" || ds === "inline-flex") {
             if (cur.children.length >= 1 && !cur.closest("[data-lt-enhancement],[data-lt-tile-injected]")) {
               return cur;
             }
@@ -2974,14 +2974,14 @@
         cur = cur.parentElement;
       }
     }
-    /* Strategy 2: fallback — look for any grid div on the page */
+    /* Strategy 2: fallback — look for any grid/flex div on the page */
     var all = Array.prototype.slice.call(document.querySelectorAll("div"));
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
       if (el.closest("[data-lt-enhancement],[data-lt-tile-injected]")) continue;
       try {
         var ds = window.getComputedStyle(el).display;
-        if ((ds === "grid" || ds === "inline-grid") && el.children.length >= 1) return el;
+        if ((ds === "grid" || ds === "inline-grid" || ds === "flex" || ds === "inline-flex") && el.children.length >= 1) return el;
       } catch (e) {}
     }
     return null;

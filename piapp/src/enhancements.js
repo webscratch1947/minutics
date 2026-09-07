@@ -2937,7 +2937,7 @@
       while (cur && cur !== document.body) {
         try {
           var ds = window.getComputedStyle(cur).display;
-          if (ds === "grid" || ds === "inline-grid") {
+          if (ds === "grid" || ds === "inline-grid" || ds === "flex" || ds === "inline-flex") {
             if (cur.children.length >= 1 && !cur.closest("[data-lt-enhancement],[data-lt-tile-injected]")) {
               return cur;
             }
@@ -2952,7 +2952,7 @@
       if (el.closest("[data-lt-enhancement],[data-lt-tile-injected]")) continue;
       try {
         var ds = window.getComputedStyle(el).display;
-        if ((ds === "grid" || ds === "inline-grid") && el.children.length >= 1) return el;
+        if ((ds === "grid" || ds === "inline-grid" || ds === "flex" || ds === "inline-flex") && el.children.length >= 1) return el;
       } catch (e) {}
     }
     return null;
