@@ -3126,7 +3126,7 @@
       grid.appendChild(makeTile("bucketlist",   "\uD83C\uDF1F", "Bucket List",    "Your dreams and goals — check them off for life.",   "#F5F3FF", "#6D28D9", false, "productivity"));
       grid.appendChild(makeTile("sixjars",     "\uD83E\uDEB4", "6 Jars",         "Split your salary into 6 purposeful money jars.",    "#F0FDF4", "#166534", false, "finance", "assets/icons/jar-savings.png"));
     }
-    /* Hide the native Screen Time tile — no longer needed */
+    /* Hide native Screen Time — no longer needed */
     var nativeBtns = grid.querySelectorAll("button");
     for (var i = 0; i < nativeBtns.length; i++) {
       var sp = nativeBtns[i].querySelector("span");
@@ -3134,7 +3134,6 @@
         nativeBtns[i].style.display = "none";
       }
     }
-    restyleNativeTiles(grid);
     ensureLifeHubSearch(grid);
   }
 

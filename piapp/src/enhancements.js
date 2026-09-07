@@ -3105,7 +3105,6 @@
         nativeBtns[i].style.display = "none";
       }
     }
-    restyleNativeTiles(grid);
     ensureLifeHubSearch(grid);
   }
 
