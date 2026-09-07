@@ -19,7 +19,8 @@
     video.id = "lt-startup-splash-video";
     video.src = "assets/lt/minutics_splash.mp4";
     video.autoplay = true;
-    video.muted = false;
+    video.muted = true; /* muted for autoplay; unmute after first frame if browser allows */
+
     video.playsInline = true;
     video.preload = "auto";
     video.loop = false;
@@ -30,10 +31,13 @@
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
 
-    video.play().catch(function () {
-      video.play().catch(function () {});
-    });
-
+    var playAttempt = video.play();
+    if (playAttempt && typeof playAttempt.catch === "function") {
+      playAttempt.catch(function () {
+        video.muted = true;
+        video.play().catch(function () {});
+      });
+    }
     var dismissed = false;
     function dismiss() {
       if (dismissed) return;
