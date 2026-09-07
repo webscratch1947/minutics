@@ -3101,27 +3101,42 @@
   }
 
   /* Hide the native Screen Time tile permanently. Uses a CSS !important
-     class so React re-renders can't override the style. Runs on a fast
-     interval (300 ms) because the main enhancement pass's 500 ms throttle
-     leaves a visible flash where React recreates the button before we
-     catch it. */
+     class so React re-renders can't override the style. Uses a
+     MutationObserver on the grid parent so it fires *instantly* when React
+     recreates the button — no flash at all. */
   var _ltHideSTStarted = false;
+  function _applyHideST() {
+    try {
+      var spans = document.querySelectorAll("button span");
+      for (var i = 0; i < spans.length; i++) {
+        if ((spans[i].textContent || "").trim() === "Screen Time") {
+          var btn = spans[i].closest("button");
+          if (btn && !btn.classList.contains("lt-hide-native-st")) {
+            btn.classList.add("lt-hide-native-st");
+          }
+        }
+      }
+    } catch (e) {}
+  }
   function hideNativeScreenTime() {
     if (_ltHideSTStarted) return;
     _ltHideSTStarted = true;
-    setInterval(function () {
-      try {
-        var spans = document.querySelectorAll("button span");
-        for (var i = 0; i < spans.length; i++) {
-          if ((spans[i].textContent || "").trim() === "Screen Time") {
-            var btn = spans[i].closest("button");
-            if (btn && !btn.classList.contains("lt-hide-native-st")) {
-              btn.classList.add("lt-hide-native-st");
-            }
-          }
+    _applyHideST();
+    /* MutationObserver on the grid parent — fires instantly when React
+       adds a new Screen Time button, zero visible flash. */
+    try {
+      var observer = new MutationObserver(function (mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          if (mutations[i].addedNodes.length) { _applyHideST(); break; }
         }
-      } catch (e) {}
-    }, 300);
+      });
+      var grid = findTileGrid();
+      if (grid && grid.parentElement) {
+        observer.observe(grid.parentElement, { childList: true, subtree: true });
+      }
+      /* Also observe body in case the grid itself gets replaced */
+      observer.observe(document.body, { childList: true, subtree: true });
+    } catch (e) {}
   }
 
   function mountLifeHubTools() {
@@ -3306,6 +3321,7 @@
        the "everything feels delayed" lag from many timers firing every
        second in the background. */
     if (_wasteBudgetTimer) { clearInterval(_wasteBudgetTimer); _wasteBudgetTimer = null; }
+    if (_tvCalcTimer) { clearInterval(_tvCalcTimer); _tvCalcTimer = null; }
     if (_focusInterval && !(readJson(FOCUS_STATE_KEY, {}).endsAt > Date.now())) {
       /* Only kill the focus ticker if a focus session isn't actually
          still running — an active focus timer should keep counting down
@@ -5483,6 +5499,154 @@
   }, true);
 
   /* ── Time Value Calculator overlay ─────────────────────────────────────── */
+
+  var _tvCalcTimer = null;
+
+  function renderTimeValueCalc() {
+    if (_tvCalcTimer) { clearInterval(_tvCalcTimer); _tvCalcTimer = null; }
+    var stored = readJson(TIMEVALUE_KEY, null) || {};
+    var sym = getCurrency().symbol;
+    activeOverlay.innerHTML =
+      '<div class="lt-tool-shell">' +
+        toolHeader("Time Value Calculator", "Set your salary and work hours to know the value of every minute.") +
+        '<div class="lt-tool-card">' +
+          '<p class="lt-card-title">Your income details</p>' +
+          '<form data-lt-tv-form>' +
+            '<div class="lt-calc-grid">' +
+              field("Monthly salary (" + sym + ")", "salary", stored.salary || "", "e.g. 50000", "number") +
+              field("Work hours / day", "hours", stored.hours || "8", "e.g. 8", "number") +
+              field("Work days / week", "days", stored.days || "6", "e.g. 6", "number") +
+            '</div>' +
+            '<div class="lt-form-actions"><button class="lt-tool-primary" type="submit">Save & Calculate</button></div>' +
+          '</form>' +
+        '</div>' +
+        '<div id="lt-tv-calc-result" class="lt-tool-card' + (stored.perMinute ? '' : ' lt-empty') + '">' +
+          (stored.perMinute
+            ? _tvResultHTML(stored, sym)
+            : 'Enter your salary and work hours above to see the value of your time.') +
+        '</div>' +
+        '<div id="lt-tv-live" class="lt-tool-card" style="' + (stored.perMinute ? '' : 'display:none') + '">' +
+          '<p class="lt-card-title">Today\'s live countdown</p>' +
+          '<div style="text-align:center;padding:10px 0 4px">' +
+            '<div id="lt-tv-live-amt" style="font-size:32px;font-weight:900;color:hsl(var(--foreground))">' + (stored.perMinute ? sym + _liveTimeValue(stored).toFixed(2) : sym + '0.00') + '</div>' +
+            '<div id="lt-tv-live-left" style="font-size:13px;color:hsl(var(--muted-foreground));margin-top:4px">' + _timeLeftToday() + '</div>' +
+          '</div>' +
+          '<div style="margin-top:12px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:12px;color:hsl(var(--muted-foreground));margin-bottom:4px">' +
+              '<span>Day\'s progress</span>' +
+              '<span id="lt-tv-live-pct">' + _dayProgressPct() + '%</span>' +
+            '</div>' +
+            '<div style="width:100%;height:8px;background:hsl(var(--secondary));border-radius:4px;overflow:hidden">' +
+              '<div id="lt-tv-live-bar" style="width:' + _dayProgressPct() + '%;height:100%;background:hsl(var(--primary));border-radius:4px;transition:width 1s linear"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    /* Save handler */
+    var form = activeOverlay.querySelector("[data-lt-tv-form]");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var salary = Number((form.querySelector('[name="salary"]') || {}).value) || 0;
+      var hours  = Number((form.querySelector('[name="hours"]') || {}).value) || 8;
+      var days   = Number((form.querySelector('[name="days"]') || {}).value) || 6;
+      if (!salary) { return; }
+      var perMonth = salary;
+      var perDay   = perMonth / days;
+      var perHour  = perDay / hours;
+      var perMin   = perHour / 60;
+      var data = { salary: salary, hours: hours, days: days, perMinute: perMin, savedAt: new Date().toISOString() };
+      writeJson(TIMEVALUE_KEY, data);
+      /* Update result */
+      var res = document.getElementById("lt-tv-calc-result");
+      if (res) { res.className = "lt-tool-card"; res.innerHTML = _tvResultHTML(data, sym); }
+      /* Show live section */
+      var live = document.getElementById("lt-tv-live");
+      if (live) live.style.display = "";
+      _tickLiveTV();
+    });
+
+    /* Live ticker */
+    function _tickLiveTV() {
+      var stored2 = readJson(TIMEVALUE_KEY, null);
+      if (!stored2 || !stored2.perMinute) return;
+      var sym2 = getCurrency().symbol;
+      var amt = document.getElementById("lt-tv-live-amt");
+      var left = document.getElementById("lt-tv-live-left");
+      var bar = document.getElementById("lt-tv-live-bar");
+      var pct = document.getElementById("lt-tv-live-pct");
+      if (amt) amt.textContent = sym2 + _liveTimeValue(stored2).toFixed(2);
+      if (left) left.textContent = _timeLeftToday();
+      if (bar) bar.style.width = _dayProgressPct() + "%";
+      if (pct) pct.textContent = _dayProgressPct() + "%";
+    }
+    if (stored.perMinute) {
+      _tvCalcTimer = setInterval(function () {
+        try { _tickLiveTV(); } catch (e) {}
+      }, 1000);
+    }
+  }
+
+  function _tvResultHTML(data, sym) {
+    return '<p class="lt-card-title">Your time value</p>' +
+      '<div class="lt-calc-result">' +
+        '<small>Per minute</small>' +
+        '<strong>' + escapeHtml(sym + data.perMinute.toFixed(2)) + '</strong>' +
+      '</div>' +
+      '<div class="lt-history-row"><span>Per hour</span><strong>' + escapeHtml(sym + (data.perMinute * 60).toFixed(2)) + '</strong></div>' +
+      '<div class="lt-history-row"><span>Per day (' + data.hours + 'h)</span><strong>' + escapeHtml(sym + (data.perMinute * 60 * data.hours).toFixed(2)) + '</strong></div>' +
+      '<div class="lt-history-row"><span>Per month</span><strong>' + escapeHtml(sym + data.salary) + '</strong></div>' +
+      '<div class="lt-history-row"><span>Per year</span><strong>' + escapeHtml(sym + (data.salary * 12).toLocaleString()) + '</strong></div>';
+  }
+
+  function _liveTimeValue(data) {
+    var now = new Date();
+    var secOfDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    var remSec = 86400 - secOfDay;
+    var dailyBudget = data.perMinute * 60 * data.hours;
+    return Math.max(0, dailyBudget * (remSec / 86400));
+  }
+
+  function _timeLeftToday() {
+    var now = new Date();
+    var secOfDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    var rem = 86400 - secOfDay;
+    return Math.floor(rem / 3600) + "h " + Math.floor((rem % 3600) / 60) + "m left today";
+  }
+
+  function _dayProgressPct() {
+    var now = new Date();
+    var secOfDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    return Math.round((secOfDay / 86400) * 100);
+  }
+
+  /* Intercept the native "Time Value" tile click on Life Hub.
+     Instead of letting React navigate to its own calculator screen,
+     show our overlay. */
+  var _tvInterceptStarted = false;
+  function interceptNativeTimeValueClick() {
+    if (_tvInterceptStarted) return;
+    _tvInterceptStarted = true;
+    document.addEventListener("click", function (e) {
+      if (activeOverlay) return;
+      var span = e.target.closest("button span");
+      if (!span) return;
+      var txt = (span.textContent || "").trim();
+      if (txt !== "Time Value") return;
+      var btn = span.closest("button");
+      if (!btn) return;
+      /* Must be inside the Life Hub grid (not the timer tab widget) */
+      var grid = btn.closest("[class*='grid'],[class*='flex']");
+      if (!grid) return;
+      /* Only intercept if our grid enhancement is active */
+      if (!grid.classList.contains("lt-hub-grid-2col")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      openOverlay(renderTimeValueCalc);
+    }, true);
+  }
+
   /* ── Click routing ─────────────────────────────────────────────────────── */
 
   document.addEventListener("click", function (e) {
@@ -8393,6 +8557,7 @@
     safeRun(ensureActivityActionDescriptions);
     safeRun(updateSavedTimeValueCard);
     safeRun(mountLifeHubTools);
+    safeRun(interceptNativeTimeValueClick);
     safeRun(pollRunningTimer);
     safeRun(injectJournalFullView);
     safeRun(upsertRunningBanner);
