@@ -19,7 +19,7 @@
     video.id = "lt-startup-splash-video";
     video.src = "assets/lt/minutics_splash.mp4";
     video.autoplay = true;
-    video.muted = true; /* muted for autoplay; unmute after first frame if browser allows */
+    video.muted = false;
 
     video.playsInline = true;
     video.preload = "auto";
