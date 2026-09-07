@@ -1961,7 +1961,7 @@
       ".lt-hub-filter-chip{flex-shrink:0;border:1px solid hsl(var(--border));background:hsl(var(--card));color:hsl(var(--foreground));font-size:12px;font-weight:700;padding:7px 14px;border-radius:999px;cursor:pointer;-webkit-tap-highlight-color:transparent}",
       ".lt-hub-filter-chip.lt-hub-filter-active{background:hsl(var(--primary));border-color:hsl(var(--primary));color:#fff}",
       ".lt-hub-empty{text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px;grid-column:1/-1}",
-      ".lt-hub-grid-2col{opacity:0;transition:opacity .3s ease}",
+      ".lt-hub-grid-2col{transition:opacity .3s ease}",
       ".lt-hub-grid-2col.lt-hub-ready{opacity:1}",
       "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
       "@keyframes lt-lh-bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(5px)}}",
@@ -2340,7 +2340,7 @@
       "#lt-life-progress .lt-lp-cdhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px}" +
       "#lt-life-progress .lt-lp-cdhead>div:first-child{flex:1;min-width:0}",
       "#lt-life-progress .lt-lp-cdtitle{margin:0;font-size:14px;font-weight:800;color:#fff}",
-      "#lt-life-progress .lt-lp-cddate{margin:3px 0 0;font-size:14px;font-weight:700;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      "#lt-life-progress .lt-lp-cddate{margin:3px 0 0;font-size:13px;font-weight:700;color:rgba(255,255,255,.85)}",
       "#lt-life-progress #lt-lp-viewplan{flex-shrink:0;background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:10px;padding:7px 12px;font-size:11px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}",
       "#lt-life-progress .lt-lp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}",
       "#lt-life-progress .lt-lp-box{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.08);border-radius:10px;padding:8px 2px}",
