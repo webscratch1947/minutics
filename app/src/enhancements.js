@@ -3100,16 +3100,16 @@
     }
   }
 
-  /* Hide the native Screen Time tile permanently. Uses a CSS !important
-     class so React re-renders can't override the style. Uses a
-     MutationObserver on the grid parent so it fires *instantly* when React
-     recreates the button — no flash at all. */
-  var _ltHideSTStarted = false;
-  function _applyHideST() {
+  /* Hide native Screen Time and native Time Value tiles. The native
+     tiles have a different look from our injected card-style tiles.
+     We hide both and inject our own Time Value card with overlay. */
+  var _ltHideNativeStarted = false;
+  function _applyHideNativeTiles() {
     try {
       var spans = document.querySelectorAll("button span");
       for (var i = 0; i < spans.length; i++) {
-        if ((spans[i].textContent || "").trim() === "Screen Time") {
+        var txt = (spans[i].textContent || "").trim();
+        if (txt === "Screen Time" || txt === "Time Value") {
           var btn = spans[i].closest("button");
           if (btn && !btn.classList.contains("lt-hide-native-st")) {
             btn.classList.add("lt-hide-native-st");
@@ -3119,22 +3119,15 @@
     } catch (e) {}
   }
   function hideNativeScreenTime() {
-    if (_ltHideSTStarted) return;
-    _ltHideSTStarted = true;
-    _applyHideST();
-    /* MutationObserver on the grid parent — fires instantly when React
-       adds a new Screen Time button, zero visible flash. */
+    if (_ltHideNativeStarted) return;
+    _ltHideNativeStarted = true;
+    _applyHideNativeTiles();
     try {
       var observer = new MutationObserver(function (mutations) {
         for (var i = 0; i < mutations.length; i++) {
-          if (mutations[i].addedNodes.length) { _applyHideST(); break; }
+          if (mutations[i].addedNodes.length) { _applyHideNativeTiles(); break; }
         }
       });
-      var grid = findTileGrid();
-      if (grid && grid.parentElement) {
-        observer.observe(grid.parentElement, { childList: true, subtree: true });
-      }
-      /* Also observe body in case the grid itself gets replaced */
       observer.observe(document.body, { childList: true, subtree: true });
     } catch (e) {}
   }
@@ -3151,6 +3144,7 @@
     }
     grid.classList.add("lt-hub-grid-2col");
     if (!grid.querySelector("[data-lt-tile-injected]")) {
+      grid.appendChild(makeTile("timevalue", getCurrency().symbol, "Time Value Calculator", "Set your salary and know the value of every minute.", "#DBEAFE", "#2563EB", false, "time"));
       grid.appendChild(makeTile("budget",   "\uD83D\uDCB3", "Budget Tracker",     "Manage income, expenses and your balance.",         "#FEF3C7", "#B45309", !isPro(), "finance"));
       grid.appendChild(makeTile("emi",      "\uD83E\uDDEE", "EMI Calculator",     "Plan your loans and calculate EMI smartly.",        "#E0E7FF", "#4338CA", false, "finance"));
       grid.appendChild(makeTile("compound", "\uD83D\uDCC8", "Compound Interest",  "See how your money grows when compounding.",         "#FCE7F3", "#BE185D", false, "finance"));
@@ -5515,7 +5509,7 @@
             '<div class="lt-calc-grid">' +
               field("Monthly salary (" + sym + ")", "salary", stored.salary || "", "e.g. 50000", "number") +
               field("Work hours / day", "hours", stored.hours || "8", "e.g. 8", "number") +
-              field("Work days / week", "days", stored.days || "6", "e.g. 6", "number") +
+              field("Work days / month", "days", stored.days || "22", "e.g. 22", "number") +
             '</div>' +
             '<div class="lt-form-actions"><button class="lt-tool-primary" type="submit">Save & Calculate</button></div>' +
           '</form>' +
@@ -5549,13 +5543,10 @@
       e.preventDefault();
       var salary = Number((form.querySelector('[name="salary"]') || {}).value) || 0;
       var hours  = Number((form.querySelector('[name="hours"]') || {}).value) || 8;
-      var days   = Number((form.querySelector('[name="days"]') || {}).value) || 6;
+      var days   = Number((form.querySelector('[name="days"]') || {}).value) || 22;
       if (!salary) { return; }
-      var perMonth = salary;
-      var perDay   = perMonth / days;
-      var perHour  = perDay / hours;
-      var perMin   = perHour / 60;
-      var data = { salary: salary, hours: hours, days: days, perMinute: perMin, savedAt: new Date().toISOString() };
+      var perMin = salary / (hours * days * 60);
+      var data = { salary: salary, hours: hours, days: days, perMinute: perMin, savedAt: Date.now() };
       writeJson(TIMEVALUE_KEY, data);
       /* Update result */
       var res = document.getElementById("lt-tv-calc-result");
@@ -5620,33 +5611,6 @@
     return Math.round((secOfDay / 86400) * 100);
   }
 
-  /* Intercept the native "Time Value" tile click on Life Hub.
-     Instead of letting React navigate to its own calculator screen,
-     show our overlay. */
-  var _tvInterceptStarted = false;
-  function interceptNativeTimeValueClick() {
-    if (_tvInterceptStarted) return;
-    _tvInterceptStarted = true;
-    document.addEventListener("click", function (e) {
-      if (activeOverlay) return;
-      var span = e.target.closest("button span");
-      if (!span) return;
-      var txt = (span.textContent || "").trim();
-      if (txt !== "Time Value") return;
-      var btn = span.closest("button");
-      if (!btn) return;
-      /* Must be inside the Life Hub grid (not the timer tab widget) */
-      var grid = btn.closest("[class*='grid'],[class*='flex']");
-      if (!grid) return;
-      /* Only intercept if our grid enhancement is active */
-      if (!grid.classList.contains("lt-hub-grid-2col")) return;
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      openOverlay(renderTimeValueCalc);
-    }, true);
-  }
-
   /* ── Click routing ─────────────────────────────────────────────────────── */
 
   document.addEventListener("click", function (e) {
@@ -5655,6 +5619,7 @@
     e.preventDefault();
     e.stopPropagation();
     var tool = tile.getAttribute("data-lifetime-tool");
+    if (tool === "timevalue") openOverlay(renderTimeValueCalc);
     if (tool === "budget" && !isPro()) { showUpgradePrompt("Budget Tracker is a premium feature. Upgrade to unlock it."); return; }
     if (tool === "budget")   openOverlay(renderBudget);
     if (tool === "emi")      openOverlay(renderEmi);
@@ -8557,7 +8522,6 @@
     safeRun(ensureActivityActionDescriptions);
     safeRun(updateSavedTimeValueCard);
     safeRun(mountLifeHubTools);
-    safeRun(interceptNativeTimeValueClick);
     safeRun(pollRunningTimer);
     safeRun(injectJournalFullView);
     safeRun(upsertRunningBanner);
