@@ -3126,17 +3126,12 @@
       grid.appendChild(makeTile("bucketlist",   "\uD83C\uDF1F", "Bucket List",    "Your dreams and goals — check them off for life.",   "#F5F3FF", "#6D28D9", false, "productivity"));
       grid.appendChild(makeTile("sixjars",     "\uD83E\uDEB4", "6 Jars",         "Split your salary into 6 purposeful money jars.",    "#F0FDF4", "#166534", false, "finance", "assets/icons/jar-savings.png"));
     }
-    /* Intercept native Time Value and Screen Time buttons so they open
-       overlays instead of navigating to a separate page. */
-    var btns = grid.querySelectorAll("button");
-    for (var i = 0; i < btns.length; i++) {
-      var span = btns[i].querySelector("span");
-      var text = (span ? span.textContent : btns[i].textContent || "").trim();
-      if (text === "Time Value" && !btns[i].getAttribute("data-lifetime-tool")) {
-        btns[i].setAttribute("data-lifetime-tool", "timevalue");
-      }
-      if (text === "Screen Time" && !btns[i].getAttribute("data-lifetime-tool")) {
-        btns[i].setAttribute("data-lifetime-tool", "screentime");
+    /* Hide the native Screen Time tile — no longer needed */
+    var nativeBtns = grid.querySelectorAll("button");
+    for (var i = 0; i < nativeBtns.length; i++) {
+      var sp = nativeBtns[i].querySelector("span");
+      if (sp && (sp.textContent || "").trim() === "Screen Time") {
+        nativeBtns[i].style.display = "none";
       }
     }
     restyleNativeTiles(grid);
@@ -5470,120 +5465,6 @@
   }, true);
 
   /* ── Time Value Calculator overlay ─────────────────────────────────────── */
-  function renderTimeValueOverlay() {
-    var tv = readJson("lt_time_value_v1", {});
-    var hourly = tv.hourlyRate || 0;
-    var currency = getCurrency();
-    var db = readJson(LOCAL_DB_KEY, { activities: [] });
-    var activities = (db.activities || []).filter(function (a) { return !a.archived; });
-    var totalMin = 0;
-    activities.forEach(function (a) {
-      (a.blocks || []).forEach(function (b) {
-        if (b.start && b.end) totalMin += (new Date(b.end) - new Date(b.start)) / 60000;
-      });
-    });
-    var todayMin = 0;
-    var today = new Date().toDateString();
-    activities.forEach(function (a) {
-      (a.blocks || []).forEach(function (b) {
-        if (b.start && b.end && new Date(b.start).toDateString() === today) todayMin += (new Date(b.end) - new Date(b.start)) / 60000;
-      });
-    });
-    var todayValue = hourly > 0 ? (todayMin / 60 * hourly).toFixed(2) : "0.00";
-    var totalValue = hourly > 0 ? (totalMin / 60 * hourly).toFixed(2) : "0.00";
-    var root = activeOverlay;
-    root.innerHTML =
-      '<div class="lt-tool-shell">' +
-        toolHeader("Time Value Calculator", "Track the value of your time every minute.") +
-        '<div class="lt-tool-card">' +
-          '<p class="lt-card-title">Your Hourly Rate</p>' +
-          '<div style="display:flex;align-items:center;gap:8px">' +
-            '<span style="font-size:24px;font-weight:800">' + currency.symbol + '</span>' +
-            '<input type="number" id="lt-tv-rate" value="' + (hourly || '') + '" placeholder="0" style="flex:1;border:1px solid hsl(var(--border));background:hsl(var(--background));padding:12px;border-radius:8px;font-size:18px;font-weight:700;color:hsl(var(--foreground));font-family:inherit">' +
-            '<span style="color:hsl(var(--muted-foreground));font-size:13px">/hour</span>' +
-          '</div>' +
-          '<button data-lt-action="tv-save" style="margin-top:12px;width:100%;background:hsl(var(--primary));border:none;color:#fff;padding:12px;font-size:14px;font-weight:700;cursor:pointer;border-radius:8px;font-family:inherit">Save Rate</button>' +
-        '</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-          '<div class="lt-tool-card" style="text-align:center">' +
-            '<p style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 4px">Today\'s Value</p>' +
-            '<p style="font-size:24px;font-weight:800;margin:0;color:hsl(var(--foreground))">' + currency.symbol + todayValue + '</p>' +
-            '<p style="font-size:12px;color:hsl(var(--muted-foreground));margin:4px 0 0">' + Math.round(todayMin) + ' min tracked</p>' +
-          '</div>' +
-          '<div class="lt-tool-card" style="text-align:center">' +
-            '<p style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 4px">Total Value</p>' +
-            '<p style="font-size:24px;font-weight:800;margin:0;color:hsl(var(--foreground))">' + currency.symbol + totalValue + '</p>' +
-            '<p style="font-size:12px;color:hsl(var(--muted-foreground));margin:4px 0 0">' + Math.round(totalMin) + ' min tracked</p>' +
-          '</div>' +
-        '</div>' +
-        '<div class="lt-tool-card">' +
-          '<p class="lt-card-title">How it works</p>' +
-          '<p style="font-size:13px;color:hsl(var(--muted-foreground));line-height:1.5;margin:0">Set your hourly rate above. Every minute you track against any activity is multiplied by your rate to show you the real monetary value of your time. Use this to make smarter decisions about how you spend each hour.</p>' +
-        '</div>' +
-      '</div>';
-    root.querySelector("[data-lt-action='tv-save']").addEventListener("click", function () {
-      var val = parseFloat(root.querySelector("#lt-tv-rate").value) || 0;
-      writeJson("lt_time_value_v1", { hourlyRate: val });
-      renderTimeValueOverlay();
-    });
-  }
-
-  /* ── Screen Time overlay ───────────────────────────────────────────────── */
-  function renderScreenTimeOverlay() {
-    var db = readJson(LOCAL_DB_KEY, { activities: [] });
-    var activities = (db.activities || []).filter(function (a) { return !a.archived; });
-    var today = new Date().toDateString();
-    var totalTime = 0;
-    var catMap = {};
-    activities.forEach(function (a) {
-      var catTime = 0;
-      (a.blocks || []).forEach(function (b) {
-        if (b.start && b.end && new Date(b.start).toDateString() === today) {
-          var mins = (new Date(b.end) - new Date(b.start)) / 60000;
-          catTime += mins;
-          totalTime += mins;
-        }
-      });
-      if (catTime > 0) catMap[a.name || "Unknown"] = (catMap[a.name || "Unknown"] || 0) + catTime;
-    });
-    var cats = Object.keys(catMap).sort(function (a, b) { return catMap[b] - catMap[a]; });
-    var maxMin = cats.length > 0 ? catMap[cats[0]] : 1;
-    var root = activeOverlay;
-    var catRows = cats.map(function (name) {
-      var mins = catMap[name];
-      var pct = maxMin > 0 ? Math.round(mins / maxMin * 100) : 0;
-      var hours = Math.floor(mins / 60);
-      var rem = Math.round(mins % 60);
-      var timeStr = hours > 0 ? hours + "h " + rem + "m" : rem + "m";
-      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0">' +
-        '<span style="font-size:13px;font-weight:600;min-width:100px;color:hsl(var(--foreground))">' + escapeHtml(name) + '</span>' +
-        '<div style="flex:1;height:8px;background:hsl(var(--secondary));border-radius:4px;overflow:hidden">' +
-          '<div style="width:' + pct + '%;height:100%;background:hsl(var(--primary));border-radius:4px;transition:width .3s"></div>' +
-        '</div>' +
-        '<span style="font-size:12px;color:hsl(var(--muted-foreground));min-width:50px;text-align:right">' + timeStr + '</span>' +
-      '</div>';
-    }).join("");
-    root.innerHTML =
-      '<div class="lt-tool-shell">' +
-        toolHeader("Screen Time", "Monitor your screen time and digital balance.") +
-        '<div class="lt-tool-card" style="text-align:center">' +
-          '<p style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 4px">Today\'s Total</p>' +
-          '<p style="font-size:32px;font-weight:800;margin:0;color:hsl(var(--foreground))">' + Math.floor(totalTime / 60) + 'h ' + Math.round(totalTime % 60) + 'm</p>' +
-          '<p style="font-size:12px;color:hsl(var(--muted-foreground));margin:4px 0 0">' + cats.length + ' activities tracked today</p>' +
-        '</div>' +
-        (cats.length > 0 ?
-          '<div class="lt-tool-card">' +
-            '<p class="lt-card-title">Breakdown by Activity</p>' +
-            catRows +
-          '</div>'
-        :
-          '<div class="lt-tool-card" style="text-align:center">' +
-            '<p style="font-size:13px;color:hsl(var(--muted-foreground));margin:0">No activities tracked today. Start a timer or log a time block to see your screen time breakdown.</p>' +
-          '</div>'
-        ) +
-      '</div>';
-  }
-
   /* ── Click routing ─────────────────────────────────────────────────────── */
 
   document.addEventListener("click", function (e) {
@@ -5592,8 +5473,6 @@
     e.preventDefault();
     e.stopPropagation();
     var tool = tile.getAttribute("data-lifetime-tool");
-    if (tool === "timevalue") openOverlay(renderTimeValueOverlay);
-    if (tool === "screentime") openOverlay(renderScreenTimeOverlay);
     if (tool === "budget" && !isPro()) { showUpgradePrompt("Budget Tracker is a premium feature. Upgrade to unlock it."); return; }
     if (tool === "budget")   openOverlay(renderBudget);
     if (tool === "emi")      openOverlay(renderEmi);
