@@ -1426,7 +1426,7 @@
       }
     }
 
-    var totalStarred = getStarredTasks().length;
+    var totalStarred = getStarredTasks().filter(function (t) { return !t.completed; }).length;
     var queuedCount = isPro() ? Math.max(0, totalStarred - starred.length) : 0;
     card.innerHTML =
       '<p class="lt-frog-title">\uD83D\uDC38 Eat the Frog</p>' +
