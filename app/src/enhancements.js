@@ -1963,6 +1963,8 @@
       ".lt-hub-empty{text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px;grid-column:1/-1}",
       ".lt-hub-grid-2col{transition:opacity .3s ease}",
       ".lt-hub-grid-2col.lt-hub-ready{opacity:1}",
+      /* Hide native Screen Time tile — class applied by fast interval below */
+      ".lt-hide-native-st{display:none!important}",
       "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
       "@keyframes lt-lh-bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(5px)}}",
       /* Activity's page (full design: title + date, 4 stat cards, section label) */
@@ -3098,6 +3100,30 @@
     }
   }
 
+  /* Hide the native Screen Time tile permanently. Uses a CSS !important
+     class so React re-renders can't override the style. Runs on a fast
+     interval (300 ms) because the main enhancement pass's 500 ms throttle
+     leaves a visible flash where React recreates the button before we
+     catch it. */
+  var _ltHideSTStarted = false;
+  function hideNativeScreenTime() {
+    if (_ltHideSTStarted) return;
+    _ltHideSTStarted = true;
+    setInterval(function () {
+      try {
+        var spans = document.querySelectorAll("button span");
+        for (var i = 0; i < spans.length; i++) {
+          if ((spans[i].textContent || "").trim() === "Screen Time") {
+            var btn = spans[i].closest("button");
+            if (btn && !btn.classList.contains("lt-hide-native-st")) {
+              btn.classList.add("lt-hide-native-st");
+            }
+          }
+        }
+      } catch (e) {}
+    }, 300);
+  }
+
   function mountLifeHubTools() {
     if (activeOverlay) return;
     var grid = findTileGrid();
@@ -3126,14 +3152,7 @@
       grid.appendChild(makeTile("bucketlist",   "\uD83C\uDF1F", "Bucket List",    "Your dreams and goals — check them off for life.",   "#F5F3FF", "#6D28D9", false, "productivity"));
       grid.appendChild(makeTile("sixjars",     "\uD83E\uDEB4", "6 Jars",         "Split your salary into 6 purposeful money jars.",    "#F0FDF4", "#166534", false, "finance", "assets/icons/jar-savings.png"));
     }
-    /* Hide native Screen Time — no longer needed */
-    var nativeBtns = grid.querySelectorAll("button");
-    for (var i = 0; i < nativeBtns.length; i++) {
-      var sp = nativeBtns[i].querySelector("span");
-      if (sp && (sp.textContent || "").trim() === "Screen Time") {
-        nativeBtns[i].style.display = "none";
-      }
-    }
+    hideNativeScreenTime();
     ensureLifeHubSearch(grid);
   }
 
