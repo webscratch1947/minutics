@@ -1246,7 +1246,7 @@
         '<div class="lt-lp-cdhead">' +
           '<div>' +
             '<p class="lt-lp-cdtitle">' + escapeHtml(profile.name) + '\u2019s Remaining ' + goal.word + ' Time</p>' +
-            '<p class="lt-lp-cddate" style="font-weight:700;font-size:14px;"><span style="font-size:18px;margin-right:2px;">\uD83C\uDFC1</span> ' + goal.dateLabel + ': <span style="color:#f5a623;">' + lifeStats(profile).dateLabel + '</span></p>' +
+            '<p class="lt-lp-cddate" style="font-weight:700;font-size:12px;white-space:nowrap"><span style="font-size:16px;margin-right:2px;">\uD83C\uDFC1</span> ' + goal.dateLabel + ': <span style="color:#f5a623;">' + lifeStats(profile).dateLabel + '</span></p>' +
           '</div>' +
           '<button id="lt-lp-viewplan" type="button">View Plan</button>' +
         '</div>' +
