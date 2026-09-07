@@ -34,18 +34,55 @@ export function mk({
       lifespanYears: l
     };
     fk(g);
-    try {
-      if (typeof window !== "undefined" && "Notification" in window && window.Notification.permission === "default") {
-        window.Notification.requestPermission().then(function() {
-          e(g);
-        }).catch(function() {
-          e(g);
-        });
-        return;
-      }
-    } catch (_) {}
-    e(g)
+    showSetupLoader(g);
   };
+
+  function showSetupLoader(profileData) {
+    /* ─── PHASE 0: inject a CSS override that FORCES #root to stay hidden
+       even after lt-authed is added. This prevents the flash of unstyled
+       content that happens because React renders asynchronously — lt-authed
+       gets added, #root becomes display:block, but enhancements haven't
+       applied yet. We remove this rule only after enhancements are done. */
+    var killSwitch = document.createElement("style");
+    killSwitch.id = "lt-root-killswitch";
+    killSwitch.textContent = "body.lt-authed #root{display:none!important}";
+    (document.head || document.documentElement).appendChild(killSwitch);
+
+    /* Phase 1: loading spinner */
+    var loader = document.createElement("div");
+    loader.id = "lt-signin-loader";
+    loader.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:hsl(230 40% 16%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;transition:opacity .5s ease;opacity:1;";
+    loader.innerHTML =
+      '<div style="width:48px;height:48px;border:3px solid rgba(255,255,255,.15);border-top-color:#fff;border-radius:50%;animation:lt-spin .8s linear infinite"></div>' +
+      '<p style="color:rgba(255,255,255,.8);font-size:15px;font-weight:600;margin:0;font-family:inherit">Setting up your app...</p>' +
+      '<style>@keyframes lt-spin{to{transform:rotate(360deg)}}</style>';
+    (document.body || document.documentElement).appendChild(loader);
+
+    /* Phase 2: after 3s, fire onComplete (renders main app) then poll until
+       enhancements have fully settled, THEN lift the killswitch. */
+    setTimeout(function () {
+      loader.style.opacity = "0";
+      setTimeout(function () {
+        if (loader.parentNode) loader.parentNode.removeChild(loader);
+        e(profileData);
+        /* Poll: wait for enhancements to apply (life-progress card or
+           enhancement markers exist + body has lt-authed) then remove the
+           killswitch so #root finally appears — fully styled. */
+        var checks = 0;
+        var readyTimer = setInterval(function () {
+          checks++;
+          var hasAuth = document.body.classList.contains("lt-authed");
+          var hasProgress = !!document.getElementById("lt-life-progress");
+          var hasGlance = !!document.querySelector("[data-lt-enhancement]");
+          if ((hasAuth && (hasProgress || hasGlance)) || checks > 50) {
+            clearInterval(readyTimer);
+            var ks = document.getElementById("lt-root-killswitch");
+            if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
+          }
+        }, 80);
+      }, 500);
+    }, 3000);
+  }
   return t === "intro" ? c.jsx("div", {
     className: "min-h-[100dvh] bg-primary flex flex-col items-center justify-center px-8 text-white",
     children: c.jsxs("div", {

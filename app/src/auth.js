@@ -5,14 +5,14 @@
    stays exactly where it already lived: on this device.
 ══════════════════════════════════════════════════════════════════════════ */
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+import { initializeApp } from "firebase/app";
 import {
   getAuth,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-} from "https://www.gstatic.com/firebasejs/12.17.0/firebase-auth.js";
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBXruwmDU9SAX4nAe5_Do-x-5qmi_SFh7E",
@@ -126,20 +126,16 @@ function injectDemoTimerStyles() {
 /* Expose logout for the Settings-page "Log out" row (added in lifetime-enhancements.js) */
 window.LTAuth = {
   logout: function () {
-    /* IMPORTANT: do NOT clear localStorage here. A previous fix wiped it on
-       every logout to stop a stale "Pro" badge / old screen flashing back
-       on the next login -- but that data (activities, profile, journal,
-       budget, plan status, everything) is exactly what the app's own
-       disclaimer promises stays on this device. Wiping it on logout meant
-       logging out and back in on the SAME device -- even as the SAME
-       account -- silently erased all of it and dropped the user back into
-       onboarding. The stale-flash problem this was trying to solve is now
-       fixed properly at the source (the auth gate overlay in this file is
-       opaque from its very first frame instead of fading in), so nothing
-       needs to be nuked here to prevent it. */
+    /* IMPORTANT: do NOT clear localStorage here. */
     
     // Clean up any enhancement visuals before logout to prevent flash
     cleanupEnhancementVisuals();
+    
+    // Force #root invisible during logout so old UI can't flash.
+    // Do NOT clear innerHTML — that breaks React's virtual DOM and the
+    // nav bar disappears on re-login.
+    var root = document.getElementById("root");
+    if (root) root.style.cssText = "display:none!important";
     
     signOut(auth).catch(function () {});
   },
@@ -595,6 +591,9 @@ onAuthStateChanged(auth, function (user) {
       }
     }
     document.body.classList.add("lt-authed");
+    /* Clear ALL inline styles that logout sets on #root (including !important) */
+    var root = document.getElementById("root");
+    if (root) root.removeAttribute("style");
   } else {
     console.log("Removing lt-authed class and rendering login gate");
     document.body.classList.remove("lt-authed");

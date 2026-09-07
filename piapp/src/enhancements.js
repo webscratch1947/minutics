@@ -31,33 +31,13 @@
     });
     splash.appendChild(video);
 
-    /* Small tap-to-unmute affordance, shown only if unmuted autoplay was
-       blocked and we had to fall back to silent playback. */
-    var unmuteBtn = document.createElement("button");
-    unmuteBtn.id = "lt-startup-splash-unmute";
-    unmuteBtn.type = "button";
-    unmuteBtn.textContent = "\uD83D\uDD07 Tap for sound";
-    unmuteBtn.style.cssText =
-      "display:none;position:absolute;bottom:28px;left:50%;transform:translateX(-50%);" +
-      "background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.35);" +
-      "border-radius:999px;padding:9px 16px;font-size:13px;font-weight:700;" +
-      "font-family:inherit;pointer-events:auto;-webkit-tap-highlight-color:transparent;";
-    unmuteBtn.addEventListener("click", function () {
-      video.muted = false;
-      video.play().catch(function () {});
-      unmuteBtn.style.display = "none";
-    });
-    splash.appendChild(unmuteBtn);
     (document.body || document.documentElement).appendChild(splash);
 
     var playAttempt = video.play();
     if (playAttempt && typeof playAttempt.catch === "function") {
       playAttempt.catch(function () {
-        /* Unmuted autoplay was blocked — fall back to silent playback so the
-           splash still shows, and offer a one-tap way to turn sound on. */
         video.muted = true;
         video.play().catch(function () {});
-        unmuteBtn.style.display = "block";
       });
     }
 
@@ -87,8 +67,6 @@
       setTimeout(dismiss, 150);
     });
     video.addEventListener("error", dismiss);
-    var playPromise = video.play();
-    if (playPromise && playPromise.catch) playPromise.catch(dismiss);
     setTimeout(dismiss, MAX_MS);
   })();
 
@@ -111,7 +89,9 @@
   var NATIVE_DB_KEY      = "lifetime_local_db_v1";
   var PROD_TOAST_KEY    = "lt_prod_toast_last_v1";
   var CURRENCY_KEY      = "lt_currency_v1";         /* { code: "INR"|"USD"|"EUR"|"GBP" } */
-  var PLAN_KEY           = "lt_plan_v1";             /* "free" | "pro" — device-local until payments are wired up */
+  var PLAN_KEY           = "lt_plan_v1";             /* "free" | "basic" | "yearly" | "lifetime" */
+  var PLAN_SINCE_KEY     = "lt_plan_since_v1";       /* timestamp when current plan was activated — for expiry checks */
+  var PLAN_GRACE_KEY     = "lt_plan_grace_v1";       /* timestamp when expiry grace period started — 1-day window before auto-unstar */
   var GOAL_TYPE_KEY      = "lt_goal_type_v1";        /* { type: "retirement"|"age"|"fire"|"milestone", milestoneLabel: "..." } */
   var PROFILE_KEY        = "lifetime_profile";       /* { name, dob, lifespanYears } — set during onboarding */
   var JARS_KEY           = "lt_6jars_v2";            /* 6-jar money management system config */
@@ -268,7 +248,7 @@
   var LT_API_ORIGIN = (typeof window.AndroidBridge !== "undefined" ||
                         location.hostname === "app.local" ||
                         location.protocol === "file:" || location.protocol === "")
-    ? "https://piapp.minutics.com"
+    ? "https://app.minutics.com"
     : "";
   var GH_WRITE_API = LT_API_ORIGIN + "/api/gram-write";
   var GRAM_REMOTE_TTL = 30 * 1000; /* re-fetch from GitHub at most every 30s */
@@ -381,23 +361,86 @@
   }
 
   function isPro() {
-    return readJson(PLAN_KEY, "free") === "pro";
+    var p = readJson(PLAN_KEY, "free");
+    return p === "basic" || p === "yearly" || p === "lifetime" || p === "pro";
+  }
+  function getPlanId() {
+    return readJson(PLAN_KEY, "free");
+  }
+  function getPlanName() {
+    var p = getPlanId();
+    if (p === "basic") return "Basic";
+    if (p === "yearly") return "1 Year";
+    if (p === "lifetime" || p === "pro") return "Lifetime";
+    return "Free";
+  }
+  function getPlanPeriod() {
+    var p = getPlanId();
+    if (p === "basic") return "/month";
+    if (p === "yearly") return "/year";
+    return "";
+  }
+  function isSubscription() {
+    var p = getPlanId();
+    return p === "basic" || p === "yearly";
+  }
+  function migrateOldProPlan() {
+    var p = readJson(PLAN_KEY, "free");
+    if (p === "pro") {
+      writeJson(PLAN_KEY, "lifetime");
+    }
   }
   function setPlan(plan) {
     var wasPro  = isPro();
-    var newPlan = plan === "pro" ? "pro" : "free";
+    var newPlan = (plan === "basic" || plan === "yearly" || plan === "lifetime") ? plan : "free";
     writeJson(PLAN_KEY, newPlan);
-    if (newPlan === "pro") {
-      /* Re-upgraded (in time or otherwise) — clear any pending grace timer. */
+    if (newPlan !== "free") {
+      writeJson(PLAN_SINCE_KEY, Date.now());
+      writeJson(PLAN_GRACE_KEY, null);
       writeJson(DOWNGRADE_AT_KEY, null);
     } else if (wasPro && nonArchivedActivityCount() > FREE_ACTIVITY_LIMIT) {
-      /* Just downgraded/cancelled while over the free limit — start the
-         grace-period countdown (only if one isn't already running). */
       if (!readJson(DOWNGRADE_AT_KEY, null)) writeJson(DOWNGRADE_AT_KEY, Date.now());
+    }
+    if (wasPro && newPlan === "free") {
+      enforceStarCap();
     }
   }
   /* Exposed so a future Razorpay/webhook flow (or manual testing) can flip this */
-  window.LTPlan = { isPro: isPro, setPlan: setPlan };
+  window.LTPlan = { isPro: isPro, setPlan: setPlan, getPlanName: getPlanName };
+
+  var PLAN_DURATIONS = { basic: 30 * 24 * 3600 * 1000, yearly: 365 * 24 * 3600 * 1000 };
+  var PLAN_GRACE_MS  = 24 * 3600 * 1000;
+
+  function enforceStarCap() {
+    var starred = getStarredTasks();
+    if (starred.length <= MAX_STARRED_TASKS) return;
+    for (var i = MAX_STARRED_TASKS; i < starred.length; i++) {
+      starred[i].starred = false;
+      upsertTask(starred[i]);
+    }
+    autoPromoteQueuedFrog();
+  }
+
+  function checkPlanExpiry() {
+    var plan = getPlanId();
+    if (plan !== "basic" && plan !== "yearly") return;
+    var since = readJson(PLAN_SINCE_KEY, null);
+    if (!since) { writeJson(PLAN_SINCE_KEY, Date.now()); return; }
+    var duration = PLAN_DURATIONS[plan];
+    var expiresAt = since + duration;
+    if (Date.now() < expiresAt) return;
+    var graceStart = readJson(PLAN_GRACE_KEY, null);
+    if (!graceStart) {
+      writeJson(PLAN_GRACE_KEY, Date.now());
+      return;
+    }
+    if (Date.now() < graceStart + PLAN_GRACE_MS) return;
+    writeJson(PLAN_KEY, "free");
+    writeJson(PLAN_GRACE_KEY, null);
+    writeJson(PLAN_SINCE_KEY, null);
+    enforceStarCap();
+    refreshPlanGatedUI();
+  }
 
   var GOAL_TYPE_DEFAULTS = {
     retirement: { word: "Retirement", dateLabel: "Retirement date" },
@@ -1203,7 +1246,7 @@
         '<div class="lt-lp-cdhead">' +
           '<div>' +
             '<p class="lt-lp-cdtitle">' + escapeHtml(profile.name) + '\u2019s Remaining ' + goal.word + ' Time</p>' +
-            '<p class="lt-lp-cddate">\uD83C\uDFC1 ' + goal.dateLabel + ': ' + lifeStats(profile).dateLabel + '</p>' +
+            '<p class="lt-lp-cddate" style="font-weight:700;font-size:14px;"><span style="font-size:18px;margin-right:2px;">\uD83C\uDFC1</span> ' + goal.dateLabel + ': <span style="color:#f5a623;">' + lifeStats(profile).dateLabel + '</span></p>' +
           '</div>' +
           '<button id="lt-lp-viewplan" type="button">View Plan</button>' +
         '</div>' +
@@ -1394,7 +1437,9 @@
           checkBtn.textContent = task.completed ? "\u2713" : "";
           var rowInput = checkBtn.parentElement.querySelector("[data-lt-frog-input]");
           if (rowInput) rowInput.classList.toggle("lt-frog-done-text", task.completed);
-          _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
+          _frogLastSignature = null;
+          autoPromoteQueuedFrog();
+          buildEatTheFrogCard();
           return;
         }
         var unstarBtn = e.target.closest("[data-lt-frog-unstar]");
@@ -1472,9 +1517,21 @@
       .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
   }
 
-  /* Native bridge helpers — used for other locally-persisted data.
-     Likes/comments no longer go through here; see gramSyncRemote above. */
+  /* Native bridge helpers — on Android, these keys are dual-written to
+     native storage (Downloads/Minutics/*.json via SharedPreferences) so
+     they survive app reinstalls. On web, they use localStorage only. */
   var NATIVE_BRIDGE_KEYS = {};
+  [
+    PROFILE_KEY, TASKS_KEY, PLAN_KEY, GOAL_TYPE_KEY, CURRENCY_KEY,
+    BUDGET_KEY, EMI_KEY, COMPOUND_KEY, OPP_KEY, ITEMCOST_KEY,
+    WASTE_BUDGET_KEY, FOCUS_STATE_KEY, ROUTINE_KEY, ROUTINE_DONE_KEY,
+    CATLOG_KEY, TIMEVALUE_KEY, STREAK_KEY, NUDGE_KEY, RUNNING_TIMER_KEY,
+    NATIVE_DB_KEY, JARS_KEY, JARS_SALARY_KEY, PENDING_TIMER_CAT_KEY,
+    PENDING_BLOCK_CAT_KEY, GRAM_CACHE_KEY, DOWNGRADE_AT_KEY,
+    "lt_bucket_list_v1", "lt_user_badges_v1", "lt_overlay_perm_skipped_v1",
+    "lt_extra_defaults_removed_v1", "lt_commute_renamed_v1",
+    "lt_default_activities_seeded_v2", "lt_prod_toast_last_v1"
+  ].forEach(function (k) { NATIVE_BRIDGE_KEYS[k] = true; });
 
   function hasBridge() {
     return typeof window.AndroidBridge !== "undefined" &&
@@ -1563,7 +1620,7 @@
     if ((!dateStr && !timeStr) || completed) return "";
     if (isTaskOverdue(dateStr, timeStr)) {
       var missed = taskMissedDays(dateStr, timeStr);
-      return "\u26A0 " + missed + " day" + (missed === 1 ? "" : "s") + " overdue";
+      return '<span class="lt-task-date-flag">\u26A0\uFE0F</span>' + missed + " day" + (missed === 1 ? "" : "s") + " overdue";
     }
     var now = new Date(); now.setHours(0,0,0,0);
     var tom = new Date(now); tom.setDate(tom.getDate() + 1);
@@ -1571,11 +1628,12 @@
     var d = new Date(basis + "T00:00:00");
     if (isNaN(d.getTime())) return "";
     var label;
-    if (d.getTime() === now.getTime()) label = "Today";
-    else if (d.getTime() === tom.getTime()) label = "Tomorrow";
-    else label = d.toLocaleDateString("en-IN", { day:"numeric", month:"short" });
+    var flag = "";
+    if (d.getTime() === now.getTime()) { label = "Today"; flag = '<span class="lt-task-date-flag">\uD83D\uDD34</span>'; }
+    else if (d.getTime() === tom.getTime()) { label = "Tomorrow"; flag = '<span class="lt-task-date-flag">\uD83D\uDFE2</span>'; }
+    else { label = d.toLocaleDateString("en-IN", { day:"numeric", month:"short" }); flag = '<span class="lt-task-date-flag">\uD83D\uDD35</span>'; }
     if (timeStr) label += " \u00b7 " + formatTaskTime(timeStr);
-    return label;
+    return flag + label;
   }
 
   function formatTaskTime(timeStr) {
@@ -1879,6 +1937,10 @@
       ".lt-hub-filter-chip{flex-shrink:0;border:1px solid hsl(var(--border));background:hsl(var(--card));color:hsl(var(--foreground));font-size:12px;font-weight:700;padding:7px 14px;border-radius:999px;cursor:pointer;-webkit-tap-highlight-color:transparent}",
       ".lt-hub-filter-chip.lt-hub-filter-active{background:hsl(var(--primary));border-color:hsl(var(--primary));color:#fff}",
       ".lt-hub-empty{text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px;grid-column:1/-1}",
+      ".lt-hub-grid-2col{opacity:0;transition:opacity .3s ease}",
+      ".lt-hub-grid-2col.lt-hub-ready{opacity:1}",
+      "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
+      "@keyframes lt-lh-bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(5px)}}",
       /* Activity's page (full design: title + date, 4 stat cards, section label) */
       ".lt-act-topline{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:16px 16px 4px;flex-wrap:wrap}",
       ".lt-act-title{font-size:26px;font-weight:900;margin:0;color:hsl(var(--foreground))}",
@@ -2004,15 +2066,22 @@
       ".lt-task-body{flex:1;min-width:0}",
       ".lt-task-title{display:block;font-size:15px;color:hsl(var(--foreground));line-height:1.35}",
       ".lt-task-title.lt-task-done{text-decoration:line-through;color:hsl(var(--muted-foreground))}",
-      ".lt-task-date{display:block;font-size:11px;margin-top:2px;color:#8e8e93}",
+      ".lt-task-date{display:block;font-size:12px;font-weight:700;margin-top:3px;color:#8e8e93;letter-spacing:.02em}",
       ".lt-task-date.lt-overdue{color:#ff3b30;font-weight:800}",
+      ".lt-task-date-flag{display:inline-block;font-size:14px;margin-right:3px;vertical-align:middle;line-height:1}",
       ".lt-task-notes{display:block;font-size:11px;color:hsl(var(--muted-foreground));margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      ".lt-task-expand{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:4px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
+      ".lt-task-expand:active{color:hsl(var(--foreground))}",
+      ".lt-task-item.lt-task-expanded .lt-task-title{white-space:normal;word-break:break-word}",
+      ".lt-task-item.lt-task-expanded .lt-task-notes{white-space:normal;word-break:break-word;overflow:visible;text-overflow:unset}",
       ".lt-task-star{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:6px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
       ".lt-task-star.lt-task-starred{color:#f5a623}",
       ".lt-task-star:active{transform:scale(.9)}",
       ".lt-task-del{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:6px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
       ".lt-task-del:active{color:hsl(var(--destructive))}",
       ".lt-tasks-section-card{background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:14px;margin-bottom:12px;overflow:hidden}",
+      ".lt-tasks-scroll-hint{text-align:center;padding:8px 0;color:hsl(var(--muted-foreground));opacity:.5;animation:lt-scroll-bounce 1.5s ease-in-out infinite}",
+      "@keyframes lt-scroll-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}",
       ".lt-tasks-completed-toggle{width:100%;text-align:left;background:none;border:none;cursor:pointer;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;color:hsl(var(--muted-foreground));font-size:13px;font-weight:600;-webkit-tap-highlight-color:transparent}",
       ".lt-tasks-empty-state{text-align:center;padding:48px 24px;color:hsl(var(--muted-foreground))}",
       ".lt-tasks-empty-icon{font-size:48px;margin-bottom:12px;opacity:.35}",
@@ -2245,7 +2314,7 @@
       "#lt-life-progress .lt-lp-countdown{margin-top:10px;background:hsl(var(--primary));border-radius:16px;padding:16px}",
       "#lt-life-progress .lt-lp-cdhead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px}",
       "#lt-life-progress .lt-lp-cdtitle{margin:0;font-size:14px;font-weight:800;color:#fff}",
-      "#lt-life-progress .lt-lp-cddate{margin:3px 0 0;font-size:11px;font-weight:600;color:rgba(255,255,255,.5)}",
+      "#lt-life-progress .lt-lp-cddate{margin:3px 0 0;font-size:14px;font-weight:700;color:rgba(255,255,255,.85)}",
       "#lt-life-progress #lt-lp-viewplan{flex-shrink:0;background:rgba(255,255,255,.12);color:#fff;border:none;border-radius:10px;padding:7px 12px;font-size:11px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}",
       "#lt-life-progress .lt-lp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}",
       "#lt-life-progress .lt-lp-box{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.08);border-radius:10px;padding:8px 2px}",
@@ -2857,12 +2926,33 @@
 
   function findTileGrid() {
     if (!isActuallyOnLifeHubScreen()) return null;
+    var spans = document.querySelectorAll("button span");
+    for (var i = 0; i < spans.length; i++) {
+      var t = (spans[i].textContent || "").trim();
+      if (t !== "Time Value" && t !== "Screen Time") continue;
+      var btn = spans[i].closest("button");
+      if (!btn) continue;
+      var cur = btn.parentElement;
+      while (cur && cur !== document.body) {
+        try {
+          var ds = window.getComputedStyle(cur).display;
+          if (ds === "grid" || ds === "inline-grid") {
+            if (cur.children.length >= 1 && !cur.closest("[data-lt-enhancement],[data-lt-tile-injected]")) {
+              return cur;
+            }
+          }
+        } catch (e) {}
+        cur = cur.parentElement;
+      }
+    }
     var all = Array.prototype.slice.call(document.querySelectorAll("div"));
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
       if (el.closest("[data-lt-enhancement],[data-lt-tile-injected]")) continue;
-      var gtc = el.style && el.style.gridTemplateColumns;
-      if (gtc && gtc.indexOf("repeat(3") !== -1 && el.children.length >= 1) return el;
+      try {
+        var ds = window.getComputedStyle(el).display;
+        if ((ds === "grid" || ds === "inline-grid") && el.children.length >= 1) return el;
+      } catch (e) {}
     }
     return null;
   }
@@ -2980,38 +3070,131 @@
 
   function mountLifeHubTools() {
     if (activeOverlay) return;
-    var grid = findTileGrid();
-    if (!grid) {
-      /* Not on the Life Hub list page right now -- clean up any tiles that
-         leaked into another view due to React reusing DOM nodes across
-         route changes, so they don't show up on the wrong page. Also drop
-         our search/filter bar so it doesn't linger on other pages. */
+    if (!isActuallyOnLifeHubScreen()) {
       var stray = document.querySelectorAll("[data-lt-tile-injected]");
       for (var i = 0; i < stray.length; i++) stray[i].remove();
       var searchWrap = document.getElementById("lt-hub-search-wrap");
       if (searchWrap) searchWrap.remove();
+      var sa = document.getElementById("lt-lifehub-scroll-arrow");
+      if (sa) sa.remove();
       return;
     }
-    grid.classList.add("lt-hub-grid-2col");
-    if (!grid.querySelector("[data-lt-tile-injected]")) {
-      grid.appendChild(makeTile("budget",   "\uD83D\uDCB3", "Budget Tracker",     "Manage income, expenses and your balance.",         "#FEF3C7", "#B45309", !isPro(), "finance"));
-      grid.appendChild(makeTile("emi",      "\uD83E\uDDEE", "EMI Calculator",     "Plan your loans and calculate EMI smartly.",        "#E0E7FF", "#4338CA", false, "finance"));
-      grid.appendChild(makeTile("compound", "\uD83D\uDCC8", "Compound Interest",  "See how your money grows when compounding.",         "#FCE7F3", "#BE185D", false, "finance"));
-      grid.appendChild(makeTile("gram",     "\uD83D\uDCD6", "Knowledge Gram",     "Track what you learn and grow every day.",           "#D1FAE5", "#047857", false, "productivity"));
-      grid.appendChild(makeTile("tasks",    "\u2705",       "My Tasks",           "Organize your tasks and things to do.",              "#DCFCE7", "#15803D", false, "productivity"));
-      grid.appendChild(makeTile("routine",  "\uD83D\uDD52", "Routine Trackers",   "Build your daily time table and tick off each slot.", "#E0F2FE", "#0369A1", false, "time"));
-      grid.appendChild(makeTile("lifevalue","\u2764\uFE0F", "Life Value",         "Calculate and improve your overall life value.",     "#FEE2E2", "#B91C1C", !isPro(), "time"));
-      grid.appendChild(makeTile("opp",      "\u25C6",       "Opportunity Cost",   "See what else your time or money could do.",         "#E0F2FE", "#0369A1", false, "finance"));
-      grid.appendChild(makeTile("itemcost", "\uD83D\uDED2", "Item Time Cost Calculator", "See how many hours of work an item really costs.", "#FFEDD5", "#C2410C", false, "finance"));
-      grid.appendChild(makeTile("prodscore", "\uD83D\uDCCA", "Productivity Score", "Your 0-100 score for today, from real logged time.", "#EEF2FF", "#4F46E5", false, "productivity"));
-      grid.appendChild(makeTile("focus",    "\uD83C\uDFA7", "Focus Mode",         "25-min focus timer with ambient sounds.",             "#ECFDF5", "#059669", false, "time"));
-      grid.appendChild(makeTile("wastebudget", "\u26A0\uFE0F", "Time Waste Budget", "Set a daily waste limit and get a red alert.",       "#FEF2F2", "#DC2626", false, "time"));
-      grid.appendChild(makeTile("achievements", "\uD83C\uDFC1", "Achievements",   "Milestones and badges you've unlocked.",             "#FFF7ED", "#C2410C", false, "productivity"));
-      grid.appendChild(makeTile("bucketlist",   "\uD83C\uDF1F", "Bucket List",    "Your dreams and goals — check them off for life.",   "#F5F3FF", "#6D28D9", false, "productivity"));
-      grid.appendChild(makeTile("sixjars",     "\uD83E\uDEB4", "6 Jars",         "Split your salary into 6 purposeful money jars.",    "#F0FDF4", "#166534", false, "finance", "assets/icons/jar-savings.png"));
+    /* ── Full replacement: hide native grid, insert our own ─────────────── */
+    var hubContainer = null;
+    var spans = document.querySelectorAll("button span");
+    for (var i = 0; i < spans.length; i++) {
+      var t = (spans[i].textContent || "").trim();
+      if (t !== "Time Value" && t !== "Screen Time") continue;
+      var btn = spans[i].closest("button");
+      if (!btn) continue;
+      var cur = btn.parentElement;
+      while (cur && cur !== document.body) {
+        var hasTimeValue = false, hasScreenTime = false;
+        var btns2 = cur.querySelectorAll("button span");
+        for (var j = 0; j < btns2.length; j++) {
+          var t2 = (btns2[j].textContent || "").trim();
+          if (t2 === "Time Value") hasTimeValue = true;
+          if (t2 === "Screen Time") hasScreenTime = true;
+        }
+        if (hasTimeValue && hasScreenTime && !cur.closest("[data-lt-enhancement],[data-lt-tile-injected]")) {
+          hubContainer = cur;
+        }
+        cur = cur.parentElement;
+      }
+      break;
     }
-    restyleNativeTiles(grid);
-    ensureLifeHubSearch(grid);
+    if (!hubContainer) return;
+    if (hubContainer.querySelector("[data-lt-hub-replacement]")) return;
+    var nativeChildren = Array.prototype.slice.call(hubContainer.children);
+    nativeChildren.forEach(function (c) { c.style.display = "none"; });
+    var wrapper = document.createElement("div");
+    wrapper.setAttribute("data-lt-hub-replacement", "1");
+    wrapper.setAttribute("data-lt-enhancement", "1");
+    wrapper.style.cssText = "width:100%;box-sizing:border-box;";
+    var searchHtml =
+      '<div class="lt-hub-search-wrap" id="lt-hub-search-wrap" style="padding:0 16px 12px">' +
+        '<div class="lt-hub-search-box" style="display:flex;align-items:center;gap:8px;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:12px;padding:10px 14px">' +
+          '<span style="font-size:16px;opacity:.5">\uD83D\uDD0D</span>' +
+          '<input id="lt-hub-search-input" type="text" placeholder="Search tools..." style="flex:1;border:none;background:transparent;font-size:14px;color:hsl(var(--foreground));outline:none;font-family:inherit">' +
+          '<button type="button" id="lt-hub-search-clear" style="display:none;background:none;border:none;cursor:pointer;color:hsl(var(--muted-foreground));font-size:16px;padding:0">\u2715</button>' +
+        '</div>' +
+        '<div id="lt-hub-filter-row" style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">' +
+          LT_HUB_FILTERS.map(function (f) {
+            return '<button type="button" class="lt-hub-filter-chip' + (f.id === "all" ? " lt-hub-filter-active" : "") + '" data-cat="' + f.id + '" style="flex-shrink:0;padding:7px 16px;border-radius:20px;border:1px solid hsl(var(--border));background:' + (f.id === "all" ? "hsl(var(--foreground))" : "hsl(var(--card))") + ';color:' + (f.id === "all" ? "#fff" : "hsl(var(--foreground))") + ';font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">' + escapeHtml(f.label) + '</button>';
+          }).join("") +
+        '</div>' +
+      '</div>';
+    var allTiles = [
+      { tool: "timevalue",   symbol: getCurrency().symbol, label: "Time Value Calculator",  desc: "Track the value of your time every minute.", bg: "#DBEAFE", fg: "#2563EB", cat: "time" },
+      { tool: "screentime",  symbol: "\u23F1",             label: "Screen Time",            desc: "Monitor your screen time and digital balance.", bg: "#EDE9FE", fg: "#7C3AED", cat: "time" },
+      { tool: "budget",      symbol: "\uD83D\uDCB3",       label: "Budget Tracker",          desc: "Manage income, expenses and your balance.",    bg: "#FEF3C7", fg: "#B45309", cat: "finance", locked: !isPro() },
+      { tool: "emi",         symbol: "\uD83E\uDDEE",       label: "EMI Calculator",          desc: "Plan your loans and calculate EMI smartly.",   bg: "#E0E7FF", fg: "#4338CA", cat: "finance" },
+      { tool: "compound",    symbol: "\uD83D\uDCC8",       label: "Compound Interest",       desc: "See how your money grows when compounding.",   bg: "#FCE7F3", fg: "#BE185D", cat: "finance" },
+      { tool: "gram",        symbol: "\uD83D\uDCD6",       label: "Knowledge Gram",          desc: "Track what you learn and grow every day.",     bg: "#D1FAE5", fg: "#047857", cat: "productivity" },
+      { tool: "tasks",       symbol: "\u2705",             label: "My Tasks",                desc: "Organize your tasks and things to do.",        bg: "#DCFCE7", fg: "#15803D", cat: "productivity" },
+      { tool: "routine",     symbol: "\uD83D\uDD52",       label: "Routine Trackers",        desc: "Build your daily time table and tick off each slot.", bg: "#E0F2FE", fg: "#0369A1", cat: "time" },
+      { tool: "lifevalue",   symbol: "\u2764\uFE0F",       label: "Life Value",              desc: "Calculate and improve your overall life value.", bg: "#FEE2E2", fg: "#B91C1C", cat: "time", locked: !isPro() },
+      { tool: "opp",         symbol: "\u25C6",             label: "Opportunity Cost",        desc: "See what else your time or money could do.",   bg: "#E0F2FE", fg: "#0369A1", cat: "finance" },
+      { tool: "itemcost",    symbol: "\uD83D\uDED2",       label: "Item Time Cost Calculator", desc: "See how many hours of work an item really costs.", bg: "#FFEDD5", fg: "#C2410C", cat: "finance" },
+      { tool: "prodscore",   symbol: "\uD83D\uDCCA",       label: "Productivity Score",      desc: "Your 0-100 score for today, from real logged time.", bg: "#EEF2FF", fg: "#4F46E5", cat: "productivity" },
+      { tool: "focus",       symbol: "\uD83C\uDFA7",       label: "Focus Mode",              desc: "25-min focus timer with ambient sounds.",      bg: "#ECFDF5", fg: "#059669", cat: "time" },
+      { tool: "wastebudget", symbol: "\u26A0\uFE0F",       label: "Time Waste Budget",       desc: "Set a daily waste limit and get a red alert.", bg: "#FEF2F2", fg: "#DC2626", cat: "time" },
+      { tool: "achievements",symbol: "\uD83C\uDFC1",       label: "Achievements",            desc: "Milestones and badges you've unlocked.",       bg: "#FFF7ED", fg: "#C2410C", cat: "productivity" },
+      { tool: "bucketlist",  symbol: "\uD83C\uDF1F",       label: "Bucket List",             desc: "Your dreams and goals — check them off for life.", bg: "#F5F3FF", fg: "#6D28D9", cat: "productivity" },
+      { tool: "sixjars",     symbol: "\uD83E\uDEB4",       label: "6 Jars",                  desc: "Split your salary into 6 purposeful money jars.", bg: "#F0FDF4", fg: "#166534", cat: "finance" }
+    ];
+    var tileHtml = allTiles.map(function (t) {
+      var lockIcon = t.locked ? '<span style="position:absolute;top:10px;right:10px;font-size:12px">\uD83D\uDD12</span>' : '';
+      var imgSrc = t.tool === "sixjars" ? "assets/icons/jar-savings.png" : null;
+      var iconContent = imgSrc ? '<img src="' + imgSrc + '" style="width:70%;height:70%;object-fit:contain;display:block" alt="">' : t.symbol;
+      return '<button type="button" data-lifetime-tool="' + t.tool + '" data-lt-tile-injected="1" data-lt-category="' + t.cat + '" ' +
+        'style="width:100%;min-width:0;box-sizing:border-box;position:relative;padding:16px;border-radius:16px;background:#fff;border:1px solid rgba(0,0,0,0.06);box-shadow:0 1px 2px rgba(0,0,0,0.04);gap:8px;display:flex;align-items:flex-start;text-align:left;cursor:pointer;border:none;font-family:inherit;-webkit-tap-highlight-color:transparent">' +
+        lockIcon +
+        '<div style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;background:' + t.bg + ';color:' + t.fg + '">' + iconContent + '</div>' +
+        '<div style="min-width:0">' +
+          '<div style="font-weight:700;font-size:14px;margin-top:4px;color:hsl(var(--foreground))">' + escapeHtml(t.label) + '</div>' +
+          '<div style="font-size:12px;color:hsl(var(--muted-foreground));line-height:1.3">' + escapeHtml(t.desc) + '</div>' +
+        '</div>' +
+      '</button>';
+    }).join("");
+    var gridHtml = '<div id="lt-hub-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 16px 16px">' + tileHtml + '</div>';
+    var emptyHtml = '<div id="lt-hub-empty" style="display:none;text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px">No tools match your search.</div>';
+    wrapper.innerHTML = searchHtml + gridHtml + emptyHtml;
+    hubContainer.appendChild(wrapper);
+    var searchInput = wrapper.querySelector("#lt-hub-search-input");
+    var clearBtn = wrapper.querySelector("#lt-hub-search-clear");
+    var grid = wrapper.querySelector("#lt-hub-grid");
+    var emptyEl = wrapper.querySelector("#lt-hub-empty");
+    function applyFilter() {
+      var q = ((searchInput && searchInput.value) || "").trim().toLowerCase();
+      clearBtn.style.display = q ? "" : "none";
+      var activeChip = wrapper.querySelector(".lt-hub-filter-active");
+      var cat = activeChip ? activeChip.getAttribute("data-cat") : "all";
+      var vis = 0;
+      Array.prototype.slice.call(grid.children).forEach(function (tile) {
+        var text = (tile.textContent || "").toLowerCase();
+        var tcat = tile.getAttribute("data-lt-category") || "";
+        var show = (!q || text.indexOf(q) !== -1) && (cat === "all" || tcat === cat);
+        tile.style.display = show ? "" : "none";
+        if (show) vis++;
+      });
+      emptyEl.style.display = vis ? "none" : "";
+    }
+    searchInput.addEventListener("input", applyFilter);
+    clearBtn.addEventListener("click", function () { searchInput.value = ""; applyFilter(); searchInput.focus(); });
+    Array.prototype.slice.call(wrapper.querySelectorAll(".lt-hub-filter-chip")).forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        Array.prototype.slice.call(wrapper.querySelectorAll(".lt-hub-filter-chip")).forEach(function (c) {
+          c.classList.remove("lt-hub-filter-active");
+          c.style.background = "hsl(var(--card))";
+          c.style.color = "hsl(var(--foreground))";
+        });
+        chip.classList.add("lt-hub-filter-active");
+        chip.style.background = "hsl(var(--foreground))";
+        chip.style.color = "#fff";
+        applyFilter();
+      });
+    });
   }
 
   /* ── Life Hub search + category filter ───────────────────────────────── */
@@ -3105,6 +3288,30 @@
     }
   }
 
+  function ensureLifeHubScrollIndicator(grid) {
+    if (!isActuallyOnLifeHubScreen()) return;
+    var arrow = document.getElementById("lt-lifehub-scroll-arrow");
+    if (!arrow) {
+      arrow = document.createElement("div");
+      arrow.id = "lt-lifehub-scroll-arrow";
+      arrow.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+      (document.body || document.documentElement).appendChild(arrow);
+    }
+    var scrollParent = grid.closest("[style*='overflow']") || grid.parentElement;
+    function check() {
+      if (!isActuallyOnLifeHubScreen() || activeOverlay) { arrow.style.display = "none"; return; }
+      var s = scrollParent || grid.parentElement;
+      if (!s) return;
+      var atBottom = s.scrollTop + s.clientHeight >= s.scrollHeight - 8;
+      arrow.style.display = atBottom ? "none" : "flex";
+    }
+    if (scrollParent) {
+      scrollParent.removeEventListener("checklh", check);
+      scrollParent.addEventListener("scroll", check, { passive: true });
+    }
+    check();
+  }
+
   /* ── Overlay management ────────────────────────────────────────────────── */
 
   function getOverlayRoot() {
@@ -3125,6 +3332,13 @@
     budgetAddingNew = false;
     gramCurrentId   = null;
     routineEditingId = null;
+    /* Kill any stale modals that were appended to document.body and would
+       otherwise persist over the newly-visible screen after the overlay
+       is torn down (e.g. upgrade prompt, plans screen, checkout). */
+    ["lt-upgrade-modal", "lt-plans-modal", "lt-checkout-modal"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.remove();
+    });
     if (_routineMidnightTimer) { clearInterval(_routineMidnightTimer); _routineMidnightTimer = null; }
     /* These per-tool background tickers must be killed here, not just left
        to self-detect a missing DOM node — otherwise closing a tool with
@@ -3777,9 +3991,9 @@
      exported image that doesn't have it. The on-screen <img> itself
      stays completely unmodified (it's just for viewing); only the
      blob handed to Save/Share is watermarked. */
-  function gramWatermarkedBlob(imgUrl, callback) {
+  function gramWatermarkedImage(imgUrl, cb) {
     var img = new Image();
-    img.crossOrigin = "anonymous"; /* required so canvas export isn't tainted by the cross-origin source */
+    img.crossOrigin = "anonymous";
     img.onload = function () {
       try {
         var canvas = document.createElement("canvas");
@@ -3787,7 +4001,6 @@
         canvas.height = img.naturalHeight || img.height;
         var ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
         var text = "minutics.com";
         var fontSize = Math.max(16, Math.round(canvas.width * 0.028));
         ctx.font = "700 " + fontSize + "px Arial, Helvetica, sans-serif";
@@ -3799,9 +4012,6 @@
         var boxX = pageMargin;
         var boxY = canvas.height - pageMargin - boxH;
         var r = boxH / 2;
-
-        /* Semi-transparent rounded pill behind the text so it stays
-           legible over both light and dark parts of any infographic. */
         ctx.fillStyle = "rgba(0,0,0,0.45)";
         ctx.beginPath();
         ctx.moveTo(boxX + r, boxY);
@@ -3811,18 +4021,25 @@
         ctx.arcTo(boxX, boxY, boxX + boxW, boxY, r);
         ctx.closePath();
         ctx.fill();
-
         ctx.fillStyle = "#ffffff";
         ctx.textBaseline = "middle";
         ctx.fillText(text, boxX + padX, boxY + boxH / 2 + fontSize * 0.04);
-
-        canvas.toBlob(function (blob) { callback(blob); }, "image/jpeg", 0.92);
-      } catch (e) {
-        callback(null);
-      }
+        cb(canvas.toDataURL("image/jpeg", 0.92));
+      } catch (e) { cb(null); }
     };
-    img.onerror = function () { callback(null); };
+    img.onerror = function () { cb(null); };
     img.src = imgUrl;
+  }
+
+  function gramWatermarkedBlob(imgUrl, callback) {
+    gramWatermarkedImage(imgUrl, function (dataUrl) {
+      if (!dataUrl) { callback(null); return; }
+      var parts = dataUrl.split(",");
+      var bin = atob(parts[1]);
+      var arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      callback(new Blob([arr], { type: "image/jpeg" }));
+    });
   }
 
   function gramImageUrl(id) {
@@ -3830,6 +4047,126 @@
   }
 
   var GRAM_SHARE_CAPTION = "Check this out on Minutics \u2014 make every minute count! \uD83D\uDCD6\u2728\nhttps://minutics.com";
+
+  /* ── Custom share sheet ───────────────────────────────────────────────── */
+  function openShareSheet(dataUrl, caption) {
+    var old = document.getElementById("lt-share-sheet-overlay");
+    if (old) old.remove();
+
+    var isAndroid = !!(window.AndroidShareBridge &&
+      (typeof window.AndroidShareBridge.shareImageTo === "function" ||
+       typeof window.AndroidShareBridge.shareImagePng === "function"));
+    var hasShareImageTo = !!(window.AndroidShareBridge && typeof window.AndroidShareBridge.shareImageTo === "function");
+
+    var apps = [
+      { id: "whatsapp",  name: "WhatsApp",  pkg: "com.whatsapp",            color: "#25D366", icon: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.627.616l4.584-1.202A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.086 0-4.033-.625-5.655-1.694l-.405-.268-2.694.707.718-2.627-.293-.467A9.965 9.965 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>' },
+      { id: "telegram",  name: "Telegram",  pkg: "org.telegram.messenger",  color: "#0088CC", icon: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0h-.056zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>' },
+      { id: "instagram", name: "Instagram", pkg: "com.instagram.android",  color: "#E4405F", icon: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>' },
+      { id: "x",         name: "X",         pkg: "com.twitter.android",     color: "#000",    icon: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>' },
+      { id: "facebook",  name: "Facebook",  pkg: "com.facebook.katana",     color: "#1877F2", icon: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>' },
+      { id: "copy",      name: "Copy",      pkg: "",                       color: "#6B7280", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>' },
+      { id: "more",      name: "More",      pkg: "",                       color: "#374151", icon: '<svg viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>' }
+    ];
+
+    var appsHtml = apps.map(function (a) {
+      return '<button class="lt-share-app" data-share-app="' + a.id + '" data-share-pkg="' + a.pkg + '" style="display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:none;cursor:pointer;-webkit-tap-highlight-color:transparent">' +
+        '<div style="width:52px;height:52px;border-radius:50%;background:' + a.color + ';display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15)">' +
+          '<div style="width:24px;height:24px">' + a.icon + '</div>' +
+        '</div>' +
+        '<span style="font-size:11px;color:hsl(var(--foreground));font-weight:500">' + a.name + '</span>' +
+      '</button>';
+    }).join("");
+
+    var overlay = document.createElement("div");
+    overlay.id = "lt-share-sheet-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;animation:lt-share-fade-in .2s ease";
+    overlay.innerHTML =
+      '<style>@keyframes lt-share-fade-in{from{opacity:0}to{opacity:1}}@keyframes lt-share-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}</style>' +
+      '<div class="lt-share-sheet" style="background:hsl(var(--card));border-radius:20px 20px 0 0;padding:20px 16px 28px;width:100%;max-width:400px;animation:lt-share-slide-up .25s ease;box-shadow:0 -4px 20px rgba(0,0,0,.2)">' +
+        '<div style="width:36px;height:4px;border-radius:2px;background:hsl(var(--muted));margin:0 auto 14px"></div>' +
+        '<p style="font-size:15px;font-weight:700;color:hsl(var(--foreground));margin:0 0 14px;text-align:center">Share to</p>' +
+        '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px">' + appsHtml + '</div>' +
+        '<button id="lt-share-sheet-cancel" style="width:100%;margin-top:16px;padding:12px;border:1px solid hsl(var(--border));border-radius:12px;background:transparent;color:hsl(var(--foreground));font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>' +
+      '</div>';
+    var host = activeOverlay || document.body;
+    host.appendChild(overlay);
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.getElementById("lt-share-sheet-cancel").addEventListener("click", function () {
+      overlay.remove();
+    });
+
+    overlay.querySelectorAll("[data-share-app]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var appId = btn.getAttribute("data-share-app");
+        var pkg = btn.getAttribute("data-share-pkg");
+        overlay.remove();
+
+        if (appId === "copy") {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(caption || GRAM_SHARE_CAPTION).then(function () {
+              showSimpleToast("Copied to clipboard", "");
+            }).catch(function () {});
+          }
+          return;
+        }
+
+        if (appId === "more") {
+          if (hasShareImageTo) {
+            window.AndroidShareBridge.shareImageTo(dataUrl, "");
+          } else if (isAndroid) {
+            window.AndroidShareBridge.shareImagePng(dataUrl);
+          } else if (navigator.share) {
+            blobToFile(dataUrl, "minutics-share.png", function (file) {
+              if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+                navigator.share({ files: [file], title: "Minutics", text: caption || GRAM_SHARE_CAPTION }).catch(function () {});
+              } else {
+                navigator.share({ title: "Minutics", text: caption || GRAM_SHARE_CAPTION, url: "https://minutics.com" }).catch(function () {});
+              }
+            });
+          }
+          return;
+        }
+
+        if (hasShareImageTo) {
+          window.AndroidShareBridge.shareImageTo(dataUrl, pkg);
+        } else if (isAndroid) {
+          window.AndroidShareBridge.shareImagePng(dataUrl);
+        } else {
+          if (navigator.share) {
+            blobToFile(dataUrl, "minutics-share.png", function (file) {
+              if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+                navigator.share({ files: [file], title: "Minutics", text: caption || GRAM_SHARE_CAPTION }).catch(function () {});
+              } else {
+                navigator.share({ title: "Minutics", text: caption || GRAM_SHARE_CAPTION, url: "https://minutics.com" }).catch(function () {});
+              }
+            });
+          } else if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(caption || GRAM_SHARE_CAPTION).then(function () {
+              showSimpleToast("Copied to clipboard", "");
+            }).catch(function () {});
+          }
+        }
+      });
+    });
+  }
+
+  function blobToFile(url, filename, cb) {
+    if (url.indexOf("data:") === 0) {
+      var parts = url.split(",");
+      var mime = (parts[0].match(/:(.*?);/) || [,"image/png"])[1];
+      var bin = atob(parts[1]);
+      var arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      cb(new File([arr], filename, { type: mime }));
+      return;
+    }
+    fetch(url).then(function (r) { return r.blob(); }).then(function (blob) {
+      cb(new File([blob], filename, { type: blob.type || "image/png" }));
+    }).catch(function () { cb(null); });
+  }
 
   function gramSetBtnSaving(btn, saving) {
     if (!btn) return;
@@ -3839,50 +4176,28 @@
 
   function gramSaveImage(id, btn) {
     gramSetBtnSaving(btn, true);
-    gramWatermarkedBlob(gramImageUrl(id), function (blob) {
+    gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
-      if (!blob) { alert("Couldn't save this image. Please try again."); return; }
-      var objUrl = URL.createObjectURL(blob);
+      if (!dataUrl) { alert("Couldn't save this image. Please try again."); return; }
+      if (window.AndroidShareBridge && typeof window.AndroidShareBridge.saveImagePng === "function") {
+        window.AndroidShareBridge.saveImagePng(dataUrl);
+        return;
+      }
       var a = document.createElement("a");
-      a.href = objUrl;
+      a.href = dataUrl;
       a.download = "minutics-" + id + ".jpg";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(objUrl); }, 4000);
     });
   }
 
   function gramShareImage(id, btn) {
     gramSetBtnSaving(btn, true);
-    gramWatermarkedBlob(gramImageUrl(id), function (blob) {
+    gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
-
-      if (blob && navigator.share && navigator.canShare) {
-        var file = new File([blob], "minutics-" + id + ".jpg", { type: "image/jpeg" });
-        var canShareFile = false;
-        try { canShareFile = navigator.canShare({ files: [file] }); } catch (e) { canShareFile = false; }
-        if (canShareFile) {
-          navigator.share({ files: [file], title: "Minutics", text: GRAM_SHARE_CAPTION })
-            .catch(function () { /* user cancelled — not an error */ });
-          return;
-        }
-      }
-      /* Fall back gracefully when the browser/device can't share files
-         directly (older Android WebViews, most desktop browsers):
-         share (or copy) the caption + link so the person can still post
-         it manually, same idea as the "share text" apps like Paytm fall
-         back to when a rich share sheet isn't available. */
-      if (navigator.share) {
-        navigator.share({ title: "Minutics", text: GRAM_SHARE_CAPTION, url: "https://minutics.com" })
-          .catch(function () {});
-      } else if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(GRAM_SHARE_CAPTION).then(function () {
-          alert("Your browser can't share images directly here, so we copied the caption + minutics.com link to your clipboard \u2014 paste it wherever you're sharing.");
-        }).catch(function () { alert(GRAM_SHARE_CAPTION); });
-      } else {
-        alert(GRAM_SHARE_CAPTION);
-      }
+      if (!dataUrl) { alert("Couldn't load this image. Please try again."); return; }
+      openShareSheet(dataUrl, GRAM_SHARE_CAPTION);
     });
   }
 
@@ -4071,6 +4386,41 @@
     return getAllTasks().filter(function (t) { return !!t.starred; });
   }
 
+  function autoPromoteQueuedFrog() {
+    var all = getStarredTasks();
+    if (all.length <= MAX_STARRED_TASKS) return;
+    var reordered = all.slice().sort(function (a, b) {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      return 0;
+    });
+    var changed = false;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].id !== reordered[i].id) { changed = true; break; }
+    }
+    if (!changed) return;
+    var tasks = getAllTasks();
+    reordered.forEach(function (t, idx) {
+      var full = tasks.find(function (x) { return x.id === t.id; });
+      if (full) {
+        full._frogOrder = idx;
+        upsertTask(full);
+      }
+    });
+    _reorderTasksByFrogOrder();
+  }
+
+  function _reorderTasksByFrogOrder() {
+    var tasks = getAllTasks();
+    var starred = tasks.filter(function (t) { return !!t.starred; });
+    var rest = tasks.filter(function (t) { return !t.starred; });
+    starred.sort(function (a, b) {
+      var oa = typeof a._frogOrder === "number" ? a._frogOrder : 999;
+      var ob = typeof b._frogOrder === "number" ? b._frogOrder : 999;
+      return oa - ob;
+    });
+    writeJson(TASKS_KEY, starred.concat(rest));
+  }
+
   /* Toggling a star is the one place the 3-task cap is enforced — both
      the Tasks app star button and (indirectly, via the same function)
      anything else that stars a task go through here, so the cap can never
@@ -4119,14 +4469,25 @@
       : '';
     var starFill = t.starred ? "#f5a623" : "none";
     var starStroke = t.starred ? "#f5a623" : "currentColor";
+    var hasLongText = (t.title && t.title.length > 40) || (t.notes && t.notes.length > 60);
+    var queuedBadge = "";
+    if (t.starred && isPro() && !t.completed) {
+      var allStarred = getStarredTasks();
+      var idx = allStarred.findIndex(function (s) { return s.id === t.id; });
+      if (idx >= MAX_STARRED_TASKS) {
+        queuedBadge = '<span class="lt-task-queued-badge" title="Queued for Eat the Frog — will appear when a slot opens">\u2b50 Queued</span>';
+      }
+    }
     return (
       '<div class="lt-task-item' + (overdue ? ' lt-task-overdue' : '') + '">' +
         '<button class="lt-task-check' + (t.completed ? ' lt-task-checked' : '') + (overdue ? ' lt-task-check-overdue' : '') + '" data-task-toggle="' + t.id + '">' + checkIcon + '</button>' +
-        '<div class="lt-task-body">' +
+        '<div class="lt-task-body" data-task-expand="' + t.id + '">' +
           '<span class="lt-task-title' + (t.completed ? ' lt-task-done' : '') + '">' + escapeHtml(t.title) + '</span>' +
-          (dl ? '<span class="lt-task-date' + (overdue ? ' lt-overdue' : '') + '">' + escapeHtml(dl) + '</span>' : '') +
+          (dl ? '<span class="lt-task-date' + (overdue ? ' lt-overdue' : '') + '">' + dl + '</span>' : '') +
+          queuedBadge +
           (t.notes ? '<span class="lt-task-notes">' + escapeHtml(t.notes) + '</span>' : '') +
         '</div>' +
+        (hasLongText ? '<button class="lt-task-expand" data-task-expand="' + t.id + '" title="View full details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></button>' : '') +
         '<button class="lt-task-star' + (t.starred ? ' lt-task-starred' : '') + '" data-task-star="' + t.id + '" title="' + (t.starred ? "Remove from Eat the Frog" : "Add to Eat the Frog") + '">' +
           '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + starFill + '" stroke="' + starStroke + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
         '</button>' +
@@ -4796,7 +5157,26 @@
       if (toggleBtn) {
         var id = toggleBtn.getAttribute("data-task-toggle");
         var task = getAllTasks().find(function (t) { return t.id === id; });
-        if (task) { task.completed = !task.completed; upsertTask(task); renderTasks(); }
+        if (task) {
+          task.completed = !task.completed;
+          upsertTask(task);
+          renderTasks();
+          autoPromoteQueuedFrog();
+          _frogLastSignature = null;
+          buildEatTheFrogCard();
+        }
+        return;
+      }
+      /* Tap task body or expand arrow → toggle expand/collapse */
+      var expandBtn = e.target.closest("[data-task-expand]");
+      if (expandBtn) {
+        var expandId = expandBtn.getAttribute("data-task-expand");
+        var item = expandBtn.closest(".lt-task-item");
+        if (!item) {
+          var body = expandBtn.closest(".lt-task-body");
+          if (body) item = body.closest(".lt-task-item");
+        }
+        if (item) item.classList.toggle("lt-task-expanded");
         return;
       }
       /* Star (add/remove from Eat the Frog, max 3) */
@@ -4804,10 +5184,10 @@
       if (starBtn) {
         var starId = starBtn.getAttribute("data-task-star");
         var ok = toggleTaskStar(starId);
+        renderTasks();
         if (!ok) {
           showSimpleToast("Eat the Frog is full", "Only 3 tasks can be starred at once — unstar one first.");
         }
-        renderTasks();
         return;
       }
       /* Delete */
@@ -5024,9 +5404,16 @@
     /* Count directly from DOM — always live, no storage lag after add/delete */
     var act = findActivityElements();
     if (act && act.list) {
-      /* The native app renders each activity as a child element of the list container */
       var children = act.list.children;
-      if (children && children.length > 0) return children.length;
+      if (children && children.length > 0) {
+        var count = 0;
+        for (var i = 0; i < children.length; i++) {
+          var text = children[i].textContent || "";
+          if (text.indexOf("No activities yet") !== -1) continue;
+          count++;
+        }
+        if (count > 0) return count;
+      }
     }
     /* Fallback: storage count (non-default activities only) */
     var db = readJson(LOCAL_DB_KEY, { activities: [] });
@@ -5082,6 +5469,119 @@
     }
   }, true);
 
+  function renderTimeValueOverlay() {
+    var tv = readJson("lt_time_value_v1", {});
+    var hourly = tv.hourlyRate || 0;
+    var currency = getCurrency();
+    var db = readJson(LOCAL_DB_KEY, { activities: [] });
+    var activities = db.activities || [];
+    var totalMin = 0;
+    activities.forEach(function (a) {
+      (a.blocks || []).forEach(function (b) {
+        if (b.start && b.end) totalMin += (new Date(b.end) - new Date(b.start)) / 60000;
+      });
+    });
+    var todayMin = 0;
+    var today = new Date().toDateString();
+    activities.forEach(function (a) {
+      (a.blocks || []).forEach(function (b) {
+        if (b.start && b.end && new Date(b.start).toDateString() === today) todayMin += (new Date(b.end) - new Date(b.start)) / 60000;
+      });
+    });
+    var todayValue = hourly > 0 ? (todayMin / 60 * hourly).toFixed(2) : "0.00";
+    var totalValue = hourly > 0 ? (totalMin / 60 * hourly).toFixed(2) : "0.00";
+    var root = activeOverlay;
+    root.innerHTML =
+      '<div class="lt-tool-shell">' +
+        toolHeader("Time Value Calculator", "Track the value of your time every minute.") +
+        '<div class="lt-tool-card">' +
+          '<p class="lt-card-title">Your Hourly Rate</p>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="font-size:24px;font-weight:800">' + currency.symbol + '</span>' +
+            '<input type="number" id="lt-tv-rate" value="' + (hourly || '') + '" placeholder="0" style="flex:1;border:1px solid hsl(var(--border));background:hsl(var(--background));padding:12px;border-radius:8px;font-size:18px;font-weight:700;color:hsl(var(--foreground));font-family:inherit">' +
+            '<span style="color:hsl(var(--muted-foreground));font-size:13px">/hour</span>' +
+          '</div>' +
+          '<button data-lt-action="tv-save" style="margin-top:12px;width:100%;background:hsl(var(--primary));border:none;color:#fff;padding:12px;font-size:14px;font-weight:700;cursor:pointer;border-radius:8px;font-family:inherit">Save Rate</button>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+          '<div class="lt-tool-card" style="text-align:center">' +
+            '<p style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 4px">Today\'s Value</p>' +
+            '<p style="font-size:24px;font-weight:800;margin:0;color:hsl(var(--foreground))">' + currency.symbol + todayValue + '</p>' +
+            '<p style="font-size:12px;color:hsl(var(--muted-foreground));margin:4px 0 0">' + Math.round(todayMin) + ' min tracked</p>' +
+          '</div>' +
+          '<div class="lt-tool-card" style="text-align:center">' +
+            '<p style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 4px">Total Value</p>' +
+            '<p style="font-size:24px;font-weight:800;margin:0;color:hsl(var(--foreground))">' + currency.symbol + totalValue + '</p>' +
+            '<p style="font-size:12px;color:hsl(var(--muted-foreground));margin:4px 0 0">' + Math.round(totalMin) + ' min tracked</p>' +
+          '</div>' +
+        '</div>' +
+        '<div class="lt-tool-card">' +
+          '<p class="lt-card-title">How it works</p>' +
+          '<p style="font-size:13px;color:hsl(var(--muted-foreground));line-height:1.5;margin:0">Set your hourly rate above. Every minute you track against any activity is multiplied by your rate to show you the real monetary value of your time. Use this to make smarter decisions about how you spend each hour.</p>' +
+        '</div>' +
+      '</div>';
+    root.querySelector("[data-lt-action='tv-save']").addEventListener("click", function () {
+      var val = parseFloat(root.querySelector("#lt-tv-rate").value) || 0;
+      writeJson("lt_time_value_v1", { hourlyRate: val });
+      renderTimeValueOverlay();
+    });
+  }
+
+  function renderScreenTimeOverlay() {
+    var db = readJson(LOCAL_DB_KEY, { activities: [] });
+    var activities = (db.activities || []).filter(function (a) { return !a.archived; });
+    var today = new Date().toDateString();
+    var totalTime = 0;
+    var catMap = {};
+    activities.forEach(function (a) {
+      var catTime = 0;
+      (a.blocks || []).forEach(function (b) {
+        if (b.start && b.end && new Date(b.start).toDateString() === today) {
+          var mins = (new Date(b.end) - new Date(b.start)) / 60000;
+          catTime += mins;
+          totalTime += mins;
+        }
+      });
+      if (catTime > 0) catMap[a.name || "Unknown"] = (catMap[a.name || "Unknown"] || 0) + catTime;
+    });
+    var cats = Object.keys(catMap).sort(function (a, b) { return catMap[b] - catMap[a]; });
+    var maxMin = cats.length > 0 ? catMap[cats[0]] : 1;
+    var root = activeOverlay;
+    var catRows = cats.map(function (name) {
+      var mins = catMap[name];
+      var pct = maxMin > 0 ? Math.round(mins / maxMin * 100) : 0;
+      var hours = Math.floor(mins / 60);
+      var rem = Math.round(mins % 60);
+      var timeStr = hours > 0 ? hours + "h " + rem + "m" : rem + "m";
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0">' +
+        '<span style="font-size:13px;font-weight:600;min-width:100px;color:hsl(var(--foreground))">' + escapeHtml(name) + '</span>' +
+        '<div style="flex:1;height:8px;background:hsl(var(--secondary));border-radius:4px;overflow:hidden">' +
+          '<div style="width:' + pct + '%;height:100%;background:hsl(var(--primary));border-radius:4px;transition:width .3s"></div>' +
+        '</div>' +
+        '<span style="font-size:12px;color:hsl(var(--muted-foreground));min-width:50px;text-align:right">' + timeStr + '</span>' +
+      '</div>';
+    }).join("");
+    root.innerHTML =
+      '<div class="lt-tool-shell">' +
+        toolHeader("Screen Time", "Monitor your screen time and digital balance.") +
+        '<div class="lt-tool-card" style="text-align:center">' +
+          '<p style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 4px">Today\'s Total</p>' +
+          '<p style="font-size:32px;font-weight:800;margin:0;color:hsl(var(--foreground))">' + Math.floor(totalTime / 60) + 'h ' + Math.round(totalTime % 60) + 'm</p>' +
+          '<p style="font-size:12px;color:hsl(var(--muted-foreground));margin:4px 0 0">' + cats.length + ' activities tracked today</p>' +
+        '</div>' +
+        (cats.length > 0 ?
+          '<div class="lt-tool-card">' +
+            '<p class="lt-card-title">Breakdown by Activity</p>' +
+            catRows +
+          '</div>'
+        :
+          '<div class="lt-tool-card" style="text-align:center">' +
+            '<p style="font-size:13px;color:hsl(var(--muted-foreground));margin:0">No activities tracked today. Start a timer or log a time block to see your screen time breakdown.</p>' +
+          '</div>'
+        ) +
+      '</div>';
+  }
+
   /* ── Click routing ─────────────────────────────────────────────────────── */
 
   document.addEventListener("click", function (e) {
@@ -5090,6 +5590,8 @@
     e.preventDefault();
     e.stopPropagation();
     var tool = tile.getAttribute("data-lifetime-tool");
+    if (tool === "timevalue") openOverlay(renderTimeValueOverlay);
+    if (tool === "screentime") openOverlay(renderScreenTimeOverlay);
     if (tool === "budget" && !isPro()) { showUpgradePrompt("Budget Tracker is a Pro feature."); return; }
     if (tool === "budget")   openOverlay(renderBudget);
     if (tool === "emi")      openOverlay(renderEmi);
@@ -5118,7 +5620,7 @@
     if (existing) existing.remove();
     var modal = document.createElement("div");
     modal.id = "lt-upgrade-modal";
-    modal.style.cssText = "position:fixed;inset:0;z-index:999998;background:rgba(20,24,45,.55);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.55);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
     var isActivityLimit = /activities/i.test(message || "");
     modal.innerHTML =
       '<div style="width:100%;max-width:320px;background:#fff;border:1px solid hsl(220 13% 88%);padding:26px;text-align:center">' +
@@ -5128,7 +5630,12 @@
         '<button id="lt-upgrade-cta" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;font-family:inherit">View Plans</button>' +
         '<button id="lt-upgrade-close" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:hsl(220 10% 40%);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>' +
       '</div>';
-    document.body.appendChild(modal);
+    /* When an overlay is active (e.g. Tasks), append inside the overlay root
+       so the modal is guaranteed to paint above the overlay content —
+       document.body modals can get trapped behind the overlay's z-index
+       on some Android WebView renderers. */
+    var host = activeOverlay || document.body;
+    host.appendChild(modal);
     modal.addEventListener("click", function (e) { if (e.target === modal) modal.remove(); });
     document.getElementById("lt-upgrade-close").addEventListener("click", function () { modal.remove(); });
     document.getElementById("lt-upgrade-cta").addEventListener("click", function () {
@@ -5577,29 +6084,9 @@
     var actions = document.getElementById("lt-fv-actions");
     if (actions) actions.style.display = "flex";
 
-    function dataUrlToFile(url, filename) {
-      var parts = url.split(",");
-      var mime = parts[0].match(/:(.*?);/)[1];
-      var bin = atob(parts[1]);
-      var arr = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-      return new File([arr], filename, { type: mime });
-    }
-
     var shareBtn = document.getElementById("lt-fv-share-btn");
     if (shareBtn) shareBtn.addEventListener("click", function () {
-      var file = dataUrlToFile(dataUrl, "lifetime-" + dateText.replace(/\//g, "-") + ".png");
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({
-          files: [file],
-          title: "Minutics",
-          text: "My day, tracked with Minutics."
-        }).catch(function () {});
-      } else if (window.AndroidShareBridge && typeof window.AndroidShareBridge.shareImagePng === "function") {
-        window.AndroidShareBridge.shareImagePng(dataUrl);
-      } else {
-        alert("Sharing isn\u2019t supported directly here \u2014 long-press the image above and choose Share.");
-      }
+      openShareSheet(dataUrl, "My day, tracked with Minutics. https://minutics.com");
     });
 
     var saveBtn = document.getElementById("lt-fv-save-btn");
@@ -7067,8 +7554,8 @@
         rowLabel("Account") +
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
           '<div style="min-width:0">' +
-            '<p style="color:hsl(230 40% 16%);font-size:14px;font-weight:700;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (user && user.username ? escapeHtml(user.username) : (user && user.email ? escapeHtml(user.email) : "Signed in")) + '</p>' +
-            '<p style="color:hsl(220 10% 55%);font-size:11px;margin:2px 0 0">\uD83D\uDFE3 Signed in via Pi Network</p>' +
+            '<p style="color:hsl(230 40% 16%);font-size:14px;font-weight:700;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (user && user.email ? escapeHtml(user.email) : "Signed in") + '</p>' +
+            '<p style="color:hsl(220 10% 55%);font-size:11px;margin:2px 0 0">Your data stays on this device</p>' +
           '</div>' +
           '<button id="lt-logout-btn" style="flex-shrink:0;background:#fff;border:1px solid hsl(0 72% 80%);color:hsl(0 72% 45%);padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Log out</button>' +
         '</div>' +
@@ -7175,402 +7662,192 @@
     });
   }
 
-  /* ── Subscription plans selection screen (Pi app — real Pi payments) ── */
-  var _plansPriceExpiresAt = 0;
-  var _plansPriceTimer = null;
-  var _plansPiUsdPrice = null;
-
-  function getApiOrigin() {
-    if (typeof window !== "undefined" && window.location) {
-      var h = window.location.hostname;
-      if (h === "piapp.minutics.com" || h === "localhost") return "";
-    }
-    return "https://piapp.minutics.com";
-  }
-
-  function fetchPiPrice(callback) {
-    var apiOrigin = getApiOrigin();
-    fetch(apiOrigin + "/api/price")
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (data && data.piUsdPrice) {
-          _plansPiUsdPrice = data.piUsdPrice;
-          _plansPriceExpiresAt = data.expiresAt || 0;
-          if (callback) callback(null, data);
-        } else {
-          if (callback) callback(new Error("No price data"));
-        }
-      })
-      .catch(function (err) {
-        if (callback) callback(err);
-      });
-  }
-
-  function startPriceCountdown(el, expiresAt) {
-    if (_plansPriceTimer) clearInterval(_plansPriceTimer);
-    function tick() {
-      var remaining = Math.max(0, expiresAt - Date.now());
-      var mins = Math.floor(remaining / 60000);
-      var secs = Math.floor((remaining % 60000) / 1000);
-      if (el) el.textContent = "Price updates in " + mins + ":" + (secs < 10 ? "0" : "") + secs;
-      if (remaining <= 0) {
-        clearInterval(_plansPriceTimer);
-        _plansPriceTimer = null;
-      }
-    }
-    tick();
-    _plansPriceTimer = setInterval(tick, 1000);
-  }
-
+  /* Subscription plans selection screen (normal app — dummy payment). */
   function showPlansScreen() {
     addStyle3();
     var existing = document.getElementById("lt-plans-modal");
     if (existing) existing.remove();
 
-    var planDefs = [
-      { id: "basic",    name: "Basic",    usd: 1,  period: "/month", desc: "Essential premium access for one month." },
-      { id: "yearly",   name: "1 Year",   usd: 9,  period: "/year",  desc: "Full premium access for 12 months with one payment." },
-      { id: "lifetime", name: "Lifetime", usd: 99, period: "",       desc: "Premium access with no expiration." },
+    var plans = [
+      { id: "basic",    name: "Basic",    price: "$1",  period: "/month", desc: "Essential premium access for one month.", features: ["Premium features", "All Minutics tools", "1 month access"] },
+      { id: "yearly",   name: "1 Year",   price: "$9",  period: "/year",  desc: "Full premium access for 12 months with one payment.", features: ["Premium features", "All Minutics tools", "12 months access", "One payment"] },
+      { id: "lifetime", name: "Lifetime", price: "$99", period: "",       desc: "Premium access with no expiration.", features: ["Premium features", "All Minutics tools", "Lifetime access", "No expiration"] },
     ];
 
-    function piAmount(usd) {
-      if (!_plansPiUsdPrice) return null;
-      return (usd / _plansPiUsdPrice).toFixed(4);
-    }
-
-    function highlightPlan(planId, listEl) {
-      listEl.querySelectorAll(".lt-plan-card").forEach(function (card) {
-        var isActive = card.getAttribute("data-plan") === planId;
-        card.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 90%)";
-        card.style.boxShadow = isActive ? "0 0 0 1px hsl(230 40% 16%), 0 4px 16px rgba(20,24,45,.1)" : (card.getAttribute("data-plan") === "yearly" ? "0 2px 12px rgba(0,0,0,.06)" : "0 1px 3px rgba(0,0,0,.03)");
-        card.style.background = isActive ? "hsl(230 40% 97%)" : "#fff";
-        var check = card.querySelector(".lt-plan-check");
-        if (check) {
-          check.style.background = isActive ? "hsl(230 40% 16%)" : "transparent";
-          check.style.borderColor = isActive ? "hsl(230 40% 16%)" : (card.getAttribute("data-plan") === "yearly" ? "hsl(230 40% 16%)" : "hsl(220 13% 82%)");
-          check.innerHTML = isActive ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
-        }
-      });
-    }
-
-    var selectedPlan = "yearly";
+    var planCards = plans.map(function (p, i) {
+      var isCurrentPlan = getPlanId() === p.id;
+      return '<div class="lt-plan-card" data-plan="' + p.id + '" style="background:#fff;border:2px solid ' + (isCurrentPlan ? "#16A34A" : (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)")) + ';border-radius:14px;padding:20px;cursor:pointer;transition:border-color .2s,box-shadow .2s;position:relative">' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">' +
+          '<div>' +
+            '<p style="color:hsl(230 40% 16%);font-size:18px;font-weight:800;margin:0">' + p.name + (isCurrentPlan ? ' <span style="color:#16A34A;font-size:11px;font-weight:700">Current</span>' : '') + '</p>' +
+            '<p style="color:hsl(230 40% 16%);font-size:28px;font-weight:800;margin:4px 0 0;letter-spacing:-.02em">' + p.price + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + p.period + '</span></p>' +
+          '</div>' +
+          '<div class="lt-plan-check" style="width:26px;height:26px;border-radius:50%;border:2px solid ' + (isCurrentPlan ? "#16A34A" : (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)")) + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:4px;transition:all .2s">' +
+            (isCurrentPlan ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '') +
+          '</div>' +
+        '</div>' +
+        '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0 0 12px;line-height:1.4">' + p.desc + '</p>' +
+        '<div style="display:flex;flex-direction:column;gap:6px">' +
+          p.features.map(function (f) {
+            return '<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:hsl(220 10% 40%)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(152 60% 45%)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' + f + '</div>';
+          }).join("") +
+        '</div>' +
+      '</div>';
+    }).join("");
 
     var modal = document.createElement("div");
     modal.id = "lt-plans-modal";
-    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
     modal.innerHTML =
       '<div style="width:100%;max-width:520px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);display:flex;flex-direction:column;max-height:90vh" id="lt-plans-card">' +
-        '<div style="text-align:center;padding:28px 28px 0;flex-shrink:0">' +
-          '<p style="color:hsl(230 40% 16%);font-size:20px;font-weight:800;margin:0 0 4px;letter-spacing:-.01em">Choose your plan</p>' +
-          '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Unlock all Minutics premium features</p>' +
+        '<div style="text-align:center;margin-bottom:16px;padding:32px 28px 0;flex-shrink:0">' +
+          '<p style="color:hsl(230 40% 16%);font-size:22px;font-weight:800;margin:0 0 4px">' + (isPro() ? "Your " + getPlanName() + " Plan" : "Choose your plan") + '</p>' +
+          '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0">' + (isPro() ? "Manage your subscription" : "Unlock all Minutics premium features") + '</p>' +
         '</div>' +
-        '<div id="lt-plans-timer-wrap" style="padding:0 28px;flex-shrink:0"></div>' +
-        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:14px;padding:16px 28px 0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0"></div>' +
+        '<div id="lt-plans-list" style="display:flex;flex-direction:column;gap:12px;padding:0 28px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0">' + planCards + '</div>' +
         '<div style="flex-shrink:0;padding:20px 28px 28px;border-top:1px solid hsl(220 13% 92%);margin-top:16px">' +
-          '<div id="lt-plans-cta-wrap" style="text-align:center">' +
-            '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with 1 Year</button>' +
-          '</div>' +
-          '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:2px;font-family:inherit">Close</button>' +
+          (isPro() && isSubscription()
+            ? '<div id="lt-plans-cta-wrap" style="text-align:center">' +
+                '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:#c0392b;border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Cancel Subscription</button>' +
+              '</div>'
+            : (isPro()
+                ? '<div id="lt-plans-cta-wrap" style="text-align:center"><p style="color:#16A34A;font-size:13px;font-weight:700;margin:0">You have ' + getPlanName() + ' \u2014 no expiration</p></div>'
+                : '<div id="lt-plans-cta-wrap" style="text-align:center">' +
+                    '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with 1 Year</button>' +
+                  '</div>'
+              )
+          ) +
+          '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:4px;font-family:inherit">Close</button>' +
+          '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
       '</div>';
-    document.body.appendChild(modal);
+    (activeOverlay || document.body).appendChild(modal);
 
-    function closeModal() {
-      modal.remove();
-      if (_plansPriceTimer) { clearInterval(_plansPriceTimer); _plansPriceTimer = null; }
+    var selectedPlan = "yearly";
+
+    function highlightPlan(planId) {
+      selectedPlan = planId;
+      modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
+        var isActive = card.getAttribute("data-plan") === planId;
+        card.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 88%)";
+        card.style.boxShadow = isActive ? "0 0 0 1px hsl(230 40% 16%), 0 4px 12px rgba(0,0,0,.08)" : "none";
+        var check = card.querySelector(".lt-plan-check");
+        if (check) {
+          check.style.background = isActive ? "hsl(230 40% 16%)" : "transparent";
+          check.style.borderColor = isActive ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)";
+          check.innerHTML = isActive ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '';
+        }
+      });
+      var cta = document.getElementById("lt-plans-cta");
+      if (cta) {
+        var p = plans.find(function (x) { return x.id === planId; });
+        cta.textContent = "Continue with " + (p ? p.name : planId);
+      }
     }
 
-    document.getElementById("lt-plans-close").addEventListener("click", closeModal);
-    modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
+    highlightPlan(isPro() ? getPlanId() : "yearly");
 
-    function renderCards(piData) {
-      var features = ["Premium features", "All Minutics tools"];
-      var listEl = document.getElementById("lt-plans-list");
-      if (!listEl) return;
-
-      var planCards = planDefs.map(function (p, i) {
-        var piAmt = piAmount(p.usd);
-        var periodFeatures = p.id === "basic" ? ["1 month access"] : p.id === "yearly" ? ["12 months access", "One payment"] : ["Lifetime access", "No expiration"];
-        var isPopular = p.id === "yearly";
-        return '<div class="lt-plan-card" data-plan="' + p.id + '" style="background:#fff;border:2px solid ' + (isPopular ? "hsl(230 40% 16%)" : "hsl(220 13% 90%)") + ';border-radius:16px;padding:22px 22px 20px;cursor:pointer;transition:border-color .2s,box-shadow .2s;position:relative;box-shadow:' + (isPopular ? "0 2px 12px rgba(0,0,0,.06)" : "0 1px 3px rgba(0,0,0,.03)") + '">' +
-          (isPopular ? '<div style="position:absolute;top:-11px;left:22px;background:hsl(230 40% 16%);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:6px;letter-spacing:.03em">MOST POPULAR</div>' : '') +
-          '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">' +
-            '<div style="flex:1">' +
-              '<p style="color:hsl(220 10% 50%);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:0 0 2px">' + p.name + '</p>' +
-              '<div style="display:flex;align-items:baseline;gap:2px;margin:0 0 3px">' +
-                '<span style="color:hsl(230 40% 16%);font-size:32px;font-weight:800;letter-spacing:-.03em;line-height:1">$' + p.usd + '</span>' +
-                (p.period ? '<span style="color:hsl(220 10% 55%);font-size:13px;font-weight:600">' + p.period + '</span>' : '') +
-              '</div>' +
-              (piAmt ? '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0">\u2248 ' + piAmt + ' PI</p>' : '<p style="color:hsl(220 10% 68%);font-size:12px;margin:0">Loading price\u2026</p>') +
-            '</div>' +
-            '<div class="lt-plan-check" style="width:24px;height:24px;border-radius:50%;border:2px solid ' + (isPopular ? "hsl(230 40% 16%)" : "hsl(220 13% 82%)") + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;transition:all .2s"></div>' +
-          '</div>' +
-          '<div style="border-top:1px solid hsl(220 13% 94%);padding-top:14px;margin-top:2px">' +
-            '<p style="color:hsl(220 10% 45%);font-size:12.5px;margin:0 0 10px;line-height:1.45">' + p.desc + '</p>' +
-            '<div style="display:flex;flex-direction:column;gap:7px">' +
-              features.concat(periodFeatures).map(function (f) {
-                return '<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:hsl(220 10% 38%);line-height:1.3"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="hsl(152 55% 42%)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' + f + '</div>';
-              }).join("") +
-            '</div>' +
-          '</div>' +
-        '</div>';
-      }).join("");
-
-      listEl.innerHTML = planCards;
-
-      var timerWrap = document.getElementById("lt-plans-timer-wrap");
-      if (timerWrap) {
-        if (piData && piData.expiresAt) {
-          var remaining = Math.max(0, piData.expiresAt - Date.now());
-          var mins = Math.floor(remaining / 60000);
-          var secs = Math.floor((remaining % 60000) / 1000);
-          timerWrap.innerHTML = '<p id="lt-plans-timer" style="color:hsl(220 10% 68%);font-size:11px;margin:0 0 16px;text-align:center;font-variant-numeric:tabular-nums">Price updates in ' + mins + ':' + (secs < 10 ? '0' : '') + secs + '</p>';
-          startPriceCountdown(document.getElementById("lt-plans-timer"), piData.expiresAt);
-        } else {
-          timerWrap.innerHTML = '';
-        }
-      }
-
-      highlightPlan(selectedPlan, listEl);
-
-      var piP = planDefs.find(function (x) { return x.id === selectedPlan; });
-      var cta = document.getElementById("lt-plans-cta");
-      if (cta) cta.textContent = "Continue with " + (piP ? piP.name : selectedPlan);
-
-      listEl.querySelectorAll(".lt-plan-card").forEach(function (card) {
-        card.addEventListener("click", function () {
+    /* Single click handler per card */
+    if (!isPro()) {
+      modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
+        card.addEventListener("click", function (e) {
           var planId = card.getAttribute("data-plan");
           if (selectedPlan === planId) {
-            closeModal();
-            showPiCheckout(planId);
+            modal.remove();
+            showDummyCheckoutForPlan(selectedPlan);
           } else {
-            selectedPlan = planId;
-            highlightPlan(planId, listEl);
-            var p = planDefs.find(function (x) { return x.id === planId; });
-            if (cta) cta.textContent = "Continue with " + (p ? p.name : planId);
+            highlightPlan(planId);
           }
         });
       });
-
-      var ctaBtn = document.getElementById("lt-plans-cta");
-      if (ctaBtn) {
-        ctaBtn.addEventListener("click", function () {
-          closeModal();
-          showPiCheckout(selectedPlan);
-        });
-      }
     }
 
-    if (_plansPiUsdPrice && Date.now() < _plansPriceExpiresAt) {
-      renderCards({ piUsdPrice: _plansPiUsdPrice, expiresAt: _plansPriceExpiresAt });
-    } else {
-      renderCards(null);
-      fetchPiPrice(function (err, data) {
-        if (!err && data) renderCards(data);
+    /* CTA button proceeds to checkout or cancel */
+    var ctaBtn = document.getElementById("lt-plans-cta");
+    if (ctaBtn) {
+      ctaBtn.addEventListener("click", function () {
+        if (isPro() && isSubscription()) {
+          if (confirm("Cancel your " + getPlanName() + " subscription? You will lose premium features at the end of your billing period.")) {
+            modal.remove();
+            setPlan("free");
+            refreshPlanGatedUI();
+          }
+          return;
+        }
+        modal.remove();
+        showDummyCheckoutForPlan(selectedPlan);
       });
     }
+
+    /* Close / backdrop */
+    document.getElementById("lt-plans-close").addEventListener("click", function () { modal.remove(); });
+    modal.addEventListener("click", function (e) { if (e.target === modal) modal.remove(); });
   }
 
-  /* Pi Network payment checkout for a specific plan */
-  function showPiCheckout(planId) {
-    var planDefs = { basic: { name: "Basic", usd: 1, period: "/month" }, yearly: { name: "1 Year", usd: 9, period: "/year" }, lifetime: { name: "Lifetime", usd: 99, period: "" } };
-    var plan = planDefs[planId] || planDefs.yearly;
-
+  function showDummyCheckoutForPlan(planId) {
+    if (isPro() && isSubscription()) {
+      showUpgradePrompt("You already have an active " + getPlanName() + " subscription. Cancel it first to switch plans.");
+      return;
+    }
+    var plans = { basic: { label: "Basic", price: "$1", sub: "/month" }, yearly: { label: "1 Year", price: "$9", sub: "/year" }, lifetime: { label: "Lifetime", price: "$99", sub: "" } };
+    var plan = plans[planId] || plans.yearly;
     addStyle3();
     var existing = document.getElementById("lt-checkout-modal");
     if (existing) existing.remove();
     var modal = document.createElement("div");
     modal.id = "lt-checkout-modal";
-    modal.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
     modal.innerHTML =
       '<div style="width:100%;max-width:340px;background:#fff;border:1px solid hsl(220 13% 88%);padding:26px" id="lt-checkout-card">' +
-        '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px">Minutics ' + plan.name + '</p>' +
-        '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px">$' + plan.usd + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + plan.period + '</span></p>' +
-        '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 22px">Budget Tracker, full history & more</p>' +
+        '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px">Minutics ' + plan.label + '</p>' +
+        '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px">' + plan.price + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + plan.sub + '</span></p>' +
+        '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 22px">Budget Tracker, Telegram reports, full history & more</p>' +
         '<div id="lt-checkout-body">' +
-          '<p style="color:hsl(220 10% 68%);font-size:11px;text-align:center;margin:0 0 12px">Fetching price and creating quote...</p>' +
-          '<button id="lt-checkout-pay-btn" style="width:100%;background:#7C3AED;border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:none;align-items:center;justify-content:center;gap:8px">\uD83D\uDFE3 Pay with Pi</button>' +
-          '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Close</button>' +
+          '<div style="background:hsl(220 15% 97%);border:1px solid hsl(220 13% 88%);padding:12px 14px;margin-bottom:10px">' +
+            '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:700;text-transform:uppercase;margin:0 0 4px">Card number</p>' +
+            '<p style="color:hsl(230 40% 16%);font-size:14px;margin:0;letter-spacing:.05em">4242 4242 4242 4242</p>' +
+          '</div>' +
+          '<div style="display:flex;gap:10px;margin-bottom:20px">' +
+            '<div style="flex:1;background:hsl(220 15% 97%);border:1px solid hsl(220 13% 88%);padding:12px 14px">' +
+              '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:700;text-transform:uppercase;margin:0 0 4px">Expiry</p>' +
+              '<p style="color:hsl(230 40% 16%);font-size:14px;margin:0">12/29</p>' +
+            '</div>' +
+            '<div style="flex:1;background:hsl(220 15% 97%);border:1px solid hsl(220 13% 88%);padding:12px 14px">' +
+              '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:700;text-transform:uppercase;margin:0 0 4px">CVV</p>' +
+              '<p style="color:hsl(230 40% 16%);font-size:14px;margin:0">\u2022\u2022\u2022</p>' +
+            '</div>' +
+          '</div>' +
+          '<button id="lt-checkout-pay-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Pay ' + plan.price + '</button>' +
+          '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>' +
+          '<p style="color:hsl(220 10% 68%);font-size:9px;text-align:center;margin:10px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
       '</div>';
-    document.body.appendChild(modal);
-
+    (activeOverlay || document.body).appendChild(modal);
     document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
     modal.addEventListener("click", function (e) { if (e.target === modal) modal.remove(); });
-
-    /* Fetch price, create quote, then enable pay button */
-    var currentQuote = null;
-    fetchPiPrice(function (err, priceData) {
-      if (err || !priceData) {
-        var body = document.getElementById("lt-checkout-body");
-        if (body) body.querySelector("p").textContent = "Unable to fetch Pi price. Please try again.";
-        return;
-      }
-      var apiOrigin = getApiOrigin();
-      fetch(apiOrigin + "/api/quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ planId: planId }),
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (quote) {
-          currentQuote = quote;
-          var piAmt = quote.piAmount ? quote.piAmount.toFixed(4) : "?";
-          var body = document.getElementById("lt-checkout-body");
-          if (!body) return;
-          body.querySelector("p").textContent = "\u2248 " + piAmt + " PI ($" + quote.usdPrice + ")";
-          var payBtn = document.getElementById("lt-checkout-pay-btn");
-          payBtn.style.display = "flex";
-          payBtn.textContent = "\uD83D\uDFE3 Pay " + piAmt + " PI";
-        })
-        .catch(function () {
-          var body = document.getElementById("lt-checkout-body");
-          if (body) body.querySelector("p").textContent = "Failed to create quote. Please try again.";
-        });
-    });
-
     document.getElementById("lt-checkout-pay-btn").addEventListener("click", function () {
-      if (typeof Pi === "undefined") {
-        alert("Pi Network SDK not loaded. Please open this app inside the Pi Browser.");
-        return;
+      var body = document.getElementById("lt-checkout-body");
+      body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:hsl(230 40% 16%);border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Processing payment...</p></div>';
+      if (!document.getElementById("lt-spin-kf")) {
+        var kf = document.createElement("style");
+        kf.id = "lt-spin-kf";
+        kf.textContent = "@keyframes lt-spin{to{transform:rotate(360deg)}}";
+        document.head.appendChild(kf);
       }
-      if (!currentQuote) {
-        alert("Quote not ready. Please wait for the price to load.");
-        return;
-      }
-      var btn = document.getElementById("lt-checkout-pay-btn");
-      btn.disabled = true;
-      btn.textContent = "Starting payment...";
-
-      function showPayError(msg) {
-        btn.disabled = false;
-        btn.textContent = "\uD83D\uDFE3 Pay with Pi";
-        var body = document.getElementById("lt-checkout-body");
-        if (body && body.querySelector("p")) body.querySelector("p").textContent = msg;
-      }
-
-      function showProcessing() {
-        var body = document.getElementById("lt-checkout-body");
-        if (!body) return;
-        body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:#7C3AED;border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Processing payment...</p></div>';
-        if (!document.getElementById("lt-spin-kf")) {
-          var kf = document.createElement("style");
-          kf.id = "lt-spin-kf";
-          kf.textContent = "@keyframes lt-spin{to{transform:rotate(360deg)}}";
-          document.head.appendChild(kf);
-        }
-      }
-
-      function showSuccess(label) {
-        var body2 = document.getElementById("lt-checkout-body");
-        if (!body2) return;
-        body2.innerHTML =
+      setTimeout(function () {
+        body.innerHTML =
           '<div style="text-align:center;padding:16px 0">' +
             '<div style="font-size:38px;margin-bottom:10px">\u2705</div>' +
             '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment successful</p>' +
-            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics ' + label + '</p>' +
+            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics ' + plan.label + '</p>' +
             '<button id="lt-checkout-done-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Done</button>' +
           '</div>';
         document.getElementById("lt-checkout-done-btn").addEventListener("click", function () {
           modal.remove();
-          setPlan("pro");
+          setPlan("lifetime");
           refreshPlanGatedUI();
         });
-      }
-
-      function showErrorRetry() {
-        var body3 = document.getElementById("lt-checkout-body");
-        if (!body3) return;
-        body3.innerHTML =
-          '<div style="text-align:center;padding:16px 0">' +
-            '<div style="font-size:38px;margin-bottom:10px">\u274C</div>' +
-            '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment failed</p>' +
-            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">Please try again or check your Pi balance.</p>' +
-            '<button id="lt-checkout-retry-btn" style="width:100%;background:#7C3AED;border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">\uD83D\uDFE3 Try again</button>' +
-            '<button id="lt-checkout-close2-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Close</button>' +
-          '</div>';
-        document.getElementById("lt-checkout-close2-btn").addEventListener("click", function () { modal.remove(); });
-        document.getElementById("lt-checkout-retry-btn").addEventListener("click", function () {
-          modal.remove();
-          showPiCheckout(planId);
-        });
-      }
-
-      var piAmount = currentQuote.piAmount;
-      if (!Number.isFinite(piAmount) || piAmount <= 0) {
-        showPayError("Invalid payment amount. Please try again.");
-        return;
-      }
-
-      var planNames = { basic: "Minutics Basic", yearly: "Minutics 1 Year", lifetime: "Minutics Lifetime" };
-      var memo = planNames[planId] || "Minutics Subscription";
-
-      try {
-        Pi.createPayment({
-          amount: piAmount,
-          memo: memo,
-          metadata: { plan: planId, orderId: currentQuote.orderId },
-        }, {
-          onReadyForServerApproval: function (paymentId) {
-            console.log("[Minutics] onReadyForServerApproval paymentId type=" + typeof paymentId + " len=" + (paymentId ? paymentId.length : 0));
-            showProcessing();
-            var apiOrigin = getApiOrigin();
-            console.log("[Minutics] posting to " + apiOrigin + "/api/pi/payments/create");
-            fetch(apiOrigin + "/api/pi/payments/create", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ paymentId: paymentId, quote: currentQuote }),
-            }).then(function (r) {
-              console.log("[Minutics] approve response status=" + r.status + " ok=" + r.ok);
-              if (!r.ok) return r.json().then(function (d) {
-                console.error("[Minutics] approve error body:", JSON.stringify(d));
-                throw new Error(d.error || d.piMessage || "Payment approval failed");
-              });
-              return r.json().then(function (d) {
-                console.log("[Minutics] approve success:", JSON.stringify(d).substring(0, 200));
-              });
-            }).catch(function (err) {
-              console.error("Server approve failed:", err);
-              showErrorRetry();
-            });
-          },
-          onReadyForServerCompletion: function (paymentId, txid) {
-            console.log("[Minutics] onReadyForServerCompletion paymentId len=" + (paymentId ? paymentId.length : 0) + " txid=" + (txid ? "present" : "missing"));
-            var apiOrigin = getApiOrigin();
-            fetch(apiOrigin + "/api/pi/payments/complete", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ paymentId: paymentId, txid: txid, quote: currentQuote }),
-            }).then(function (r) { return r.json(); }).then(function (d) {
-              var label = (d && d.plan && d.plan.label) || plan.name;
-              showSuccess(label);
-            }).catch(function (err) {
-              console.error("Server complete failed:", err);
-              showErrorRetry();
-            });
-          },
-          onError: function (error) {
-            console.error("Pi payment error:", error);
-            showPayError("Payment error: " + (error.message || "Please try again."));
-          },
-          onCancel: function (paymentId) {
-            console.log("Pi payment cancelled:", paymentId);
-            btn.disabled = false;
-            btn.textContent = "\uD83D\uDFE3 Pay with Pi";
-            var body = document.getElementById("lt-checkout-body");
-            if (body && body.querySelector("p")) {
-              var piAmt = currentQuote.piAmount ? currentQuote.piAmount.toFixed(4) : "?";
-              body.querySelector("p").textContent = "\u2248 " + piAmt + " PI ($" + currentQuote.usdPrice + ")";
-            }
-          },
-        });
-      } catch (e) {
-        console.error("Pi.createPayment threw:", e);
-        showPayError("Could not start payment: " + (e.message || "Please try again."));
-      }
+      }, 1400);
     });
   }
 
@@ -8188,6 +8465,8 @@
   }
 
   function runEnhancements() {
+    safeRun(migrateOldProPlan);
+    safeRun(checkPlanExpiry);
     safeRun(addStyle);
     safeRun(addStyle2);
     safeRun(addStyle3);

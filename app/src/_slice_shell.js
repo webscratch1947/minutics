@@ -9,23 +9,7 @@ function LTAvatarInitial() {
 }
 
 function LTTopNav() {
-  return c.jsxs("div", {
-    className: "flex items-center justify-between px-4 py-3 sticky top-0",
-    style: {
-      zIndex: 40,
-      backgroundColor: "#000000"
-    },
-    children: [c.jsx("span", {
-      className: "font-black text-lg tracking-wide text-white",
-      children: "LifeTime"
-    }), c.jsx("div", {
-      className: "w-9 h-9 rounded-full bg-white flex items-center justify-center font-bold text-sm",
-      style: {
-        color: "#000000"
-      },
-      children: LTAvatarInitial()
-    })]
-  })
+  return null;
 }
 
 export function ak({
