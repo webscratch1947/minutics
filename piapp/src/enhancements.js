@@ -3071,131 +3071,47 @@
 
   function mountLifeHubTools() {
     if (activeOverlay) return;
-    if (!isActuallyOnLifeHubScreen()) {
+    var grid = findTileGrid();
+    if (!grid) {
       var stray = document.querySelectorAll("[data-lt-tile-injected]");
       for (var i = 0; i < stray.length; i++) stray[i].remove();
       var searchWrap = document.getElementById("lt-hub-search-wrap");
       if (searchWrap) searchWrap.remove();
-      var sa = document.getElementById("lt-lifehub-scroll-arrow");
-      if (sa) sa.remove();
       return;
     }
-    /* ── Full replacement: hide native grid, insert our own ─────────────── */
-    var hubContainer = null;
-    var spans = document.querySelectorAll("button span");
-    for (var i = 0; i < spans.length; i++) {
-      var t = (spans[i].textContent || "").trim();
-      if (t !== "Time Value" && t !== "Screen Time") continue;
-      var btn = spans[i].closest("button");
-      if (!btn) continue;
-      var cur = btn.parentElement;
-      while (cur && cur !== document.body) {
-        var hasTimeValue = false, hasScreenTime = false;
-        var btns2 = cur.querySelectorAll("button span");
-        for (var j = 0; j < btns2.length; j++) {
-          var t2 = (btns2[j].textContent || "").trim();
-          if (t2 === "Time Value") hasTimeValue = true;
-          if (t2 === "Screen Time") hasScreenTime = true;
-        }
-        if (hasTimeValue && hasScreenTime && !cur.closest("[data-lt-enhancement],[data-lt-tile-injected]")) {
-          hubContainer = cur;
-        }
-        cur = cur.parentElement;
+    grid.classList.add("lt-hub-grid-2col");
+    if (!grid.querySelector("[data-lt-tile-injected]")) {
+      grid.appendChild(makeTile("budget",   "\uD83D\uDCB3", "Budget Tracker",     "Manage income, expenses and your balance.",         "#FEF3C7", "#B45309", !isPro(), "finance"));
+      grid.appendChild(makeTile("emi",      "\uD83E\uDDEE", "EMI Calculator",     "Plan your loans and calculate EMI smartly.",        "#E0E7FF", "#4338CA", false, "finance"));
+      grid.appendChild(makeTile("compound", "\uD83D\uDCC8", "Compound Interest",  "See how your money grows when compounding.",         "#FCE7F3", "#BE185D", false, "finance"));
+      grid.appendChild(makeTile("gram",     "\uD83D\uDCD6", "Knowledge Gram",     "Track what you learn and grow every day.",           "#D1FAE5", "#047857", false, "productivity"));
+      grid.appendChild(makeTile("tasks",    "\u2705",       "My Tasks",           "Organize your tasks and things to do.",              "#DCFCE7", "#15803D", false, "productivity"));
+      grid.appendChild(makeTile("routine",  "\uD83D\uDD52", "Routine Trackers",   "Build your daily time table and tick off each slot.", "#E0F2FE", "#0369A1", false, "time"));
+      grid.appendChild(makeTile("lifevalue","\u2764\uFE0F", "Life Value",         "Calculate and improve your overall life value.",     "#FEE2E2", "#B91C1C", !isPro(), "time"));
+      grid.appendChild(makeTile("opp",      "\u25C6",       "Opportunity Cost",   "See what else your time or money could do.",         "#E0F2FE", "#0369A1", false, "finance"));
+      grid.appendChild(makeTile("itemcost", "\uD83D\uDED2", "Item Time Cost Calculator", "See how many hours of work an item really costs.", "#FFEDD5", "#C2410C", false, "finance"));
+      grid.appendChild(makeTile("prodscore", "\uD83D\uDCCA", "Productivity Score", "Your 0-100 score for today, from real logged time.", "#EEF2FF", "#4F46E5", false, "productivity"));
+      grid.appendChild(makeTile("focus",    "\uD83C\uDFA7", "Focus Mode",         "25-min focus timer with ambient sounds.",             "#ECFDF5", "#059669", false, "time"));
+      grid.appendChild(makeTile("wastebudget", "\u26A0\uFE0F", "Time Waste Budget", "Set a daily waste limit and get a red alert.",       "#FEF2F2", "#DC2626", false, "time"));
+      grid.appendChild(makeTile("achievements", "\uD83C\uDFC1", "Achievements",   "Milestones and badges you've unlocked.",             "#FFF7ED", "#C2410C", false, "productivity"));
+      grid.appendChild(makeTile("bucketlist",   "\uD83C\uDF1F", "Bucket List",    "Your dreams and goals — check them off for life.",   "#F5F3FF", "#6D28D9", false, "productivity"));
+      grid.appendChild(makeTile("sixjars",     "\uD83E\uDEB4", "6 Jars",         "Split your salary into 6 purposeful money jars.",    "#F0FDF4", "#166534", false, "finance", "assets/icons/jar-savings.png"));
+    }
+    /* Intercept native Time Value and Screen Time buttons so they open
+       overlays instead of navigating to a separate page. */
+    var btns = grid.querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) {
+      var span = btns[i].querySelector("span");
+      var text = (span ? span.textContent : btns[i].textContent || "").trim();
+      if (text === "Time Value" && !btns[i].getAttribute("data-lifetime-tool")) {
+        btns[i].setAttribute("data-lifetime-tool", "timevalue");
       }
-      break;
+      if (text === "Screen Time" && !btns[i].getAttribute("data-lifetime-tool")) {
+        btns[i].setAttribute("data-lifetime-tool", "screentime");
+      }
     }
-    if (!hubContainer) return;
-    if (hubContainer.querySelector("[data-lt-hub-replacement]")) return;
-    var nativeChildren = Array.prototype.slice.call(hubContainer.children);
-    nativeChildren.forEach(function (c) { c.style.display = "none"; });
-    var wrapper = document.createElement("div");
-    wrapper.setAttribute("data-lt-hub-replacement", "1");
-    wrapper.setAttribute("data-lt-enhancement", "1");
-    wrapper.style.cssText = "width:100%;box-sizing:border-box;";
-    var searchHtml =
-      '<div class="lt-hub-search-wrap" id="lt-hub-search-wrap" style="padding:0 16px 12px">' +
-        '<div class="lt-hub-search-box" style="display:flex;align-items:center;gap:8px;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:12px;padding:10px 14px">' +
-          '<span style="font-size:16px;opacity:.5">\uD83D\uDD0D</span>' +
-          '<input id="lt-hub-search-input" type="text" placeholder="Search tools..." style="flex:1;border:none;background:transparent;font-size:14px;color:hsl(var(--foreground));outline:none;font-family:inherit">' +
-          '<button type="button" id="lt-hub-search-clear" style="display:none;background:none;border:none;cursor:pointer;color:hsl(var(--muted-foreground));font-size:16px;padding:0">\u2715</button>' +
-        '</div>' +
-        '<div id="lt-hub-filter-row" style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">' +
-          LT_HUB_FILTERS.map(function (f) {
-            return '<button type="button" class="lt-hub-filter-chip' + (f.id === "all" ? " lt-hub-filter-active" : "") + '" data-cat="' + f.id + '" style="flex-shrink:0;padding:7px 16px;border-radius:20px;border:1px solid hsl(var(--border));background:' + (f.id === "all" ? "hsl(var(--foreground))" : "hsl(var(--card))") + ';color:' + (f.id === "all" ? "#fff" : "hsl(var(--foreground))") + ';font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">' + escapeHtml(f.label) + '</button>';
-          }).join("") +
-        '</div>' +
-      '</div>';
-    var allTiles = [
-      { tool: "timevalue",   symbol: getCurrency().symbol, label: "Time Value Calculator",  desc: "Track the value of your time every minute.", bg: "#DBEAFE", fg: "#2563EB", cat: "time" },
-      { tool: "screentime",  symbol: "\u23F1",             label: "Screen Time",            desc: "Monitor your screen time and digital balance.", bg: "#EDE9FE", fg: "#7C3AED", cat: "time" },
-      { tool: "budget",      symbol: "\uD83D\uDCB3",       label: "Budget Tracker",          desc: "Manage income, expenses and your balance.",    bg: "#FEF3C7", fg: "#B45309", cat: "finance", locked: !isPro() },
-      { tool: "emi",         symbol: "\uD83E\uDDEE",       label: "EMI Calculator",          desc: "Plan your loans and calculate EMI smartly.",   bg: "#E0E7FF", fg: "#4338CA", cat: "finance" },
-      { tool: "compound",    symbol: "\uD83D\uDCC8",       label: "Compound Interest",       desc: "See how your money grows when compounding.",   bg: "#FCE7F3", fg: "#BE185D", cat: "finance" },
-      { tool: "gram",        symbol: "\uD83D\uDCD6",       label: "Knowledge Gram",          desc: "Track what you learn and grow every day.",     bg: "#D1FAE5", fg: "#047857", cat: "productivity" },
-      { tool: "tasks",       symbol: "\u2705",             label: "My Tasks",                desc: "Organize your tasks and things to do.",        bg: "#DCFCE7", fg: "#15803D", cat: "productivity" },
-      { tool: "routine",     symbol: "\uD83D\uDD52",       label: "Routine Trackers",        desc: "Build your daily time table and tick off each slot.", bg: "#E0F2FE", fg: "#0369A1", cat: "time" },
-      { tool: "lifevalue",   symbol: "\u2764\uFE0F",       label: "Life Value",              desc: "Calculate and improve your overall life value.", bg: "#FEE2E2", fg: "#B91C1C", cat: "time", locked: !isPro() },
-      { tool: "opp",         symbol: "\u25C6",             label: "Opportunity Cost",        desc: "See what else your time or money could do.",   bg: "#E0F2FE", fg: "#0369A1", cat: "finance" },
-      { tool: "itemcost",    symbol: "\uD83D\uDED2",       label: "Item Time Cost Calculator", desc: "See how many hours of work an item really costs.", bg: "#FFEDD5", fg: "#C2410C", cat: "finance" },
-      { tool: "prodscore",   symbol: "\uD83D\uDCCA",       label: "Productivity Score",      desc: "Your 0-100 score for today, from real logged time.", bg: "#EEF2FF", fg: "#4F46E5", cat: "productivity" },
-      { tool: "focus",       symbol: "\uD83C\uDFA7",       label: "Focus Mode",              desc: "25-min focus timer with ambient sounds.",      bg: "#ECFDF5", fg: "#059669", cat: "time" },
-      { tool: "wastebudget", symbol: "\u26A0\uFE0F",       label: "Time Waste Budget",       desc: "Set a daily waste limit and get a red alert.", bg: "#FEF2F2", fg: "#DC2626", cat: "time" },
-      { tool: "achievements",symbol: "\uD83C\uDFC1",       label: "Achievements",            desc: "Milestones and badges you've unlocked.",       bg: "#FFF7ED", fg: "#C2410C", cat: "productivity" },
-      { tool: "bucketlist",  symbol: "\uD83C\uDF1F",       label: "Bucket List",             desc: "Your dreams and goals — check them off for life.", bg: "#F5F3FF", fg: "#6D28D9", cat: "productivity" },
-      { tool: "sixjars",     symbol: "\uD83E\uDEB4",       label: "6 Jars",                  desc: "Split your salary into 6 purposeful money jars.", bg: "#F0FDF4", fg: "#166534", cat: "finance" }
-    ];
-    var tileHtml = allTiles.map(function (t) {
-      var lockIcon = t.locked ? '<span style="position:absolute;top:10px;right:10px;font-size:12px">\uD83D\uDD12</span>' : '';
-      var imgSrc = t.tool === "sixjars" ? "assets/icons/jar-savings.png" : null;
-      var iconContent = imgSrc ? '<img src="' + imgSrc + '" style="width:70%;height:70%;object-fit:contain;display:block" alt="">' : t.symbol;
-      return '<button type="button" data-lifetime-tool="' + t.tool + '" data-lt-tile-injected="1" data-lt-category="' + t.cat + '" ' +
-        'style="width:100%;min-width:0;box-sizing:border-box;position:relative;padding:16px;border-radius:16px;background:#fff;border:1px solid rgba(0,0,0,0.06);box-shadow:0 1px 2px rgba(0,0,0,0.04);gap:8px;display:flex;align-items:flex-start;text-align:left;cursor:pointer;border:none;font-family:inherit;-webkit-tap-highlight-color:transparent">' +
-        lockIcon +
-        '<div style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;background:' + t.bg + ';color:' + t.fg + '">' + iconContent + '</div>' +
-        '<div style="min-width:0">' +
-          '<div style="font-weight:700;font-size:14px;margin-top:4px;color:hsl(var(--foreground))">' + escapeHtml(t.label) + '</div>' +
-          '<div style="font-size:12px;color:hsl(var(--muted-foreground));line-height:1.3">' + escapeHtml(t.desc) + '</div>' +
-        '</div>' +
-      '</button>';
-    }).join("");
-    var gridHtml = '<div id="lt-hub-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 16px 16px">' + tileHtml + '</div>';
-    var emptyHtml = '<div id="lt-hub-empty" style="display:none;text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px">No tools match your search.</div>';
-    wrapper.innerHTML = searchHtml + gridHtml + emptyHtml;
-    hubContainer.appendChild(wrapper);
-    var searchInput = wrapper.querySelector("#lt-hub-search-input");
-    var clearBtn = wrapper.querySelector("#lt-hub-search-clear");
-    var grid = wrapper.querySelector("#lt-hub-grid");
-    var emptyEl = wrapper.querySelector("#lt-hub-empty");
-    function applyFilter() {
-      var q = ((searchInput && searchInput.value) || "").trim().toLowerCase();
-      clearBtn.style.display = q ? "" : "none";
-      var activeChip = wrapper.querySelector(".lt-hub-filter-active");
-      var cat = activeChip ? activeChip.getAttribute("data-cat") : "all";
-      var vis = 0;
-      Array.prototype.slice.call(grid.children).forEach(function (tile) {
-        var text = (tile.textContent || "").toLowerCase();
-        var tcat = tile.getAttribute("data-lt-category") || "";
-        var show = (!q || text.indexOf(q) !== -1) && (cat === "all" || tcat === cat);
-        tile.style.display = show ? "" : "none";
-        if (show) vis++;
-      });
-      emptyEl.style.display = vis ? "none" : "";
-    }
-    searchInput.addEventListener("input", applyFilter);
-    clearBtn.addEventListener("click", function () { searchInput.value = ""; applyFilter(); searchInput.focus(); });
-    Array.prototype.slice.call(wrapper.querySelectorAll(".lt-hub-filter-chip")).forEach(function (chip) {
-      chip.addEventListener("click", function () {
-        Array.prototype.slice.call(wrapper.querySelectorAll(".lt-hub-filter-chip")).forEach(function (c) {
-          c.classList.remove("lt-hub-filter-active");
-          c.style.background = "hsl(var(--card))";
-          c.style.color = "hsl(var(--foreground))";
-        });
-        chip.classList.add("lt-hub-filter-active");
-        chip.style.background = "hsl(var(--foreground))";
-        chip.style.color = "#fff";
-        applyFilter();
-      });
-    });
+    restyleNativeTiles(grid);
+    ensureLifeHubSearch(grid);
   }
 
   /* ── Life Hub search + category filter ───────────────────────────────── */
