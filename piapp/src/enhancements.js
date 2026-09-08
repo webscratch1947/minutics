@@ -19,28 +19,24 @@
     video.id = "lt-startup-splash-video";
     video.src = "assets/lt/minutics_splash.mp4";
     video.autoplay = true;
-    video.muted = false; /* keep audio — only mute as a fallback if the platform blocks unmuted autoplay */
+    video.muted = true; /* MUST be muted for autoplay in Chrome/WebView */
     video.playsInline = true;
     video.preload = "auto";
-    video.loop = false; /* play exactly once — do not loop */
-    /* Stay invisible (background color shows through) until the video has an
-       actual decoded frame ready — avoids the "broken video" flash at start. */
+    video.loop = false;
     video.style.cssText = "width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s ease;";
     video.addEventListener("loadeddata", function () {
       video.style.opacity = "1";
+      /* Unmute after first frame loads — gives the user audio while
+         still allowing autoplay to work on all browsers. */
+      try { video.muted = false; video.volume = 1; } catch (e) {}
     });
     splash.appendChild(video);
-
     (document.body || document.documentElement).appendChild(splash);
 
-    var playAttempt = video.play();
-    if (playAttempt && typeof playAttempt.catch === "function") {
-      playAttempt.catch(function () {
-        video.muted = true;
-        video.play().catch(function () {});
-      });
-    }
-
+    video.play().catch(function () {
+      /* Autoplay blocked — try once more (some WebViews need a retry) */
+      video.play().catch(function () {});
+    });
     var dismissed = false;
     function dismiss() {
       if (dismissed) return;
@@ -384,6 +380,7 @@
     var p = getPlanId();
     return p === "basic" || p === "yearly";
   }
+  /* Migrate legacy "pro" plan value to "lifetime" on first load */
   function migrateOldProPlan() {
     var p = readJson(PLAN_KEY, "free");
     if (p === "pro") {
@@ -395,12 +392,18 @@
     var newPlan = (plan === "basic" || plan === "yearly" || plan === "lifetime") ? plan : "free";
     writeJson(PLAN_KEY, newPlan);
     if (newPlan !== "free") {
+      /* Record when the plan was activated — used for expiry checks. */
       writeJson(PLAN_SINCE_KEY, Date.now());
       writeJson(PLAN_GRACE_KEY, null);
+      /* Re-upgraded (in time or otherwise) — clear any pending grace timer. */
       writeJson(DOWNGRADE_AT_KEY, null);
     } else if (wasPro && nonArchivedActivityCount() > FREE_ACTIVITY_LIMIT) {
+      /* Just downgraded/cancelled while over the free limit — start the
+         grace-period countdown (only if one isn't already running). */
       if (!readJson(DOWNGRADE_AT_KEY, null)) writeJson(DOWNGRADE_AT_KEY, Date.now());
     }
+    /* When downgrading from a paid plan, auto-unstar excess tasks
+       beyond the free 3-task cap. */
     if (wasPro && newPlan === "free") {
       enforceStarCap();
     }
@@ -408,12 +411,17 @@
   /* Exposed so a future Razorpay/webhook flow (or manual testing) can flip this */
   window.LTPlan = { isPro: isPro, setPlan: setPlan, getPlanName: getPlanName };
 
+  /* ── Plan expiry & star cap enforcement ──────────────────────────────────── */
   var PLAN_DURATIONS = { basic: 30 * 24 * 3600 * 1000, yearly: 365 * 24 * 3600 * 1000 };
-  var PLAN_GRACE_MS  = 24 * 3600 * 1000;
+  var PLAN_GRACE_MS  = 24 * 3600 * 1000; /* 1-day grace period after expiry */
 
+  /* Unstar excess tasks beyond the free 3-task cap. Called when plan
+     expires or user manually downgrades. Keeps the first 3 starred
+     tasks (by starred order) and unstarring the rest. */
   function enforceStarCap() {
     var starred = getStarredTasks();
     if (starred.length <= MAX_STARRED_TASKS) return;
+    /* Unstar the excess (all beyond the first 3) */
     for (var i = MAX_STARRED_TASKS; i < starred.length; i++) {
       starred[i].starred = false;
       upsertTask(starred[i]);
@@ -421,6 +429,9 @@
     autoPromoteQueuedFrog();
   }
 
+  /* Check on load whether a subscription plan has expired. If so,
+     start a 1-day grace period. If grace period already passed,
+     downgrade to free and enforce the star cap. */
   function checkPlanExpiry() {
     var plan = getPlanId();
     if (plan !== "basic" && plan !== "yearly") return;
@@ -428,13 +439,16 @@
     if (!since) { writeJson(PLAN_SINCE_KEY, Date.now()); return; }
     var duration = PLAN_DURATIONS[plan];
     var expiresAt = since + duration;
-    if (Date.now() < expiresAt) return;
+    if (Date.now() < expiresAt) return; /* still within paid period */
+    /* Plan has expired — check grace period */
     var graceStart = readJson(PLAN_GRACE_KEY, null);
     if (!graceStart) {
+      /* Start the 1-day grace period now */
       writeJson(PLAN_GRACE_KEY, Date.now());
       return;
     }
-    if (Date.now() < graceStart + PLAN_GRACE_MS) return;
+    if (Date.now() < graceStart + PLAN_GRACE_MS) return; /* still in grace period */
+    /* Grace period over — downgrade and enforce cap */
     writeJson(PLAN_KEY, "free");
     writeJson(PLAN_GRACE_KEY, null);
     writeJson(PLAN_SINCE_KEY, null);
@@ -564,26 +578,36 @@
 
   function applySubTabVisibility() {
     var onTimerPage = location.pathname === "/";
+    var isActivity = _activeSubTab === "activity" && onTimerPage;
+    var showTimerStuff = onTimerPage && !isActivity;
     var lp = document.getElementById("lt-life-progress");
-    if (lp) lp.style.display = (!onTimerPage || _activeSubTab === "activity") ? "none" : "";
+    if (lp) lp.style.display = showTimerStuff ? "" : "none";
     var glance = document.getElementById("lt-glance-section");
-    if (glance) glance.style.display = (!onTimerPage || _activeSubTab === "activity") ? "none" : "";
+    if (glance) glance.style.display = showTimerStuff ? "" : "none";
+    var frog = document.getElementById("lt-frog-card");
+    if (frog) frog.style.display = showTimerStuff ? "" : "none";
+    /* Hide retirement countdown + time value when on Activity sub-tab */
+    var retirement = document.querySelector("[data-lt-enhancement='retirement']");
+    if (retirement) retirement.style.display = showTimerStuff ? "" : "none";
+    var tvCard = document.querySelector("[data-lt-enhancement='saved-value']");
+    if (tvCard) tvCard.style.display = showTimerStuff ? "" : "none";
     var quote = document.getElementById("lt-quote-section");
-    /* Remove the decorative flower/quote card from the Timer page. */
     if (quote) quote.remove();
     var achTimer = document.getElementById("lt-timer-achievements");
     if (achTimer) achTimer.remove();
     var act = findActivityElements();
     if (act) {
-      var show = (_activeSubTab === "activity" && onTimerPage) ? "" : "none";
+      var show = isActivity ? "" : "none";
       if (act.addRow) act.addRow.style.display = show;
       if (act.list) act.list.style.display = show;
     }
-    if (_activeSubTab === "activity" && onTimerPage) {
+    if (isActivity) {
       buildActivityStatsHeader();
     } else {
       var header = document.getElementById("lt-activity-header");
       if (header) header.style.display = "none";
+      var limitBadge = document.getElementById("lt-activity-limit");
+      if (limitBadge) limitBadge.style.display = "none";
     }
     lockTimerPageScroll();
   }
@@ -716,7 +740,7 @@
         var count = nonArchivedActivityCount();
         return '<p style="font-size:11px;color:#c0392b;background:#FDECEA;margin:0 16px 10px;padding:8px 10px;font-weight:700;line-height:1.4">' +
           '⚠️ You have ' + count + ' activities but the Free plan only allows ' + FREE_ACTIVITY_LIMIT + '. ' +
-          'Upgrade to Pro within ' + grace.daysLeft + ' day' + (grace.daysLeft === 1 ? "" : "s") +
+          'Upgrade within ' + grace.daysLeft + ' day' + (grace.daysLeft === 1 ? "" : "s") +
           ' or extra activities will be automatically removed.' +
         '</p>';
       })();
@@ -739,18 +763,7 @@
       btn.type = "button";
       btn.id = "lt-activity-navtab";
       btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l2.5 2.5L16 9"></path></svg><span>Activity</span>';
-      /* One-way select, same as the other tabs — clicking it always
-         switches TO Activity (never toggles back off on a second tap).
-         If tapped from a different page, hop back to "/" first since the
-         activity list only lives on that route, then arm the sub-tab. */
       btn.addEventListener("click", function () {
-        /* Order matters: clicking the Timer <a> below fires its own click
-           listener (attached further down) which sets _activeSubTab back
-           to "timer" — that listener exists so switching between real
-           tabs exits Activity mode. If we set "activity" BEFORE calling
-           .click(), that listener immediately stomps it back to "timer",
-           which is exactly why tapping Activity from another page used to
-           land you back on Timer. Setting it AFTER makes it stick. */
         if (location.pathname !== "/") {
           var timerLink = nav.querySelector('a[href="/"]');
           if (timerLink) timerLink.click();
@@ -759,37 +772,20 @@
         applySubTabVisibility();
         syncNavTabStyles();
         upsertRunningBanner();
-        /* Route change is async (SPA re-render), so the Timer page's DOM
-           (the activity list/add row) usually isn't mounted yet on this
-           same tick — re-apply shortly after so it doesn't wait on the
-           slower background poll to actually show Activity content. */
         setTimeout(function () { applySubTabVisibility(); syncNavTabStyles(); upsertRunningBanner(); }, 60);
         setTimeout(function () { applySubTabVisibility(); syncNavTabStyles(); upsertRunningBanner(); }, 250);
       });
-      /* Clicking any of the real tabs (Timer included) exits Activity mode,
-         same as switching between any other two tabs. This must NOT touch
-         the Timer link's own highlight classes — React owns those and sets
-         them correctly based on the real current route. Forcing them here
-         was exactly why every tab used to show Timer as highlighted no
-         matter which page was actually open. */
       Array.prototype.slice.call(nav.querySelectorAll("a")).forEach(function (a) {
         a.addEventListener("click", function () {
           _activeSubTab = "timer";
           applySubTabVisibility();
           syncNavTabStyles();
           upsertRunningBanner();
-          /* Same reasoning as above — the destination page's own content
-             (Life Hub / Journal / Settings) mounts a moment after the SPA
-             route change, so re-check shortly after instead of waiting on
-             the slower background poll. */
           setTimeout(upsertRunningBanner, 60);
           setTimeout(upsertRunningBanner, 250);
         });
       });
     }
-    /* Always keep it positioned right after the Timer tab, not appended
-       at the end — nav can get re-rendered by React, so re-assert order
-       every cycle rather than only on first creation. */
     var timerLink = nav.querySelector('a[href="/"]');
     var desiredNext = timerLink ? timerLink.nextSibling : nav.firstChild;
     if (btn.previousSibling !== timerLink || desiredNext !== btn) {
@@ -1248,7 +1244,7 @@
             '<p class="lt-lp-cdtitle">' + escapeHtml(profile.name) + '\u2019s Remaining ' + goal.word + ' Time</p>' +
             '<p class="lt-lp-cddate" style="font-weight:700;font-size:12px;white-space:nowrap"><span style="font-size:16px;margin-right:2px;">\uD83C\uDFC1</span> ' + goal.dateLabel + ': <span style="color:#f5a623;">' + lifeStats(profile).dateLabel + '</span></p>' +
           '</div>' +
-          '<button id="lt-lp-viewplan" type="button">View Plan</button>' +
+          '<button id="lt-lp-viewplan" type="button">' + (isPro() ? "\u2B50 " + getPlanName() : "View Plan") + '</button>' +
         '</div>' +
         '<div class="lt-lp-grid">' +
           lpBox("lt-lp-y", "YEARS") + lpBox("lt-lp-d", "DAYS") + lpBox("lt-lp-h", "HOURS") +
@@ -1354,7 +1350,9 @@
       return;
     }
 
-    var starred = getStarredTasks().slice(0, MAX_STARRED_TASKS);
+    var starred = getActiveFrogTasks();
+    autoPromoteQueuedFrog();
+    starred = getActiveFrogTasks();
     var sig = frogSignature(starred);
 
     if (existing) {
@@ -1409,9 +1407,13 @@
       }
     }
 
+    var totalStarred = getStarredTasks().filter(function (t) { return !t.completed; }).length;
+    var queuedCount = isPro() ? Math.max(0, totalStarred - starred.length) : 0;
     card.innerHTML =
       '<p class="lt-frog-title">\uD83D\uDC38 Eat the Frog</p>' +
-      '<p class="lt-frog-sub">Your 3 most important tasks today</p>' +
+      '<p class="lt-frog-sub">Your ' + starred.length + ' most important tasks today' +
+        (queuedCount > 0 ? ' <span style="color:#f5a623;font-weight:600">(\u2b50 ' + queuedCount + ' more queued)</span>' : '') +
+      '</p>' +
       rowsHtml;
 
     if (!existing) anchor.parentNode.insertBefore(card, anchor.nextSibling);
@@ -1437,8 +1439,10 @@
           checkBtn.textContent = task.completed ? "\u2713" : "";
           var rowInput = checkBtn.parentElement.querySelector("[data-lt-frog-input]");
           if (rowInput) rowInput.classList.toggle("lt-frog-done-text", task.completed);
-          _frogLastSignature = null;
           autoPromoteQueuedFrog();
+          /* Force rebuild: clear the cached signature so buildEatTheFrogCard()
+             doesn't skip the DOM update due to the sig-matches guard. */
+          _frogLastSignature = null;
           buildEatTheFrogCard();
           return;
         }
@@ -1479,7 +1483,7 @@
               unstarBtn2.style.visibility = "";
             }
           }
-          _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
+          _frogLastSignature = frogSignature(getActiveFrogTasks());
           return;
         }
 
@@ -1487,7 +1491,7 @@
         if (!task2) return;
         task2.title = input.value;
         upsertTask(task2);
-        _frogLastSignature = frogSignature(getStarredTasks().slice(0, MAX_STARRED_TASKS));
+        _frogLastSignature = frogSignature(getActiveFrogTasks());
       });
 
       /* focusout (unlike blur) bubbles, so it works with delegation.
@@ -1521,6 +1525,7 @@
      native storage (Downloads/Minutics/*.json via SharedPreferences) so
      they survive app reinstalls. On web, they use localStorage only. */
   var NATIVE_BRIDGE_KEYS = {};
+  /* Register all critical data keys so they survive reinstall */
   [
     PROFILE_KEY, TASKS_KEY, PLAN_KEY, GOAL_TYPE_KEY, CURRENCY_KEY,
     BUDGET_KEY, EMI_KEY, COMPOUND_KEY, OPP_KEY, ITEMCOST_KEY,
@@ -1939,6 +1944,19 @@
       ".lt-hub-empty{text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px;grid-column:1/-1}",
       ".lt-hub-grid-2col{transition:opacity .3s ease}",
       ".lt-hub-grid-2col.lt-hub-ready{opacity:1}",
+      /* ── PERMANENTLY HIDE native React-compiled page content.
+         Each screen component adds data-source-file="screens/X.js" on its
+         outermost div. Our enhancements replace this content.
+
+         Home.js: first 2 children = LTTimerPanel + LTDailyValueBar (hide),
+         3rd child+ = activity list (KEEP — visible on Activity sub-tab).
+         LifeHub.js: hide the h1 title and the 2 native tile children inside
+         the grid, but NOT the grid itself or our injected tiles.
+         Journal.js: no enhancement replacement, leave visible. ── */
+      'div[data-source-file="screens/Home.js"]>:nth-child(1){display:none!important}',
+      'div[data-source-file="screens/Home.js"]>:nth-child(2){display:none!important}',
+      'div[data-source-file="screens/LifeHub.js"]>h1{display:none!important}',
+      'div[data-source-file="screens/LifeHub.js"]>div[style*="grid"]>div:not([data-lt-tile-injected]){display:none!important}',
       /* Hide native Screen Time tile — class applied by fast interval below */
       ".lt-hide-native-st{display:none!important}",
       "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
@@ -2071,6 +2089,7 @@
       ".lt-task-date{display:block;font-size:12px;font-weight:700;margin-top:3px;color:#8e8e93;letter-spacing:.02em}",
       ".lt-task-date.lt-overdue{color:#ff3b30;font-weight:800}",
       ".lt-task-date-flag{display:inline-block;font-size:14px;margin-right:3px;vertical-align:middle;line-height:1}",
+      ".lt-task-queued-badge{display:inline-block;font-size:10px;font-weight:700;color:#f5a623;background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.25);border-radius:8px;padding:1px 7px;margin-top:3px;letter-spacing:.02em}",
       ".lt-task-notes{display:block;font-size:11px;color:hsl(var(--muted-foreground));margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
       ".lt-task-expand{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:4px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
       ".lt-task-expand:active{color:hsl(var(--foreground))}",
@@ -2929,6 +2948,9 @@
 
   function findTileGrid() {
     if (!isActuallyOnLifeHubScreen()) return null;
+    /* Strategy 1: find the grid container by walking up from the native
+       "Time Value" or "Screen Time" button — the grid is the nearest
+       ancestor whose computed display is "grid", "inline-grid", or "flex". */
     var spans = document.querySelectorAll("button span");
     for (var i = 0; i < spans.length; i++) {
       var t = (spans[i].textContent || "").trim();
@@ -2948,6 +2970,7 @@
         cur = cur.parentElement;
       }
     }
+    /* Strategy 2: fallback — look for any grid/flex div on the page */
     var all = Array.prototype.slice.call(document.querySelectorAll("div"));
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
@@ -3931,6 +3954,10 @@
      exported image that doesn't have it. The on-screen <img> itself
      stays completely unmodified (it's just for viewing); only the
      blob handed to Save/Share is watermarked. */
+  /* Shared canvas pipeline: loads the gram image, draws the watermark,
+     and calls back with a data URL (for bridge) and a blob (for web fallback).
+     Using data URLs directly (like the Journal card does) avoids the
+     FileReader blob→dataURL round-trip that was breaking on Android. */
   function gramWatermarkedImage(imgUrl, cb) {
     var img = new Image();
     img.crossOrigin = "anonymous";
@@ -3941,6 +3968,7 @@
         canvas.height = img.naturalHeight || img.height;
         var ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
         var text = "minutics.com";
         var fontSize = Math.max(16, Math.round(canvas.width * 0.028));
         ctx.font = "700 " + fontSize + "px Arial, Helvetica, sans-serif";
@@ -3952,6 +3980,7 @@
         var boxX = pageMargin;
         var boxY = canvas.height - pageMargin - boxH;
         var r = boxH / 2;
+
         ctx.fillStyle = "rgba(0,0,0,0.45)";
         ctx.beginPath();
         ctx.moveTo(boxX + r, boxY);
@@ -3961,16 +3990,22 @@
         ctx.arcTo(boxX, boxY, boxX + boxW, boxY, r);
         ctx.closePath();
         ctx.fill();
+
         ctx.fillStyle = "#ffffff";
         ctx.textBaseline = "middle";
         ctx.fillText(text, boxX + padX, boxY + boxH / 2 + fontSize * 0.04);
-        cb(canvas.toDataURL("image/jpeg", 0.92));
-      } catch (e) { cb(null); }
+
+        var dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+        cb(dataUrl);
+      } catch (e) {
+        cb(null);
+      }
     };
     img.onerror = function () { cb(null); };
     img.src = imgUrl;
   }
 
+  /* Legacy blob version for web fallback */
   function gramWatermarkedBlob(imgUrl, callback) {
     gramWatermarkedImage(imgUrl, function (dataUrl) {
       if (!dataUrl) { callback(null); return; }
@@ -3988,8 +4023,12 @@
 
   var GRAM_SHARE_CAPTION = "Check this out on Minutics \u2014 make every minute count! \uD83D\uDCD6\u2728\nhttps://minutics.com";
 
-  /* ── Custom share sheet ───────────────────────────────────────────────── */
+  /* ── Custom share sheet ─────────────────────────────────────────────────
+     Shows WhatsApp, Telegram, Instagram, X, Facebook, Copy, and More.
+     On Android uses the native bridge for direct-to-app sharing.
+     On web uses navigator.share or clipboard fallback. */
   function openShareSheet(dataUrl, caption) {
+    /* Remove any existing share sheet */
     var old = document.getElementById("lt-share-sheet-overlay");
     if (old) old.remove();
 
@@ -4028,9 +4067,14 @@
         '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px">' + appsHtml + '</div>' +
         '<button id="lt-share-sheet-cancel" style="width:100%;margin-top:16px;padding:12px;border:1px solid hsl(var(--border));border-radius:12px;background:transparent;color:hsl(var(--foreground));font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>' +
       '</div>';
+    /* When a Life Hub overlay is open (e.g. Knowledge Gram), append the
+       share sheet inside it so it paints above the overlay content — both
+       are position:fixed with the same z-index, but DOM order inside the
+       same stacking context determines which paints on top. */
     var host = activeOverlay || document.body;
     host.appendChild(overlay);
 
+    /* Close on backdrop tap */
     overlay.addEventListener("click", function (e) {
       if (e.target === overlay) overlay.remove();
     });
@@ -4038,6 +4082,7 @@
       overlay.remove();
     });
 
+    /* App button handlers */
     overlay.querySelectorAll("[data-share-app]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var appId = btn.getAttribute("data-share-app");
@@ -4054,6 +4099,7 @@
         }
 
         if (appId === "more") {
+          /* System share sheet */
           if (hasShareImageTo) {
             window.AndroidShareBridge.shareImageTo(dataUrl, "");
           } else if (isAndroid) {
@@ -4070,11 +4116,13 @@
           return;
         }
 
+        /* Specific app */
         if (hasShareImageTo) {
           window.AndroidShareBridge.shareImageTo(dataUrl, pkg);
         } else if (isAndroid) {
           window.AndroidShareBridge.shareImagePng(dataUrl);
         } else {
+          /* Web fallback — try system share */
           if (navigator.share) {
             blobToFile(dataUrl, "minutics-share.png", function (file) {
               if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -4093,7 +4141,9 @@
     });
   }
 
+  /* Helper: convert data URL or blob URL to a File object */
   function blobToFile(url, filename, cb) {
+    /* If it's already a data URL */
     if (url.indexOf("data:") === 0) {
       var parts = url.split(",");
       var mime = (parts[0].match(/:(.*?);/) || [,"image/png"])[1];
@@ -4103,6 +4153,7 @@
       cb(new File([arr], filename, { type: mime }));
       return;
     }
+    /* Fetch blob URL */
     fetch(url).then(function (r) { return r.blob(); }).then(function (blob) {
       cb(new File([blob], filename, { type: blob.type || "image/png" }));
     }).catch(function () { cb(null); });
@@ -4119,10 +4170,12 @@
     gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
       if (!dataUrl) { alert("Couldn't save this image. Please try again."); return; }
+      /* Same pattern as Journal save — pass dataUrl directly to bridge */
       if (window.AndroidShareBridge && typeof window.AndroidShareBridge.saveImagePng === "function") {
         window.AndroidShareBridge.saveImagePng(dataUrl);
         return;
       }
+      /* Web fallback */
       var a = document.createElement("a");
       a.href = dataUrl;
       a.download = "minutics-" + id + ".jpg";
@@ -4137,6 +4190,7 @@
     gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
       if (!dataUrl) { alert("Couldn't load this image. Please try again."); return; }
+      /* Same pattern as Journal share — pass dataUrl directly to bridge */
       openShareSheet(dataUrl, GRAM_SHARE_CAPTION);
     });
   }
@@ -4326,18 +4380,57 @@
     return getAllTasks().filter(function (t) { return !!t.starred; });
   }
 
+  /* Toggling a star is the one place the 3-task cap is enforced for free
+     users — both the Tasks app star button and (indirectly, via the same
+     function) anything else that stars a task go through here, so the cap
+     can never be bypassed.
+     PRO users: no cap — they can star unlimited tasks. Extra starred tasks
+     beyond the first 3 are "queued" and will auto-promote into the frog
+     card when a slot opens (see autoPromoteQueuedFrog below).
+     Free users: hard cap at 3. Show upgrade prompt if they try to exceed. */
+  function toggleTaskStar(id) {
+    var task = getAllTasks().find(function (t) { return t.id === id; });
+    if (!task) return true;
+    if (!task.starred && !isPro() && getStarredTasks().length >= MAX_STARRED_TASKS) {
+      return false;
+    }
+    task.starred = !task.starred;
+    upsertTask(task);
+    /* After starring/unstarring, auto-promote the next queued task if a slot opened. */
+    autoPromoteQueuedFrog();
+    return true;
+  }
+
+  /* The frog card shows the first 3 incomplete starred tasks.
+     Completed starred tasks drop out and the next queued one fills in.
+     Works for both free (max 3 starred) and pro (unlimited starred). */
+  function getActiveFrogTasks() {
+    var all = getStarredTasks();
+    var incomplete = all.filter(function (t) { return !t.completed; });
+    return incomplete.slice(0, MAX_STARRED_TASKS);
+  }
+
+  /* After any star change or task completion, if fewer than 3 incomplete
+     starred tasks are in the "active" frog slots, promote the next queued
+     (starred but not in top-3-incomplete) task. Works for both free and pro. */
   function autoPromoteQueuedFrog() {
     var all = getStarredTasks();
-    if (all.length <= MAX_STARRED_TASKS) return;
+    if (all.length <= MAX_STARRED_TASKS) return; /* nothing to reorder */
+    /* Stable-sort: incomplete first, then completed. This moves the next
+       queued incomplete task into the top-3 window when a slot opens. */
     var reordered = all.slice().sort(function (a, b) {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
-      return 0;
+      return 0; /* preserve original order within each group */
     });
+    /* Only rewrite if the order actually changed */
     var changed = false;
     for (var i = 0; i < all.length; i++) {
       if (all[i].id !== reordered[i].id) { changed = true; break; }
     }
     if (!changed) return;
+    /* Persist the new order by updating each task's starred timestamp
+       (createdAt) so the sort order sticks. We use a synthetic sort key
+       stored in a hidden field to avoid touching visible createdAt. */
     var tasks = getAllTasks();
     reordered.forEach(function (t, idx) {
       var full = tasks.find(function (x) { return x.id === t.id; });
@@ -4346,6 +4439,8 @@
         upsertTask(full);
       }
     });
+    /* Also reorder the underlying task list so subsequent getStarredTasks()
+       calls return the new order without needing another sort. */
     _reorderTasksByFrogOrder();
   }
 
@@ -4359,33 +4454,6 @@
       return oa - ob;
     });
     writeJson(TASKS_KEY, starred.concat(rest));
-  }
-
-  /* Toggling a star is the one place the 3-task cap is enforced — both
-     the Tasks app star button and (indirectly, via the same function)
-     anything else that stars a task go through here, so the cap can never
-     be bypassed.
-     When the cap is already hit AND at least one of the 3 starred tasks
-     is already completed, starring a new task auto-unstars that finished
-     one to make room instead of blocking — a completed frog has already
-     been "eaten", so it makes way for the next one automatically. Only
-     when all 3 are still active does this return false (and leave the
-     task untouched) so the caller can show the "full" warning. */
-  function toggleTaskStar(id) {
-    var task = getAllTasks().find(function (t) { return t.id === id; });
-    if (!task) return true;
-    if (!task.starred && getStarredTasks().length >= MAX_STARRED_TASKS) {
-      var completedStarred = getStarredTasks().filter(function (t) { return t.completed; });
-      if (completedStarred.length) {
-        completedStarred[0].starred = false;
-        upsertTask(completedStarred[0]);
-      } else {
-        return false;
-      }
-    }
-    task.starred = !task.starred;
-    upsertTask(task);
-    return true;
   }
 
   function sectionFor(task) {
@@ -4410,6 +4478,8 @@
     var starFill = t.starred ? "#f5a623" : "none";
     var starStroke = t.starred ? "#f5a623" : "currentColor";
     var hasLongText = (t.title && t.title.length > 40) || (t.notes && t.notes.length > 60);
+    /* Pro queued badge: if this task is starred but not in the top-3 active
+       frog slots, show a small warning so the user knows it's queued. */
     var queuedBadge = "";
     if (t.starred && isPro() && !t.completed) {
       var allStarred = getStarredTasks();
@@ -5101,6 +5171,8 @@
           task.completed = !task.completed;
           upsertTask(task);
           renderTasks();
+          /* After completing a task, promote queued starred tasks and
+             refresh the frog card so completed items drop out. */
           autoPromoteQueuedFrog();
           _frogLastSignature = null;
           buildEatTheFrogCard();
@@ -5119,14 +5191,14 @@
         if (item) item.classList.toggle("lt-task-expanded");
         return;
       }
-      /* Star (add/remove from Eat the Frog, max 3) */
+      /* Star (add/remove from Eat the Frog, max 3 for free users) */
       var starBtn = e.target.closest("[data-task-star]");
       if (starBtn) {
         var starId = starBtn.getAttribute("data-task-star");
         var ok = toggleTaskStar(starId);
         renderTasks();
         if (!ok) {
-          showSimpleToast("Eat the Frog is full", "Only 3 tasks can be starred at once — unstar one first.");
+          showUpgradePrompt("You've reached the 3-task limit on the Free plan. Upgrade to unlock Queued Eat the Frog \u2014 star unlimited tasks and auto-promote queued ones when slots open.");
         }
         return;
       }
@@ -5346,6 +5418,11 @@
     if (act && act.list) {
       var children = act.list.children;
       if (children && children.length > 0) {
+        /* The empty-state div ("No activities yet") is also a child element.
+           Only count children that are actual activity cards (not the
+           empty-state placeholder). Activity cards carry an onclick handler
+           or a specific structure; the empty-state div is a centered flex
+           column with "No activities yet" text. */
         var count = 0;
         for (var i = 0; i < children.length; i++) {
           var text = children[i].textContent || "";
@@ -5384,7 +5461,7 @@
       host.insertBefore(badge, act.addRow.nextSibling);
     }
     if (isPro()) {
-      badge.textContent = "Pro \u00B7 Unlimited activities";
+      badge.textContent = getPlanName() + " \u00B7 Unlimited activities";
       badge.style.color = "hsl(var(--primary))";
     } else {
       var userCount = userActivityCount();
@@ -5405,7 +5482,7 @@
     if (userActivityCount() >= FREE_ACTIVITY_LIMIT) {
       e.preventDefault();
       e.stopPropagation();
-      showUpgradePrompt("You can't add more than " + FREE_ACTIVITY_LIMIT + " activities on the Free plan. Remove an activity or upgrade to Pro.");
+      showUpgradePrompt("You can't add more than " + FREE_ACTIVITY_LIMIT + " activities on the Free plan. Remove an activity or upgrade for unlimited.");
     }
   }, true);
 
@@ -5454,6 +5531,7 @@
         '</div>' +
       '</div>';
 
+    /* Save handler */
     var form = activeOverlay.querySelector("[data-lt-tv-form]");
     form.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -5464,22 +5542,25 @@
       var perMin = salary / (hours * days * 60);
       var data = { salary: salary, hours: hours, days: days, perMinute: perMin, savedAt: Date.now() };
       writeJson(TIMEVALUE_KEY, data);
+      /* Update result */
       var res = document.getElementById("lt-tv-calc-result");
       if (res) { res.className = "lt-tool-card"; res.innerHTML = _tvResultHTML(data, sym); }
+      /* Show live section */
       var live = document.getElementById("lt-tv-live");
       if (live) live.style.display = "";
       _tickLiveTV();
     });
 
+    /* Live ticker */
     function _tickLiveTV() {
-      var s2 = readJson(TIMEVALUE_KEY, null);
-      if (!s2 || !s2.perMinute) return;
+      var stored2 = readJson(TIMEVALUE_KEY, null);
+      if (!stored2 || !stored2.perMinute) return;
       var sym2 = getCurrency().symbol;
       var amt = document.getElementById("lt-tv-live-amt");
       var left = document.getElementById("lt-tv-live-left");
       var bar = document.getElementById("lt-tv-live-bar");
       var pct = document.getElementById("lt-tv-live-pct");
-      if (amt) amt.textContent = sym2 + _liveTimeValue(s2).toFixed(2);
+      if (amt) amt.textContent = sym2 + _liveTimeValue(stored2).toFixed(2);
       if (left) left.textContent = _timeLeftToday();
       if (bar) bar.style.width = _dayProgressPct() + "%";
       if (pct) pct.textContent = _dayProgressPct() + "%";
@@ -5533,7 +5614,7 @@
     e.stopPropagation();
     var tool = tile.getAttribute("data-lifetime-tool");
     if (tool === "timevalue") openOverlay(renderTimeValueCalc);
-    if (tool === "budget" && !isPro()) { showUpgradePrompt("Budget Tracker is a Pro feature."); return; }
+    if (tool === "budget" && !isPro()) { showUpgradePrompt("Budget Tracker is a premium feature. Upgrade to unlock it."); return; }
     if (tool === "budget")   openOverlay(renderBudget);
     if (tool === "emi")      openOverlay(renderEmi);
     if (tool === "compound") openOverlay(renderCompound);
@@ -5541,7 +5622,7 @@
     if (tool === "tasks")    openOverlay(renderTasks);
     if (tool === "routine")  openOverlay(renderRoutine);
     if (tool === "lifevalue") {
-      if (!isPro()) { showUpgradePrompt("Life Value is a Pro feature."); return; }
+      if (!isPro()) { showUpgradePrompt("Life Value is a premium feature. Upgrade to unlock it."); return; }
       lifeValueShowCalc = false; openOverlay(renderLifeValue);
     }
     if (tool === "opp")       openOverlay(renderOpportunity);
@@ -5566,8 +5647,8 @@
     modal.innerHTML =
       '<div style="width:100%;max-width:320px;background:#fff;border:1px solid hsl(220 13% 88%);padding:26px;text-align:center">' +
         '<div style="font-size:30px;margin-bottom:10px;color:' + (isActivityLimit ? "#d94264" : "hsl(230 40% 16%)") + '">' + (isActivityLimit ? "\u00D7" : "\u2B50") + '</div>' +
-        '<p style="color:hsl(230 40% 16%);font-size:16px;font-weight:800;margin:0 0 6px">' + (isActivityLimit ? "Limit reached" : "Pro feature") + '</p>' +
-        '<p style="color:hsl(220 10% 45%);font-size:13px;margin:0 0 20px;line-height:1.4">' + escapeHtml(message || "This is a Pro feature.") + '</p>' +
+        '<p style="color:hsl(230 40% 16%);font-size:16px;font-weight:800;margin:0 0 6px">' + (isActivityLimit ? "Limit reached" : "Premium feature") + '</p>' +
+        '<p style="color:hsl(220 10% 45%);font-size:13px;margin:0 0 20px;line-height:1.4">' + escapeHtml(message || "This is a premium feature.") + '</p>' +
         '<button id="lt-upgrade-cta" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;font-family:inherit">View Plans</button>' +
         '<button id="lt-upgrade-close" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:hsl(220 10% 40%);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>' +
       '</div>';
@@ -6032,17 +6113,13 @@
 
     var saveBtn = document.getElementById("lt-fv-save-btn");
     if (saveBtn) saveBtn.addEventListener("click", function () {
-      /* <a download> on a data: URL is silently ignored by Android WebView
-         — that's why Save never did anything before. Use the native
-         bridge to actually write the file when it's available, and only
-         fall back to the <a> click on a real browser. */
       if (window.AndroidShareBridge && typeof window.AndroidShareBridge.saveImagePng === "function") {
         window.AndroidShareBridge.saveImagePng(dataUrl);
         return;
       }
       var a = document.createElement("a");
       a.href = dataUrl;
-      a.download = "lifetime-" + dateText.replace(/\//g, "-") + ".png";
+      a.download = "minutics-" + dateText.replace(/\//g, "-") + ".png";
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -7504,8 +7581,11 @@
       '<div style="padding:16px 20px;border-bottom:1px solid hsl(220 13% 92%)">' +
         rowLabel("Plan") +
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
-          '<p style="color:hsl(230 40% 16%);font-size:14px;font-weight:700;margin:0">' + (isPro() ? "\u2B50 Pro" : "Free") + '</p>' +
-          '<button id="lt-plan-toggle-btn" style="flex-shrink:0;background:#fff;border:1px solid hsl(230 40% 16%);color:hsl(230 40% 16%);padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">View Plans</button>' +
+          '<p style="color:hsl(230 40% 16%);font-size:14px;font-weight:700;margin:0">' + (isPro() ? "\u2B50 " + getPlanName() : "Free") + '</p>' +
+          (isPro() && isSubscription()
+            ? '<button id="lt-plan-cancel-btn" style="flex-shrink:0;background:#fff;border:1px solid #c0392b;color:#c0392b;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>'
+            : '<button id="lt-plan-toggle-btn" style="flex-shrink:0;background:#fff;border:1px solid hsl(230 40% 16%);color:hsl(230 40% 16%);padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">' + (isPro() ? "Manage" : "View Plans") + '</button>'
+          ) +
         '</div>' +
       '</div>' +
       '<div style="padding:16px 20px">' +
@@ -7589,6 +7669,15 @@
     document.getElementById("lt-plan-toggle-btn").addEventListener("click", function () {
       showPlansScreen();
     });
+    var cancelBtn = document.getElementById("lt-plan-cancel-btn");
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", function () {
+        if (confirm("Cancel your " + getPlanName() + " subscription? You will lose premium features at the end of your billing period.")) {
+          setPlan("free");
+          refreshPlanGatedUI();
+        }
+      });
+    }
 
     document.getElementById("lt-curr-settings-btn").addEventListener("click", function () {
       showCurrencyPicker(function () {
@@ -7610,9 +7699,12 @@
     if (existing) existing.remove();
 
     var plans = [
-      { id: "basic",    name: "Basic",    price: "$1",  period: "/month", desc: "Essential premium access for one month.", features: ["Premium features", "All Minutics tools", "1 month access"] },
-      { id: "yearly",   name: "1 Year",   price: "$9",  period: "/year",  desc: "Full premium access for 12 months with one payment.", features: ["Premium features", "All Minutics tools", "12 months access", "One payment"] },
-      { id: "lifetime", name: "Lifetime", price: "$99", period: "",       desc: "Premium access with no expiration.", features: ["Premium features", "All Minutics tools", "Lifetime access", "No expiration"] },
+      { id: "basic",    name: "Basic",    price: "$1",  period: "/month", desc: "Essential premium access for one month.",
+        features: ["Budget Tracker", "Life Value Calculator", "Telegram daily reports", "Full journal history", "Queued Eat the Frog (unlimited starred tasks)", "All Minutics tools", "1 month access"] },
+      { id: "yearly",   name: "1 Year",   price: "$9",  period: "/year",  desc: "Full premium access for 12 months with one payment.",
+        features: ["Budget Tracker", "Life Value Calculator", "Telegram daily reports", "Full journal history", "Queued Eat the Frog (unlimited starred tasks)", "All Minutics tools", "12 months access", "One payment"] },
+      { id: "lifetime", name: "Lifetime", price: "$99", period: "",       desc: "Premium access with no expiration.",
+        features: ["Budget Tracker", "Life Value Calculator", "Telegram daily reports", "Full journal history", "Queued Eat the Frog (unlimited starred tasks)", "All Minutics tools", "Lifetime access", "No expiration"] },
     ];
 
     var planCards = plans.map(function (p, i) {
@@ -7628,7 +7720,7 @@
           '</div>' +
         '</div>' +
         '<p style="color:hsl(220 10% 50%);font-size:13px;margin:0 0 12px;line-height:1.4">' + p.desc + '</p>' +
-        '<div style="display:flex;flex-direction:column;gap:6px">' +
+        '<div class="lt-plan-features" data-plan-features="' + p.id + '" style="display:flex;flex-direction:column;gap:6px">' +
           p.features.map(function (f) {
             return '<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:hsl(220 10% 40%)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(152 60% 45%)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' + f + '</div>';
           }).join("") +
@@ -7662,7 +7754,8 @@
           '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
       '</div>';
-    (activeOverlay || document.body).appendChild(modal);
+    var plansHost = activeOverlay || document.body;
+    plansHost.appendChild(modal);
 
     var selectedPlan = "yearly";
 
@@ -7680,7 +7773,7 @@
         }
       });
       var cta = document.getElementById("lt-plans-cta");
-      if (cta) {
+      if (cta && !isPro()) {
         var p = plans.find(function (x) { return x.id === planId; });
         cta.textContent = "Continue with " + (p ? p.name : planId);
       }
@@ -7688,7 +7781,7 @@
 
     highlightPlan(isPro() ? getPlanId() : "yearly");
 
-    /* Single click handler per card */
+    /* Card click handler — select plan (or checkout if already selected) */
     if (!isPro()) {
       modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
         card.addEventListener("click", function (e) {
@@ -7703,7 +7796,7 @@
       });
     }
 
-    /* CTA button proceeds to checkout or cancel */
+    /* CTA button */
     var ctaBtn = document.getElementById("lt-plans-cta");
     if (ctaBtn) {
       ctaBtn.addEventListener("click", function () {
@@ -7726,6 +7819,7 @@
   }
 
   function showDummyCheckoutForPlan(planId) {
+    /* Block purchasing another plan while a subscription is active */
     if (isPro() && isSubscription()) {
       showUpgradePrompt("You already have an active " + getPlanName() + " subscription. Cancel it first to switch plans.");
       return;
@@ -7785,7 +7879,7 @@
           '</div>';
         document.getElementById("lt-checkout-done-btn").addEventListener("click", function () {
           modal.remove();
-          setPlan("lifetime");
+          setPlan(planId);
           refreshPlanGatedUI();
         });
       }, 1400);
@@ -7797,7 +7891,10 @@
     document.getElementById("lt-account-card") && document.getElementById("lt-account-card").remove();
     removeTelegramGateVisuals();
     document.querySelectorAll("[data-lt-tile-injected]").forEach(function (el) { el.remove(); });
-    setTimeout(function () { safeRun(injectAccountCard); safeRun(gateTelegramSettings); }, 30);
+    /* Force rebuild life-progress card so View Plan button updates */
+    var lp = document.getElementById("lt-life-progress");
+    if (lp) lp.remove();
+    setTimeout(function () { safeRun(injectAccountCard); safeRun(gateTelegramSettings); buildEatTheFrogCard(); }, 30);
   }
 
   /* ── Gate Telegram settings the same way Budget Tracker is gated: dim it,
@@ -7874,7 +7971,7 @@
       overlay.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        showUpgradePrompt("Telegram daily reports are a Pro feature.");
+        showUpgradePrompt("Telegram daily reports are a premium feature. Upgrade to unlock.");
       });
       document.body.appendChild(overlay);
     }
@@ -8540,33 +8637,56 @@
     document.addEventListener("click", function (e) {
       if (activeOverlay) {
         if (e.target.closest && e.target.closest("#lt-overlay-root")) return;
-        var navBtn = e.target.closest("nav button, nav a, [data-lt-bottom-nav] button, [data-lt-bottom-nav] a");
+        var navBtn = e.target.closest("nav button, nav a");
         if (navBtn) closeOverlay();
       }
-      /* Any tap on the bottom nav is a likely tab switch — even if we're
-         not inside our own overlay right now. Schedule an immediate,
-         throttle-bypassing cleanup pass shortly after so it lands once
-         React has actually swapped the route content in, instead of
-         racing it. But only mask/re-run if the tap is actually GOING
-         somewhere new — re-tapping the tab you're already on shouldn't
-         mask anything; that's what made it look like the page reloads
-         in place when tapping the current tab. */
-      var navTap = e.target.closest("nav button, nav a, [data-lt-bottom-nav] button, [data-lt-bottom-nav] a");
+      var navTap = e.target.closest("nav button, nav a");
       if (navTap) {
         var isActivityTabTap = navTap.id === "lt-activity-navtab";
         var targetHref = navTap.getAttribute && navTap.getAttribute("href");
         var isSameTab = isActivityTabTap
           ? _activeSubTab === "activity"
           : (targetHref != null && targetHref === location.pathname && _activeSubTab !== "activity");
-        if (!isSameTab) {
-          showNavMaskWithTimeout(1000);
-          setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 0);
-          setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 120);
-          /* Some screens (native Life Hub grid especially) still finish their
-             own transition/render after 120ms on slower devices — take one
-             more pass before fully trusting the page is settled. */
-          setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 260);
+        /* Same exact tab: block React re-render entirely */
+        if (isSameTab) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
         }
+        /* Timer ↔ Activity is same route (/), just toggle visibility.
+           Show a brief nav mask so the user sees a clean transition
+           (like switching between other tabs) instead of elements jumping. */
+        var isTimerActivitySwitch = (targetHref === "/" || isActivityTabTap) && location.pathname === "/";
+        if (isTimerActivitySwitch) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isActivityTabTap) {
+            _activeSubTab = "activity";
+          } else {
+            _activeSubTab = "timer";
+          }
+          showNavMaskWithTimeout(250);
+          runEnhancementsImmediate();
+          applySubTabVisibility();
+          syncNavTabStyles();
+          upsertRunningBanner();
+          return;
+        }
+        /* Real route switch: hide all injected elements, show nav mask to
+           cover the flash of native React content, then re-inject after
+           React has finished rendering. Also detect if the user is
+           navigating TO the Activity tab from another route (Life Hub,
+           Journal, Settings) — in that case, set _activeSubTab = "activity"
+           so the Activity sub-tab is shown immediately when enhancements
+           re-inject, instead of briefly showing Timer content first. */
+        var goingToActivity = isActivityTabTap || (targetHref === "/" && _activeSubTab === "activity");
+        var injected = document.querySelectorAll("[data-lt-enhancement],[data-lt-tile-injected]");
+        for (var i = 0; i < injected.length; i++) {
+          injected[i].remove();
+        }
+        _activeSubTab = goingToActivity ? "activity" : "timer";
+        showNavMaskWithTimeout(800);
+        setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 80);
       }
     }, true);
   }

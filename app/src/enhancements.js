@@ -8655,7 +8655,10 @@
         }
         /* Timer ↔ Activity is same route (/), just toggle visibility.
            Show a brief nav mask so the user sees a clean transition
-           (like switching between other tabs) instead of elements jumping. */
+           (like switching between other tabs) instead of elements jumping.
+           The mask is created FIRST so the browser paints it in the same
+           frame as the visibility toggle — the user only sees the mask,
+           never the raw element jump. */
         var isTimerActivitySwitch = (targetHref === "/" || isActivityTabTap) && location.pathname === "/";
         if (isTimerActivitySwitch) {
           e.preventDefault();
@@ -8665,11 +8668,11 @@
           } else {
             _activeSubTab = "timer";
           }
-          showNavMaskWithTimeout(400);
+          showNavMaskWithTimeout(250);
+          runEnhancementsImmediate();
           applySubTabVisibility();
           syncNavTabStyles();
           upsertRunningBanner();
-          setTimeout(function () { hideNavMask(); }, 100);
           return;
         }
         /* Real route switch: hide all injected elements, show nav mask to
