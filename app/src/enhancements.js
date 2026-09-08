@@ -1956,7 +1956,7 @@
       'div[data-source-file="screens/Home.js"]>:nth-child(1){display:none!important}',
       'div[data-source-file="screens/Home.js"]>:nth-child(2){display:none!important}',
       'div[data-source-file="screens/LifeHub.js"]>h1{display:none!important}',
-      'div[data-source-file="screens/LifeHub.js"]>div>div:not([data-lt-tile-injected]):not(.lt-hub-search-wrap):not(.lt-hub-filter-row){display:none!important}',
+      'div[data-source-file="screens/LifeHub.js"]>div[style*="grid"]>div:not([data-lt-tile-injected]){display:none!important}',
       /* Hide native Screen Time tile — class applied by fast interval below */
       ".lt-hide-native-st{display:none!important}",
       "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
@@ -8653,7 +8653,9 @@
           e.stopPropagation();
           return;
         }
-        /* Timer ↔ Activity is same route (/), just toggle visibility */
+        /* Timer ↔ Activity is same route (/), just toggle visibility.
+           Show a brief nav mask so the user sees a clean transition
+           (like switching between other tabs) instead of elements jumping. */
         var isTimerActivitySwitch = (targetHref === "/" || isActivityTabTap) && location.pathname === "/";
         if (isTimerActivitySwitch) {
           e.preventDefault();
@@ -8663,9 +8665,11 @@
           } else {
             _activeSubTab = "timer";
           }
+          showNavMaskWithTimeout(400);
           applySubTabVisibility();
           syncNavTabStyles();
           upsertRunningBanner();
+          setTimeout(function () { hideNavMask(); }, 100);
           return;
         }
         /* Real route switch: hide all injected elements, show nav mask to
