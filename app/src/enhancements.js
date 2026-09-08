@@ -125,33 +125,50 @@
   }
 
   /* ── Tab-switch transition ─────────────────────────────────────────────
-     On every route change, immediately hide all children of <main> so
-     old-page content can't flash through, then reveal them only once
-     our enhancement pass has had a chance to patch the new content.
-     Uses CSS class so it wins over inline styles. */
+     Immediately hide ALL our injected enhancements + the React shell
+     content before triggering SPA navigation. React's async rendering
+     means old content can flash for hundreds ofms. By hiding everything
+     INSTANTLY in the click handler (synchronous, before React sees the
+     click), the user never sees stale content. We show everything back
+     once enhancements rebuild. */
   var _transitionActive = false;
+  var _savedStyles = [];
   function startTransition() {
     _transitionActive = true;
+    _savedStyles = [];
+    /* Nuclear option: hide the ENTIRE main area with opacity:0
+       (opacity CANNOT be overridden by children, unlike visibility) */
     var main = document.querySelector("main");
     if (main) {
-      main.setAttribute("data-lt-transition", "1");
+      _savedStyles.push({ el: main, prop: "opacity", val: main.style.opacity });
+      _savedStyles.push({ el: main, prop: "transition", val: main.style.transition });
+      main.style.transition = "none";
+      main.style.opacity = "0";
     }
-    /* Also hide the React bottom nav during transition to prevent flash */
+    /* Hide React's own bottom nav during transition */
     var reactNavs = document.querySelectorAll("div.fixed.bottom-0");
     for (var i = 0; i < reactNavs.length; i++) {
       if (!reactNavs[i].hasAttribute("data-lt-bottom-nav")) {
-        reactNavs[i].setAttribute("data-lt-transition-hidden", "1");
+        _savedStyles.push({ el: reactNavs[i], prop: "display", val: reactNavs[i].style.display });
+        reactNavs[i].style.display = "none";
       }
     }
   }
   function endTransition() {
     _transitionActive = false;
+    /* Restore main opacity with a smooth fade-in */
     var main = document.querySelector("main");
     if (main) {
-      main.removeAttribute("data-lt-transition");
+      main.style.transition = "opacity .12s ease";
+      main.style.opacity = "1";
     }
-    var hidden = document.querySelectorAll("[data-lt-transition-hidden]");
-    for (var i = 0; i < hidden.length; i++) hidden[i].removeAttribute("data-lt-transition-hidden");
+    /* Restore React nav */
+    var reactNavs = document.querySelectorAll("div.fixed.bottom-0");
+    for (var i = 0; i < reactNavs.length; i++) {
+      if (!reactNavs[i].hasAttribute("data-lt-bottom-nav")) {
+        reactNavs[i].style.display = "";
+      }
+    }
   }
 
   function _ltNavNavigate(href) {
@@ -159,32 +176,37 @@
     if (href === "/activity") {
       if (location.pathname === "/" && _activeSubTab === "activity") return;
       startTransition();
+      void document.body.offsetHeight;
       if (location.pathname !== "/") {
         _navClickReactLink("/");
       }
+      /* Apply sub-tab visibility immediately (synchronous) */
+      _activeSubTab = "activity";
+      applySubTabVisibility();
+      syncNavTabStyles();
+      _updateNavHighlight();
+      upsertRunningBanner();
+      /* Force synchronous enhancement pass after React renders */
       setTimeout(function () {
-        _activeSubTab = "activity";
-        applySubTabVisibility();
-        syncNavTabStyles();
-        _updateNavHighlight();
-        upsertRunningBanner();
+        runEnhancementsImmediate();
         endTransition();
-      }, 80);
-      setTimeout(endTransition, 400);
+      }, 50);
+      setTimeout(endTransition, 300);
       return;
     }
     /* Don't re-navigate if already on this tab */
     if (location.pathname === href && _activeSubTab !== "activity") return;
     startTransition();
+    void document.body.offsetHeight;
     /* Find the React link and click it for SPA navigation */
     _activeSubTab = "timer";
     _navClickReactLink(href);
+    /* Run enhancements immediately after React renders */
     setTimeout(function () {
-      applySubTabVisibility();
-      _updateNavHighlight();
+      runEnhancementsImmediate();
       endTransition();
-    }, 80);
-    setTimeout(endTransition, 400);
+    }, 50);
+    setTimeout(endTransition, 300);
   }
 
   function _navClickReactLink(href) {
