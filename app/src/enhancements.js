@@ -80,6 +80,7 @@
   ];
   var _ltNavStarted = false;
   var _ltCustomNav = null;
+  var _ltNavNavigating = false;
 
   function ensureCustomNav() {
     if (_ltCustomNav && _ltCustomNav.isConnected) {
@@ -109,6 +110,8 @@
           '<div class="lt-nav-icon" style="color:hsl(220 9% 46%)">' + tab.icon + '</div>' +
           '<span class="lt-nav-label" style="font-size:10px;font-weight:600;color:hsl(220 9% 46%)">' + tab.label + '</span>';
         btn.addEventListener("click", function () {
+          _ltNavNavigating = true;
+          setTimeout(function () { _ltNavNavigating = false; }, 300);
           _ltNavNavigate(tab.href);
         });
         inner.appendChild(btn);
@@ -124,6 +127,7 @@
   function _ltNavNavigate(href) {
     /* For Activity, it's a sub-tab on the Timer page */
     if (href === "/activity") {
+      if (location.pathname === "/" && _activeSubTab === "activity") return;
       if (location.pathname !== "/") {
         _navClickReactLink("/");
       }
@@ -136,10 +140,12 @@
       }, 60);
       return;
     }
+    /* Don't re-navigate if already on this tab */
+    if (location.pathname === href && _activeSubTab !== "activity") return;
     /* Find the React link and click it for SPA navigation */
+    _activeSubTab = "timer";
     _navClickReactLink(href);
     setTimeout(function () {
-      _activeSubTab = "timer";
       applySubTabVisibility();
       _updateNavHighlight();
     }, 60);
@@ -8754,20 +8760,16 @@
          mask anything; that's what made it look like the page reloads
          in place when tapping the current tab. */
       var navTap = e.target.closest("nav button, nav a, [data-lt-bottom-nav] button, [data-lt-bottom-nav] a");
-      if (navTap) {
+      if (navTap && !_ltNavNavigating) {
         var isActivityTabTap = navTap.id === "lt-activity-navtab";
-        var targetHref = navTap.getAttribute && navTap.getAttribute("href");
+        var targetHref = navTap.getAttribute && (navTap.getAttribute("href") || navTap.getAttribute("data-lt-nav-href"));
         var isSameTab = isActivityTabTap
           ? _activeSubTab === "activity"
-          : (targetHref != null && targetHref === location.pathname && _activeSubTab !== "activity");
+          : (targetHref != null && targetHref !== "/activity" && targetHref === location.pathname && _activeSubTab !== "activity") ||
+            (targetHref === "/activity" && _activeSubTab === "activity" && location.pathname === "/") ||
+            (targetHref === "/" && location.pathname === "/" && _activeSubTab !== "activity");
         if (!isSameTab) {
-          showNavMaskWithTimeout(1000);
-          setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 0);
-          setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 120);
-          /* Some screens (native Life Hub grid especially) still finish their
-             own transition/render after 120ms on slower devices — take one
-             more pass before fully trusting the page is settled. */
-          setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 260);
+          setTimeout(function () { runEnhancementsImmediate(); }, 150);
         }
       }
     }, true);
