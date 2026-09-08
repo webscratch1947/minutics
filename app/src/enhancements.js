@@ -125,44 +125,46 @@
   }
 
   /* ── Tab-switch transition ─────────────────────────────────────────────
-     Immediately hide ALL our injected enhancements + the React shell
-     content before triggering SPA navigation. React's async rendering
-     means old content can flash for hundreds ofms. By hiding everything
-     INSTANTLY in the click handler (synchronous, before React sees the
-     click), the user never sees stale content. We show everything back
-     once enhancements rebuild. */
+     Completely hides main content during SPA route transitions so no
+     stale/enhanced content from the OLD page flashes on the NEW page,
+     and no raw native content shows before our enhancements rebuild.
+     Instead of guessing with timeouts, waits for DOM mutations to fully
+     settle (React 18 concurrent rendering delivers content in multiple
+     frames) then runs a final enhancement pass before fading in. */
   var _transitionActive = false;
-  var _savedStyles = [];
+  var _transitionSettleTimer = null;
+  var _transitionShowTimer = null;
   function startTransition() {
     _transitionActive = true;
-    _savedStyles = [];
-    /* Nuclear option: hide the ENTIRE main area with opacity:0
-       (opacity CANNOT be overridden by children, unlike visibility) */
+    clearTimeout(_transitionSettleTimer);
+    clearTimeout(_transitionShowTimer);
     var main = document.querySelector("main");
     if (main) {
-      _savedStyles.push({ el: main, prop: "opacity", val: main.style.opacity });
-      _savedStyles.push({ el: main, prop: "transition", val: main.style.transition });
       main.style.transition = "none";
       main.style.opacity = "0";
     }
-    /* Hide React's own bottom nav during transition */
+    /* Also hide React's own bottom nav */
     var reactNavs = document.querySelectorAll("div.fixed.bottom-0");
     for (var i = 0; i < reactNavs.length; i++) {
       if (!reactNavs[i].hasAttribute("data-lt-bottom-nav")) {
-        _savedStyles.push({ el: reactNavs[i], prop: "display", val: reactNavs[i].style.display });
         reactNavs[i].style.display = "none";
       }
     }
+    /* Force synchronous paint of the hidden state before React renders */
+    void document.body.offsetHeight;
   }
   function endTransition() {
     _transitionActive = false;
-    /* Restore main opacity with a smooth fade-in */
+    clearTimeout(_transitionSettleTimer);
+    clearTimeout(_transitionShowTimer);
+    _showTransitionContent();
+  }
+  function _showTransitionContent() {
     var main = document.querySelector("main");
     if (main) {
       main.style.transition = "opacity .12s ease";
       main.style.opacity = "1";
     }
-    /* Restore React nav */
     var reactNavs = document.querySelectorAll("div.fixed.bottom-0");
     for (var i = 0; i < reactNavs.length; i++) {
       if (!reactNavs[i].hasAttribute("data-lt-bottom-nav")) {
@@ -170,43 +172,58 @@
       }
     }
   }
+  /* Wait for DOM to fully settle after React renders, then show.
+     Uses a MutationObserver that watches for DOM changes — when mutations
+     stop for 120ms, we know React is done painting. */
+  function _waitForSettleThenShow() {
+    clearTimeout(_transitionSettleTimer);
+    clearTimeout(_transitionShowTimer);
+    var lastMutation = Date.now();
+    var obs = new MutationObserver(function () {
+      lastMutation = Date.now();
+    });
+    obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+    /* Check every 50ms if mutations have stopped */
+    var check = setInterval(function () {
+      if (!_transitionActive) { clearInterval(check); obs.disconnect(); return; }
+      if (Date.now() - lastMutation > 120) {
+        clearInterval(check);
+        obs.disconnect();
+        /* One final enhancement pass on the settled DOM */
+        runEnhancementsImmediate();
+        _showTransitionContent();
+      }
+    }, 50);
+    /* Absolute safety: show no matter what after 600ms */
+    _transitionShowTimer = setTimeout(function () {
+      clearInterval(check);
+      obs.disconnect();
+      _showTransitionContent();
+    }, 600);
+  }
 
   function _ltNavNavigate(href) {
     /* For Activity, it's a sub-tab on the Timer page */
     if (href === "/activity") {
       if (location.pathname === "/" && _activeSubTab === "activity") return;
       startTransition();
-      void document.body.offsetHeight;
       if (location.pathname !== "/") {
         _navClickReactLink("/");
       }
-      /* Apply sub-tab visibility immediately (synchronous) */
       _activeSubTab = "activity";
       applySubTabVisibility();
       syncNavTabStyles();
       _updateNavHighlight();
       upsertRunningBanner();
-      /* Force synchronous enhancement pass after React renders */
-      setTimeout(function () {
-        runEnhancementsImmediate();
-        endTransition();
-      }, 50);
-      setTimeout(endTransition, 300);
+      _waitForSettleThenShow();
       return;
     }
     /* Don't re-navigate if already on this tab */
     if (location.pathname === href && _activeSubTab !== "activity") return;
     startTransition();
-    void document.body.offsetHeight;
-    /* Find the React link and click it for SPA navigation */
     _activeSubTab = "timer";
     _navClickReactLink(href);
-    /* Run enhancements immediately after React renders */
-    setTimeout(function () {
-      runEnhancementsImmediate();
-      endTransition();
-    }, 50);
-    setTimeout(endTransition, 300);
+    _waitForSettleThenShow();
   }
 
   function _navClickReactLink(href) {
