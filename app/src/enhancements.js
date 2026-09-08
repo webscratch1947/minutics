@@ -8624,19 +8624,33 @@
         var isSameTab = isActivityTabTap
           ? _activeSubTab === "activity"
           : (targetHref != null && targetHref === location.pathname && _activeSubTab !== "activity");
-        /* Same tab: prevent React from re-rendering (causes reload flash) */
+        /* Same exact tab: block React re-render entirely */
         if (isSameTab) {
           e.preventDefault();
           e.stopPropagation();
           return;
         }
-        /* Different tab: instantly remove all our injected elements so
-           nothing from the old page is visible during React's route swap.
-           Enhancements will rebuild them for the new page. */
+        /* Timer ↔ Activity is same route (/), just toggle visibility */
+        var isTimerActivitySwitch = (targetHref === "/" || isActivityTabTap) && location.pathname === "/";
+        if (isTimerActivitySwitch) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isActivityTabTap) {
+            _activeSubTab = "activity";
+          } else {
+            _activeSubTab = "timer";
+          }
+          applySubTabVisibility();
+          syncNavTabStyles();
+          upsertRunningBanner();
+          return;
+        }
+        /* Real route switch: remove injected elements to prevent flash */
         var injected = document.querySelectorAll("[data-lt-enhancement],[data-lt-tile-injected]");
         for (var i = 0; i < injected.length; i++) {
           injected[i].remove();
         }
+        _activeSubTab = "timer";
         setTimeout(function () { runEnhancementsImmediate(); }, 100);
       }
     }, true);
