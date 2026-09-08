@@ -124,35 +124,41 @@
     _updateNavHighlight();
   }
 
-  /* ── Content-area transition mask ──────────────────────────────────────
-     Covers everything except the bottom nav during tab switches so
-     old-page content never flashes through while React is swapping
-     routes and our enhancements are rebuilding. Appended to document.body
-     so it survives React's DOM replacements of <main>. */
-  var _contentMaskEl = null;
-  function showContentMask() {
-    if (_contentMaskEl) return;
-    var bg = "";
-    try { bg = getComputedStyle(document.body).backgroundColor; } catch (e) {}
-    _contentMaskEl = document.createElement("div");
-    _contentMaskEl.id = "lt-content-mask";
-    _contentMaskEl.style.cssText =
-      "position:fixed;top:0;left:0;right:0;bottom:60px;z-index:2147483000;" +
-      "background:" + (bg && bg !== "rgba(0, 0, 0, 0)" ? bg : "#ffffff") + ";" +
-      "pointer-events:none;";
-    document.body.appendChild(_contentMaskEl);
+  /* ── Tab-switch transition ─────────────────────────────────────────────
+     On every route change, immediately hide all children of <main> so
+     old-page content can't flash through, then reveal them only once
+     our enhancement pass has had a chance to patch the new content.
+     Uses CSS class so it wins over inline styles. */
+  var _transitionActive = false;
+  function startTransition() {
+    _transitionActive = true;
+    var main = document.querySelector("main");
+    if (main) {
+      main.setAttribute("data-lt-transition", "1");
+    }
+    /* Also hide the React bottom nav during transition to prevent flash */
+    var reactNavs = document.querySelectorAll("div.fixed.bottom-0");
+    for (var i = 0; i < reactNavs.length; i++) {
+      if (!reactNavs[i].hasAttribute("data-lt-bottom-nav")) {
+        reactNavs[i].setAttribute("data-lt-transition-hidden", "1");
+      }
+    }
   }
-  function hideContentMask() {
-    if (!_contentMaskEl) return;
-    if (_contentMaskEl.parentNode) _contentMaskEl.parentNode.removeChild(_contentMaskEl);
-    _contentMaskEl = null;
+  function endTransition() {
+    _transitionActive = false;
+    var main = document.querySelector("main");
+    if (main) {
+      main.removeAttribute("data-lt-transition");
+    }
+    var hidden = document.querySelectorAll("[data-lt-transition-hidden]");
+    for (var i = 0; i < hidden.length; i++) hidden[i].removeAttribute("data-lt-transition-hidden");
   }
 
   function _ltNavNavigate(href) {
     /* For Activity, it's a sub-tab on the Timer page */
     if (href === "/activity") {
       if (location.pathname === "/" && _activeSubTab === "activity") return;
-      showContentMask();
+      startTransition();
       if (location.pathname !== "/") {
         _navClickReactLink("/");
       }
@@ -162,23 +168,23 @@
         syncNavTabStyles();
         _updateNavHighlight();
         upsertRunningBanner();
-        hideContentMask();
-      }, 60);
-      setTimeout(hideContentMask, 300);
+        endTransition();
+      }, 80);
+      setTimeout(endTransition, 400);
       return;
     }
     /* Don't re-navigate if already on this tab */
     if (location.pathname === href && _activeSubTab !== "activity") return;
-    showContentMask();
+    startTransition();
     /* Find the React link and click it for SPA navigation */
     _activeSubTab = "timer";
     _navClickReactLink(href);
     setTimeout(function () {
       applySubTabVisibility();
       _updateNavHighlight();
-      hideContentMask();
-    }, 60);
-    setTimeout(hideContentMask, 300);
+      endTransition();
+    }, 80);
+    setTimeout(endTransition, 400);
   }
 
   function _navClickReactLink(href) {
@@ -2050,6 +2056,8 @@
       ".lt-navtab-active::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:16px;height:3px;border-radius:3px;background:hsl(var(--primary))}",
       "#lt-activity-navtab.lt-navtab-active-custom{color:hsl(var(--primary))}",
       "div.fixed.bottom-0.left-0.right-0.z-50{display:none!important}",
+      "main[data-lt-transition]>*{visibility:hidden!important}",
+      "[data-lt-transition-hidden]{display:none!important}",
       "#lt-custom-nav{pointer-events:auto!important}",
       "#lt-custom-nav button{-webkit-tap-highlight-color:transparent!important}",
       /* Dims the real Timer tab ONLY while the pseudo Activity tab is the
@@ -8700,6 +8708,7 @@
     _enhanceScheduled = false;
     _lastEnhanceRun = Date.now();
     if (!activeOverlay) runEnhancements();
+    if (_transitionActive) endTransition();
   }
 
   /* ── Nav-transition mask ──────────────────────────────────────────────────
