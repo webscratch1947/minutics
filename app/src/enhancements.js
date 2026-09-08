@@ -66,247 +66,6 @@
     setTimeout(dismiss, MAX_MS);
   })();
 
-  /* ── Custom bottom navigation bar ──────────────────────────────────────
-     Replaces the React-rendered bottom nav which is unreliable (gets
-     re-rendered and sometimes disappears). This nav is injected once
-     via MutationObserver and stays permanently. Uses programmatic
-     clicks on the hidden React links for SPA navigation. */
-  var _navTabs = [
-    { href: "/",       label: "Timer",   icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>' },
-    { href: "/activity", label: "Activity", icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>' },
-    { href: "/timeline", label: "Life Hub", icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>' },
-    { href: "/journal", label: "Journal", icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>' },
-    { href: "/settings", label: "Settings", icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>' }
-  ];
-  var _ltNavStarted = false;
-  var _ltCustomNav = null;
-  var _ltNavNavigating = false;
-
-  function ensureCustomNav() {
-    if (_ltCustomNav && _ltCustomNav.isConnected) {
-      _updateNavHighlight();
-      return;
-    }
-    _ltCustomNav = document.getElementById("lt-custom-nav");
-    if (!_ltCustomNav) {
-      _ltCustomNav = document.createElement("div");
-      _ltCustomNav.id = "lt-custom-nav";
-      _ltCustomNav.setAttribute("data-lt-bottom-nav", "1");
-      _ltCustomNav.style.cssText =
-        "position:fixed;bottom:0;left:0;right:0;z-index:2147483646;" +
-        "background:#ffffff;border-top:1px solid hsl(220 13% 90%);" +
-        "box-shadow:0 -2px 10px rgba(0,0,0,0.08);pointer-events:auto;";
-      var inner = document.createElement("div");
-      inner.style.cssText = "max-width:430px;margin:0 auto;display:flex;align-items:stretch;";
-      _navTabs.forEach(function (tab) {
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.dataset.ltNavHref = tab.href;
-        btn.style.cssText =
-          "flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;" +
-          "gap:2px;padding:8px 0 6px;border:none;background:transparent;cursor:pointer;" +
-          "-webkit-tap-highlight-color:transparent;font-family:'Inter',sans-serif;";
-        btn.innerHTML =
-          '<div class="lt-nav-icon" style="color:hsl(220 9% 46%)">' + tab.icon + '</div>' +
-          '<span class="lt-nav-label" style="font-size:10px;font-weight:600;color:hsl(220 9% 46%)">' + tab.label + '</span>';
-        btn.addEventListener("click", function () {
-          _ltNavNavigating = true;
-          setTimeout(function () { _ltNavNavigating = false; }, 300);
-          _ltNavNavigate(tab.href);
-        });
-        inner.appendChild(btn);
-      });
-      _ltCustomNav.appendChild(inner);
-      document.body.appendChild(_ltCustomNav);
-      /* Add bottom padding to main content so it doesn't hide behind the nav */
-      _ensureContentPadding();
-    }
-    _updateNavHighlight();
-  }
-
-  /* ── Tab-switch transition ─────────────────────────────────────────────
-     Completely hides main content during SPA route transitions so no
-     stale/enhanced content from the OLD page flashes on the NEW page,
-     and no raw native content shows before our enhancements rebuild.
-     Instead of guessing with timeouts, waits for DOM mutations to fully
-     settle (React 18 concurrent rendering delivers content in multiple
-     frames) then runs a final enhancement pass before fading in. */
-  var _transitionActive = false;
-  var _transitionSettleTimer = null;
-  var _transitionShowTimer = null;
-  function startTransition() {
-    _transitionActive = true;
-    clearTimeout(_transitionSettleTimer);
-    clearTimeout(_transitionShowTimer);
-    var main = document.querySelector("main");
-    if (main) {
-      main.style.transition = "none";
-      main.style.opacity = "0";
-    }
-    /* Also hide React's own bottom nav */
-    var reactNavs = document.querySelectorAll("div.fixed.bottom-0");
-    for (var i = 0; i < reactNavs.length; i++) {
-      if (!reactNavs[i].hasAttribute("data-lt-bottom-nav")) {
-        reactNavs[i].style.display = "none";
-      }
-    }
-    /* Force synchronous paint of the hidden state before React renders */
-    void document.body.offsetHeight;
-  }
-  function endTransition() {
-    _transitionActive = false;
-    clearTimeout(_transitionSettleTimer);
-    clearTimeout(_transitionShowTimer);
-    _showTransitionContent();
-  }
-  function _showTransitionContent() {
-    var main = document.querySelector("main");
-    if (main) {
-      main.style.transition = "opacity .12s ease";
-      main.style.opacity = "1";
-    }
-    var reactNavs = document.querySelectorAll("div.fixed.bottom-0");
-    for (var i = 0; i < reactNavs.length; i++) {
-      if (!reactNavs[i].hasAttribute("data-lt-bottom-nav")) {
-        reactNavs[i].style.display = "";
-      }
-    }
-  }
-  /* Wait for DOM to fully settle after React renders, then show.
-     Uses a MutationObserver that watches for DOM changes — when mutations
-     stop for 120ms, we know React is done painting. */
-  function _waitForSettleThenShow() {
-    clearTimeout(_transitionSettleTimer);
-    clearTimeout(_transitionShowTimer);
-    var lastMutation = Date.now();
-    var obs = new MutationObserver(function () {
-      lastMutation = Date.now();
-    });
-    obs.observe(document.body, { childList: true, subtree: true, characterData: true });
-    /* Check every 50ms if mutations have stopped */
-    var check = setInterval(function () {
-      if (!_transitionActive) { clearInterval(check); obs.disconnect(); return; }
-      if (Date.now() - lastMutation > 120) {
-        clearInterval(check);
-        obs.disconnect();
-        /* One final enhancement pass on the settled DOM */
-        runEnhancementsImmediate();
-        _showTransitionContent();
-      }
-    }, 50);
-    /* Absolute safety: show no matter what after 600ms */
-    _transitionShowTimer = setTimeout(function () {
-      clearInterval(check);
-      obs.disconnect();
-      _showTransitionContent();
-    }, 600);
-  }
-
-  function _ltNavNavigate(href) {
-    /* For Activity, it's a sub-tab on the Timer page */
-    if (href === "/activity") {
-      if (location.pathname === "/" && _activeSubTab === "activity") return;
-      startTransition();
-      if (location.pathname !== "/") {
-        _navClickReactLink("/");
-      }
-      _activeSubTab = "activity";
-      applySubTabVisibility();
-      syncNavTabStyles();
-      _updateNavHighlight();
-      upsertRunningBanner();
-      _waitForSettleThenShow();
-      return;
-    }
-    /* Don't re-navigate if already on this tab */
-    if (location.pathname === href && _activeSubTab !== "activity") return;
-    startTransition();
-    _activeSubTab = "timer";
-    _navClickReactLink(href);
-    _waitForSettleThenShow();
-  }
-
-  function _navClickReactLink(href) {
-    var links = document.querySelectorAll("nav a");
-    for (var i = 0; i < links.length; i++) {
-      if (links[i].getAttribute("href") === href) {
-        links[i].click();
-        return;
-      }
-    }
-    /* Fallback: push state directly */
-    window.history.pushState({}, "", href);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }
-
-  function _updateNavHighlight() {
-    if (!_ltCustomNav) return;
-    var path = location.pathname;
-    var isActivity = _activeSubTab === "activity" && path === "/";
-    var btns = _ltCustomNav.querySelectorAll("button[data-lt-nav-href]");
-    btns.forEach(function (btn) {
-      var href = btn.dataset.ltNavHref;
-      var active = false;
-      if (href === "/activity") active = isActivity;
-      else if (href === "/") active = path === "/" && !isActivity;
-      else active = path.startsWith(href);
-
-      var iconDiv = btn.querySelector(".lt-nav-icon");
-      var labelSpan = btn.querySelector(".lt-nav-label");
-      if (active) {
-        if (iconDiv) iconDiv.style.color = "hsl(var(--primary))";
-        if (labelSpan) { labelSpan.style.color = "hsl(var(--primary))"; labelSpan.style.fontWeight = "700"; }
-        btn.style.position = "relative";
-        /* Active indicator dot */
-        var dot = btn.querySelector(".lt-nav-dot");
-        if (!dot) {
-          dot = document.createElement("div");
-          dot.className = "lt-nav-dot";
-          dot.style.cssText = "position:absolute;bottom:2px;width:16px;height:3px;border-radius:3px;background:hsl(var(--primary))";
-          btn.appendChild(dot);
-        }
-      } else {
-        if (iconDiv) iconDiv.style.color = "hsl(220 9% 46%)";
-        if (labelSpan) { labelSpan.style.color = "hsl(220 9% 46%)"; labelSpan.style.fontWeight = "600"; }
-        var oldDot = btn.querySelector(".lt-nav-dot");
-        if (oldDot) oldDot.remove();
-      }
-    });
-  }
-
-  function _ensureContentPadding() {
-    var main = document.querySelector("main");
-    if (main && main.style.paddingBottom !== "64px") {
-      main.style.paddingBottom = "64px";
-    }
-  }
-
-  /* Hide the React-rendered bottom nav permanently */
-  function _hideReactNav() {
-    var reactNavs = document.querySelectorAll("div.fixed.bottom-0");
-    for (var i = 0; i < reactNavs.length; i++) {
-      if (!reactNavs[i].hasAttribute("data-lt-bottom-nav")) {
-        reactNavs[i].style.display = "none";
-      }
-    }
-  }
-
-  function initCustomNav() {
-    if (_ltNavStarted) return;
-    _ltNavStarted = true;
-    _hideReactNav();
-    ensureCustomNav();
-    _updateNavHighlight();
-    /* Watch for React re-renders that recreate the old nav */
-    var obs = new MutationObserver(function () {
-      _hideReactNav();
-      ensureCustomNav();
-      _updateNavHighlight();
-      _ensureContentPadding();
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
-  }
-
   /* ── Storage keys ──────────────────────────────────────────────────────── */
   var BUDGET_KEY    = "lt_budget_tracker_v1";
   var EMI_KEY       = "lt_emi_history_v1";
@@ -823,7 +582,6 @@
     if (lp) lp.style.display = (!onTimerPage || _activeSubTab === "activity") ? "none" : "";
     var glance = document.getElementById("lt-glance-section");
     if (glance) glance.style.display = (!onTimerPage || _activeSubTab === "activity") ? "none" : "";
-    if (typeof _updateNavHighlight === "function") _updateNavHighlight();
     var quote = document.getElementById("lt-quote-section");
     /* Remove the decorative flower/quote card from the Timer page. */
     if (quote) quote.remove();
@@ -987,8 +745,44 @@
   }
 
   function ensureActivityNavTab() {
-    /* No-op: the custom bottom nav (#lt-custom-nav) handles Activity as a
-       native tab. We no longer inject into the React-rendered nav. */
+    var nav = document.querySelector("nav.flex.items-stretch") || document.querySelector("nav");
+    if (!nav) return;
+    var btn = document.getElementById("lt-activity-navtab");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.id = "lt-activity-navtab";
+      btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l2.5 2.5L16 9"></path></svg><span>Activity</span>';
+      btn.addEventListener("click", function () {
+        if (location.pathname !== "/") {
+          var timerLink = nav.querySelector('a[href="/"]');
+          if (timerLink) timerLink.click();
+        }
+        _activeSubTab = "activity";
+        applySubTabVisibility();
+        syncNavTabStyles();
+        upsertRunningBanner();
+        setTimeout(function () { applySubTabVisibility(); syncNavTabStyles(); upsertRunningBanner(); }, 60);
+        setTimeout(function () { applySubTabVisibility(); syncNavTabStyles(); upsertRunningBanner(); }, 250);
+      });
+      Array.prototype.slice.call(nav.querySelectorAll("a")).forEach(function (a) {
+        a.addEventListener("click", function () {
+          _activeSubTab = "timer";
+          applySubTabVisibility();
+          syncNavTabStyles();
+          upsertRunningBanner();
+          setTimeout(upsertRunningBanner, 60);
+          setTimeout(upsertRunningBanner, 250);
+        });
+      });
+    }
+    var timerLink = nav.querySelector('a[href="/"]');
+    var desiredNext = timerLink ? timerLink.nextSibling : nav.firstChild;
+    if (btn.previousSibling !== timerLink || desiredNext !== btn) {
+      if (timerLink) nav.insertBefore(btn, timerLink.nextSibling);
+      else nav.insertBefore(btn, nav.firstChild);
+    }
+    btn.style.display = "";
     syncNavTabStyles();
   }
 
@@ -2094,11 +1888,7 @@
       ".lt-navtab-active{position:relative}",
       ".lt-navtab-active::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:16px;height:3px;border-radius:3px;background:hsl(var(--primary))}",
       "#lt-activity-navtab.lt-navtab-active-custom{color:hsl(var(--primary))}",
-      "div.fixed.bottom-0.left-0.right-0.z-50{display:none!important}",
-      "main[data-lt-transition]>*{visibility:hidden!important}",
-      "[data-lt-transition-hidden]{display:none!important}",
-      "#lt-custom-nav{pointer-events:auto!important}",
-      "#lt-custom-nav button{-webkit-tap-highlight-color:transparent!important}",
+      "div.fixed.bottom-0.left-0.right-0.z-50{background:#fff!important;isolation:isolate;pointer-events:auto!important}",
       /* Dims the real Timer tab ONLY while the pseudo Activity tab is the
          active one — scoped strictly to the data attribute so it can never
          linger or fight with React's own route-based styling of that link. */
@@ -8711,7 +8501,6 @@
     safeRun(buildLifeProgressCard);
     safeRun(buildEatTheFrogCard);
     safeRun(restyleTopNav);
-    safeRun(initCustomNav);
     safeRun(injectCurrencyChipsIntoOverlays);
     safeRun(replaceRupeeGlobally);
     safeRun(normalizeMinuteUnits);
@@ -8747,7 +8536,6 @@
     _enhanceScheduled = false;
     _lastEnhanceRun = Date.now();
     if (!activeOverlay) runEnhancements();
-    if (_transitionActive) endTransition();
   }
 
   /* ── Nav-transition mask ──────────────────────────────────────────────────
@@ -8826,26 +8614,18 @@
     document.addEventListener("click", function (e) {
       if (activeOverlay) {
         if (e.target.closest && e.target.closest("#lt-overlay-root")) return;
-        var navBtn = e.target.closest("nav button, nav a, [data-lt-bottom-nav] button, [data-lt-bottom-nav] a");
+        var navBtn = e.target.closest("nav button, nav a");
         if (navBtn) closeOverlay();
       }
-      /* Any tap on the bottom nav is a likely tab switch — even if we're
-         not inside our own overlay right now. Schedule an immediate,
-         throttle-bypassing cleanup pass shortly after so it lands once
-         React has actually swapped the route content in, instead of
-         racing it. But only mask/re-run if the tap is actually GOING
-         somewhere new — re-tapping the tab you're already on shouldn't
-         mask anything; that's what made it look like the page reloads
-         in place when tapping the current tab. */
-      var navTap = e.target.closest("nav button, nav a, [data-lt-bottom-nav] button, [data-lt-bottom-nav] a");
-      if (navTap && !_ltNavNavigating) {
+      /* Any tap on the bottom nav is a likely tab switch. Schedule an
+         immediate cleanup pass so enhancements rebuild quickly. */
+      var navTap = e.target.closest("nav button, nav a");
+      if (navTap) {
         var isActivityTabTap = navTap.id === "lt-activity-navtab";
-        var targetHref = navTap.getAttribute && (navTap.getAttribute("href") || navTap.getAttribute("data-lt-nav-href"));
+        var targetHref = navTap.getAttribute && navTap.getAttribute("href");
         var isSameTab = isActivityTabTap
           ? _activeSubTab === "activity"
-          : (targetHref != null && targetHref !== "/activity" && targetHref === location.pathname && _activeSubTab !== "activity") ||
-            (targetHref === "/activity" && _activeSubTab === "activity" && location.pathname === "/") ||
-            (targetHref === "/" && location.pathname === "/" && _activeSubTab !== "activity");
+          : (targetHref != null && targetHref === location.pathname && _activeSubTab !== "activity");
         if (!isSameTab) {
           setTimeout(function () { runEnhancementsImmediate(); }, 150);
         }
