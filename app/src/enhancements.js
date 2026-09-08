@@ -578,26 +578,36 @@
 
   function applySubTabVisibility() {
     var onTimerPage = location.pathname === "/";
+    var isActivity = _activeSubTab === "activity" && onTimerPage;
+    var showTimerStuff = onTimerPage && !isActivity;
     var lp = document.getElementById("lt-life-progress");
-    if (lp) lp.style.display = (!onTimerPage || _activeSubTab === "activity") ? "none" : "";
+    if (lp) lp.style.display = showTimerStuff ? "" : "none";
     var glance = document.getElementById("lt-glance-section");
-    if (glance) glance.style.display = (!onTimerPage || _activeSubTab === "activity") ? "none" : "";
+    if (glance) glance.style.display = showTimerStuff ? "" : "none";
+    var frog = document.getElementById("lt-frog-card");
+    if (frog) frog.style.display = showTimerStuff ? "" : "none";
+    /* Hide retirement countdown + time value when on Activity sub-tab */
+    var retirement = document.querySelector("[data-lt-enhancement='retirement']");
+    if (retirement) retirement.style.display = showTimerStuff ? "" : "none";
+    var tvCard = document.querySelector("[data-lt-enhancement='saved-value']");
+    if (tvCard) tvCard.style.display = showTimerStuff ? "" : "none";
     var quote = document.getElementById("lt-quote-section");
-    /* Remove the decorative flower/quote card from the Timer page. */
     if (quote) quote.remove();
     var achTimer = document.getElementById("lt-timer-achievements");
     if (achTimer) achTimer.remove();
     var act = findActivityElements();
     if (act) {
-      var show = (_activeSubTab === "activity" && onTimerPage) ? "" : "none";
+      var show = isActivity ? "" : "none";
       if (act.addRow) act.addRow.style.display = show;
       if (act.list) act.list.style.display = show;
     }
-    if (_activeSubTab === "activity" && onTimerPage) {
+    if (isActivity) {
       buildActivityStatsHeader();
     } else {
       var header = document.getElementById("lt-activity-header");
       if (header) header.style.display = "none";
+      var limitBadge = document.getElementById("lt-activity-limit");
+      if (limitBadge) limitBadge.style.display = "none";
     }
     lockTimerPageScroll();
   }
