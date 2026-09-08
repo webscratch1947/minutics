@@ -1944,6 +1944,19 @@
       ".lt-hub-empty{text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px;grid-column:1/-1}",
       ".lt-hub-grid-2col{transition:opacity .3s ease}",
       ".lt-hub-grid-2col.lt-hub-ready{opacity:1}",
+      /* ── PERMANENTLY HIDE all native React-compiled page content.
+         Each screen component adds data-source-file="screens/X.js" on its
+         outermost div. Our enhancements replace ALL of this content, so
+         the native compiled UI should NEVER be visible — it only causes
+         ugly flash-of-raw-content on route/tab switches.
+
+         Home.js: first 2 children = LTTimerPanel + LTDailyValueBar (hide),
+         3rd child+ = activity list (KEEP — visible on Activity sub-tab).
+         LifeHub.js: entire container replaced by our tile system (hide all).
+         Journal.js: no enhancement replacement, leave visible. ── */
+      'div[data-source-file="screens/Home.js"]>:nth-child(1){display:none!important}',
+      'div[data-source-file="screens/Home.js"]>:nth-child(2){display:none!important}',
+      'div[data-source-file="screens/LifeHub.js"]{display:none!important}',
       /* Hide native Screen Time tile — class applied by fast interval below */
       ".lt-hide-native-st{display:none!important}",
       "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
