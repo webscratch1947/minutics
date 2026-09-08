@@ -1889,6 +1889,7 @@
       ".lt-navtab-active::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:16px;height:3px;border-radius:3px;background:hsl(var(--primary))}",
       "#lt-activity-navtab.lt-navtab-active-custom{color:hsl(var(--primary))}",
       "div.fixed.bottom-0.left-0.right-0.z-50{background:#fff!important;isolation:isolate;pointer-events:auto!important}",
+      "main[data-lt-nav-hidden]{opacity:0!important;transition:none!important}",
       /* Dims the real Timer tab ONLY while the pseudo Activity tab is the
          active one — scoped strictly to the data attribute so it can never
          linger or fight with React's own route-based styling of that link. */
@@ -8505,6 +8506,13 @@
     safeRun(replaceRupeeGlobally);
     safeRun(normalizeMinuteUnits);
     safeRun(lockTimerPageScroll);
+    /* Safety: always restore main visibility after enhancements run */
+    var mainEl = document.querySelector("main");
+    if (mainEl && mainEl.hasAttribute("data-lt-nav-hidden")) {
+      mainEl.removeAttribute("data-lt-nav-hidden");
+      mainEl.style.transition = "opacity .12s ease";
+      mainEl.style.opacity = "1";
+    }
   }
 
   /* Runs the full enhancement pass, but throttled + de-duplicated so a burst
@@ -8617,17 +8625,34 @@
         var navBtn = e.target.closest("nav button, nav a");
         if (navBtn) closeOverlay();
       }
-      /* Any tap on the bottom nav is a likely tab switch. Schedule an
-         immediate cleanup pass so enhancements rebuild quickly. */
+      /* Any tap on the bottom nav is a likely tab switch. INSTANTLY hide
+         the entire main content area so the user never sees old-page
+         content flash during React's route swap. React will replace
+         <main>'s children, then our enhancements rebuild for the new
+         page, then we restore visibility. */
       var navTap = e.target.closest("nav button, nav a");
       if (navTap) {
+        var main = document.querySelector("main");
+        if (main) {
+          main.style.transition = "none";
+          main.style.opacity = "0";
+          main.setAttribute("data-lt-nav-hidden", "1");
+        }
         var isActivityTabTap = navTap.id === "lt-activity-navtab";
         var targetHref = navTap.getAttribute && navTap.getAttribute("href");
         var isSameTab = isActivityTabTap
           ? _activeSubTab === "activity"
           : (targetHref != null && targetHref === location.pathname && _activeSubTab !== "activity");
         if (!isSameTab) {
-          setTimeout(function () { runEnhancementsImmediate(); }, 150);
+          setTimeout(function () {
+            runEnhancementsImmediate();
+            var m = document.querySelector("main");
+            if (m && m.hasAttribute("data-lt-nav-hidden")) {
+              m.removeAttribute("data-lt-nav-hidden");
+              m.style.transition = "opacity .12s ease";
+              m.style.opacity = "1";
+            }
+          }, 100);
         }
       }
     }, true);
