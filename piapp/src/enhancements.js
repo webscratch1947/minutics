@@ -8665,11 +8665,12 @@
           } else {
             _activeSubTab = "timer";
           }
-          showNavMaskWithTimeout(250);
+          showNavMask();
           runEnhancementsImmediate();
           applySubTabVisibility();
           syncNavTabStyles();
           upsertRunningBanner();
+          hideNavMask();
           return;
         }
         /* Real route switch: hide all injected elements, show nav mask to
