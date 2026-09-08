@@ -1944,19 +1944,19 @@
       ".lt-hub-empty{text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px;grid-column:1/-1}",
       ".lt-hub-grid-2col{transition:opacity .3s ease}",
       ".lt-hub-grid-2col.lt-hub-ready{opacity:1}",
-      /* ── PERMANENTLY HIDE all native React-compiled page content.
+      /* ── PERMANENTLY HIDE native React-compiled page content.
          Each screen component adds data-source-file="screens/X.js" on its
-         outermost div. Our enhancements replace ALL of this content, so
-         the native compiled UI should NEVER be visible — it only causes
-         ugly flash-of-raw-content on route/tab switches.
+         outermost div. Our enhancements replace this content.
 
          Home.js: first 2 children = LTTimerPanel + LTDailyValueBar (hide),
          3rd child+ = activity list (KEEP — visible on Activity sub-tab).
-         LifeHub.js: entire container replaced by our tile system (hide all).
+         LifeHub.js: hide the h1 title and the 2 native tile children inside
+         the grid, but NOT the grid itself or our injected tiles.
          Journal.js: no enhancement replacement, leave visible. ── */
       'div[data-source-file="screens/Home.js"]>:nth-child(1){display:none!important}',
       'div[data-source-file="screens/Home.js"]>:nth-child(2){display:none!important}',
-      'div[data-source-file="screens/LifeHub.js"]{display:none!important}',
+      'div[data-source-file="screens/LifeHub.js"]>h1{display:none!important}',
+      'div[data-source-file="screens/LifeHub.js"]>div>div:not([data-lt-tile-injected]):not(.lt-hub-search-wrap):not(.lt-hub-filter-row){display:none!important}',
       /* Hide native Screen Time tile — class applied by fast interval below */
       ".lt-hide-native-st{display:none!important}",
       "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
@@ -8668,13 +8668,21 @@
           upsertRunningBanner();
           return;
         }
-        /* Real route switch: remove injected elements to prevent flash */
+        /* Real route switch: hide all injected elements, show nav mask to
+           cover the flash of native React content, then re-inject after
+           React has finished rendering. Also detect if the user is
+           navigating TO the Activity tab from another route (Life Hub,
+           Journal, Settings) — in that case, set _activeSubTab = "activity"
+           so the Activity sub-tab is shown immediately when enhancements
+           re-inject, instead of briefly showing Timer content first. */
+        var goingToActivity = isActivityTabTap || (targetHref === "/" && _activeSubTab === "activity");
         var injected = document.querySelectorAll("[data-lt-enhancement],[data-lt-tile-injected]");
         for (var i = 0; i < injected.length; i++) {
           injected[i].remove();
         }
-        _activeSubTab = "timer";
-        setTimeout(function () { runEnhancementsImmediate(); }, 100);
+        _activeSubTab = goingToActivity ? "activity" : "timer";
+        showNavMaskWithTimeout(800);
+        setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 80);
       }
     }, true);
   }
