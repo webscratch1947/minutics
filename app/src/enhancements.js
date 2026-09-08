@@ -124,10 +124,35 @@
     _updateNavHighlight();
   }
 
+  /* ── Content-area transition mask ──────────────────────────────────────
+     Covers everything except the bottom nav during tab switches so
+     old-page content never flashes through while React is swapping
+     routes and our enhancements are rebuilding. Appended to document.body
+     so it survives React's DOM replacements of <main>. */
+  var _contentMaskEl = null;
+  function showContentMask() {
+    if (_contentMaskEl) return;
+    var bg = "";
+    try { bg = getComputedStyle(document.body).backgroundColor; } catch (e) {}
+    _contentMaskEl = document.createElement("div");
+    _contentMaskEl.id = "lt-content-mask";
+    _contentMaskEl.style.cssText =
+      "position:fixed;top:0;left:0;right:0;bottom:60px;z-index:2147483000;" +
+      "background:" + (bg && bg !== "rgba(0, 0, 0, 0)" ? bg : "#ffffff") + ";" +
+      "pointer-events:none;";
+    document.body.appendChild(_contentMaskEl);
+  }
+  function hideContentMask() {
+    if (!_contentMaskEl) return;
+    if (_contentMaskEl.parentNode) _contentMaskEl.parentNode.removeChild(_contentMaskEl);
+    _contentMaskEl = null;
+  }
+
   function _ltNavNavigate(href) {
     /* For Activity, it's a sub-tab on the Timer page */
     if (href === "/activity") {
       if (location.pathname === "/" && _activeSubTab === "activity") return;
+      showContentMask();
       if (location.pathname !== "/") {
         _navClickReactLink("/");
       }
@@ -137,18 +162,23 @@
         syncNavTabStyles();
         _updateNavHighlight();
         upsertRunningBanner();
+        hideContentMask();
       }, 60);
+      setTimeout(hideContentMask, 300);
       return;
     }
     /* Don't re-navigate if already on this tab */
     if (location.pathname === href && _activeSubTab !== "activity") return;
+    showContentMask();
     /* Find the React link and click it for SPA navigation */
     _activeSubTab = "timer";
     _navClickReactLink(href);
     setTimeout(function () {
       applySubTabVisibility();
       _updateNavHighlight();
+      hideContentMask();
     }, 60);
+    setTimeout(hideContentMask, 300);
   }
 
   function _navClickReactLink(href) {
