@@ -2187,6 +2187,16 @@
       ".lt-clockpicker-actions{display:flex;justify-content:flex-end;gap:14px}",
       ".lt-clockpicker-actions button{background:none;border:none;color:#0369A1;font-size:13.5px;font-weight:800;cursor:pointer;padding:8px 6px;font-family:inherit;-webkit-tap-highlight-color:transparent}",
       ".lt-clockpicker-actions button.lt-cancel{color:hsl(var(--muted-foreground))}",
+      /* Hide timer-only enhanced elements on non-timer pages via CSS.
+         data-lt-route is set by the route switch handler BEFORE React
+         processes the navigation, so this kicks in instantly with no
+         timing gap. On initial load (no attribute) everything is visible. */
+      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-life-progress," +
+      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-glance-section," +
+      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-frog-card," +
+      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) [data-lt-enhancement='retirement']," +
+      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) [data-lt-enhancement='saved-value']" +
+      "{display:none!important}",
     ].join("");
     document.head.appendChild(s);
   }
@@ -8621,13 +8631,47 @@
         }
         /* Real route switch: hide enhanced elements, let React re-render
            naturally, then re-show/rebuild enhancements after paint.
-           Removing elements caused a visible flash — the user saw native
-           content for 80ms before rebuild. Instead, just hide via
-           applySubTabVisibility() and let the next enhancement pass
-           handle anything React may have removed. */
+           IMPORTANT: We cannot use applySubTabVisibility() here because
+           location.pathname hasn't changed yet at click time (React Router
+           processes asynchronously). Instead, determine visibility from the
+           target href directly. */
+        var goingToTimer = targetHref === "/";
         var goingToActivity = isActivityTabTap || (targetHref === "/" && _activeSubTab === "activity");
         _activeSubTab = goingToActivity ? "activity" : "timer";
-        applySubTabVisibility();
+        /* Set body attribute so CSS can also hide timer elements instantly */
+        document.body.setAttribute("data-lt-route", goingToTimer ? "timer" : targetHref);
+        /* Hide timer elements if navigating away from Timer */
+        if (!goingToTimer) {
+          var hIds = ["lt-life-progress","lt-glance-section","lt-frog-card"];
+          for (var hi = 0; hi < hIds.length; hi++) {
+            var hel = document.getElementById(hIds[hi]);
+            if (hel) hel.style.display = "none";
+          }
+          var hRet = document.querySelector("[data-lt-enhancement='retirement']");
+          if (hRet) hRet.style.display = "none";
+          var hTv = document.querySelector("[data-lt-enhancement='saved-value']");
+          if (hTv) hTv.style.display = "none";
+          var hAct = findActivityElements();
+          if (hAct) {
+            if (hAct.addRow) hAct.addRow.style.display = "none";
+            if (hAct.list) hAct.list.style.display = "none";
+          }
+          var hHeader = document.getElementById("lt-activity-header");
+          if (hHeader) hHeader.style.display = "none";
+          var hLimit = document.getElementById("lt-activity-limit");
+          if (hLimit) hLimit.style.display = "none";
+        } else {
+          /* Navigating TO Timer — ensure timer elements are visible */
+          var sIds = ["lt-life-progress","lt-glance-section","lt-frog-card"];
+          for (var si = 0; si < sIds.length; si++) {
+            var sel = document.getElementById(sIds[si]);
+            if (sel) sel.style.display = "";
+          }
+          var sRet = document.querySelector("[data-lt-enhancement='retirement']");
+          if (sRet) sRet.style.display = "";
+          var sTv = document.querySelector("[data-lt-enhancement='saved-value']");
+          if (sTv) sTv.style.display = "";
+        }
         requestAnimationFrame(function () {
           runEnhancementsImmediate();
         });
@@ -8733,6 +8777,8 @@
   setInterval(maybeShowOverlayPermissionModal, 2000);
 
   document.addEventListener("DOMContentLoaded", function () {
+    /* Set initial route attribute so CSS visibility rules work from the start */
+    document.body.setAttribute("data-lt-route", location.pathname === "/" ? "timer" : location.pathname);
     installOverlayNavGuard();
     killHighlighting();
     runEnhancements();
