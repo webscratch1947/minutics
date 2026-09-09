@@ -1032,6 +1032,7 @@
     if (!existing) {
       existing = document.createElement("div");
       existing.id = "lt-glance-section";
+      existing.setAttribute("data-lt-enhancement", "1");
       existing.style.cssText = "margin:12px 16px 0;box-sizing:border-box";
       lp.parentNode.insertBefore(existing, lp.nextSibling);
     }
@@ -1274,7 +1275,7 @@
       "#lt-frog-card .lt-frog-check{width:22px;height:22px;flex-shrink:0;border-radius:50%;border:2px solid hsl(var(--border));background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;-webkit-tap-highlight-color:transparent}",
       "#lt-frog-card .lt-frog-check.lt-frog-done{background:#16A34A;border-color:#16A34A}",
       "#lt-frog-card .lt-frog-check.lt-frog-check-empty{opacity:.35;cursor:default}",
-      "#lt-frog-card .lt-frog-input{flex:1;border:none;background:transparent;font-size:14px;color:hsl(var(--foreground));outline:none;min-width:0}",
+      "#lt-frog-card .lt-frog-input{flex:1;border:1px solid hsl(var(--border));background:hsl(var(--muted)/0.3);font-size:14px;color:hsl(var(--foreground));outline:none;min-width:0;border-radius:8px;padding:6px 10px}",
       "#lt-frog-card .lt-frog-input.lt-frog-done-text{text-decoration:line-through;opacity:.5}",
       "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}",
       "#lt-frog-card .lt-frog-unstar{background:none;border:none;color:#f5a623;cursor:pointer;padding:4px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
@@ -8640,6 +8641,7 @@
           injected[i].remove();
         }
         _activeSubTab = goingToActivity ? "activity" : "timer";
+        applySubTabVisibility();
         setTimeout(function () { runEnhancementsImmediate(); }, 80);
       }
     }, true);

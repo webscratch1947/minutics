@@ -1032,6 +1032,7 @@
     if (!existing) {
       existing = document.createElement("div");
       existing.id = "lt-glance-section";
+      existing.setAttribute("data-lt-enhancement", "1");
       existing.style.cssText = "margin:12px 16px 0;box-sizing:border-box";
       lp.parentNode.insertBefore(existing, lp.nextSibling);
     }
@@ -1274,7 +1275,7 @@
       "#lt-frog-card .lt-frog-check{width:22px;height:22px;flex-shrink:0;border-radius:50%;border:2px solid hsl(var(--border));background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;-webkit-tap-highlight-color:transparent}",
       "#lt-frog-card .lt-frog-check.lt-frog-done{background:#16A34A;border-color:#16A34A}",
       "#lt-frog-card .lt-frog-check.lt-frog-check-empty{opacity:.35;cursor:default}",
-      "#lt-frog-card .lt-frog-input{flex:1;border:none;background:transparent;font-size:14px;color:hsl(var(--foreground));outline:none;min-width:0}",
+      "#lt-frog-card .lt-frog-input{flex:1;border:1px solid hsl(var(--border));background:hsl(var(--muted)/0.3);font-size:14px;color:hsl(var(--foreground));outline:none;min-width:0;border-radius:8px;padding:6px 10px}",
       "#lt-frog-card .lt-frog-input.lt-frog-done-text{text-decoration:line-through;opacity:.5}",
       "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}",
       "#lt-frog-card .lt-frog-unstar{background:none;border:none;color:#f5a623;cursor:pointer;padding:4px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
@@ -1910,19 +1911,7 @@
       ".lt-hub-empty{text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px;grid-column:1/-1}",
       ".lt-hub-grid-2col{transition:opacity .3s ease}",
       ".lt-hub-grid-2col.lt-hub-ready{opacity:1}",
-      /* ── PERMANENTLY HIDE native React-compiled page content.
-         Each screen component adds data-source-file="screens/X.js" on its
-         outermost div. Our enhancements replace this content.
-
-         Home.js: LTTimerPanel and LTDailyValueBar removed from React;
-         activity list remains (visible on Activity sub-tab).
-         LifeHub.js: hide the h1 title and the 2 native tile children inside
-         the grid, but NOT the grid itself or our injected tiles.
-         Journal.js: no enhancement replacement, leave visible. ── */
-      'div[data-source-file="screens/LifeHub.js"]>h1{display:none!important}',
-      'div[data-source-file="screens/LifeHub.js"]>div[style*="grid"]>div:not([data-lt-tile-injected]){display:none!important}',
-      /* Hide native Screen Time tile — class applied by fast interval below */
-      ".lt-hide-native-st{display:none!important}",
+      /* LifeHub tiles and search are now built in React — no CSS hacks needed. */
       "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
       "@keyframes lt-lh-bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(5px)}}",
       /* Activity's page (full design: title + date, 4 stat cards, section label) */
@@ -8467,6 +8456,11 @@
   }
 
   function runEnhancements() {
+    var p = location.pathname;
+    var onHome = p === "/";
+    var onLifeHub = p === "/life-hub";
+    var onJournal = p === "/journal";
+    /* One-time setup — always run */
     safeRun(migrateOldProPlan);
     safeRun(checkPlanExpiry);
     safeRun(addStyle);
@@ -8474,24 +8468,28 @@
     safeRun(addStyle3);
     safeRun(seedDefaultActivities);
     safeRun(enforceActivityGraceIfNeeded);
-    safeRun(updateActivityLimitBadge);
-    safeRun(normalizeOriginalLabels);
-    safeRun(hijackDateInputs);
-    safeRun(ensureActivityActionDescriptions);
-    safeRun(updateSavedTimeValueCard);
-    safeRun(mountLifeHubTools);
-    safeRun(pollRunningTimer);
-    safeRun(injectJournalFullView);
-    safeRun(upsertRunningBanner);
-    safeRun(checkIdleNudge);
-    safeRun(updateStreak);
-    safeRun(buildLifeProgressCard);
-    safeRun(buildEatTheFrogCard);
-    safeRun(restyleTopNav);
-    safeRun(injectCurrencyChipsIntoOverlays);
-    safeRun(replaceRupeeGlobally);
     safeRun(normalizeMinuteUnits);
-    safeRun(lockTimerPageScroll);
+    /* Timer / Activity page */
+    if (onHome) {
+      safeRun(updateActivityLimitBadge);
+      safeRun(normalizeOriginalLabels);
+      safeRun(hijackDateInputs);
+      safeRun(ensureActivityActionDescriptions);
+      safeRun(updateSavedTimeValueCard);
+      safeRun(pollRunningTimer);
+      safeRun(upsertRunningBanner);
+      safeRun(checkIdleNudge);
+      safeRun(updateStreak);
+      safeRun(buildLifeProgressCard);
+      safeRun(buildEatTheFrogCard);
+      safeRun(restyleTopNav);
+      safeRun(replaceRupeeGlobally);
+      safeRun(lockTimerPageScroll);
+    }
+    /* Journal page */
+    if (onJournal) {
+      safeRun(injectJournalFullView);
+    }
   }
 
   /* Runs the full enhancement pass, but throttled + de-duplicated so a burst
@@ -8618,11 +8616,8 @@
           return;
         }
         /* Timer ↔ Activity is same route (/), just toggle visibility.
-           Show a brief nav mask so the user sees a clean transition
-           (like switching between other tabs) instead of elements jumping.
-           The mask is created FIRST so the browser paints it in the same
-           frame as the visibility toggle — the user only sees the mask,
-           never the raw element jump. */
+           No mask — toggle display properties instantly. Only run the
+           subset of enhancements needed for each sub-tab. */
         var isTimerActivitySwitch = (targetHref === "/" || isActivityTabTap) && location.pathname === "/";
         if (isTimerActivitySwitch) {
           e.preventDefault();
@@ -8632,12 +8627,9 @@
           } else {
             _activeSubTab = "timer";
           }
-          showNavMask();
-          runEnhancementsImmediate();
           applySubTabVisibility();
           syncNavTabStyles();
           upsertRunningBanner();
-          hideNavMask();
           return;
         }
         /* Real route switch: remove injected elements, let React re-render
@@ -8649,6 +8641,7 @@
           injected[i].remove();
         }
         _activeSubTab = goingToActivity ? "activity" : "timer";
+        applySubTabVisibility();
         setTimeout(function () { runEnhancementsImmediate(); }, 80);
       }
     }, true);
@@ -8768,25 +8761,29 @@
        scheduled at a time, and runs are throttled to at most one per 500ms
        (nav taps bypass this throttle via runEnhancementsImmediate above,
        so a fast tab switch still gets instant cleanup). */
+    /* ── MutationObserver + polling ───────────────────────────────────────
+       The observer watches for React re-renders and re-applies enhancements.
+       normalizeMinuteUnits() is expensive (walks every text node in the DOM)
+       so it's only called inside the throttled scheduleEnhance path, NOT
+       directly in the observer callback. Fast poll covers cold-start where
+       React paints in stages; slow poll is a safety net for edge cases. */
     var observer = new MutationObserver(function (mutations) {
       if (activeOverlay) return;
-      normalizeMinuteUnits();
       var relevant = mutations.some(function (m) {
         return !m.target.closest || !m.target.closest("[data-lt-enhancement],[data-lt-tile-injected]");
       });
       if (relevant) scheduleEnhance();
     });
     observer.observe(document.body, { childList:true, subtree:true, characterData:true });
-    /* Fast-poll for the first 9 seconds after cold start (well past the
-       splash MAX_MS of 7s) so the zoom is always applied once the DOM is
-       fully painted — not just during early partial renders. */
+    /* Fast-poll for the first 3 seconds after cold start (covers splash
+       + initial paint) — reduced from 9s/100ms to 3s/200ms to cut CPU. */
     var fastPolls = 0;
     var fastTimer = setInterval(function () {
       fastPolls++;
       if (!activeOverlay) runEnhancements();
-      if (fastPolls >= 90) clearInterval(fastTimer); /* ~9s at 100ms */
-    }, 100);
-    setInterval(function () { if (!activeOverlay) runEnhancements(); }, 1500);
+      if (fastPolls >= 15) clearInterval(fastTimer); /* ~3s at 200ms */
+    }, 200);
+    setInterval(function () { if (!activeOverlay) runEnhancements(); }, 3000);
 
     /* Also re-apply zoom whenever the viewport resizes (rotation, etc.) */
     window.addEventListener("resize", function () {
