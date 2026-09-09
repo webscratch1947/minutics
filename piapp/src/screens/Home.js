@@ -15,46 +15,15 @@ import {
   c,
   fh,
   jC,
-  jy,
   kC,
-  la,
   lk,
   nk,
-  pk,
   rh,
   rk,
   tk,
   w,
   zh
 } from "../shared.js";
-
-function LTTimerPanel({
-  profile: e
-}) {
-  const [open, setOpen] = w.useState(!1);
-  return c.jsxs("div", {
-    className: "relative",
-    children: [c.jsx("button", {
-      type: "button",
-      onClick: () => setOpen(!open),
-      className: "w-full h-8 flex items-center justify-center bg-primary text-white transition-colors pointer-events-auto",
-      title: open ? "Hide timer" : "Show timer",
-      "aria-label": open ? "Hide timer" : "Show timer",
-      children: c.jsx("span", {
-        className: "text-xs",
-        children: open ? "▲" : "▼"
-      })
-    }), c.jsx("div", {
-      className: "overflow-hidden transition-all duration-300 ease-in-out",
-      style: {
-        maxHeight: open ? "320px" : "0px"
-      },
-      children: c.jsx(MC, {
-        profile: e
-      })
-    })]
-  })
-}
 
 export function HomeScreen({
   profile: e
@@ -131,9 +100,7 @@ export function HomeScreen({
   return c.jsxs("div", {
     "data-source-file": "screens/Home.js",
     className: "flex flex-col",
-    children: [c.jsx(LTTimerPanel, {
-      profile: e
-    }), c.jsx(LTDailyValueBar, {}), c.jsxs("div", {
+    children: [c.jsxs("div", {
       className: "flex flex-col divide-y divide-border",
       children: [n.length === 0 && c.jsxs("div", {
         className: "flex flex-col items-center justify-center py-20 px-8 text-center bg-background",
@@ -240,76 +207,6 @@ export function HomeScreen({
           }
         })
       }
-    })]
-  })
-}
-
-function MC({
-  profile: e
-}) {
-  const [t, n] = w.useState(() => la(e)), r = jy(e);
-  w.useEffect(() => {
-    n(la(e));
-    const s = setInterval(() => n(la(e)), 1e3);
-    return () => clearInterval(s)
-  }, [e]);
-  const o = pk(t);
-  return c.jsxs("div", {
-    className: "bg-primary text-white px-5 pt-8 pb-6",
-    children: [c.jsxs("p", {
-      className: "text-xs font-semibold text-white/40 uppercase tracking-widest mb-5",
-      children: [e.name, "'s Remaining Retirement Time"]
-    }), c.jsxs("div", {
-      className: "grid grid-cols-5 gap-2 mb-5",
-      children: [c.jsx(jo, {
-        value: o.years,
-        label: "years"
-      }), c.jsx(jo, {
-        value: o.days,
-        label: "days"
-      }), c.jsx(jo, {
-        value: o.hours,
-        label: "hours"
-      }), c.jsx(jo, {
-        value: o.minutes,
-        label: "min"
-      }), c.jsx(jo, {
-        value: o.seconds,
-        label: "sec",
-        accent: !0
-      })]
-    }), c.jsx("div", {
-      className: "h-1 w-full bg-white/10 overflow-hidden mb-2",
-      children: c.jsx("div", {
-        className: "h-full bg-accent",
-        style: {
-          width: `${r}%`
-        }
-      })
-    }), c.jsxs("div", {
-      className: "flex justify-between text-[11px] text-white/35 font-medium",
-      children: [c.jsxs("span", {
-        children: [r.toFixed(1), "% lived"]
-      }), c.jsxs("span", {
-        children: [o.totalMinutes.toLocaleString(), " min left"]
-      })]
-    })]
-  })
-}
-
-function jo({
-  value: e,
-  label: t,
-  accent: n
-}) {
-  return c.jsxs("div", {
-    className: "flex flex-col items-center bg-white/8 py-3 gap-0.5",
-    children: [c.jsx("span", {
-      className: Pe("font-black tabular-nums leading-none", n ? "text-accent text-2xl" : "text-white text-2xl"),
-      children: String(e).padStart(2, "0")
-    }), c.jsx("span", {
-      className: "text-[10px] font-semibold text-white/40 uppercase tracking-wide",
-      children: t
     })]
   })
 }
@@ -713,12 +610,9 @@ function DC({
           children: e.name
         }), c.jsx("button", {
           onClick: openEdit,
-          className: "w-8 h-8 flex items-center justify-center border border-transparent hover:border-primary hover:text-primary text-muted-foreground transition-all shrink-0",
+          className: "h-7 px-2.5 flex items-center justify-center border border-transparent hover:border-primary hover:text-primary text-muted-foreground transition-all shrink-0 text-[11px] font-semibold",
           title: "Edit",
-          children: c.jsx("span", {
-            className: "text-sm",
-            children: "✏️"
-          })
+          children: "Edit"
         })]
       }), c.jsxs("div", {
         className: "flex items-center gap-2 px-4 shrink-0",
@@ -1230,60 +1124,5 @@ function FC(e) {
   return new Date(e).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit"
-  })
-}
-
-function LTDailyValueBar() {
-  const [pv, setPv] = w.useState(() => {
-    try {
-      const r = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
-      return r && r.perMinute ? r.perMinute : 0
-    } catch {
-      return 0
-    }
-  }), [dailyHours, setDailyHours] = w.useState(() => {
-    try {
-      const r = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
-      return r && r.hours ? r.hours : 8
-    } catch {
-      return 8
-    }
-  }), [now, setNow] = w.useState(Date.now());
-  w.useEffect(() => {
-    const iv = setInterval(() => {
-      setNow(Date.now());
-      try {
-        const r = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
-        setPv(r && r.perMinute ? r.perMinute : 0);
-        setDailyHours(r && r.hours ? r.hours : 8)
-      } catch {}
-    }, 1e3);
-    return () => clearInterval(iv)
-  }, []);
-  if (!pv) return null;
-  const dt = new Date(now),
-    startOfDay = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime(),
-    endOfDay = startOfDay + 864e5,
-    minutesLeft = Math.max(0, (endOfDay - now) / 6e4),
-    fracLeft = Math.max(0, Math.min(1, minutesLeft / 1440)),
-    dailyBudget = pv * 60 * dailyHours,
-    valueLeft = dailyBudget * fracLeft;
-  return c.jsxs("div", {
-    className: "bg-primary text-white px-5 py-4",
-    children: [c.jsx("p", {
-      className: "text-xs font-semibold text-white/50 uppercase tracking-widest mb-1",
-      children: "Today's time value left"
-    }), c.jsxs("p", {
-      className: "text-2xl font-black",
-      children: ["₹", valueLeft.toFixed(2)]
-    }), c.jsx("div", {
-      className: "h-1 w-full bg-white/10 overflow-hidden mt-3",
-      children: c.jsx("div", {
-        className: "h-full bg-accent",
-        style: {
-          width: `${fracLeft*100}%`
-        }
-      })
-    })]
   })
 }

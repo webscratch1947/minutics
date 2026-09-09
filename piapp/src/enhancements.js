@@ -20,15 +20,16 @@
     video.src = "assets/lt/minutics_splash.mp4";
     video.autoplay = true;
     video.muted = true; /* MUST be muted for autoplay in Chrome/WebView */
-    video.playsInline = true;
+    /* Set playsinline as HTML attribute (not just property) for real mobile
+       devices — some WebViews ignore the JS property. Also set webkit
+       variant for older iOS. */
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
     video.preload = "auto";
     video.loop = false;
     video.style.cssText = "width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s ease;";
     video.addEventListener("loadeddata", function () {
       video.style.opacity = "1";
-      /* Unmute after first frame loads — gives the user audio while
-         still allowing autoplay to work on all browsers. */
-      try { video.muted = false; video.volume = 1; } catch (e) {}
     });
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
@@ -1913,13 +1914,11 @@
          Each screen component adds data-source-file="screens/X.js" on its
          outermost div. Our enhancements replace this content.
 
-         Home.js: first 2 children = LTTimerPanel + LTDailyValueBar (hide),
-         3rd child+ = activity list (KEEP — visible on Activity sub-tab).
+         Home.js: LTTimerPanel and LTDailyValueBar removed from React;
+         activity list remains (visible on Activity sub-tab).
          LifeHub.js: hide the h1 title and the 2 native tile children inside
          the grid, but NOT the grid itself or our injected tiles.
          Journal.js: no enhancement replacement, leave visible. ── */
-      'div[data-source-file="screens/Home.js"]>:nth-child(1){display:none!important}',
-      'div[data-source-file="screens/Home.js"]>:nth-child(2){display:none!important}',
       'div[data-source-file="screens/LifeHub.js"]>h1{display:none!important}',
       'div[data-source-file="screens/LifeHub.js"]>div[style*="grid"]>div:not([data-lt-tile-injected]){display:none!important}',
       /* Hide native Screen Time tile — class applied by fast interval below */
@@ -8641,18 +8640,16 @@
           hideNavMask();
           return;
         }
-        /* Real route switch: remove injected elements, show mask to cover
-           the gap while React re-renders, then re-inject enhancements and
-           lift the mask immediately — all within the same setTimeout so the
-           browser only paints the final state. */
+        /* Real route switch: remove injected elements, let React re-render
+           naturally (no mask = no white screen), then re-inject enhancements
+           after React has committed. */
         var goingToActivity = isActivityTabTap || (targetHref === "/" && _activeSubTab === "activity");
         var injected = document.querySelectorAll("[data-lt-enhancement],[data-lt-tile-injected]");
         for (var i = 0; i < injected.length; i++) {
           injected[i].remove();
         }
         _activeSubTab = goingToActivity ? "activity" : "timer";
-        showNavMask();
-        setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 80);
+        setTimeout(function () { runEnhancementsImmediate(); }, 80);
       }
     }, true);
   }
