@@ -8467,6 +8467,11 @@
   }
 
   function runEnhancements() {
+    var p = location.pathname;
+    var onHome = p === "/";
+    var onLifeHub = p === "/life-hub";
+    var onJournal = p === "/journal";
+    /* One-time setup — always run */
     safeRun(migrateOldProPlan);
     safeRun(checkPlanExpiry);
     safeRun(addStyle);
@@ -8474,24 +8479,33 @@
     safeRun(addStyle3);
     safeRun(seedDefaultActivities);
     safeRun(enforceActivityGraceIfNeeded);
-    safeRun(updateActivityLimitBadge);
-    safeRun(normalizeOriginalLabels);
-    safeRun(hijackDateInputs);
-    safeRun(ensureActivityActionDescriptions);
-    safeRun(updateSavedTimeValueCard);
-    safeRun(mountLifeHubTools);
-    safeRun(pollRunningTimer);
-    safeRun(injectJournalFullView);
-    safeRun(upsertRunningBanner);
-    safeRun(checkIdleNudge);
-    safeRun(updateStreak);
-    safeRun(buildLifeProgressCard);
-    safeRun(buildEatTheFrogCard);
-    safeRun(restyleTopNav);
-    safeRun(injectCurrencyChipsIntoOverlays);
-    safeRun(replaceRupeeGlobally);
     safeRun(normalizeMinuteUnits);
-    safeRun(lockTimerPageScroll);
+    /* Timer / Activity page */
+    if (onHome) {
+      safeRun(updateActivityLimitBadge);
+      safeRun(normalizeOriginalLabels);
+      safeRun(hijackDateInputs);
+      safeRun(ensureActivityActionDescriptions);
+      safeRun(updateSavedTimeValueCard);
+      safeRun(pollRunningTimer);
+      safeRun(upsertRunningBanner);
+      safeRun(checkIdleNudge);
+      safeRun(updateStreak);
+      safeRun(buildLifeProgressCard);
+      safeRun(buildEatTheFrogCard);
+      safeRun(restyleTopNav);
+      safeRun(injectCurrencyChipsIntoOverlays);
+      safeRun(replaceRupeeGlobally);
+      safeRun(lockTimerPageScroll);
+    }
+    /* Life Hub page */
+    if (onLifeHub) {
+      safeRun(mountLifeHubTools);
+    }
+    /* Journal page */
+    if (onJournal) {
+      safeRun(injectJournalFullView);
+    }
   }
 
   /* Runs the full enhancement pass, but throttled + de-duplicated so a burst
@@ -8618,11 +8632,8 @@
           return;
         }
         /* Timer ↔ Activity is same route (/), just toggle visibility.
-           Show a brief nav mask so the user sees a clean transition
-           (like switching between other tabs) instead of elements jumping.
-           The mask is created FIRST so the browser paints it in the same
-           frame as the visibility toggle — the user only sees the mask,
-           never the raw element jump. */
+           No mask — toggle display properties instantly. Only run the
+           subset of enhancements needed for each sub-tab. */
         var isTimerActivitySwitch = (targetHref === "/" || isActivityTabTap) && location.pathname === "/";
         if (isTimerActivitySwitch) {
           e.preventDefault();
@@ -8632,12 +8643,9 @@
           } else {
             _activeSubTab = "timer";
           }
-          showNavMask();
-          runEnhancementsImmediate();
           applySubTabVisibility();
           syncNavTabStyles();
           upsertRunningBanner();
-          hideNavMask();
           return;
         }
         /* Real route switch: remove injected elements, let React re-render
@@ -8768,25 +8776,29 @@
        scheduled at a time, and runs are throttled to at most one per 500ms
        (nav taps bypass this throttle via runEnhancementsImmediate above,
        so a fast tab switch still gets instant cleanup). */
+    /* ── MutationObserver + polling ───────────────────────────────────────
+       The observer watches for React re-renders and re-applies enhancements.
+       normalizeMinuteUnits() is expensive (walks every text node in the DOM)
+       so it's only called inside the throttled scheduleEnhance path, NOT
+       directly in the observer callback. Fast poll covers cold-start where
+       React paints in stages; slow poll is a safety net for edge cases. */
     var observer = new MutationObserver(function (mutations) {
       if (activeOverlay) return;
-      normalizeMinuteUnits();
       var relevant = mutations.some(function (m) {
         return !m.target.closest || !m.target.closest("[data-lt-enhancement],[data-lt-tile-injected]");
       });
       if (relevant) scheduleEnhance();
     });
     observer.observe(document.body, { childList:true, subtree:true, characterData:true });
-    /* Fast-poll for the first 9 seconds after cold start (well past the
-       splash MAX_MS of 7s) so the zoom is always applied once the DOM is
-       fully painted — not just during early partial renders. */
+    /* Fast-poll for the first 3 seconds after cold start (covers splash
+       + initial paint) — reduced from 9s/100ms to 3s/200ms to cut CPU. */
     var fastPolls = 0;
     var fastTimer = setInterval(function () {
       fastPolls++;
       if (!activeOverlay) runEnhancements();
-      if (fastPolls >= 90) clearInterval(fastTimer); /* ~9s at 100ms */
-    }, 100);
-    setInterval(function () { if (!activeOverlay) runEnhancements(); }, 1500);
+      if (fastPolls >= 15) clearInterval(fastTimer); /* ~3s at 200ms */
+    }, 200);
+    setInterval(function () { if (!activeOverlay) runEnhancements(); }, 3000);
 
     /* Also re-apply zoom whenever the viewport resizes (rotation, etc.) */
     window.addEventListener("resize", function () {
