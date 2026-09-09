@@ -1910,19 +1910,7 @@
       ".lt-hub-empty{text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px;grid-column:1/-1}",
       ".lt-hub-grid-2col{transition:opacity .3s ease}",
       ".lt-hub-grid-2col.lt-hub-ready{opacity:1}",
-      /* ── PERMANENTLY HIDE native React-compiled page content.
-         Each screen component adds data-source-file="screens/X.js" on its
-         outermost div. Our enhancements replace this content.
-
-         Home.js: LTTimerPanel and LTDailyValueBar removed from React;
-         activity list remains (visible on Activity sub-tab).
-         LifeHub.js: hide the h1 title and the 2 native tile children inside
-         the grid, but NOT the grid itself or our injected tiles.
-         Journal.js: no enhancement replacement, leave visible. ── */
-      'div[data-source-file="screens/LifeHub.js"]>h1{display:none!important}',
-      'div[data-source-file="screens/LifeHub.js"]>div[style*="grid"]>div:not([data-lt-tile-injected]){display:none!important}',
-      /* Hide native Screen Time tile — class applied by fast interval below */
-      ".lt-hide-native-st{display:none!important}",
+      /* LifeHub tiles and search are now built in React — no CSS hacks needed. */
       "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
       "@keyframes lt-lh-bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(5px)}}",
       /* Activity's page (full design: title + date, 4 stat cards, section label) */
@@ -8494,13 +8482,8 @@
       safeRun(buildLifeProgressCard);
       safeRun(buildEatTheFrogCard);
       safeRun(restyleTopNav);
-      safeRun(injectCurrencyChipsIntoOverlays);
       safeRun(replaceRupeeGlobally);
       safeRun(lockTimerPageScroll);
-    }
-    /* Life Hub page */
-    if (onLifeHub) {
-      safeRun(mountLifeHubTools);
     }
     /* Journal page */
     if (onJournal) {
