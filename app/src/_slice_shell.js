@@ -47,7 +47,7 @@ const uk = [{
 }];
 
 export function ck() {
-  const [e] = useLocation();
+  const { pathname: e } = useLocation();
   return jsx("div", {
     className: "fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border",
     style: {
