@@ -3,9 +3,17 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-query-devtools": "^5.102.8",
     "@vercel/functions": "^1.0.0",
+    "clsx": "^2.1.1",
     "firebase": "^12.17.0",
     "firebase-admin": "^13.0.0",
+    "lucide-react": "^1.43.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.3",
+    "tailwind-merge": "^3.6.0",
     "three": "^0.185.1"
   },
   "devDependencies": {
