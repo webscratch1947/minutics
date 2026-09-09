@@ -1152,15 +1152,28 @@
     anchor.parentNode.insertBefore(section, anchor.nextSibling);
   }
 
+  /* ── Timer host: a container OUTSIDE React's <main> so React can never
+     destroy our timer-only injections (life-progress, glance, frog) during
+     route changes. Inserted as the first child of <body>, before <main>. */
+  function getOrCreateTimerHost() {
+    var existing = document.getElementById("lt-timer-host");
+    if (existing) return existing;
+    var host = document.createElement("div");
+    host.id = "lt-timer-host";
+    host.style.cssText = "position:relative;z-index:1;";
+    var main = document.querySelector("main");
+    if (main && main.parentNode) {
+      main.parentNode.insertBefore(host, main);
+    } else {
+      document.body.insertBefore(host, document.body.firstChild);
+    }
+    return host;
+  }
+
   function buildLifeProgressCard() {
     if (location.pathname !== "/") {
-      var existing = document.getElementById("lt-life-progress");
-      if (existing) existing.remove();
-      var g = document.getElementById("lt-glance-section");   if (g) g.remove();
-      var q = document.getElementById("lt-quote-section");    if (q) q.remove();
-      /* lt-timer-achievements intentionally removed */
-      /* Activity tab stays visible/positioned on every route now — only
-         its highlighted "active" state resets when you're not on Timer. */
+      /* Instead of removing elements (which kills them for good), just hide
+         them — the CSS body[data-lt-route] rule handles visibility. */
       _activeSubTab = "timer";
       if (_lifeProgressTimer) { clearInterval(_lifeProgressTimer); _lifeProgressTimer = null; }
       ensureActivityNavTab();
@@ -1176,7 +1189,7 @@
     var card = document.getElementById("lt-life-progress");
     if (card) { tickLifeProgressCard(); return; }
 
-    var host = document.querySelector("main") || document.body;
+    var host = getOrCreateTimerHost();
     card = document.createElement("div");
     card.id = "lt-life-progress";
     card.setAttribute("data-lt-enhancement", "1");
@@ -2191,6 +2204,7 @@
          data-lt-route is set by the route switch handler BEFORE React
          processes the navigation, so this kicks in instantly with no
          timing gap. On initial load (no attribute) everything is visible. */
+      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-timer-host," +
       "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-life-progress," +
       "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-glance-section," +
       "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-frog-card," +
@@ -8629,52 +8643,13 @@
           upsertRunningBanner();
           return;
         }
-        /* Real route switch: hide enhanced elements, let React re-render
-           naturally, then re-show/rebuild enhancements after paint.
-           IMPORTANT: We cannot use applySubTabVisibility() here because
-           location.pathname hasn't changed yet at click time (React Router
-           processes asynchronously). Instead, determine visibility from the
-           target href directly. */
-        var goingToTimer = targetHref === "/";
+        /* Real route switch: elements now live in #lt-timer-host (outside
+           React's <main>), so React can't destroy them. Just flip the CSS
+           body attribute — zero DOM manipulation, zero delay, zero flash. */
         var goingToActivity = isActivityTabTap || (targetHref === "/" && _activeSubTab === "activity");
         _activeSubTab = goingToActivity ? "activity" : "timer";
-        /* Set body attribute so CSS can also hide timer elements instantly */
-        document.body.setAttribute("data-lt-route", goingToTimer ? "timer" : targetHref);
-        /* Hide timer elements if navigating away from Timer */
-        if (!goingToTimer) {
-          var hIds = ["lt-life-progress","lt-glance-section","lt-frog-card"];
-          for (var hi = 0; hi < hIds.length; hi++) {
-            var hel = document.getElementById(hIds[hi]);
-            if (hel) hel.style.display = "none";
-          }
-          var hRet = document.querySelector("[data-lt-enhancement='retirement']");
-          if (hRet) hRet.style.display = "none";
-          var hTv = document.querySelector("[data-lt-enhancement='saved-value']");
-          if (hTv) hTv.style.display = "none";
-          var hAct = findActivityElements();
-          if (hAct) {
-            if (hAct.addRow) hAct.addRow.style.display = "none";
-            if (hAct.list) hAct.list.style.display = "none";
-          }
-          var hHeader = document.getElementById("lt-activity-header");
-          if (hHeader) hHeader.style.display = "none";
-          var hLimit = document.getElementById("lt-activity-limit");
-          if (hLimit) hLimit.style.display = "none";
-        } else {
-          /* Navigating TO Timer — ensure timer elements are visible */
-          var sIds = ["lt-life-progress","lt-glance-section","lt-frog-card"];
-          for (var si = 0; si < sIds.length; si++) {
-            var sel = document.getElementById(sIds[si]);
-            if (sel) sel.style.display = "";
-          }
-          var sRet = document.querySelector("[data-lt-enhancement='retirement']");
-          if (sRet) sRet.style.display = "";
-          var sTv = document.querySelector("[data-lt-enhancement='saved-value']");
-          if (sTv) sTv.style.display = "";
-        }
-        requestAnimationFrame(function () {
-          runEnhancementsImmediate();
-        });
+        document.body.setAttribute("data-lt-route", targetHref === "/" ? "timer" : targetHref);
+        syncNavTabStyles();
       }
     }, true);
   }

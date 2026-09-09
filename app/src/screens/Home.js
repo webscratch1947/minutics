@@ -1,4 +1,4 @@
-import {
+﻿import {
   Ay,
   Es,
   Ho,
@@ -15,15 +15,46 @@ import {
   c,
   fh,
   jC,
+  jy,
   kC,
+  la,
   lk,
   nk,
+  pk,
   rh,
   rk,
   tk,
   w,
   zh
 } from "../shared.js";
+
+function LTTimerPanel({
+  profile: e
+}) {
+  const [open, setOpen] = w.useState(!1);
+  return c.jsxs("div", {
+    className: "relative",
+    children: [c.jsx("button", {
+      type: "button",
+      onClick: () => setOpen(!open),
+      className: "w-full h-8 flex items-center justify-center bg-primary text-white transition-colors pointer-events-auto",
+      title: open ? "Hide timer" : "Show timer",
+      "aria-label": open ? "Hide timer" : "Show timer",
+      children: c.jsx("span", {
+        className: "text-xs",
+        children: open ? "Γû▓" : "Γû╝"
+      })
+    }), c.jsx("div", {
+      className: "overflow-hidden transition-all duration-300 ease-in-out",
+      style: {
+        maxHeight: open ? "320px" : "0px"
+      },
+      children: c.jsx(MC, {
+        profile: e
+      })
+    })]
+  })
+}
 
 export function HomeScreen({
   profile: e
@@ -100,7 +131,9 @@ export function HomeScreen({
   return c.jsxs("div", {
     "data-source-file": "screens/Home.js",
     className: "flex flex-col",
-    children: [c.jsxs("div", {
+    children: [c.jsx(LTTimerPanel, {
+      profile: e
+    }), c.jsx(LTDailyValueBar, {}), c.jsxs("div", {
       className: "flex flex-col divide-y divide-border",
       children: [n.length === 0 && c.jsxs("div", {
         className: "flex flex-col items-center justify-center py-20 px-8 text-center bg-background",
@@ -211,206 +244,276 @@ export function HomeScreen({
   })
 }
 
-const LT_EMOJIS = ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😋", "😛", "🤑", "🤗", "🤔", "😐", "😑", "😶", "😏", "😒", "🙄", "😌", "😔", "😴", "🤒", "🥵", "🥶", "😵", "🤯", "🥳", "😎", "🤓", "🧐", "😕", "😮", "😲", "🥺", "😢", "😭", "😡", "😤", "👍", "👎", "👏", "🙌", "🙏", "💪", "✊", "🤝", "🖐️", "✍️", "💀", "👻", "👽", "🤖", "💩", "🔥", "⭐", "🌟", "✨", "⚡", "💧", "🌈", "☀️", "🌙", "☁️", "🎯", "🎨", "🎮", "🎧", "🎵", "🎸", "🎬", "🎭", "📚", "📖", "📝", "✏️", "💻", "🖥️", "💼", "📈", "📊", "📉", "🧠", "💡", "🔍", "🔧", "🔨", "⚙️", "🏋️", "🏃", "🚴", "⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🏸", "🥊", "🧘", "🏊", "🚶", "🧗", "🛌", "🍎", "🍕", "🍔", "🍟", "🍣", "🍜", "🍩", "☕", "🍵", "🍺", "🍷", "🥗", "🍳", "🧹", "🧺", "🧼", "🚿", "🛁", "🛒", "💰", "💵", "💳", "🏠", "🏢", "🏥", "🏦", "🏫", "🚗", "🚕", "✈️", "🚌", "🚲", "🚀", "🐶", "🐱", "🐦", "🐟", "🌳", "🌱", "🌸", "🎓", "📅", "⏰", "🕒", "⏱️", "📱", "☎️", "📷", "🎤", "🎁", "💊", "🧘‍♂️", "🧘‍♀️", "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💯", "✅", "❌", "➕", "➖", "🔔", "🔕", "📌", "📍", "🚩", "🏁", "🗓️", "💤", "🧴", "🧠", "🕹️", "🛠️", "🧑‍💻", "🧑‍🍳", "🧑‍🏫", "🧑‍⚕️", "🧑‍🌾", "🧑‍🎨", "🧑‍🔧"];
+function MC({
+  profile: e
+}) {
+  const [t, n] = w.useState(() => la(e)), r = jy(e);
+  w.useEffect(() => {
+    n(la(e));
+    const s = setInterval(() => n(la(e)), 1e3);
+    return () => clearInterval(s)
+  }, [e]);
+  const o = pk(t);
+  return c.jsxs("div", {
+    className: "bg-primary text-white px-5 pt-8 pb-6",
+    children: [c.jsxs("p", {
+      className: "text-xs font-semibold text-white/40 uppercase tracking-widest mb-5",
+      children: [e.name, "'s Remaining Retirement Time"]
+    }), c.jsxs("div", {
+      className: "grid grid-cols-5 gap-2 mb-5",
+      children: [c.jsx(jo, {
+        value: o.years,
+        label: "years"
+      }), c.jsx(jo, {
+        value: o.days,
+        label: "days"
+      }), c.jsx(jo, {
+        value: o.hours,
+        label: "hours"
+      }), c.jsx(jo, {
+        value: o.minutes,
+        label: "min"
+      }), c.jsx(jo, {
+        value: o.seconds,
+        label: "sec",
+        accent: !0
+      })]
+    }), c.jsx("div", {
+      className: "h-1 w-full bg-white/10 overflow-hidden mb-2",
+      children: c.jsx("div", {
+        className: "h-full bg-accent",
+        style: {
+          width: `${r}%`
+        }
+      })
+    }), c.jsxs("div", {
+      className: "flex justify-between text-[11px] text-white/35 font-medium",
+      children: [c.jsxs("span", {
+        children: [r.toFixed(1), "% lived"]
+      }), c.jsxs("span", {
+        children: [o.totalMinutes.toLocaleString(), " min left"]
+      })]
+    })]
+  })
+}
+
+function jo({
+  value: e,
+  label: t,
+  accent: n
+}) {
+  return c.jsxs("div", {
+    className: "flex flex-col items-center bg-white/8 py-3 gap-0.5",
+    children: [c.jsx("span", {
+      className: Pe("font-black tabular-nums leading-none", n ? "text-accent text-2xl" : "text-white text-2xl"),
+      children: String(e).padStart(2, "0")
+    }), c.jsx("span", {
+      className: "text-[10px] font-semibold text-white/40 uppercase tracking-wide",
+      children: t
+    })]
+  })
+}
+
+const LT_EMOJIS = ["≡ƒÿÇ", "≡ƒÿâ", "≡ƒÿä", "≡ƒÿü", "≡ƒÿå", "≡ƒÿà", "≡ƒñú", "≡ƒÿé", "≡ƒÖé", "≡ƒÖâ", "≡ƒÿë", "≡ƒÿè", "≡ƒÿç", "≡ƒÑ░", "≡ƒÿì", "≡ƒñ⌐", "≡ƒÿÿ", "≡ƒÿï", "≡ƒÿ¢", "≡ƒñæ", "≡ƒñù", "≡ƒñö", "≡ƒÿÉ", "≡ƒÿæ", "≡ƒÿ╢", "≡ƒÿÅ", "≡ƒÿÆ", "≡ƒÖä", "≡ƒÿî", "≡ƒÿö", "≡ƒÿ┤", "≡ƒñÆ", "≡ƒÑ╡", "≡ƒÑ╢", "≡ƒÿ╡", "≡ƒñ»", "≡ƒÑ│", "≡ƒÿÄ", "≡ƒñô", "≡ƒºÉ", "≡ƒÿò", "≡ƒÿ«", "≡ƒÿ▓", "≡ƒÑ║", "≡ƒÿó", "≡ƒÿ¡", "≡ƒÿí", "≡ƒÿñ", "≡ƒæì", "≡ƒæÄ", "≡ƒæÅ", "≡ƒÖî", "≡ƒÖÅ", "≡ƒÆ¬", "Γ£è", "≡ƒñ¥", "≡ƒûÉ∩╕Å", "Γ£ì∩╕Å", "≡ƒÆÇ", "≡ƒæ╗", "≡ƒæ╜", "≡ƒñû", "≡ƒÆ⌐", "≡ƒöÑ", "Γ¡É", "≡ƒîƒ", "Γ£¿", "ΓÜí", "≡ƒÆº", "≡ƒîê", "ΓÿÇ∩╕Å", "≡ƒîÖ", "Γÿü∩╕Å", "≡ƒÄ»", "≡ƒÄ¿", "≡ƒÄ«", "≡ƒÄº", "≡ƒÄ╡", "≡ƒÄ╕", "≡ƒÄ¼", "≡ƒÄ¡", "≡ƒôÜ", "≡ƒôû", "≡ƒô¥", "Γ£Å∩╕Å", "≡ƒÆ╗", "≡ƒûÑ∩╕Å", "≡ƒÆ╝", "≡ƒôê", "≡ƒôè", "≡ƒôë", "≡ƒºá", "≡ƒÆí", "≡ƒöì", "≡ƒöº", "≡ƒö¿", "ΓÜÖ∩╕Å", "≡ƒÅï∩╕Å", "≡ƒÅâ", "≡ƒÜ┤", "ΓÜ╜", "≡ƒÅÇ", "≡ƒÅê", "ΓÜ╛", "≡ƒÄ╛", "≡ƒÅÉ", "≡ƒÅ╕", "≡ƒÑè", "≡ƒºÿ", "≡ƒÅè", "≡ƒÜ╢", "≡ƒºù", "≡ƒ¢î", "≡ƒìÄ", "≡ƒìò", "≡ƒìö", "≡ƒìƒ", "≡ƒìú", "≡ƒì£", "≡ƒì⌐", "Γÿò", "≡ƒì╡", "≡ƒì║", "≡ƒì╖", "≡ƒÑù", "≡ƒì│", "≡ƒº╣", "≡ƒº║", "≡ƒº╝", "≡ƒÜ┐", "≡ƒ¢ü", "≡ƒ¢Æ", "≡ƒÆ░", "≡ƒÆ╡", "≡ƒÆ│", "≡ƒÅá", "≡ƒÅó", "≡ƒÅÑ", "≡ƒÅª", "≡ƒÅ½", "≡ƒÜù", "≡ƒÜò", "Γ£ê∩╕Å", "≡ƒÜî", "≡ƒÜ▓", "≡ƒÜÇ", "≡ƒÉ╢", "≡ƒÉ▒", "≡ƒÉª", "≡ƒÉƒ", "≡ƒî│", "≡ƒî▒", "≡ƒî╕", "≡ƒÄô", "≡ƒôà", "ΓÅ░", "≡ƒòÆ", "ΓÅ▒∩╕Å", "≡ƒô▒", "ΓÿÄ∩╕Å", "≡ƒô╖", "≡ƒÄñ", "≡ƒÄü", "≡ƒÆè", "≡ƒºÿΓÇìΓÖé∩╕Å", "≡ƒºÿΓÇìΓÖÇ∩╕Å", "Γ¥ñ∩╕Å", "≡ƒºí", "≡ƒÆ¢", "≡ƒÆÜ", "≡ƒÆÖ", "≡ƒÆ£", "≡ƒûñ", "≡ƒñì", "≡ƒÆ»", "Γ£à", "Γ¥î", "Γ₧ò", "Γ₧û", "≡ƒöö", "≡ƒöò", "≡ƒôî", "≡ƒôì", "≡ƒÜ⌐", "≡ƒÅü", "≡ƒùô∩╕Å", "≡ƒÆñ", "≡ƒº┤", "≡ƒºá", "≡ƒò╣∩╕Å", "≡ƒ¢á∩╕Å", "≡ƒºæΓÇì≡ƒÆ╗", "≡ƒºæΓÇì≡ƒì│", "≡ƒºæΓÇì≡ƒÅ½", "≡ƒºæΓÇìΓÜò∩╕Å", "≡ƒºæΓÇì≡ƒî╛", "≡ƒºæΓÇì≡ƒÄ¿", "≡ƒºæΓÇì≡ƒöº"];
 
 const LT_EMOJI_KEYWORDS = {
-  "😀": "grinning happy",
-  "😃": "grinning happy joy",
-  "😄": "smile happy joy",
-  "😁": "grin happy",
-  "😆": "laugh happy",
-  "😅": "sweat laugh nervous",
-  "🤣": "rofl laugh funny",
-  "😂": "laugh cry funny",
-  "🙂": "smile",
-  "🙃": "upside down silly",
-  "😉": "wink",
-  "😊": "smile happy blush",
-  "😇": "angel innocent",
-  "🥰": "love heart smile",
-  "😍": "love heart eyes",
-  "🤩": "star eyes excited",
-  "😘": "kiss love",
-  "😋": "yum tongue tasty",
-  "😛": "tongue playful",
-  "🤑": "money greedy",
-  "🤗": "hug",
-  "🤔": "think thinking",
-  "😐": "neutral face",
-  "😑": "blank expressionless",
-  "😶": "silent quiet",
-  "😏": "smirk",
-  "😒": "unamused annoyed",
-  "🙄": "eyeroll annoyed",
-  "😌": "relieved calm",
-  "😔": "sad pensive",
-  "😴": "sleep tired",
-  "🤒": "sick ill",
-  "🥵": "hot sweat",
-  "🥶": "cold freezing",
-  "😵": "dizzy confused",
-  "🤯": "mind blown shocked",
-  "🥳": "party celebrate",
-  "😎": "cool sunglasses",
-  "🤓": "nerd glasses",
-  "🧐": "monocle curious",
-  "😕": "confused",
-  "😮": "surprised wow",
-  "😲": "shocked astonished",
-  "🥺": "pleading puppy eyes",
-  "😢": "cry sad",
-  "😭": "sob cry sad",
-  "😡": "angry mad",
-  "😤": "huff frustrated",
-  "👍": "thumbsup like good",
-  "👎": "thumbsdown dislike bad",
-  "👏": "clap applause",
-  "🙌": "hands celebrate praise",
-  "🙏": "pray thanks please",
-  "💪": "muscle strong flex",
-  "✊": "fist power",
-  "🤝": "handshake deal",
-  "🖐️": "hand stop",
-  "✍️": "writing hand",
-  "💀": "skull dead",
-  "👻": "ghost spooky",
-  "👽": "alien ufo",
-  "🤖": "robot bot",
-  "💩": "poop",
-  "🔥": "fire hot lit",
-  "⭐": "star",
-  "🌟": "star sparkle",
-  "✨": "sparkles magic",
-  "⚡": "lightning bolt energy",
-  "💧": "water drop",
-  "🌈": "rainbow",
-  "☀️": "sun sunny",
-  "🌙": "moon night",
-  "☁️": "cloud",
-  "🎯": "target goal aim",
-  "🎨": "art paint",
-  "🎮": "game controller gaming",
-  "🎧": "headphones music",
-  "🎵": "music note",
-  "🎸": "guitar music",
-  "🎬": "movie film clapper",
-  "🎭": "theatre drama",
-  "📚": "books study",
-  "📖": "book read",
-  "📝": "note write",
-  "✏️": "pencil write edit",
-  "💻": "laptop computer work",
-  "🖥️": "desktop computer",
-  "💼": "briefcase work job",
-  "📈": "chart growth up",
-  "📊": "chart bar stats",
-  "📉": "chart down decline",
-  "🧠": "brain",
-  "💡": "idea bulb",
-  "🔍": "search magnify",
-  "🔧": "wrench tool fix",
-  "🔨": "hammer tool build",
-  "⚙️": "gear settings",
-  "🏋️": "gym weights workout",
-  "🏃": "run running",
-  "🚴": "cycling bike",
-  "⚽": "football soccer",
-  "🏀": "basketball",
-  "🏈": "american football",
-  "⚾": "baseball",
-  "🎾": "tennis",
-  "🏐": "volleyball",
-  "🏸": "badminton",
-  "🥊": "boxing",
-  "🧘": "yoga meditate",
-  "🏊": "swim swimming",
-  "🚶": "walk walking",
-  "🧗": "climb climbing",
-  "🛌": "rest sleep bed",
-  "🍎": "apple fruit food",
-  "🍕": "pizza food",
-  "🍔": "burger food",
-  "🍟": "fries food",
-  "🍣": "sushi food",
-  "🍜": "noodles food ramen",
-  "🍩": "donut sweet food",
-  "☕": "coffee drink",
-  "🍵": "tea drink",
-  "🍺": "beer drink",
-  "🍷": "wine drink",
-  "🥗": "salad healthy food",
-  "🍳": "egg cooking breakfast",
-  "🧹": "broom clean chore",
-  "🧺": "laundry basket chore",
-  "🧼": "soap clean hygiene",
-  "🚿": "shower hygiene",
-  "🛁": "bath hygiene",
-  "🛒": "shopping cart",
-  "💰": "money bag",
-  "💵": "cash money dollar",
-  "💳": "card payment",
-  "🏠": "home house",
-  "🏢": "office building",
-  "🏥": "hospital",
-  "🏦": "bank",
-  "🏫": "school",
-  "🚗": "car drive",
-  "🚕": "taxi cab",
-  "✈️": "flight plane travel",
-  "🚌": "bus travel",
-  "🚲": "bike bicycle",
-  "🚀": "rocket launch",
-  "🐶": "dog pet",
-  "🐱": "cat pet",
-  "🐦": "bird",
-  "🐟": "fish",
-  "🌳": "tree nature",
-  "🌱": "plant seedling",
-  "🌸": "flower blossom",
-  "🎓": "graduation study",
-  "📅": "calendar date",
-  "⏰": "alarm clock time",
-  "🕒": "clock time",
-  "⏱️": "stopwatch timer",
-  "📱": "phone mobile",
-  "☎️": "phone call",
-  "📷": "camera photo",
-  "🎤": "mic sing karaoke",
-  "🎁": "gift present",
-  "💊": "pill medicine",
-  "🧘‍♂️": "yoga meditate man",
-  "🧘‍♀️": "yoga meditate woman",
-  "❤️": "heart love red",
-  "🧡": "heart orange",
-  "💛": "heart yellow",
-  "💚": "heart green",
-  "💙": "heart blue",
-  "💜": "heart purple",
-  "🖤": "heart black",
-  "🤍": "heart white",
-  "💯": "hundred perfect",
-  "✅": "check done complete",
-  "❌": "cross wrong cancel",
-  "➕": "plus add",
-  "➖": "minus remove",
-  "🔔": "bell notification",
-  "🔕": "mute silent",
-  "📌": "pin",
-  "📍": "location pin",
-  "🚩": "flag",
-  "🏁": "finish flag race",
-  "🗓️": "calendar schedule",
-  "💤": "sleep zzz",
-  "🧴": "lotion bottle",
-  "🕹️": "joystick gaming",
-  "🛠️": "tools fix",
-  "🧑‍💻": "coder programmer work",
-  "🧑‍🍳": "chef cook",
-  "🧑‍🏫": "teacher",
-  "🧑‍⚕️": "doctor health",
-  "🧑‍🌾": "farmer",
-  "🧑‍🎨": "artist",
-  "🧑‍🔧": "mechanic fix"
+  "≡ƒÿÇ": "grinning happy",
+  "≡ƒÿâ": "grinning happy joy",
+  "≡ƒÿä": "smile happy joy",
+  "≡ƒÿü": "grin happy",
+  "≡ƒÿå": "laugh happy",
+  "≡ƒÿà": "sweat laugh nervous",
+  "≡ƒñú": "rofl laugh funny",
+  "≡ƒÿé": "laugh cry funny",
+  "≡ƒÖé": "smile",
+  "≡ƒÖâ": "upside down silly",
+  "≡ƒÿë": "wink",
+  "≡ƒÿè": "smile happy blush",
+  "≡ƒÿç": "angel innocent",
+  "≡ƒÑ░": "love heart smile",
+  "≡ƒÿì": "love heart eyes",
+  "≡ƒñ⌐": "star eyes excited",
+  "≡ƒÿÿ": "kiss love",
+  "≡ƒÿï": "yum tongue tasty",
+  "≡ƒÿ¢": "tongue playful",
+  "≡ƒñæ": "money greedy",
+  "≡ƒñù": "hug",
+  "≡ƒñö": "think thinking",
+  "≡ƒÿÉ": "neutral face",
+  "≡ƒÿæ": "blank expressionless",
+  "≡ƒÿ╢": "silent quiet",
+  "≡ƒÿÅ": "smirk",
+  "≡ƒÿÆ": "unamused annoyed",
+  "≡ƒÖä": "eyeroll annoyed",
+  "≡ƒÿî": "relieved calm",
+  "≡ƒÿö": "sad pensive",
+  "≡ƒÿ┤": "sleep tired",
+  "≡ƒñÆ": "sick ill",
+  "≡ƒÑ╡": "hot sweat",
+  "≡ƒÑ╢": "cold freezing",
+  "≡ƒÿ╡": "dizzy confused",
+  "≡ƒñ»": "mind blown shocked",
+  "≡ƒÑ│": "party celebrate",
+  "≡ƒÿÄ": "cool sunglasses",
+  "≡ƒñô": "nerd glasses",
+  "≡ƒºÉ": "monocle curious",
+  "≡ƒÿò": "confused",
+  "≡ƒÿ«": "surprised wow",
+  "≡ƒÿ▓": "shocked astonished",
+  "≡ƒÑ║": "pleading puppy eyes",
+  "≡ƒÿó": "cry sad",
+  "≡ƒÿ¡": "sob cry sad",
+  "≡ƒÿí": "angry mad",
+  "≡ƒÿñ": "huff frustrated",
+  "≡ƒæì": "thumbsup like good",
+  "≡ƒæÄ": "thumbsdown dislike bad",
+  "≡ƒæÅ": "clap applause",
+  "≡ƒÖî": "hands celebrate praise",
+  "≡ƒÖÅ": "pray thanks please",
+  "≡ƒÆ¬": "muscle strong flex",
+  "Γ£è": "fist power",
+  "≡ƒñ¥": "handshake deal",
+  "≡ƒûÉ∩╕Å": "hand stop",
+  "Γ£ì∩╕Å": "writing hand",
+  "≡ƒÆÇ": "skull dead",
+  "≡ƒæ╗": "ghost spooky",
+  "≡ƒæ╜": "alien ufo",
+  "≡ƒñû": "robot bot",
+  "≡ƒÆ⌐": "poop",
+  "≡ƒöÑ": "fire hot lit",
+  "Γ¡É": "star",
+  "≡ƒîƒ": "star sparkle",
+  "Γ£¿": "sparkles magic",
+  "ΓÜí": "lightning bolt energy",
+  "≡ƒÆº": "water drop",
+  "≡ƒîê": "rainbow",
+  "ΓÿÇ∩╕Å": "sun sunny",
+  "≡ƒîÖ": "moon night",
+  "Γÿü∩╕Å": "cloud",
+  "≡ƒÄ»": "target goal aim",
+  "≡ƒÄ¿": "art paint",
+  "≡ƒÄ«": "game controller gaming",
+  "≡ƒÄº": "headphones music",
+  "≡ƒÄ╡": "music note",
+  "≡ƒÄ╕": "guitar music",
+  "≡ƒÄ¼": "movie film clapper",
+  "≡ƒÄ¡": "theatre drama",
+  "≡ƒôÜ": "books study",
+  "≡ƒôû": "book read",
+  "≡ƒô¥": "note write",
+  "Γ£Å∩╕Å": "pencil write edit",
+  "≡ƒÆ╗": "laptop computer work",
+  "≡ƒûÑ∩╕Å": "desktop computer",
+  "≡ƒÆ╝": "briefcase work job",
+  "≡ƒôê": "chart growth up",
+  "≡ƒôè": "chart bar stats",
+  "≡ƒôë": "chart down decline",
+  "≡ƒºá": "brain",
+  "≡ƒÆí": "idea bulb",
+  "≡ƒöì": "search magnify",
+  "≡ƒöº": "wrench tool fix",
+  "≡ƒö¿": "hammer tool build",
+  "ΓÜÖ∩╕Å": "gear settings",
+  "≡ƒÅï∩╕Å": "gym weights workout",
+  "≡ƒÅâ": "run running",
+  "≡ƒÜ┤": "cycling bike",
+  "ΓÜ╜": "football soccer",
+  "≡ƒÅÇ": "basketball",
+  "≡ƒÅê": "american football",
+  "ΓÜ╛": "baseball",
+  "≡ƒÄ╛": "tennis",
+  "≡ƒÅÉ": "volleyball",
+  "≡ƒÅ╕": "badminton",
+  "≡ƒÑè": "boxing",
+  "≡ƒºÿ": "yoga meditate",
+  "≡ƒÅè": "swim swimming",
+  "≡ƒÜ╢": "walk walking",
+  "≡ƒºù": "climb climbing",
+  "≡ƒ¢î": "rest sleep bed",
+  "≡ƒìÄ": "apple fruit food",
+  "≡ƒìò": "pizza food",
+  "≡ƒìö": "burger food",
+  "≡ƒìƒ": "fries food",
+  "≡ƒìú": "sushi food",
+  "≡ƒì£": "noodles food ramen",
+  "≡ƒì⌐": "donut sweet food",
+  "Γÿò": "coffee drink",
+  "≡ƒì╡": "tea drink",
+  "≡ƒì║": "beer drink",
+  "≡ƒì╖": "wine drink",
+  "≡ƒÑù": "salad healthy food",
+  "≡ƒì│": "egg cooking breakfast",
+  "≡ƒº╣": "broom clean chore",
+  "≡ƒº║": "laundry basket chore",
+  "≡ƒº╝": "soap clean hygiene",
+  "≡ƒÜ┐": "shower hygiene",
+  "≡ƒ¢ü": "bath hygiene",
+  "≡ƒ¢Æ": "shopping cart",
+  "≡ƒÆ░": "money bag",
+  "≡ƒÆ╡": "cash money dollar",
+  "≡ƒÆ│": "card payment",
+  "≡ƒÅá": "home house",
+  "≡ƒÅó": "office building",
+  "≡ƒÅÑ": "hospital",
+  "≡ƒÅª": "bank",
+  "≡ƒÅ½": "school",
+  "≡ƒÜù": "car drive",
+  "≡ƒÜò": "taxi cab",
+  "Γ£ê∩╕Å": "flight plane travel",
+  "≡ƒÜî": "bus travel",
+  "≡ƒÜ▓": "bike bicycle",
+  "≡ƒÜÇ": "rocket launch",
+  "≡ƒÉ╢": "dog pet",
+  "≡ƒÉ▒": "cat pet",
+  "≡ƒÉª": "bird",
+  "≡ƒÉƒ": "fish",
+  "≡ƒî│": "tree nature",
+  "≡ƒî▒": "plant seedling",
+  "≡ƒî╕": "flower blossom",
+  "≡ƒÄô": "graduation study",
+  "≡ƒôà": "calendar date",
+  "ΓÅ░": "alarm clock time",
+  "≡ƒòÆ": "clock time",
+  "ΓÅ▒∩╕Å": "stopwatch timer",
+  "≡ƒô▒": "phone mobile",
+  "ΓÿÄ∩╕Å": "phone call",
+  "≡ƒô╖": "camera photo",
+  "≡ƒÄñ": "mic sing karaoke",
+  "≡ƒÄü": "gift present",
+  "≡ƒÆè": "pill medicine",
+  "≡ƒºÿΓÇìΓÖé∩╕Å": "yoga meditate man",
+  "≡ƒºÿΓÇìΓÖÇ∩╕Å": "yoga meditate woman",
+  "Γ¥ñ∩╕Å": "heart love red",
+  "≡ƒºí": "heart orange",
+  "≡ƒÆ¢": "heart yellow",
+  "≡ƒÆÜ": "heart green",
+  "≡ƒÆÖ": "heart blue",
+  "≡ƒÆ£": "heart purple",
+  "≡ƒûñ": "heart black",
+  "≡ƒñì": "heart white",
+  "≡ƒÆ»": "hundred perfect",
+  "Γ£à": "check done complete",
+  "Γ¥î": "cross wrong cancel",
+  "Γ₧ò": "plus add",
+  "Γ₧û": "minus remove",
+  "≡ƒöö": "bell notification",
+  "≡ƒöò": "mute silent",
+  "≡ƒôî": "pin",
+  "≡ƒôì": "location pin",
+  "≡ƒÜ⌐": "flag",
+  "≡ƒÅü": "finish flag race",
+  "≡ƒùô∩╕Å": "calendar schedule",
+  "≡ƒÆñ": "sleep zzz",
+  "≡ƒº┤": "lotion bottle",
+  "≡ƒò╣∩╕Å": "joystick gaming",
+  "≡ƒ¢á∩╕Å": "tools fix",
+  "≡ƒºæΓÇì≡ƒÆ╗": "coder programmer work",
+  "≡ƒºæΓÇì≡ƒì│": "chef cook",
+  "≡ƒºæΓÇì≡ƒÅ½": "teacher",
+  "≡ƒºæΓÇìΓÜò∩╕Å": "doctor health",
+  "≡ƒºæΓÇì≡ƒî╛": "farmer",
+  "≡ƒºæΓÇì≡ƒÄ¿": "artist",
+  "≡ƒºæΓÇì≡ƒöº": "mechanic fix"
 };
 
 function LTEmojiPicker({
@@ -427,39 +530,39 @@ function LTEmojiPicker({
   });
   const categories = [{
     name: "Recent",
-    icon: "🕐",
+    icon: "≡ƒòÉ",
     list: recent
   }, {
     name: "Smileys",
-    icon: "😀",
+    icon: "≡ƒÿÇ",
     list: LT_EMOJIS.slice(0, 48)
   }, {
     name: "Gestures",
-    icon: "👍",
+    icon: "≡ƒæì",
     list: LT_EMOJIS.slice(48, 63)
   }, {
     name: "Nature",
-    icon: "🌸",
+    icon: "≡ƒî╕",
     list: LT_EMOJIS.slice(63, 73)
   }, {
     name: "Activity",
-    icon: "⚽",
+    icon: "ΓÜ╜",
     list: LT_EMOJIS.slice(73, 113)
   }, {
     name: "Food",
-    icon: "🍔",
+    icon: "≡ƒìö",
     list: LT_EMOJIS.slice(113, 135)
   }, {
     name: "Travel",
-    icon: "🚗",
+    icon: "≡ƒÜù",
     list: LT_EMOJIS.slice(135, 154)
   }, {
     name: "Objects",
-    icon: "💡",
+    icon: "≡ƒÆí",
     list: LT_EMOJIS.slice(154, 166)
   }, {
     name: "Symbols",
-    icon: "🚩",
+    icon: "≡ƒÜ⌐",
     list: LT_EMOJIS.slice(166, 198)
   }];
   const q = search.trim().toLowerCase(),
@@ -610,9 +713,12 @@ function DC({
           children: e.name
         }), c.jsx("button", {
           onClick: openEdit,
-          className: "h-7 px-2.5 flex items-center justify-center border border-transparent hover:border-primary hover:text-primary text-muted-foreground transition-all shrink-0 text-[11px] font-semibold",
+          className: "w-8 h-8 flex items-center justify-center border border-transparent hover:border-primary hover:text-primary text-muted-foreground transition-all shrink-0",
           title: "Edit",
-          children: "Edit"
+          children: c.jsx("span", {
+            className: "text-sm",
+            children: "Γ£Å∩╕Å"
+          })
         })]
       }), c.jsxs("div", {
         className: "flex items-center gap-2 px-4 shrink-0",
@@ -651,7 +757,7 @@ function DC({
             type: "button",
             onClick: () => setShowPicker(!0),
             className: "w-11 h-11 flex items-center justify-center text-2xl bg-secondary border border-border shrink-0",
-            children: editEmoji || "➕"
+            children: editEmoji || "Γ₧ò"
           }), c.jsxs("div", {
             children: [c.jsx("p", {
               className: "font-bold text-foreground",
@@ -858,7 +964,7 @@ function LC({
     onFromDateChange = v => {
       const nv = v.target.value;
       setFromDate(nv);
-      /* Keep "To" from silently landing before "From" — nudge it forward
+      /* Keep "To" from silently landing before "From" ΓÇö nudge it forward
          to match, same as it already defaults to match on open. */
       if (toDate < nv) setToDate(nv);
     };
@@ -891,7 +997,7 @@ function LC({
         }), c.jsx("button", {
           onClick: t,
           className: "text-muted-foreground px-2 py-1 text-sm",
-          children: "✕"
+          children: "Γ£ò"
         })]
       }), c.jsxs("div", {
         className: "overflow-y-auto flex-1 px-5 py-5 flex flex-col gap-4",
@@ -1012,7 +1118,7 @@ function AC({
         }), c.jsx("button", {
           onClick: n,
           className: "text-muted-foreground px-2 py-1 text-sm",
-          children: "✕"
+          children: "Γ£ò"
         })]
       }), c.jsxs("div", {
         className: "overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-4",
@@ -1103,7 +1209,7 @@ function IC() {
         onClick: () => setShowNewPicker(!0),
         className: "h-full px-4 py-4 flex items-center justify-center text-xl text-muted-foreground shrink-0",
         title: "Choose emoji",
-        children: newEmoji || "🙂"
+        children: newEmoji || "≡ƒÖé"
       }), c.jsxs("button", {
         onClick: s,
         disabled: !e.trim() || n.isPending,
@@ -1124,5 +1230,60 @@ function FC(e) {
   return new Date(e).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit"
+  })
+}
+
+function LTDailyValueBar() {
+  const [pv, setPv] = w.useState(() => {
+    try {
+      const r = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
+      return r && r.perMinute ? r.perMinute : 0
+    } catch {
+      return 0
+    }
+  }), [dailyHours, setDailyHours] = w.useState(() => {
+    try {
+      const r = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
+      return r && r.hours ? r.hours : 8
+    } catch {
+      return 8
+    }
+  }), [now, setNow] = w.useState(Date.now());
+  w.useEffect(() => {
+    const iv = setInterval(() => {
+      setNow(Date.now());
+      try {
+        const r = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
+        setPv(r && r.perMinute ? r.perMinute : 0);
+        setDailyHours(r && r.hours ? r.hours : 8)
+      } catch {}
+    }, 1e3);
+    return () => clearInterval(iv)
+  }, []);
+  if (!pv) return null;
+  const dt = new Date(now),
+    startOfDay = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime(),
+    endOfDay = startOfDay + 864e5,
+    minutesLeft = Math.max(0, (endOfDay - now) / 6e4),
+    fracLeft = Math.max(0, Math.min(1, minutesLeft / 1440)),
+    dailyBudget = pv * 60 * dailyHours,
+    valueLeft = dailyBudget * fracLeft;
+  return c.jsxs("div", {
+    className: "bg-primary text-white px-5 py-4",
+    children: [c.jsx("p", {
+      className: "text-xs font-semibold text-white/50 uppercase tracking-widest mb-1",
+      children: "Today's time value left"
+    }), c.jsxs("p", {
+      className: "text-2xl font-black",
+      children: ["Γé╣", valueLeft.toFixed(2)]
+    }), c.jsx("div", {
+      className: "h-1 w-full bg-white/10 overflow-hidden mt-3",
+      children: c.jsx("div", {
+        className: "h-full bg-accent",
+        style: {
+          width: `${fracLeft*100}%`
+        }
+      })
+    })]
   })
 }
