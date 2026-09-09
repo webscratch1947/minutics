@@ -83,7 +83,6 @@
   var NUDGE_KEY         = "lt_idle_nudge_v3";       /* { noActivitySince, lastNudge } */
   var RUNNING_TIMER_KEY = "lt_running_timer_start_v1";
   var NATIVE_DB_KEY      = "lifetime_local_db_v1";
-  var PROD_TOAST_KEY    = "lt_prod_toast_last_v1";
   var CURRENCY_KEY      = "lt_currency_v1";         /* { code: "INR"|"USD"|"EUR"|"GBP" } */
   var PLAN_KEY           = "lt_plan_v1";             /* "free" | "basic" | "yearly" | "lifetime" */
   var PLAN_SINCE_KEY     = "lt_plan_since_v1";       /* timestamp when current plan was activated — for expiry checks */
@@ -537,30 +536,8 @@
     '</div>';
   }
 
-  /* Hide the native collapsible countdown panel — it's the "▲/▼" toggle
-     bar plus the panel beneath it — since our card fully replaces it and
-     showing both was a confusing duplicate/mismatched timer. */
-  function hideNativeTimerPanel() {
-    var toggle = Array.prototype.slice.call(document.querySelectorAll("button"))
-      .find(function (b) { var t = (b.textContent || "").trim(); return t === "\u25B2" || t === "\u25BC"; });
-    if (!toggle) return;
-    var wrap = toggle.parentElement;
-    if (wrap && wrap.style.display !== "none") wrap.style.display = "none";
-  }
-
-  /* Hide the native "Today's time value left" widget — replaced by our
-     own live Time Value section inside #lt-life-progress. */
-  function hideNativeTvWidget() {
-    var label = Array.prototype.slice.call(document.querySelectorAll("p"))
-      .find(function (el) { return el.children.length === 0 && el.textContent.trim() === "Today's time value left"; });
-    if (!label) return;
-    var card = label.parentElement;
-    while (card && card !== document.body && card.style.display !== "none" &&
-           (!card.className || card.className.indexOf("bg-primary") === -1)) {
-      card = card.parentElement;
-    }
-    if (card && card !== document.body) card.style.display = "none";
-  }
+  /* NOTE: hideNativeTimerPanel() and hideNativeTvWidget() removed —
+     superseded by permanent CSS rules on data-source-file selectors. */
 
   /* Locate the native "New activity..." add-row and the activity list
      directly above it (they're adjacent siblings in the app's own markup) —
@@ -929,24 +906,9 @@
       tvSection.style.display = "none";
     }
 
-    hideNativeTimerPanel();
-    hideNativeTvWidget();
     ensureActivityNavTab();
     applySubTabVisibility();
   }
-
-  var MOTIVATIONAL_QUOTES = [
-    "The best investment you can make is in yourself.",
-    "Your time today builds your life tomorrow.",
-    "Small steps daily lead to giant leaps yearly.",
-    "Discipline is choosing between what you want now and what you want most.",
-    "Every hour you invest in yourself compounds for life.",
-    "Don\u2019t count the days, make the days count.",
-    "Success is the sum of small efforts repeated day in and day out.",
-    "You don\u2019t rise to the level of your goals, you fall to the level of your systems.",
-    "The future belongs to those who prepare for it today.",
-    "One day or day one \u2014 you decide.",
-  ];
 
   function buildTimerAchievements() {
     /* Achievement section removed from timer home — this is a no-op now. */
@@ -8679,24 +8641,18 @@
           hideNavMask();
           return;
         }
-        /* Real route switch: hide all injected elements, show nav mask to
-           cover the flash of native React content, then re-inject after
-           React has finished rendering. Also detect if the user is
-           navigating TO the Activity tab from another route (Life Hub,
-           Journal, Settings) — in that case, set _activeSubTab = "activity"
-           so the Activity sub-tab is shown immediately when enhancements
-           re-inject, instead of briefly showing Timer content first. */
-        /* Real route switch: remove injected elements and re-inject after
-           React re-renders. No mask needed — CSS rules on data-source-file
-           permanently hide native timer panel, daily value bar, and Life Hub
-           tiles, so there's no visible flash of native content. */
+        /* Real route switch: remove injected elements, show mask to cover
+           the gap while React re-renders, then re-inject enhancements and
+           lift the mask immediately — all within the same setTimeout so the
+           browser only paints the final state. */
         var goingToActivity = isActivityTabTap || (targetHref === "/" && _activeSubTab === "activity");
         var injected = document.querySelectorAll("[data-lt-enhancement],[data-lt-tile-injected]");
         for (var i = 0; i < injected.length; i++) {
           injected[i].remove();
         }
         _activeSubTab = goingToActivity ? "activity" : "timer";
-        setTimeout(function () { runEnhancementsImmediate(); }, 80);
+        showNavMask();
+        setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 80);
       }
     }, true);
   }
