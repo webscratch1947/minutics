@@ -11,7 +11,6 @@ import { LifeHubScreen } from '../screens/LifeHub.js';
 import { JournalScreen } from '../screens/Journal.js';
 import { SettingsScreen } from '../screens/Settings.js';
 
-// React Query client — retry off, no refetch on window focus
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -22,18 +21,21 @@ const queryClient = new QueryClient({
 });
 
 function AuthenticatedApp({ profile }) {
-  return jsxs(ak, {
-    children: [
-      jsx(HC, {}),
-      jsxs(HashRouter, {
-        children: [
-          jsx(Route, { path: '/', component: () => jsx(HomeScreen, { profile }) }),
-          jsx(Route, { path: '/timeline', component: () => jsx(LifeHubScreen, { profile }) }),
-          jsx(Route, { path: '/journal', component: () => jsx(JournalScreen, {}) }),
-          jsx(Route, { path: '/settings', component: () => jsx(SettingsScreen, {}) })
-        ]
-      })
-    ]
+  return jsx(HashRouter, {
+    children: jsxs(ak, {
+      children: [
+        jsx(HC, {}),
+        jsx(Routes, {
+          children: [
+            jsx(Route, { path: '/', element: jsx(HomeScreen, { profile }) }),
+            jsx(Route, { path: '/timeline', element: jsx(LifeHubScreen, { profile }) }),
+            jsx(Route, { path: '/journal', element: jsx(JournalScreen, {}) }),
+            jsx(Route, { path: '/settings', element: jsx(SettingsScreen, {}) }),
+            jsx(Route, { path: '*', element: jsx(dk, {}) })
+          ]
+        })
+      ]
+    })
   });
 }
 

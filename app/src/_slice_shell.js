@@ -68,14 +68,14 @@ export function ck() {
           position: "relative",
           zIndex: 52
         },
-        children: uk.map(({
+        children:         uk.map(({
           href: t,
           icon: n,
           label: r
         }) => {
           const o = t === "/" ? e === "/" : e.startsWith(t);
           return jsxs(Link, {
-            href: t,
+            to: t,
             className: cn("flex flex-col items-center justify-center gap-0.5 flex-1 py-2 transition-colors text-[10px] font-semibold tracking-wide", o ? "text-primary lt-navtab-active" : "text-muted-foreground active:text-muted-foreground"),
             style: {
               position: "relative",
@@ -111,7 +111,7 @@ export function dk() {
         className: "text-muted-foreground text-lg mb-8 leading-relaxed",
         children: "The page you are looking for has slipped away."
       }), jsx(Link, {
-        href: "/",
+        to: "/",
         className: "inline-flex items-center justify-center px-8 py-4 bg-white text-black rounded-2xl font-bold tracking-wide active:scale-95 transition-transform",
         children: "Return Home"
       })]
