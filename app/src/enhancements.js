@@ -680,8 +680,8 @@
 
   function buildActivityStatsHeader() {
     var act = findActivityElements();
-    if (!act || !act.list || !act.addRow) return;
-    var host = act.list.parentElement;
+    if (!act || !act.addRow) return;
+    var host = act.list ? act.list.parentElement : act.addRow.parentElement;
     if (!host) return;
     var header = document.getElementById("lt-activity-header");
     if (!header) {
@@ -692,9 +692,12 @@
     /* Must sit directly above the activity list (Work/Sleep/etc) and the
        add row — NOT at the very top of host, which also holds the Timer
        panel / Daily Value bar as siblings. Re-assert every call since the
-       app's own re-renders can reorder things. */
-    if (header.nextElementSibling !== act.list || header.parentNode !== host) {
-      host.insertBefore(header, act.list);
+       app's own re-renders can reorder things. For new users with no
+       activities, act.list may be null — fall back to inserting before
+       addRow. */
+    var anchor = act.list || act.addRow;
+    if (header.nextElementSibling !== anchor || header.parentNode !== host) {
+      host.insertBefore(header, anchor);
     }
     header.style.display = "";
 

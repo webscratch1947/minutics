@@ -680,14 +680,18 @@
 
   function buildActivityStatsHeader() {
     var act = findActivityElements();
-    if (!act || !act.list || !act.addRow) return;
-    var host = act.list.parentElement;
+    if (!act || !act.addRow) return;
+    var host = act.list ? act.list.parentElement : act.addRow.parentElement;
     if (!host) return;
     var header = document.getElementById("lt-activity-header");
     if (!header) {
       header = document.createElement("div");
       header.id = "lt-activity-header";
       header.setAttribute("data-lt-enhancement", "1");
+    }
+    var anchor = act.list || act.addRow;
+    if (header.nextElementSibling !== anchor || header.parentNode !== host) {
+      host.insertBefore(header, anchor);
     }
     /* Must sit directly above the activity list (Work/Sleep/etc) and the
        add row — NOT at the very top of host, which also holds the Timer
