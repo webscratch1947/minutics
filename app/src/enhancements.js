@@ -1047,7 +1047,7 @@
     function fmtMins(m) {
       if (!m) return "0m";
       var h = Math.floor(m / 60), min = m % 60;
-      return h > 0 ? h + "h" + (min > 0 ? " " + min + " min" : "") : min + " min";
+      return h > 0 ? h + "h" + (min > 0 ? " " + min + "m" : "") : min + "m";
     }
 
     var CARD_COLORS = [
@@ -8424,20 +8424,7 @@
      bundle uses the short "m" form in some refreshed list rows while the
      enhanced countdown uses "min". Normalizing text nodes at the DOM boundary
      prevents React re-renders from making the label appear to alternate. */
-  function normalizeMinuteUnits() {
-    if (!document.body) return;
-    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    var node;
-    while ((node = walker.nextNode())) {
-      var parent = node.parentElement;
-      if (!parent || /^(SCRIPT|STYLE|TEXTAREA|INPUT)$/i.test(parent.tagName)) continue;
-      var text = node.nodeValue || "";
-      var normalized = text
-        .replace(/(\d+)\s*m\b/g, "$1 min")
-        .replace(/^(\s*)m(\s*)$/i, "$1min$2");
-      if (normalized !== text) node.nodeValue = normalized;
-    }
-  }
+  function normalizeMinuteUnits() { /* removed — fmtMins uses consistent 'm' everywhere */ }
 
   /* Every step below patches a live React tree that can re-render out from
      under us mid-pass (an element we looked up a line ago can already be
@@ -8632,17 +8619,18 @@
           upsertRunningBanner();
           return;
         }
-        /* Real route switch: remove injected elements, let React re-render
-           naturally (no mask = no white screen), then re-inject enhancements
-           after React has committed. */
+        /* Real route switch: hide enhanced elements, let React re-render
+           naturally, then re-show/rebuild enhancements after paint.
+           Removing elements caused a visible flash — the user saw native
+           content for 80ms before rebuild. Instead, just hide via
+           applySubTabVisibility() and let the next enhancement pass
+           handle anything React may have removed. */
         var goingToActivity = isActivityTabTap || (targetHref === "/" && _activeSubTab === "activity");
-        var injected = document.querySelectorAll("[data-lt-enhancement],[data-lt-tile-injected]");
-        for (var i = 0; i < injected.length; i++) {
-          injected[i].remove();
-        }
         _activeSubTab = goingToActivity ? "activity" : "timer";
         applySubTabVisibility();
-        setTimeout(function () { runEnhancementsImmediate(); }, 80);
+        requestAnimationFrame(function () {
+          runEnhancementsImmediate();
+        });
       }
     }, true);
   }
@@ -8781,7 +8769,7 @@
     var fastTimer = setInterval(function () {
       fastPolls++;
       if (!activeOverlay) runEnhancements();
-      if (fastPolls >= 15) clearInterval(fastTimer); /* ~3s at 200ms */
+      if (fastPolls >= 8) clearInterval(fastTimer); /* ~1.6s at 200ms */
     }, 200);
     setInterval(function () { if (!activeOverlay) runEnhancements(); }, 3000);
 
