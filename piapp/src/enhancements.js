@@ -95,7 +95,7 @@
 
   /* ── Currency config ────────────────────────────────────────────────────── */
   var CURRENCIES = [
-    { code: "INR", symbol: "\u20B9", label: "Indian Rupee",          locale: "en-IN", flag: "\uD83C\uDDEE\uD83C\uDDF3" },
+    { code: "INR", symbol: "Rs.",  label: "Indian Rupee",          locale: "en-IN", flag: "\uD83C\uDDEE\uD83C\uDDF3" },
     { code: "USD", symbol: "$",      label: "US Dollar",             locale: "en-US", flag: "\uD83C\uDDFA\uD83C\uDDF8" },
     { code: "EUR", symbol: "\u20AC", label: "Euro",                  locale: "de-DE", flag: "\uD83C\uDDEA\uD83C\uDDFA" },
     { code: "GBP", symbol: "\u00A3", label: "British Pound",         locale: "en-GB", flag: "\uD83C\uDDEC\uD83C\uDDE7" },
@@ -1163,9 +1163,9 @@
     host.style.cssText = "position:relative;z-index:1;";
     var main = document.querySelector("main");
     if (main && main.parentNode) {
-      main.parentNode.insertBefore(host, main);
+      main.parentNode.insertBefore(host, main.nextSibling);
     } else {
-      document.body.insertBefore(host, document.body.firstChild);
+      document.body.appendChild(host);
     }
     return host;
   }
@@ -8030,7 +8030,7 @@
      React update — this keeps it in sync with the saved currency. */
   function replaceRupeeGlobally() {
     var cur = getCurrency();
-    if (cur.code === "INR") return;
+    var target = cur.code === "INR" ? "Rs." : cur.symbol;
     var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
         if (!node.nodeValue || node.nodeValue.indexOf("\u20B9") === -1) return NodeFilter.FILTER_REJECT;
@@ -8042,11 +8042,10 @@
     var node, hits = [];
     while ((node = walker.nextNode())) hits.push(node);
     hits.forEach(function (n) {
-      n.nodeValue = n.nodeValue.split("\u20B9").join(cur.symbol);
+      n.nodeValue = n.nodeValue.split("\u20B9").join(target);
     });
-    /* also cover input placeholder attributes that carry ₹ */
     document.querySelectorAll('input[placeholder*="\u20B9"]').forEach(function (inp) {
-      inp.placeholder = inp.placeholder.split("\u20B9").join(cur.symbol);
+      inp.placeholder = inp.placeholder.split("\u20B9").join(target);
     });
   }
 

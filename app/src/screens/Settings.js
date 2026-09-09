@@ -14,7 +14,7 @@
 } from "../shared.js";
 
 var CURRENCIES = [
-  { code: "INR", symbol: "\u20B9", label: "Indian Rupee",     locale: "en-IN", flag: "\uD83C\uDDEE\uD83C\uDDF3" },
+  { code: "INR", symbol: "Rs.", label: "Indian Rupee",     locale: "en-IN", flag: "\uD83C\uDDEE\uD83C\uDDF3" },
   { code: "USD", symbol: "$",      label: "US Dollar",        locale: "en-US", flag: "\uD83C\uDDFA\uD83C\uDDF8" },
   { code: "EUR", symbol: "\u20AC", label: "Euro",             locale: "de-DE", flag: "\uD83C\uDDEA\uD83C\uDDFA" },
   { code: "GBP", symbol: "\u00A3", label: "British Pound",    locale: "en-GB", flag: "\uD83C\uDDEC\uD83C\uDDE7" },

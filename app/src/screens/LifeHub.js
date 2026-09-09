@@ -5,7 +5,7 @@ import {
 } from "../shared.js";
 
 var LT_TOOLS = [
-  { id: "timevalue",   icon: null,     symbol: "\u20B9", label: "Time Value Calculator", desc: "Set your salary and know the value of every minute.",         bg: "#DBEAFE", fg: "#2563EB", category: "time",         locked: false },
+  { id: "timevalue",   icon: null,     symbol: "Rs.",  label: "Time Value Calculator", desc: "Set your salary and know the value of every minute.",         bg: "#DBEAFE", fg: "#2563EB", category: "time",         locked: false },
   { id: "budget",      icon: null,     symbol: "\uD83D\uDCB3", label: "Budget Tracker",     desc: "Manage income, expenses and your balance.",                 bg: "#FEF3C7", fg: "#B45309", category: "finance",      locked: false },
   { id: "emi",         icon: null,     symbol: "\uD83E\uDDEE", label: "EMI Calculator",     desc: "Plan your loans and calculate EMI smartly.",               bg: "#E0E7FF", fg: "#4338CA", category: "finance",      locked: false },
   { id: "compound",    icon: null,     symbol: "\uD83D\uDCC8", label: "Compound Interest",  desc: "See how your money grows when compounding.",               bg: "#FCE7F3", fg: "#BE185D", category: "finance",      locked: false },
@@ -42,7 +42,7 @@ function getCurrencySymbol() {
     var c = JSON.parse(localStorage.getItem("lt_currency_v1") || "null");
     if (c && c.symbol) return c.symbol;
   } catch {}
-  return "\u20B9";
+  return "Rs.";
 }
 
 export function LifeHubScreen({
