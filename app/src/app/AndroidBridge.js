@@ -1,9 +1,13 @@
-import { Cl, Iy, Ly, Ns, RC, UC, Xt, b, fh, id, w } from '../shared.js';
+import { useEffect } from 'react';
+import { jsx } from 'react/jsx-runtime';
+import { getStore, setStore, nextId } from '../lib/storage.js';
+import { getTelegramSettings, saveTelegramSettings, getTelegramReportData, updateLastSummaryDate, sendTelegramReport } from '../lib/telegram.js';
+import { COLOR_PALETTE } from '../lib/constants.js';
 
 export function HC() {
-  return w.useEffect(() => {
+  return useEffect(() => {
     const e = () => {
-      const n = Ns();
+      const n = getTelegramSettings();
       if (!n.telegramConnected) {
         try {
           const b = window.AndroidBridge;
@@ -14,23 +18,23 @@ export function HC() {
       try {
         const b = window.AndroidBridge;
         if (b) {
-          b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", RC(), n.lastSummaryDate || "");
+          b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), n.lastSummaryDate || "");
           b.scheduleReport && b.scheduleReport(n.dailyReportTime)
         }
       } catch {}
       const r = new Date,
         o = `${String(r.getHours()).padStart(2,"0")}:${String(r.getMinutes()).padStart(2,"0")}`,
         s = r.toLocaleDateString("en-CA");
-      o !== n.dailyReportTime || n.lastSummaryDate === s || (UC(s), Iy(RC(), n))
+      o !== n.dailyReportTime || n.lastSummaryDate === s || (updateLastSummaryDate(s), sendTelegramReport(getTelegramReportData(), n))
     };
     e();
     const t = window.setInterval(e, 30 * 1e3);
     return () => window.clearInterval(t)
   }, []);
-  w.useEffect(() => {
+  useEffect(() => {
     const tick = () => {
       try {
-        const data = Xt(),
+        const data = getStore(),
           act = data.activities || [],
           blk = data.blocks || [],
           running = blk.filter(x => !x.endTime).map(x => {
@@ -78,18 +82,18 @@ export function HC() {
 
 window.__lifetimeStopActivity = function(blockId) {
   try {
-    const data = Xt(),
+    const data = getStore(),
       blk = data.blocks.find(b => String(b.id) === String(blockId));
     if (blk && !blk.endTime) {
       blk.endTime = new Date().toISOString();
-      Cl(data)
+      setStore(data)
     }
   } catch {}
 };
 
 window.__lifetimeStartActivityFromWidget = function(activityId, mode, minutes) {
   try {
-    const data = Xt();
+    const data = getStore();
     if (!data.activities || data.activities.length === 0) return;
     const act = data.activities.find(a => String(a.id) === String(activityId)) || data.activities[0];
     if (!act) return;
@@ -111,33 +115,33 @@ window.__lifetimeStartActivityFromWidget = function(activityId, mode, minutes) {
       newBlock.targetSeconds = Number(minutes) * 60;
       setTimeout(function() {
         try {
-          const d2 = Xt(),
+          const d2 = getStore(),
             b2 = d2.blocks.find(b => b.id === newBlock.id);
           if (b2 && !b2.endTime) {
             b2.endTime = new Date().toISOString();
             b2.totalSeconds = Number(minutes) * 60;
-            Cl(d2)
+            setStore(d2)
           }
         } catch {}
       }, Number(minutes) * 60 * 1000);
     }
     data.blocks.push(newBlock);
-    Cl(data);
+    setStore(data);
   } catch {}
 };
 
 window.__lifetimeAddActivityFromWidget = function(name, emoji) {
   try {
     if (!name || !String(name).trim()) return;
-    const data = Xt();
-    const id = Ly(data.activities);
-    const color = fh[Math.floor(Math.random() * fh.length)];
+    const data = getStore();
+    const id = nextId(data.activities);
+    const color = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
     data.activities.push({
       id: id,
       name: String(name).trim(),
       color: color,
       emoji: emoji || "🙂"
     });
-    Cl(data);
+    setStore(data);
   } catch {}
 };

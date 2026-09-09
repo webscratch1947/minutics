@@ -1,27 +1,11 @@
-import {
-  Iy,    // sendTelegramReport(token, chatId, reportText)
-  Ns,    // getTelegramSettings() → { telegramBotToken, chatId, connected, dailyReportTime, lastSummaryDate }
-  Ny,    // getProfile() → { name, dob, lifespanYears } or null
-  c,     // JSX runtime (jsx, jsxs)
-  eh,    // CircleCheckBig icon (lucide)
-  gh,    // saveTelegramSettings({ telegramBotToken, chatId, dailyReportTime })
-  hk,    // clearProfile()
-  nh,    // notification helper or icon
-  ok,    // setCurrency(code)
-  sk,    // getCurrency() → { code }
-  th,    // saveGoalType({ type, milestoneLabel })
-  w      // React
-} from '../shared.js';
-
-/* ── helpers ── */
-
-var _readJson = function (key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
-};
-
-var _writeJson = function (key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
-};
+import { useState, Fragment } from 'react';
+import { jsx, jsxs } from 'react/jsx-runtime';
+import { getProfile, clearProfile } from '../lib/profile.js';
+import { getTelegramSettings, saveTelegramSettings, sendTelegramReport } from '../lib/telegram.js';
+import { getCurrency, setCurrency } from '../lib/currency.js';
+import { saveGoalType, getGoalType } from '../lib/settings.js';
+import { readJson, writeJson } from '../lib/settings.js';
+import { CircleCheckBig as eh } from 'lucide-react';
 
 /* ── constants ── */
 
@@ -65,14 +49,14 @@ var PLANS = {
  * @param {{ enabled: boolean, onToggle: () => void }} props
  */
 function Toggle(props) {
-  return c.jsx("button", {
+  return jsx("button", {
     onClick: props.onToggle,
     className: [
       "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent",
       "transition-colors duration-200 ease-in-out focus:outline-none",
       props.enabled ? "bg-primary" : "bg-gray-300"
     ].join(" "),
-    children: c.jsx("span", {
+    children: jsx("span", {
       className: [
         "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0",
         "transition duration-200 ease-in-out",
@@ -86,7 +70,7 @@ function Toggle(props) {
  * Uppercase section heading label.
  */
 function SectionLabel(props) {
-  return c.jsx("p", {
+  return jsx("p", {
     className: "text-xs font-semibold uppercase tracking-wider text-gray-400",
     children: props.children
   });
@@ -96,17 +80,17 @@ function SectionLabel(props) {
  * Settings row: label + description on the left, children (controls) on the right.
  */
 function SettingsRow(props) {
-  return c.jsxs("div", {
+  return jsxs("div", {
     className: "flex items-center justify-between py-2",
     children: [
-      c.jsxs("div", {
+      jsxs("div", {
         className: "flex-1 mr-4",
         children: [
-          c.jsx("p", { className: "text-sm font-medium text-gray-900", children: props.label }),
-          props.desc ? c.jsx("p", { className: "text-xs text-gray-500 mt-0.5", children: props.desc }) : null
+          jsx("p", { className: "text-sm font-medium text-gray-900", children: props.label }),
+          props.desc ? jsx("p", { className: "text-xs text-gray-500 mt-0.5", children: props.desc }) : null
         ]
       }),
-      c.jsx("div", { children: props.children })
+      jsx("div", { children: props.children })
     ]
   });
 }
@@ -117,7 +101,7 @@ function SettingsRow(props) {
 
 export function SettingsScreen() {
   /* ── profile ── */
-  var profile = Ny();
+  var profile = getProfile();
   var profileName = (profile && profile.name) ? profile.name : "Signed in";
 
   /* ── plan ── */
@@ -126,55 +110,55 @@ export function SettingsScreen() {
   var planLabel = PLANS[rawPlan] || "Free";
 
   /* ── currency ── */
-  var savedCurrency = sk();
+  var savedCurrency = getCurrency();
   var currentCurrencyCode = (savedCurrency && savedCurrency.code) ? savedCurrency.code : "INR";
-  var _currencyState = w.useState(currentCurrencyCode);
+  var _currencyState = useState(currentCurrencyCode);
   var selectedCurrencyCode = _currencyState[0];
   var setSelectedCurrencyCode = _currencyState[1];
-  var _showPickerState = w.useState(false);
+  var _showPickerState = useState(false);
   var showPicker = _showPickerState[0];
   var setShowPicker = _showPickerState[1];
 
   var currentCurrencyObj = CURRENCIES.find(function (c) { return c.code === selectedCurrencyCode; }) || CURRENCIES[0];
 
   /* ── goal type ── */
-  var savedGoal = _readJson("lt_goal_type_v1", { type: "retirement", milestoneLabel: "" });
-  var _goalState = w.useState(savedGoal.type || "retirement");
+  var savedGoal = readJson("lt_goal_type_v1", { type: "retirement", milestoneLabel: "" });
+  var _goalState = useState(savedGoal.type || "retirement");
   var goalType = _goalState[0];
   var setGoalType = _goalState[1];
-  var _milestoneLabelState = w.useState(savedGoal.milestoneLabel || "");
+  var _milestoneLabelState = useState(savedGoal.milestoneLabel || "");
   var milestoneLabel = _milestoneLabelState[0];
   var setMilestoneLabel = _milestoneLabelState[1];
 
   /* ── smart nudges ── */
-  var _nudgesState = w.useState(localStorage.getItem("lt_notifs_enabled_v1") === "true");
+  var _nudgesState = useState(localStorage.getItem("lt_notifs_enabled_v1") === "true");
   var nudgesEnabled = _nudgesState[0];
   var setNudgesEnabled = _nudgesState[1];
 
   /* ── web notifications permission ── */
-  var _notifPermState = w.useState(typeof Notification !== "undefined" ? Notification.permission : "default");
+  var _notifPermState = useState(typeof Notification !== "undefined" ? Notification.permission : "default");
   var notifPermission = _notifPermState[0];
   var setNotifPermission = _notifPermState[1];
 
   /* ── telegram ── */
-  var tgSettings = Ns();
-  var _tgTokenState = w.useState((tgSettings && tgSettings.telegramBotToken) || "");
+  var tgSettings = getTelegramSettings();
+  var _tgTokenState = useState((tgSettings && tgSettings.telegramBotToken) || "");
   var tgToken = _tgTokenState[0];
   var setTgToken = _tgTokenState[1];
-  var _tgChatIdState = w.useState((tgSettings && tgSettings.chatId) || "");
+  var _tgChatIdState = useState((tgSettings && tgSettings.chatId) || "");
   var tgChatId = _tgChatIdState[0];
   var setTgChatId = _tgChatIdState[1];
-  var _tgTimeState = w.useState((tgSettings && tgSettings.dailyReportTime) || "21:00");
+  var _tgTimeState = useState((tgSettings && tgSettings.dailyReportTime) || "21:00");
   var tgTime = _tgTimeState[0];
   var setTgTime = _tgTimeState[1];
   var tgConnected = tgSettings && tgSettings.connected;
-  var _tgSavingState = w.useState(false);
+  var _tgSavingState = useState(false);
   var tgSaving = _tgSavingState[0];
   var setTgSaving = _tgSavingState[1];
-  var _tgTestResultState = w.useState(null);
+  var _tgTestResultState = useState(null);
   var tgTestResult = _tgTestResultState[0];
   var setTgTestResult = _tgTestResultState[1];
-  var _tgTestLoadingState = w.useState(false);
+  var _tgTestLoadingState = useState(false);
   var tgTestLoading = _tgTestLoadingState[0];
   var setTgTestLoading = _tgTestLoadingState[1];
 
@@ -182,24 +166,24 @@ export function SettingsScreen() {
 
   function handleCurrencyChange(code) {
     setSelectedCurrencyCode(code);
-    ok(code);
+    setCurrency(code);
     setShowPicker(false);
   }
 
   function handleGoalChange(type) {
     setGoalType(type);
-    th({ type: type, milestoneLabel: milestoneLabel });
+    saveGoalType({ type: type, milestoneLabel: milestoneLabel });
   }
 
   function handleMilestoneLabelChange(val) {
     setMilestoneLabel(val);
-    th({ type: goalType, milestoneLabel: val });
+    saveGoalType({ type: goalType, milestoneLabel: val });
   }
 
   function handleNudgesToggle() {
     var next = !nudgesEnabled;
     setNudgesEnabled(next);
-    _writeJson("lt_notifs_enabled_v1", next ? "true" : "false");
+    writeJson("lt_notifs_enabled_v1", next ? "true" : "false");
     if (next && typeof Notification !== "undefined" && Notification.permission === "default") {
       Notification.requestPermission().then(function (perm) { setNotifPermission(perm); });
     }
@@ -213,14 +197,14 @@ export function SettingsScreen() {
 
   function handleResetProfile() {
     if (confirm("Are you sure? This will remove all your profile data.")) {
-      hk();
+      clearProfile();
       window.location.reload();
     }
   }
 
   function handleSaveTelegram() {
     setTgSaving(true);
-    gh({
+    saveTelegramSettings({
       telegramBotToken: tgToken,
       chatId: tgChatId,
       dailyReportTime: tgTime
@@ -231,7 +215,7 @@ export function SettingsScreen() {
   function handleTestTelegram() {
     setTgTestLoading(true);
     setTgTestResult(null);
-    Iy(tgToken, tgChatId, "Test from Minutics — your Telegram integration is working!")
+    sendTelegramReport(tgToken, tgChatId, "Test from Minutics — your Telegram integration is working!")
       .then(function (ok) {
         setTgTestResult(ok ? "success" : "error");
         setTgTestLoading(false);
@@ -244,22 +228,22 @@ export function SettingsScreen() {
 
   /* ── render ── */
 
-  return c.jsx("div", {
+  return jsx("div", {
     className: "px-5 py-6 flex flex-col gap-6",
-    children: c.jsxs(w.Fragment, {
+    children: jsxs(Fragment, {
       children: [
 
         /* ─── a. Account ─── */
-        c.jsxs("section", {
+        jsxs("section", {
           className: "flex flex-col gap-3",
           children: [
-            c.jsx(SectionLabel, { children: "Account" }),
-            c.jsxs(SettingsRow, {
+            jsx(SectionLabel, { children: "Account" }),
+            jsxs(SettingsRow, {
               label: profileName,
               desc: "Your data stays on this device",
               children: null
             }),
-            c.jsx("button", {
+            jsx("button", {
               onClick: handleResetProfile,
               className: "w-full rounded-xl bg-red-50 py-2.5 text-sm font-medium text-red-600 active:bg-red-100 transition",
               children: "Reset Profile"
@@ -268,16 +252,16 @@ export function SettingsScreen() {
         }),
 
         /* ─── b. Plan ─── */
-        c.jsxs("section", {
+        jsxs("section", {
           className: "flex flex-col gap-3",
           children: [
-            c.jsx(SectionLabel, { children: "Plan" }),
-            c.jsxs(SettingsRow, {
+            jsx(SectionLabel, { children: "Plan" }),
+            jsxs(SettingsRow, {
               label: planLabel,
               desc: isPro ? "Pro features unlocked" : "Free tier",
-              children: isPro ? c.jsx("span", { className: "text-lg", children: "\u2B50" }) : null
+              children: isPro ? jsx("span", { className: "text-lg", children: "\u2B50" }) : null
             }),
-            c.jsx("button", {
+            jsx("button", {
               className: "w-full rounded-xl bg-primary/10 py-2.5 text-sm font-medium text-primary active:bg-primary/20 transition",
               children: "View Plans"
             })
@@ -285,40 +269,40 @@ export function SettingsScreen() {
         }),
 
         /* ─── c. Display Currency ─── */
-        c.jsxs("section", {
+        jsxs("section", {
           className: "flex flex-col gap-3",
           children: [
-            c.jsx(SectionLabel, { children: "Display Currency" }),
-            c.jsxs(SettingsRow, {
+            jsx(SectionLabel, { children: "Display Currency" }),
+            jsxs(SettingsRow, {
               label: currentCurrencyObj.flag + " " + currentCurrencyObj.label,
               desc: currentCurrencyObj.code + " (" + currentCurrencyObj.symbol + ") \u2022 " + currentCurrencyObj.locale,
-              children: c.jsx("button", {
+              children: jsx("button", {
                 onClick: function () { setShowPicker(!showPicker); },
                 className: "rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 active:bg-gray-200 transition",
                 children: showPicker ? "Close" : "Change"
               })
             }),
-            showPicker ? c.jsx("div", {
+            showPicker ? jsx("div", {
               className: "flex flex-col gap-1.5 mt-1",
               children: CURRENCIES.map(function (cur) {
                 var isActive = cur.code === selectedCurrencyCode;
-                return c.jsx("button", {
+                return jsx("button", {
                   onClick: function () { handleCurrencyChange(cur.code); },
                   className: [
                     "flex items-center gap-3 rounded-xl px-4 py-3 text-left transition",
                     isActive ? "bg-primary/10 ring-1 ring-primary" : "bg-white active:bg-gray-50"
                   ].join(" "),
-                  children: c.jsxs(w.Fragment, {
+                  children: jsxs(Fragment, {
                     children: [
-                      c.jsx("span", { className: "text-xl", children: cur.flag }),
-                      c.jsxs("span", {
+                      jsx("span", { className: "text-xl", children: cur.flag }),
+                      jsxs("span", {
                         className: "flex-1",
                         children: [
-                          c.jsx("span", { className: "text-sm font-medium text-gray-900", children: cur.label }),
-                          c.jsx("span", { className: "text-xs text-gray-500 ml-2", children: cur.code + " " + cur.symbol })
+                          jsx("span", { className: "text-sm font-medium text-gray-900", children: cur.label }),
+                          jsx("span", { className: "text-xs text-gray-500 ml-2", children: cur.code + " " + cur.symbol })
                         ]
                       }),
-                      isActive ? c.jsx(eh, { className: "h-4 w-4 text-primary" }) : null
+                      isActive ? jsx(eh, { className: "h-4 w-4 text-primary" }) : null
                     ]
                   })
                 });
@@ -328,15 +312,15 @@ export function SettingsScreen() {
         }),
 
         /* ─── d. Goal Type ─── */
-        c.jsxs("section", {
+        jsxs("section", {
           className: "flex flex-col gap-3",
           children: [
-            c.jsx(SectionLabel, { children: "Goal Type" }),
-            c.jsx("div", {
+            jsx(SectionLabel, { children: "Goal Type" }),
+            jsx("div", {
               className: "grid grid-cols-2 gap-2",
               children: GOAL_OPTIONS.map(function (opt) {
                 var isActive = goalType === opt.type;
-                return c.jsx("button", {
+                return jsx("button", {
                   onClick: function () { handleGoalChange(opt.type); },
                   className: [
                     "rounded-xl py-2.5 px-3 text-sm font-medium transition",
@@ -348,7 +332,7 @@ export function SettingsScreen() {
                 });
               })
             }),
-            goalType === "milestone" ? c.jsx("input", {
+            goalType === "milestone" ? jsx("input", {
               type: "text",
               value: milestoneLabel,
               onChange: function (e) { handleMilestoneLabelChange(e.target.value); },
@@ -362,16 +346,16 @@ export function SettingsScreen() {
         }),
 
         /* ─── e. Features ─── */
-        c.jsxs("section", {
+        jsxs("section", {
           className: "flex flex-col gap-3",
           children: [
-            c.jsx(SectionLabel, { children: "Features" }),
-            c.jsx(SettingsRow, {
+            jsx(SectionLabel, { children: "Features" }),
+            jsx(SettingsRow, {
               label: "Smart Nudges",
               desc: "Personalized reminders based on your spending",
-              children: c.jsx(Toggle, { enabled: nudgesEnabled, onToggle: handleNudgesToggle })
+              children: jsx(Toggle, { enabled: nudgesEnabled, onToggle: handleNudgesToggle })
             }),
-            c.jsxs(SettingsRow, {
+            jsxs(SettingsRow, {
               label: "Website Notifications",
               desc: notifPermission === "granted"
                 ? "Notifications are enabled"
@@ -379,14 +363,14 @@ export function SettingsScreen() {
                   ? "Blocked by browser settings"
                   : "Receive alerts in your browser",
               children: notifPermission === "granted"
-                ? c.jsx("span", {
+                ? jsx("span", {
                     className: [
                       "inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1",
                       "text-xs font-medium text-green-700"
                     ].join(" "),
                     children: "On"
                   })
-                : c.jsx("button", {
+                : jsx("button", {
                     onClick: handleEnableNotifications,
                     disabled: notifPermission === "denied",
                     className: [
@@ -401,25 +385,25 @@ export function SettingsScreen() {
         }),
 
         /* ─── f. Telegram Daily Reports ─── */
-        c.jsxs("section", {
+        jsxs("section", {
           className: "flex flex-col gap-3",
           children: [
-            c.jsx(SectionLabel, { children: "Telegram Daily Reports" }),
+            jsx(SectionLabel, { children: "Telegram Daily Reports" }),
 
             /* connection status */
-            c.jsxs("div", {
+            jsxs("div", {
               className: [
                 "flex items-center gap-2 rounded-xl px-4 py-3",
                 tgConnected ? "bg-green-50" : "bg-gray-50"
               ].join(" "),
               children: [
-                c.jsx(eh, {
+                jsx(eh, {
                   className: [
                     "h-5 w-5",
                     tgConnected ? "text-green-500" : "text-gray-400"
                   ].join(" ")
                 }),
-                c.jsx("span", {
+                jsx("span", {
                   className: [
                     "text-sm font-medium",
                     tgConnected ? "text-green-700" : "text-gray-500"
@@ -430,14 +414,14 @@ export function SettingsScreen() {
             }),
 
             /* bot token */
-            c.jsxs("div", {
+            jsxs("div", {
               className: "flex flex-col gap-1",
               children: [
-                c.jsx("label", {
+                jsx("label", {
                   className: "text-xs font-medium text-gray-500",
                   children: "Bot Token"
                 }),
-                c.jsx("input", {
+                jsx("input", {
                   type: "text",
                   value: tgToken,
                   onChange: function (e) { setTgToken(e.target.value); },
@@ -451,14 +435,14 @@ export function SettingsScreen() {
             }),
 
             /* chat ID */
-            c.jsxs("div", {
+            jsxs("div", {
               className: "flex flex-col gap-1",
               children: [
-                c.jsx("label", {
+                jsx("label", {
                   className: "text-xs font-medium text-gray-500",
                   children: "Chat ID"
                 }),
-                c.jsx("input", {
+                jsx("input", {
                   type: "text",
                   value: tgChatId,
                   onChange: function (e) { setTgChatId(e.target.value); },
@@ -472,14 +456,14 @@ export function SettingsScreen() {
             }),
 
             /* daily report time */
-            c.jsxs("div", {
+            jsxs("div", {
               className: "flex flex-col gap-1",
               children: [
-                c.jsx("label", {
+                jsx("label", {
                   className: "text-xs font-medium text-gray-500",
                   children: "Daily Report Time"
                 }),
-                c.jsx("input", {
+                jsx("input", {
                   type: "time",
                   value: tgTime,
                   onChange: function (e) { setTgTime(e.target.value); },
@@ -492,7 +476,7 @@ export function SettingsScreen() {
             }),
 
             /* save button */
-            c.jsx("button", {
+            jsx("button", {
               onClick: handleSaveTelegram,
               disabled: tgSaving || !tgToken || !tgChatId,
               className: [
@@ -505,7 +489,7 @@ export function SettingsScreen() {
             }),
 
             /* test button */
-            c.jsx("button", {
+            jsx("button", {
               onClick: handleTestTelegram,
               disabled: tgTestLoading || !tgToken || !tgChatId,
               className: [
@@ -519,12 +503,12 @@ export function SettingsScreen() {
 
             /* test result banner */
             tgTestResult === "success"
-              ? c.jsx("div", {
+              ? jsx("div", {
                   className: "rounded-xl bg-green-50 px-4 py-3 text-sm font-medium text-green-700",
                   children: "Test message sent successfully!"
                 })
               : tgTestResult === "error"
-                ? c.jsx("div", {
+                ? jsx("div", {
                     className: "rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600",
                     children: "Failed to send test message. Check your token and chat ID."
                   })
