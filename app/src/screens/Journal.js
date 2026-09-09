@@ -1,271 +1,523 @@
 import {
-  Ay,
-  CC,
-  Hc,
-  c,
-  uh,
-  w
-} from "../shared.js";
+  Ay,    // useBlocks — useQuery for all time blocks (refetch every 1s)
+  Pe,    // cn — tailwind-merge utility
+  c,     // JSX runtime (React.createElement/jsxs)
+  eh,    // CircleCheckBig icon (lucide)
+  w      // React
+} from '../shared.js';
+
+/* ─── Helper Functions ──────────────────────────────────────────────────────── */
+
+// Format seconds to human-readable duration
+function formatDuration(totalSeconds) {
+  if (totalSeconds < 60) return totalSeconds + "s";
+  var hours = Math.floor(totalSeconds / 3600);
+  var minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0) return hours + "h " + minutes + "m";
+  return minutes + "m";
+}
+
+// Format ISO string to 12-hour time "3:45 PM"
+function formatTime12(isoString) {
+  var d = new Date(isoString);
+  var h = d.getHours();
+  var m = d.getMinutes();
+  var ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return h + ":" + String(m).padStart(2, "0") + " " + ampm;
+}
+
+// Format date to "dd/MM/yyyy"
+function formatDate(date) {
+  var d = new Date(date);
+  return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
+}
+
+// Get day name abbreviation (Mon, Tue, etc.)
+function getDayName(date) {
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(date).getDay()];
+}
+
+// Get day number
+function getDayNum(date) {
+  return new Date(date).getDate();
+}
+
+// Get start of week (Monday)
+function getWeekStart(date) {
+  var d = new Date(date);
+  var day = d.getDay();
+  var diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Get start of today (midnight as timestamp)
+function getTodayStart() {
+  var now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+// Get day start (midnight) for a given timestamp
+function getDayStart(ts) {
+  var d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+// Check if two dates are the same calendar day
+function isSameDay(a, b) {
+  var da = new Date(a);
+  var db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
+// Enrich blocks for a given day range (clips cross-midnight blocks)
+function enrichBlocksForDay(blocks, activities, dayStart, dayEnd) {
+  var map = new Map();
+  for (var i = 0; i < blocks.length; i++) {
+    var b = blocks[i];
+    var bStart = new Date(b.startTime).getTime();
+    var bEnd = b.endTime ? new Date(b.endTime).getTime() : Date.now();
+    var clippedStart = Math.max(bStart, dayStart);
+    var clippedEnd = Math.min(bEnd, dayEnd);
+    if (clippedEnd <= clippedStart) continue;
+
+    // Find the activity for this block
+    var act = null;
+    for (var j = 0; j < activities.length; j++) {
+      if (activities[j].id === b.activityId) {
+        act = activities[j];
+        break;
+      }
+    }
+    if (!act) continue;
+
+    var entry = map.get(act.id) || {
+      activityId: act.id,
+      activityName: act.name,
+      activityColor: act.color,
+      totalSeconds: 0,
+      blocks: []
+    };
+    entry.totalSeconds += Math.round((clippedEnd - clippedStart) / 1000);
+    entry.blocks.push({
+      id: b.id,
+      startTime: b.startTime,
+      endTime: b.endTime || null,
+      startedBefore: bStart < dayStart,
+      continuesAfter: bEnd > dayEnd,
+      durationSeconds: Math.round((clippedEnd - clippedStart) / 1000)
+    });
+    map.set(act.id, entry);
+  }
+  var result = Array.from(map.values()).sort(function(a, b) {
+    return b.totalSeconds - a.totalSeconds;
+  });
+  return {
+    totalSeconds: result.reduce(function(sum, a) { return sum + a.totalSeconds; }, 0),
+    activities: result
+  };
+}
+
+// Get install date from localStorage
+function getInstallDate() {
+  try {
+    var d = localStorage.getItem("lifetime_install_date");
+    return d ? new Date(d) : new Date();
+  } catch { return new Date(); }
+}
+
+/* ─── Main Component ────────────────────────────────────────────────────────── */
 
 export function JournalScreen() {
-  const {
-    data: e
-  } = CC(), {
-    data: n = []
-  } = Ay(), [expandedDay, setExpandedDay] = w.useState(null), s = a => {
-    if (a < 60) return `${a}s`;
-    const u = Math.floor(a / 3600),
-      d = Math.floor(a % 3600 / 60);
-    return u > 0 ? `${u}h ${d}m` : `${d}m`
-  }, i = a => {
-    const date = new Date(a);
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const hours12 = hours % 12 || 12; // Convert 0 to 12 for midnight
-    const minutesStr = minutes < 10 ? '0' + minutes : minutes;
-    return `${hours12}:${minutesStr} ${ampm}`;
-  }, l = (e == null ? void 0 : e.totalSeconds) ?? 0, now = new Date, _installRaw = localStorage.getItem("lifetime_install_date"), _installDate = _installRaw ? new Date(_installRaw) : new Date(now.getFullYear(), now.getMonth(), 1), _installMidnight = new Date(_installDate.getFullYear(), _installDate.getMonth(), _installDate.getDate()), _totalDays = Math.floor((now - _installMidnight) / (864e5)) + 1, days = Array.from({
-    length: _totalDays
-  }, (_, idx) => new Date(_installDate.getFullYear(), _installDate.getMonth(), _installDate.getDate() + _totalDays - 1 - idx)), todayIdx = days.findIndex(d => Hc(d, now)),
-  /* A block that crosses midnight belongs, in real terms, to two days —
-     count only the slice of it that actually falls within each day
-     instead of dumping the whole duration onto whichever day it started
-     on. `_startedBefore` / `_continuesAfter` flag the clipped edges so
-     the row can say so instead of silently showing a truncated range. */
-  _nowMs = now.getTime(),
-  _splitForDay = (b, dayStart, dayEnd) => {
-    const s = new Date(b.startTime).getTime(),
-      eRaw = b.endTime ? new Date(b.endTime).getTime() : _nowMs,
-      os = Math.max(s, dayStart),
-      oe = Math.min(eRaw, dayEnd);
-    if (oe <= os) return null;
-    return {
-      ...b,
-      _rangeStart: os,
-      _rangeEnd: oe,
-      _startedBefore: s < dayStart,
-      _continuesAfter: eRaw > dayEnd,
-      durationSeconds: Math.round((oe - os) / 1000)
-    }
-  },
-  activeDay = expandedDay === null ? (todayIdx >= 0 ? todayIdx : 0) : expandedDay, dayGroups = days.map(d => {
-    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(),
-      dayEnd = dayStart + 864e5,
-      blocksForDay = n.map(b => _splitForDay(b, dayStart, dayEnd)).filter(Boolean),
-      grouped = blocksForDay.reduce((acc, b) => (acc[b.activityId] || (acc[b.activityId] = {
-        name: b.activityName || "Unknown",
-        color: b.activityColor || "#888",
-        blocks: []
-      }), acc[b.activityId].blocks.push(b), acc), {}),
-      total = blocksForDay.reduce((sum, b) => sum + (b.durationSeconds || 0), 0);
-    return {
-      date: d,
-      grouped,
-      total
-    }
-  });
-  const _streakStart = dayGroups.length && dayGroups[0].total > 0 ? 0 : 1;
-  let streak = 0;
-  for (let _i = _streakStart; _i < dayGroups.length; _i++) {
-    if (dayGroups[_i].total > 0) streak++;
-    else break;
+  // ── Data Queries ────────────────────────────────────────────────────────────
+
+  // Get all blocks from react-query (auto-refreshes every 1s)
+  var { data: blocks = [] } = Ay();
+
+  // Read activities from localStorage (not exported from shared.js)
+  var _activities_state = w.useState([]);
+  var _activities = _activities_state[0];
+  var setActivities = _activities_state[1];
+  w.useEffect(function() {
+    try {
+      var store = JSON.parse(localStorage.getItem("lifetime_local_db_v1") || "{}");
+      setActivities(Array.isArray(store.activities) ? store.activities : []);
+    } catch {}
+  }, []);
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  var _expandedDay_state = w.useState(null);
+  var expandedDay = _expandedDay_state[0];
+  var setExpandedDay = _expandedDay_state[1];
+
+  // ── Derived Data ────────────────────────────────────────────────────────────
+  var now = new Date();
+  var dayStartMs = getTodayStart();
+  var dayEndMs = dayStartMs + 86400000;
+
+  // Today stats: enriched blocks for today, computed locally
+  var todayStats = w.useMemo(function() {
+    return enrichBlocksForDay(blocks, _activities, dayStartMs, dayEndMs);
+  }, [blocks, _activities, dayStartMs, dayEndMs]);
+
+  var todayTotalSeconds = todayStats.totalSeconds;
+
+  // Install date (first day of tracking)
+  var installDate = getInstallDate();
+  var installMidnight = getDayStart(installDate.getTime());
+
+  // Build array of all days from install date to today (newest first)
+  var totalDays = Math.floor((now.getTime() - installMidnight) / 86400000) + 1;
+  var days = [];
+  for (var idx = 0; idx < totalDays; idx++) {
+    days.push(new Date(
+      installDate.getFullYear(),
+      installDate.getMonth(),
+      installDate.getDate() + totalDays - 1 - idx
+    ));
   }
-  const _dow = now.getDay();
-  const weekDates = Array.from({
-    length: 7
-  }, (_, _i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() - _dow + _i));
-  const weekLogged = weekDates.filter(_d => dayGroups.some(_dg => Hc(_dg.date, _d) && _dg.total > 0)).length;
-  const StreakWeekBlock = c.jsxs("div", {
-    className: "px-5 pt-5",
-    children: [c.jsxs("div", {
-      style: {
-        display: "grid",
-        gridTemplateColumns: "repeat(2,1fr)",
-        gap: "12px",
-        width: "100%"
-      },
-      className: "mb-4",
-      children: [c.jsxs("div", {
-        className: "rounded-2xl p-4",
-        style: {
-          backgroundColor: "#FEF3E2",
-          border: "1px solid #FBD38D"
-        },
-        children: [c.jsx("p", {
-          className: "text-xs font-bold uppercase tracking-widest mb-1",
-          style: {
-            color: "#B45309"
-          },
-          children: "Consistency Streak"
-        }), c.jsxs("p", {
-          className: "text-2xl font-black text-foreground",
-          children: [streak, " ", streak === 1 ? "day" : "days"]
-        }), c.jsx("p", {
-          className: "text-xs font-semibold mt-1",
-          style: {
-            color: "#B45309"
-          },
-          children: streak > 0 ? "Keep showing up!" : "Start today!"
-        })]
-      }), c.jsxs("div", {
-        className: "rounded-2xl p-4 bg-white border border-border",
-        children: [c.jsx("p", {
-          className: "text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1",
-          children: "This Week"
-        }), c.jsxs("p", {
-          className: "text-2xl font-black text-foreground",
-          children: [weekLogged, " ", weekLogged === 1 ? "day" : "days", " logged"]
-        }), c.jsx("p", {
-          className: "text-xs text-primary font-semibold mt-1",
-          children: "Stay on track"
-        })]
-      })]
-    }), c.jsx("div", {
-      style: {
-        display: "grid",
-        gridTemplateColumns: "repeat(7,1fr)",
-        gap: "4px",
-        width: "100%"
-      },
-      className: "mb-2",
-      children: weekDates.map((d, _i) => {
-        const isToday = Hc(d, now);
-        const dg = dayGroups.find(x => Hc(x.date, d));
-        const tracked = dg && dg.total > 0;
-        return c.jsxs("div", {
-          className: "flex flex-col items-center gap-1",
-          children: [c.jsx("span", {
-            className: "text-xs font-bold text-muted-foreground",
-            children: uh(d, "EEE")
-          }), c.jsx("div", {
-            className: "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
-            style: isToday ? {
-              backgroundColor: "#16a34a",
-              color: "#ffffff"
-            } : {
-              color: "#1f2937"
-            },
-            children: uh(d, "d")
-          }), c.jsx("span", {
-            className: "w-1 h-1 rounded-full",
-            style: {
-              backgroundColor: tracked ? "#16a34a" : "transparent"
-            }
-          })]
-        }, _i)
-      })
-    })]
+
+  // Enrich each day with its blocks (clipped to that day)
+  var dayGroups = days.map(function(d) {
+    var dStart = getDayStart(d.getTime());
+    var dEnd = dStart + 86400000;
+    return enrichBlocksForDay(blocks, _activities, dStart, dEnd);
   });
+
+  // ── Streak Calculation ──────────────────────────────────────────────────────
+  // Start from today (index 0) if it has time, otherwise start from index 1
+  var streakStart = (dayGroups.length > 0 && dayGroups[0].totalSeconds > 0) ? 0 : 1;
+  var streak = 0;
+  for (var si = streakStart; si < dayGroups.length; si++) {
+    if (dayGroups[si].totalSeconds > 0) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  // ── Week Calendar Grid (Monday–Sunday) ──────────────────────────────────────
+  var weekStart = getWeekStart(now);
+  var weekDates = [];
+  for (var wi = 0; wi < 7; wi++) {
+    var wd = new Date(weekStart);
+    wd.setDate(weekStart.getDate() + wi);
+    weekDates.push(wd);
+  }
+
+  // Count how many days this week have logged time
+  var weekLogged = 0;
+  for (var wl = 0; wl < weekDates.length; wl++) {
+    for (var dg = 0; dg < dayGroups.length; dg++) {
+      if (isSameDay(days[dg], weekDates[wl]) && dayGroups[dg].totalSeconds > 0) {
+        weekLogged++;
+        break;
+      }
+    }
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return c.jsxs("div", {
-    "data-source-file": "screens/Journal.js",
+    "data-source-file": "screens/Journal_new.js",
     className: "flex flex-col",
-    children: [StreakWeekBlock, c.jsxs("div", {
-      className: "bg-primary text-white px-5 pt-10 pb-6",
-      children: [c.jsx("p", {
-        className: "text-xs font-semibold text-white/50 uppercase tracking-widest mb-1",
-        children: uh(new Date, "EEEE, MMMM d")
-      }), c.jsx("p", {
-        className: "text-4xl font-black",
-        children: l === 0 ? "0 min" : s(l)
-      }), c.jsx("p", {
-        className: "text-white/50 text-sm mt-1",
-        children: "tracked today"
-      }), (e == null ? void 0 : e.activities) && e.activities.length > 0 && c.jsx("div", {
-        className: "mt-4 flex h-1.5 w-full bg-white/10 overflow-hidden",
-        children: e.activities.map(a => c.jsx("div", {
-          style: {
-            width: `${a.totalSeconds/Math.max(1,l)*100}%`,
-            backgroundColor: a.activityColor
-          },
-          className: "h-full"
-        }, a.activityId))
-      })]
-    }), c.jsx("div", {
-      className: "px-5 pt-5 pb-2",
-      children: c.jsx("h2", {
-        className: "text-xs font-semibold text-muted-foreground uppercase tracking-widest",
-        children: "This month"
-      })
-    }), c.jsx("div", {
-      className: "flex flex-col divide-y divide-border border-t border-b border-border",
-      children: dayGroups.map((dg, idx) => {
-        const isToday = Hc(dg.date, now),
-          isOpen = activeDay === idx,
-          groupVals = Object.values(dg.grouped);
-        return c.jsxs("div", {
-          children: [c.jsxs("button", {
-            type: "button",
-            onClick: () => setExpandedDay(isOpen ? -1 : idx),
-            className: "w-full flex items-center justify-between px-5 py-4 bg-white",
-            children: [c.jsxs("div", {
-              className: "flex items-center gap-2.5",
-              children: [isToday && c.jsxs("span", {
-                className: "relative flex h-2.5 w-2.5 shrink-0",
-                children: [c.jsx("span", {
-                  className: "animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"
-                }), c.jsx("span", {
-                  className: "relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"
-                })]
-              }), c.jsx("span", {
-                className: "font-bold text-sm text-foreground",
-                children: isToday ? uh(dg.date, "dd/MM/yyyy") : uh(dg.date, "dd/MM/yyyy")
-              })]
-            }), c.jsxs("div", {
-              className: "flex items-center gap-3",
-              children: [c.jsx("span", {
-                className: "font-mono text-sm font-bold text-muted-foreground",
-                children: dg.total > 0 ? s(dg.total) : "—"
-              }), c.jsx("span", {
-                className: `text-muted-foreground text-xs transition-transform ${isOpen?"rotate-90":""}`,
-                children: "▶"
-              })]
-            })]
-          }), isOpen && (groupVals.length === 0 ? c.jsx("div", {
-            className: "px-5 py-4 text-sm text-muted-foreground bg-secondary",
-            children: "No time logged."
-          }) : c.jsx("div", {
-            className: "bg-secondary",
-            children: groupVals.map((a, u) => c.jsxs("div", {
-              children: [c.jsxs("div", {
-                className: "flex items-center justify-between px-5 py-2.5",
+    children: [
+
+      /* ── 1. Streak & Week Block ────────────────────────────────────────────── */
+      c.jsxs("div", {
+        className: "px-5 pt-5",
+        children: [
+
+          // Two cards side by side
+          c.jsxs("div", {
+            className: "grid grid-cols-2 gap-3 w-full mb-4",
+            children: [
+
+              // Consistency Streak card
+              c.jsxs("div", {
+                className: "rounded-2xl p-4",
+                style: { backgroundColor: "#FEF3E2", border: "1px solid #FBD38D" },
+                children: [
+                  c.jsx("p", {
+                    className: "text-xs font-bold uppercase tracking-widest mb-1",
+                    style: { color: "#B45309" },
+                    children: "Consistency Streak"
+                  }),
+                  c.jsxs("p", {
+                    className: "text-2xl font-black text-foreground",
+                    children: [streak, " ", streak === 1 ? "day" : "days"]
+                  }),
+                  c.jsx("p", {
+                    className: "text-xs font-semibold mt-1",
+                    style: { color: "#B45309" },
+                    children: streak > 0 ? "Keep showing up!" : "Start today!"
+                  })
+                ]
+              }),
+
+              // This Week card
+              c.jsxs("div", {
+                className: "rounded-2xl p-4 bg-white border border-border",
+                children: [
+                  c.jsx("p", {
+                    className: "text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1",
+                    children: "This Week"
+                  }),
+                  c.jsxs("p", {
+                    className: "text-2xl font-black text-foreground",
+                    children: [weekLogged, " ", weekLogged === 1 ? "day" : "days", " logged"]
+                  }),
+                  c.jsx("p", {
+                    className: "text-xs text-primary font-semibold mt-1",
+                    children: "Stay on track"
+                  })
+                ]
+              })
+            ]
+          }),
+
+          // Week calendar grid (Mon–Sun)
+          c.jsx("div", {
+            className: "grid grid-cols-7 gap-1 w-full mb-2",
+            children: weekDates.map(function(d, i) {
+              var isToday = isSameDay(d, now);
+              // Check if this day has tracked time
+              var tracked = false;
+              for (var ti = 0; ti < dayGroups.length; ti++) {
+                if (isSameDay(days[ti], d) && dayGroups[ti].totalSeconds > 0) {
+                  tracked = true;
+                  break;
+                }
+              }
+              return c.jsxs("div", {
+                className: "flex flex-col items-center gap-1",
+                children: [
+                  // Day name label (Mon, Tue, etc.)
+                  c.jsx("span", {
+                    className: "text-xs font-bold text-muted-foreground",
+                    children: getDayName(d)
+                  }),
+                  // Day number circle
+                  c.jsx("div", {
+                    className: "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
+                    style: isToday
+                      ? { backgroundColor: "#16a34a", color: "#ffffff" }
+                      : { color: "#1f2937" },
+                    children: getDayNum(d)
+                  }),
+                  // Tracking dot (green if tracked, transparent if not)
+                  c.jsx("span", {
+                    className: "w-1 h-1 rounded-full",
+                    style: { backgroundColor: tracked ? "#16a34a" : "transparent" }
+                  })
+                ]
+              }, i);
+            })
+          })
+        ]
+      }),
+
+      /* ── 2. Today's Time Summary (primary banner) ──────────────────────────── */
+      c.jsxs("div", {
+        className: "bg-primary text-white px-5 pt-10 pb-6",
+        children: [
+          // Full date: "Wednesday, September 9"
+          c.jsx("p", {
+            className: "text-xs font-semibold text-white/50 uppercase tracking-widest mb-1",
+            children: formatDateLong(now)
+          }),
+          // Large time display
+          c.jsx("p", {
+            className: "text-4xl font-black",
+            children: todayTotalSeconds === 0 ? "0 min" : formatDuration(todayTotalSeconds)
+          }),
+          // Subtitle
+          c.jsx("p", {
+            className: "text-white/50 text-sm mt-1",
+            children: "tracked today"
+          }),
+          // Activity bar (horizontal segments proportional to time)
+          todayStats.activities.length > 0 && c.jsx("div", {
+            className: "mt-4 flex h-1.5 w-full bg-white/10 overflow-hidden",
+            children: todayStats.activities.map(function(a) {
+              return c.jsx("div", {
                 style: {
-                  borderLeft: `4px solid ${a.color}`
+                  width: (a.totalSeconds / Math.max(1, todayTotalSeconds) * 100) + "%",
+                  backgroundColor: a.activityColor
                 },
-                children: [c.jsx("span", {
-                  className: "font-bold text-sm text-foreground",
-                  children: a.name
-                }), c.jsx("span", {
-                  className: "font-mono text-sm font-bold text-muted-foreground",
-                  children: s(a.blocks.reduce((f, p) => f + (p.durationSeconds || 0), 0))
-                })]
-              }), a.blocks.map(f => c.jsxs("div", {
-                className: "flex items-center justify-between px-5 py-2 pl-8",
-                style: {
-                  borderLeft: `4px solid ${a.color}40`
-                },
-                children: [c.jsxs("span", {
-                  className: "text-sm text-muted-foreground",
-                  children: [i(f._rangeStart), f._startedBefore && c.jsx("span", {
-                    className: "text-xs italic",
-                    children: " (from prev. day)"
-                  }), f._continuesAfter ? c.jsxs(w.Fragment, {
-                    children: [` → ${i(f._rangeEnd)}`, c.jsx("span", {
-                      className: "text-xs italic",
-                      children: " (continues next day)"
-                    })]
-                  }) : (f.endTime ? ` → ${i(f._rangeEnd)}` : " · running")]
-                }), c.jsx("span", {
-                  className: "font-mono text-sm font-semibold",
-                  children: f.durationSeconds ? s(f.durationSeconds) : "—"
-                })]
-              }, f.id))]
-            }, u))
-          }))]
-        }, idx)
-      })
-    }), c.jsx("div", {
-      className: "h-6"
-    })]
-  })
+                className: "h-full"
+              }, a.activityId);
+            })
+          })
+        ]
+      }),
+
+      /* ── 3. "THIS MONTH" Day List ───────────────────────────────────────────── */
+      c.jsxs("div", {
+        className: "px-5 pt-5 pb-2",
+        children: [
+          c.jsx("h2", {
+            className: "text-xs font-semibold text-muted-foreground uppercase tracking-widest",
+            children: "This month"
+          })
+        ]
+      }),
+      c.jsx("div", {
+        className: "flex flex-col divide-y divide-border border-t border-b border-border",
+        children: dayGroups.map(function(dg, idx) {
+          var dayDate = days[idx];
+          var isToday = isSameDay(dayDate, now);
+          var isOpen = expandedDay === idx;
+          var activities = dg.activities;
+
+          return c.jsxs("div", {
+            children: [
+              // Day row button (tap to expand)
+              c.jsxs("button", {
+                type: "button",
+                onClick: function() { setExpandedDay(isOpen ? -1 : idx); },
+                className: "w-full flex items-center justify-between px-5 py-4 bg-white",
+                children: [
+                  c.jsxs("div", {
+                    className: "flex items-center gap-2.5",
+                    children: [
+                      // Animated green dot for today
+                      isToday && c.jsxs("span", {
+                        className: "relative flex h-2.5 w-2.5 shrink-0",
+                        children: [
+                          c.jsx("span", {
+                            className: "animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"
+                          }),
+                          c.jsx("span", {
+                            className: "relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"
+                          })
+                        ]
+                      }),
+                      // Date label
+                      c.jsx("span", {
+                        className: "font-bold text-sm text-foreground",
+                        children: formatDate(dayDate)
+                      })
+                    ]
+                  }),
+                  c.jsxs("div", {
+                    className: "flex items-center gap-3",
+                    children: [
+                      // Total time for the day
+                      c.jsx("span", {
+                        className: "font-mono text-sm font-bold text-muted-foreground",
+                        children: dg.totalSeconds > 0 ? formatDuration(dg.totalSeconds) : "\u2014"
+                      }),
+                      // Expand arrow (rotates when open)
+                      c.jsx("span", {
+                        className: "text-muted-foreground text-xs transition-transform " + (isOpen ? "rotate-90" : ""),
+                        children: "\u25B6"
+                      })
+                    ]
+                  })
+                ]
+              }),
+
+              // Expanded content: activity groups with individual blocks
+              isOpen && (activities.length === 0
+                ? c.jsx("div", {
+                    className: "px-5 py-4 text-sm text-muted-foreground bg-secondary",
+                    children: "No time logged."
+                  })
+                : c.jsx("div", {
+                    className: "bg-secondary",
+                    children: activities.map(function(a, ai) {
+                      var activityTotal = a.blocks.reduce(function(sum, b) {
+                        return sum + (b.durationSeconds || 0);
+                      }, 0);
+                      return c.jsxs("div", {
+                        children: [
+                          // Activity header row (colored bar + name + total)
+                          c.jsxs("div", {
+                            className: "flex items-center justify-between px-5 py-2.5",
+                            style: { borderLeft: "4px solid " + a.activityColor },
+                            children: [
+                              c.jsx("span", {
+                                className: "font-bold text-sm text-foreground",
+                                children: a.activityName
+                              }),
+                              c.jsx("span", {
+                                className: "font-mono text-sm font-bold text-muted-foreground",
+                                children: formatDuration(activityTotal)
+                              })
+                            ]
+                          }),
+                          // Individual block rows
+                          a.blocks.map(function(b) {
+                            return c.jsxs("div", {
+                              className: "flex items-center justify-between px-5 py-2 pl-8",
+                              style: { borderLeft: "4px solid " + a.activityColor + "40" },
+                              children: [
+                                c.jsxs("span", {
+                                  className: "text-sm text-muted-foreground",
+                                  children: [
+                                    formatTime12(b.startTime),
+                                    // If block started before this day
+                                    b.startedBefore && c.jsx("span", {
+                                      className: "text-xs italic",
+                                      children: " (from prev. day)"
+                                    }),
+                                    // End time or running indicator
+                                    b.continuesAfter
+                                      ? c.jsxs(w.Fragment, {
+                                          children: [
+                                            " \u2192 " + formatTime12(b.endTime),
+                                            c.jsx("span", {
+                                              className: "text-xs italic",
+                                              children: " (continues next day)"
+                                            })
+                                          ]
+                                        })
+                                      : (b.endTime
+                                          ? " \u2192 " + formatTime12(b.endTime)
+                                          : " \u00B7 running")
+                                  ]
+                                }),
+                                c.jsx("span", {
+                                  className: "font-mono text-sm font-semibold",
+                                  children: b.durationSeconds
+                                    ? formatDuration(b.durationSeconds)
+                                    : "\u2014"
+                                })
+                              ]
+                            }, b.id);
+                          })
+                        ]
+                      }, ai);
+                    })
+                  })
+              )
+            ]
+          }, idx);
+        })
+      }),
+
+      // Bottom spacer
+      c.jsx("div", { className: "h-6" })
+    ]
+  });
+}
+
+/* ─── Extra Helper ──────────────────────────────────────────────────────────── */
+
+// Format date to long form "Wednesday, September 9"
+function formatDateLong(date) {
+  var dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  var monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  var d = new Date(date);
+  return dayNames[d.getDay()] + ", " + monthNames[d.getMonth()] + " " + d.getDate();
 }
