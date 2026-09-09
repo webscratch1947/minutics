@@ -8683,14 +8683,17 @@
            Journal, Settings) — in that case, set _activeSubTab = "activity"
            so the Activity sub-tab is shown immediately when enhancements
            re-inject, instead of briefly showing Timer content first. */
+        /* Real route switch: remove injected elements and re-inject after
+           React re-renders. No mask needed — CSS rules on data-source-file
+           permanently hide native timer panel, daily value bar, and Life Hub
+           tiles, so there's no visible flash of native content. */
         var goingToActivity = isActivityTabTap || (targetHref === "/" && _activeSubTab === "activity");
         var injected = document.querySelectorAll("[data-lt-enhancement],[data-lt-tile-injected]");
         for (var i = 0; i < injected.length; i++) {
           injected[i].remove();
         }
         _activeSubTab = goingToActivity ? "activity" : "timer";
-        showNavMaskWithTimeout(800);
-        setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 80);
+        setTimeout(function () { runEnhancementsImmediate(); }, 80);
       }
     }, true);
   }
