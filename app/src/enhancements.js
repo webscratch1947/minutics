@@ -401,7 +401,7 @@
     }
   }
   /* Exposed so a future Razorpay/webhook flow (or manual testing) can flip this */
-  window.LTPlan = { isPro: isPro, setPlan: setPlan, getPlanName: getPlanName };
+  window.LTPlan = { isPro: isPro, setPlan: setPlan, getPlanName: getPlanName, showPlansScreen: showPlansScreen };
 
   /* ── Plan expiry & star cap enforcement ──────────────────────────────────── */
   var PLAN_DURATIONS = { basic: 30 * 24 * 3600 * 1000, yearly: 365 * 24 * 3600 * 1000 };

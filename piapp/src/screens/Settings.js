@@ -286,16 +286,35 @@ export function SettingsScreen() {
         children: [
           jsx(SectionHeader, { children: "Plan" }),
           jsx(Card, {
-            children: jsxs(CardRow, {
-              label: planLabel + " Plan",
-              desc: isPro ? "All premium features unlocked" : "Basic features included",
-              children: jsx("span", {
-                className: [
-                  "inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full",
-                  isPro ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
-                ].join(" "),
-                children: isPro ? "\u2B50 Pro" : "Free"
-              })
+            children: jsxs(Fragment, {
+              children: [
+                jsxs(CardRow, {
+                  label: planLabel + " Plan",
+                  desc: isPro ? "All premium features unlocked" : "Basic features included",
+                  children: jsx("span", {
+                    className: [
+                      "inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full",
+                      isPro ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
+                    ].join(" "),
+                    children: isPro ? "\u2B50 Pro" : "Free"
+                  })
+                }),
+                jsx(Divider, {}),
+                jsx("div", {
+                  className: "px-4 py-3",
+                  children: jsx("button", {
+                    onClick: function () {
+                      if (typeof window !== "undefined" && window.LTPlan && window.LTPlan.showPlansScreen) {
+                        window.LTPlan.showPlansScreen();
+                      } else {
+                        alert("Plans screen is managed from the main app.");
+                      }
+                    },
+                    className: "w-full rounded-xl bg-primary/10 py-2.5 text-sm font-semibold text-primary active:bg-primary/20 transition",
+                    children: "View Plans"
+                  })
+                })
+              ]
             })
           })
         ]
@@ -400,38 +419,28 @@ export function SettingsScreen() {
         children: [
           jsx(SectionHeader, { children: "Features" }),
           jsx(Card, {
-            children: jsxs(Fragment, {
-              children: [
-                jsx(CardRow, {
-                  label: "Smart Nudges",
-                  desc: "Personalized reminders based on your activity",
-                  children: jsx(Toggle, { enabled: nudgesEnabled, onToggle: handleNudgesToggle })
-                }),
-                jsx(Divider, {}),
-                jsx(CardRow, {
-                  label: "Website Notifications",
-                  desc: notifPermission === "granted"
-                    ? "Notifications are enabled"
-                    : notifPermission === "denied"
-                      ? "Blocked by browser settings"
-                      : "Receive alerts in your browser",
-                  children: notifPermission === "granted"
-                    ? jsx("span", {
-                        className: "inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-600",
-                        children: "On"
-                      })
-                    : jsx("button", {
-                        onClick: handleEnableNotifications,
-                        disabled: notifPermission === "denied",
-                        className: [
-                          "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary",
-                          "active:bg-primary/20 transition",
-                          notifPermission === "denied" ? "opacity-40 cursor-not-allowed" : ""
-                        ].join(" "),
-                        children: "Enable"
-                      })
-                })
-              ]
+            children: jsx(CardRow, {
+              label: "Website Notifications",
+              desc: notifPermission === "granted"
+                ? "Notifications are enabled"
+                : notifPermission === "denied"
+                  ? "Blocked by browser settings"
+                  : "Receive alerts in your browser",
+              children: notifPermission === "granted"
+                ? jsx("span", {
+                    className: "inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-600",
+                    children: "On"
+                  })
+                : jsx("button", {
+                    onClick: handleEnableNotifications,
+                    disabled: notifPermission === "denied",
+                    className: [
+                      "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary",
+                      "active:bg-primary/20 transition",
+                      notifPermission === "denied" ? "opacity-40 cursor-not-allowed" : ""
+                    ].join(" "),
+                    children: "Enable"
+                  })
             })
           })
         ]
