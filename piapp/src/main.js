@@ -1,5 +1,7 @@
+import { createRoot } from 'react-dom/client';
+import { jsx } from 'react/jsx-runtime';
 import { QC } from './app/AppRoot.js';
-import { Um, c } from './shared.js';
+import { getStore, setStore } from './lib/storage.js';
 
 (function seedDefaultActivitiesEarly() {
   var SEEDED_KEY = "lt_default_activities_seeded_v2";
@@ -37,7 +39,7 @@ import { Um, c } from './shared.js';
 console.log("MAIN.JS: Starting React app render");
 const rootElement = document.getElementById("root");
 console.log("MAIN.JS: Root element:", rootElement);
-const root = Um(rootElement);
+const root = createRoot(rootElement);
 console.log("MAIN.JS: React root created:", root);
-root.render(c.jsx(QC, {}));
+root.render(jsx(QC, {}));
 console.log("MAIN.JS: React render called");

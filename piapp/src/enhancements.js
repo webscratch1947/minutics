@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   /* ── Startup loading screen ────────────────────────────────────────────
@@ -46,14 +46,6 @@
       splash.style.opacity = "0";
       setTimeout(function () {
         if (splash.parentNode) splash.parentNode.removeChild(splash);
-        [0, 200, 500, 1000].forEach(function (d) {
-          setTimeout(function () {
-            if (typeof lockTimerPageScroll === "function" &&
-                location.pathname === "/" && _activeSubTab !== "activity") {
-              lockTimerPageScroll();
-            }
-          }, d);
-        });
       }, 450);
     }
 
@@ -544,953 +536,29 @@
      directly above it (they're adjacent siblings in the app's own markup) —
      these get tucked under the new pseudo "Activity" nav tab instead of
      always showing on the Timer tab. */
-  function findActivityElements() {
-    var input = document.querySelector('input[placeholder="New activity..."]');
-    if (!input) return null;
-    var addRow = input.parentElement;
-    var list = addRow ? addRow.previousElementSibling : null;
-    return { addRow: addRow, list: list };
-  }
+  /* P1+P2 REMOVED: findActivityElements, _activeSubTab, applySubTabVisibility
+     The Activity pseudo-tab and Timer/Activity sub-tab switching are now
+     managed entirely by React. Home.js owns both the timer panel and
+     activity list on the "/" route. */
+
+  /* P9 REMOVED: calcFocusScore, todayEntriesIncludingLive, activityStatsForToday
+     P6+P7+P8 REMOVED: tickLifeProgressCard, tvRateStored, buildTimerAchievements,
+     buildGlanceSection, buildQuotePlantSection, getOrCreateTimerHost,
+     buildLifeProgressCard, addStyleFrog, frogSignature, buildEatTheFrogCard
+     All now rendered by React components in Home.js:
+     LifeProgressCard, TodayGlance, EatTheFrog */
+
+  /* P1 REMOVED: activityTabClasses, ensureActivityNavTab, syncNavTabStyles
+     The Activity nav tab and tab styling are now managed by React's
+     _slice_shell.js bottom nav. */
+
+  /* P11 REMOVED: restyleTopNav — React's LTTopNav handles the top bar. */
+  /* P6+P7+P8 REMOVED: tickLifeProgressCard, tvRateStored, buildTimerAchievements,
+     buildGlanceSection, buildQuotePlantSection, getOrCreateTimerHost,
+     buildLifeProgressCard, addStyleFrog, frogSignature, buildEatTheFrogCard
+     All now rendered by React components in Home.js:
+     LifeProgressCard, TodayGlance, EatTheFrog */
 
-  var _activeSubTab = "timer"; /* "timer" | "activity" — our own pseudo-tab, both live on route "/" */
-
-  function applySubTabVisibility() {
-    var onTimerPage = location.pathname === "/";
-    var isActivity = _activeSubTab === "activity" && onTimerPage;
-    var showTimerStuff = onTimerPage && !isActivity;
-    var lp = document.getElementById("lt-life-progress");
-    if (lp) lp.style.display = showTimerStuff ? "" : "none";
-    var glance = document.getElementById("lt-glance-section");
-    if (glance) glance.style.display = showTimerStuff ? "" : "none";
-    var frog = document.getElementById("lt-frog-card");
-    if (frog) frog.style.display = showTimerStuff ? "" : "none";
-    /* Hide retirement countdown + time value when on Activity sub-tab */
-    var retirement = document.querySelector("[data-lt-enhancement='retirement']");
-    if (retirement) retirement.style.display = showTimerStuff ? "" : "none";
-    var tvCard = document.querySelector("[data-lt-enhancement='saved-value']");
-    if (tvCard) tvCard.style.display = showTimerStuff ? "" : "none";
-    var quote = document.getElementById("lt-quote-section");
-    if (quote) quote.remove();
-    var achTimer = document.getElementById("lt-timer-achievements");
-    if (achTimer) achTimer.remove();
-    var act = findActivityElements();
-    if (act) {
-      var show = isActivity ? "" : "none";
-      if (act.addRow) act.addRow.style.display = show;
-      if (act.list) act.list.style.display = show;
-    }
-    if (isActivity) {
-      buildActivityStatsHeader();
-    } else {
-      var header = document.getElementById("lt-activity-header");
-      if (header) header.style.display = "none";
-      var limitBadge = document.getElementById("lt-activity-limit");
-      if (limitBadge) limitBadge.style.display = "none";
-    }
-    lockTimerPageScroll();
-  }
-
-  /* Categories that hurt focus score when time is logged against them */
-  var FOCUS_PENALTY_CATEGORIES = ["Time Waste", "Social Media", "Entertainment"];
-  /* Categories that boost focus score */
-  var FOCUS_BOOST_CATEGORIES   = ["Duty / Work", "Study / Learning", "Exercise / Fitness", "Creative / Hobby", "Health / Self-care"];
-
-  /* Compute a 0-100 focus score from today's category log.
-     Logic:
-       - Start at 100.
-       - For every minute in a penalty category: -1 pt.
-       - For every minute in a boost category:   +0.25 pts, never above 100.
-       - Result clamped 0-100. */
-  function calcFocusScore(entries) {
-    if (!entries || entries.length === 0) return 100;
-    var penaltyMin = 0, boostMin = 0;
-    entries.forEach(function (e) {
-      var m = Number(e.minutes) || 0;
-      if (FOCUS_PENALTY_CATEGORIES.indexOf(e.category) !== -1) penaltyMin += m;
-      else if (FOCUS_BOOST_CATEGORIES.indexOf(e.category) !== -1) boostMin += m;
-    });
-    var score = 100 - penaltyMin + (boostMin * 0.25);
-    return Math.min(100, Math.max(0, Math.round(score)));
-  }
-
-  /* Include the currently running, already-tagged activity in the cards.
-     The timer is intentionally allowed to run without a tag; blank tags do
-     not earn value or change focus score. */
-  function todayEntriesIncludingLive() {
-    var entries = catLogEntries().filter(function (e) { return e.date === today(); });
-    var pending = readJson(PENDING_TIMER_CAT_KEY, null);
-    var startedAt = Number(readJson(RUNNING_TIMER_KEY, 0));
-    if (pending && pending.category && startedAt > 0) {
-      var liveMinutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60000));
-      if (liveMinutes > 0) {
-        entries.push({
-          category: pending.category,
-          minutes: liveMinutes,
-          label: pending.label || "",
-          reason: pending.reason || ""
-        });
-      }
-    }
-    return entries;
-  }
-
-  /* Full "Activity's" page chrome: date-stamped title + 4 stat cards +
-     section label, sitting above the app's own native activity list/add
-     row (those keep working exactly as before — we're only framing them). */
-  function activityStatsForToday() {
-    var entries = todayEntriesIncludingLive();
-    var minutes = entries.reduce(function (s, e) { return s + (Number(e.minutes) || 0); }, 0);
-    var rate = tvRateStored();
-    /* Only tagged, non-waste minutes count toward Value Earned. */
-    var productiveMinutes = entries.reduce(function (s, e) {
-      return e.category && WASTE_CATEGORIES.indexOf(e.category) === -1
-        ? s + (Number(e.minutes) || 0) : s;
-    }, 0);
-    var value = rate ? productiveMinutes * Number(rate.perMinute) : 0;
-    return {
-      minutes: minutes,
-      value: value,
-      hasValue: !!rate,
-      focusScore: calcFocusScore(entries),
-      activityCount: nonArchivedActivityCount()
-    };
-  }
-
-  function buildActivityStatsHeader() {
-    var act = findActivityElements();
-    if (!act || !act.addRow) return;
-    var host = act.list ? act.list.parentElement : act.addRow.parentElement;
-    if (!host) return;
-    var header = document.getElementById("lt-activity-header");
-    if (!header) {
-      header = document.createElement("div");
-      header.id = "lt-activity-header";
-      header.setAttribute("data-lt-enhancement", "1");
-    }
-    /* Must sit directly above the activity list (Work/Sleep/etc) and the
-       add row — NOT at the very top of host, which also holds the Timer
-       panel / Daily Value bar as siblings. Re-assert every call since the
-       app's own re-renders can reorder things. For new users with no
-       activities, act.list may be null — fall back to inserting before
-       addRow. */
-    var anchor = act.list || act.addRow;
-    if (header.nextElementSibling !== anchor || header.parentNode !== host) {
-      host.insertBefore(header, anchor);
-    }
-    header.style.display = "";
-
-    var s = activityStatsForToday();
-    var dateLabel = new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", year: "numeric" });
-
-    header.innerHTML =
-      '<div class="lt-act-topline">' +
-        '<h1 class="lt-act-title">Activity\u2019s</h1>' +
-        '<span class="lt-act-date">' + escapeHtml(dateLabel) + '</span>' +
-      '</div>' +
-      '<div class="lt-act-stats-grid">' +
-        '<div class="lt-act-stat-card">' +
-          '<span class="lt-act-stat-icon" style="background:#DCFCE7">\u23F1</span>' +
-          '<p class="lt-act-stat-label">Time Tracked</p>' +
-          '<p class="lt-act-stat-value">' + fvFormatMinutes(s.minutes) + '</p>' +
-        '</div>' +
-         '<div class="lt-act-stat-card" id="lt-value-earned-card">' +
-          '<span class="lt-act-stat-icon" style="background:#FEF3C7">\uD83D\uDCB0</span>' +
-          '<p class="lt-act-stat-label">Value Earned</p>' +
-           (s.hasValue
-             ? '<p class="lt-act-stat-value">' + money(s.value) + '</p>'
-             : '<p class="lt-add-time-value-label">Setup Time Value Calculator</p>') +
-        '</div>' +
-        '<div class="lt-act-stat-card">' +
-          '<span class="lt-act-stat-icon" style="background:#FEE2E2">\uD83C\uDFAF</span>' +
-          '<p class="lt-act-stat-label">Focus Score</p>' +
-          '<p class="lt-act-stat-value">' + s.focusScore + '<span class="lt-act-stat-suffix">/100</span></p>' +
-        '</div>' +
-        '<div class="lt-act-stat-card">' +
-          '<span class="lt-act-stat-icon" style="background:#EDE9FE">\uD83D\uDD25</span>' +
-          '<p class="lt-act-stat-label">Activities</p>' +
-          '<p class="lt-act-stat-value">' + s.activityCount + '</p>' +
-        '</div>' +
-      '</div>' +
-      '<p class="lt-act-section-label">Your Activities</p>' +
-      '<p style="font-size:11px;color:hsl(var(--muted-foreground));margin:-4px 16px 8px;font-weight:600">' +
-        '⚠️ Default activities don’t count toward achievements' +
-      '</p>' +
-      (function () {
-        var grace = downgradeGraceStatus();
-        if (!grace) return "";
-        var count = nonArchivedActivityCount();
-        return '<p style="font-size:11px;color:#c0392b;background:#FDECEA;margin:0 16px 10px;padding:8px 10px;font-weight:700;line-height:1.4">' +
-          '⚠️ You have ' + count + ' activities but the Free plan only allows ' + FREE_ACTIVITY_LIMIT + '. ' +
-          'Upgrade within ' + grace.daysLeft + ' day' + (grace.daysLeft === 1 ? "" : "s") +
-          ' or extra activities will be automatically removed.' +
-        '</p>';
-      })();
-
-    var addTimeValue = document.getElementById("lt-add-time-value");
-    if (addTimeValue) addTimeValue.addEventListener("click", goToTimeValueTool); /* no-op now: element is plain text, kept for safety if markup ever restores the button */
-  }
-
-  function activityTabClasses() {
-    return "flex flex-col items-center justify-center gap-0.5 flex-1 py-2 transition-colors text-[10px] font-semibold tracking-wide " +
-      (_activeSubTab === "activity" ? "text-primary lt-navtab-active" : "text-muted-foreground");
-  }
-
-  function ensureActivityNavTab() {
-    var nav = document.querySelector("nav.flex.items-stretch") || document.querySelector("nav");
-    if (!nav) return;
-    var btn = document.getElementById("lt-activity-navtab");
-    if (!btn) {
-      btn = document.createElement("button");
-      btn.type = "button";
-      btn.id = "lt-activity-navtab";
-      btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l2.5 2.5L16 9"></path></svg><span>Activity</span>';
-      btn.addEventListener("click", function () {
-        if (location.pathname !== "/") {
-          var timerLink = nav.querySelector('a[href="/"]');
-          if (timerLink) timerLink.click();
-        }
-        _activeSubTab = "activity";
-        applySubTabVisibility();
-        syncNavTabStyles();
-        upsertRunningBanner();
-        setTimeout(function () { applySubTabVisibility(); syncNavTabStyles(); upsertRunningBanner(); }, 60);
-        setTimeout(function () { applySubTabVisibility(); syncNavTabStyles(); upsertRunningBanner(); }, 250);
-      });
-      Array.prototype.slice.call(nav.querySelectorAll("a")).forEach(function (a) {
-        a.addEventListener("click", function () {
-          _activeSubTab = "timer";
-          applySubTabVisibility();
-          syncNavTabStyles();
-          upsertRunningBanner();
-          setTimeout(upsertRunningBanner, 60);
-          setTimeout(upsertRunningBanner, 250);
-        });
-      });
-    }
-    var timerLink = nav.querySelector('a[href="/"]');
-    var desiredNext = timerLink ? timerLink.nextSibling : nav.firstChild;
-    if (btn.previousSibling !== timerLink || desiredNext !== btn) {
-      if (timerLink) nav.insertBefore(btn, timerLink.nextSibling);
-      else nav.insertBefore(btn, nav.firstChild);
-    }
-    btn.style.display = "";
-    syncNavTabStyles();
-  }
-
-  function syncNavTabStyles() {
-    var btn = document.getElementById("lt-activity-navtab");
-    if (btn) btn.className = activityTabClasses();
-    var nav = document.querySelector("nav.flex.items-stretch") || document.querySelector("nav");
-    if (!nav) return;
-    /* The real Timer link's highlight classes (text-primary / lt-navtab-active
-       vs text-muted-foreground) are set by React itself on every render,
-       based on the actual current route — this file must never add or
-       remove them directly, or they go stale the instant a real tab click
-       fires. The ONLY thing we need to do here is dim the Timer link while
-       our pseudo Activity tab is showing instead, which is done purely via
-       a data attribute + CSS override below so it can never conflict with
-       or outlive React's own class management. */
-    if (_activeSubTab === "activity") {
-      nav.setAttribute("data-lt-activity-mode", "1");
-    } else {
-      nav.removeAttribute("data-lt-activity-mode");
-    }
-  }
-
-  /* Top bar restyle — swap the hardcoded black/white header for a light
-     card with dark text, to match the app's own light color scheme.
-     Colors only. The app's own LTTopNav component (checked directly in
-     the compiled bundle) already renders as the FIRST child of the page's
-     root flex column, before <main>, with "sticky top-0" baked into its
-     own className — it was never structurally broken. Every earlier
-     attempt here to also "fix" its position/order was solving a problem
-     that didn't exist, and the DOM-reordering was itself what caused the
-     bar to end up out of place. Leave positioning to the app; only touch
-     colors, every tick, since the bar's background is also set inline by
-     React on its own renders and gets reset on re-mounts. */
-  function restyleTopNav() {
-    var title = Array.prototype.slice.call(document.querySelectorAll("span"))
-      .find(function (el) { return el.textContent.trim() === "LifeTime" && el.children.length === 0; });
-    if (!title) return;
-    var oldBar = title.parentElement;
-    if (!oldBar) return;
-
-    /* Permanently hide the original bar — we're not touching or
-       restyling it anymore, it's replaced outright below. */
-    oldBar.style.setProperty("display", "none", "important");
-
-    /* Build a brand new bar once, then just keep its content in sync
-       on every pass instead of tearing it down and rebuilding — avoids
-       any flash/duplication from being re-inserted every tick. */
-    var bar = document.getElementById("lt-new-topbar");
-    if (!bar) {
-      bar = document.createElement("div");
-      bar.id = "lt-new-topbar";
-      bar.style.cssText =
-        "position:sticky;top:0;z-index:40;display:flex;align-items:center;" +
-        "justify-content:space-between;padding:14px 20px;" +
-        "background-color:hsl(42 40% 95%);" +
-        "border-bottom:1px solid hsl(220 15% 88%);" +
-        "font-family:'Inter',sans-serif;";
-      bar.innerHTML =
-        '<span style="font-weight:800;font-size:17px;color:hsl(230 40% 16%);letter-spacing:-0.01em;">LifeTime</span>' +
-        '<span id="lt-new-topbar-avatar" style="width:32px;height:32px;border-radius:50%;' +
-        'background-color:hsl(230 40% 16%);color:#fff;font-weight:800;font-size:14px;' +
-        'display:flex;align-items:center;justify-content:center;">N</span>';
-      oldBar.parentElement.insertBefore(bar, oldBar);
-    }
-
-    /* Keep the avatar initial in sync with the saved profile name. */
-    var avatar = document.getElementById("lt-new-topbar-avatar");
-    if (avatar) {
-      var profile = getLtProfile();
-      var initial = (profile && profile.name) ? profile.name.trim().charAt(0).toUpperCase() : "N";
-      if (avatar.textContent !== initial) avatar.textContent = initial;
-    }
-  }
-
-  function clickNavTab(name) {
-    var link = Array.prototype.slice.call(document.querySelectorAll("nav a,nav button"))
-      .find(function (el) { return new RegExp(name, "i").test(el.textContent); });
-    if (link) link.click();
-  }
-
-  function tvRateStored() {
-    var stored = readJson("lt_time_value_v1", null);
-    if (!stored || !Number(stored.perMinute)) return null;
-    return stored;
-  }
-
-  function tickLifeProgressCard() {
-    var card = document.getElementById("lt-life-progress");
-    if (!card) return;
-    var profile = getLtProfile();
-    if (!profile) return;
-    var s = lifeStats(profile);
-    var circumference = 2 * Math.PI * 44;
-    var offset = circumference - (s.percent / 100) * circumference;
-
-    var fill = card.querySelector(".lt-lp-fill");
-    if (fill) fill.setAttribute("stroke-dashoffset", offset.toFixed(1));
-    var pctEl = document.getElementById("lt-lp-pct");
-    if (pctEl) pctEl.textContent = Math.round(s.percent) + "%";
-
-    var vals = { "lt-lp-y": s.years, "lt-lp-d": s.days, "lt-lp-h": s.hours, "lt-lp-mi": s.minutes, "lt-lp-s": s.seconds };
-    Object.keys(vals).forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.textContent = String(vals[id]).padStart(2, "0");
-    });
-
-    /* Live-decreasing Time Value section, same math as the native ticker */
-    var tvSection = document.getElementById("lt-lp-tv");
-    var stored = tvRateStored();
-    if (stored) {
-      var pm = Number(stored.perMinute);
-      var dailyHours = Number(stored.hours) || 8;
-      var now = new Date();
-      var secOfDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-      var remSecToday = 86400 - secOfDay;
-      var dailyBudget = pm * 60 * dailyHours;
-      var value = Math.max(0, dailyBudget * (remSecToday / 86400));
-      var remHours = Math.floor(remSecToday / 3600);
-      var remMin = Math.floor((remSecToday % 3600) / 60);
-
-      if (tvSection) {
-        var amtEl = document.getElementById("lt-lp-tv-amt");
-        if (amtEl) amtEl.textContent = money(value);
-        var leftEl = document.getElementById("lt-lp-tv-left");
-        if (leftEl) leftEl.textContent = remHours + "h " + remMin + "m left";
-        var rateEl = document.getElementById("lt-lp-tv-rate");
-        if (rateEl) rateEl.textContent = money(pm * 60) + "/hour based on your income";
-      }
-    } else if (tvSection) {
-      tvSection.style.display = "none";
-    }
-
-    ensureActivityNavTab();
-    applySubTabVisibility();
-  }
-
-  function buildTimerAchievements() {
-    /* Achievement section removed from timer home — this is a no-op now. */
-    return;
-    var lp = document.getElementById("lt-life-progress");
-    if (!lp) return;
-
-    var existing = document.getElementById("lt-timer-achievements");
-    if (!existing) {
-      existing = document.createElement("div");
-      existing.id = "lt-timer-achievements";
-      existing.style.cssText = "margin:12px 16px 20px;box-sizing:border-box";
-      /* Insert after quote section if present, else after glance, else after lp */
-      var quote  = document.getElementById("lt-quote-section");
-      var glance = document.getElementById("lt-glance-section");
-      var anchor = quote || glance || lp;
-      anchor.parentNode.insertBefore(existing, anchor.nextSibling);
-    }
-
-    var stats      = computeAchievementStats();
-    var milestones = computeAutoMilestones(stats);
-    var unlocked   = milestones.filter(function (m) { return m.current >= m.target; });
-    var inProgress = milestones.filter(function (m) { return m.current > 0 && m.current < m.target; }).slice(0, 2);
-    var userBadges = getUserBadges();
-
-    var recentBadge = userBadges[0];
-    var recentUnlocked = unlocked[unlocked.length - 1]; /* last unlocked */
-
-    /* Only render a slot if there is a real badge — no empty "Add Achievement" boxes */
-    function makeBadgeSlot(badge, idx, fullWidth) {
-      if (!badge) return '';
-      var base = 'border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;min-height:90px;' + (fullWidth ? 'width:100%;box-sizing:border-box;' : 'flex:1;');
-      return '<div style="background:hsl(var(--accent)/.08);' + base + '" data-ta-badge="' + idx + '">' +
-        '<span style="font-size:26px">' + escapeHtml(badge.icon || "\uD83C\uDFC5") + '</span>' +
-        '<span style="font-size:11px;font-weight:700;text-align:center;color:hsl(var(--foreground))">' + escapeHtml(badge.name) + '</span>' +
-        '<span style="font-size:10px;color:hsl(var(--muted-foreground))">Your badge</span>' +
-      '</div>';
-    }
-
-    /* Build badge card HTML — only the slots that have real badges */
-    var slot0 = makeBadgeSlot(userBadges[0], 0, true);
-    var slot1 = makeBadgeSlot(userBadges[1], 1, false);
-    var slot2 = makeBadgeSlot(userBadges[2], 2, false);
-    var rowTwo = (slot1 || slot2)
-      ? '<div style="display:flex;gap:10px;margin-top:10px">' + slot1 + slot2 + '</div>'
-      : '';
-    /* If the user has no badges yet, show a compact placeholder so the
-       section header is still visible but no empty dashed boxes appear */
-    var badgeBody = (slot0 || rowTwo)
-      ? '<div style="background:hsl(var(--background));border:1px solid hsl(var(--border));border-radius:16px;padding:14px;">' + slot0 + rowTwo + '</div>'
-      : '<div style="color:hsl(var(--muted-foreground));font-size:12px;padding:8px 2px">Earn your first badge — tap View All to see milestones.</div>';
-
-    existing.innerHTML =
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
-        '<span style="font-size:18px;font-weight:900;color:hsl(var(--foreground))">Achievements</span>' +
-        '<span id="lt-ta-viewall" style="font-size:13px;font-weight:700;color:hsl(var(--primary));cursor:pointer">View All</span>' +
-      '</div>' +
-      badgeBody;
-
-    document.getElementById("lt-ta-viewall").addEventListener("click", function () {
-      openOverlay(renderAchievements);
-    });
-    /* Any badge slot click → open achievement overlay so user can pick */
-    existing.addEventListener("click", function (e) {
-      var slot = e.target.closest("[data-ta-badge]");
-      if (slot) openOverlay(renderAchievements);
-    });
-  }
-
-  function buildGlanceSection() {
-    var lp = document.getElementById("lt-life-progress");
-    if (!lp) return;
-
-    /* Collect today's usage */
-    var todayEntries = catLogEntries().filter(function (e) { return e.date === today(); });
-    var db = readJson(LOCAL_DB_KEY, { activities: [] });
-    /* Deleting an activity in the native app is a soft-delete — it flags
-       archived:true rather than removing it from storage. The native list
-       correctly filters these out; this section wasn't, which is exactly
-       why a deleted activity kept showing here indefinitely. */
-    var activities = (Array.isArray(db.activities) ? db.activities : []).filter(function (a) { return !a.archived; });
-
-    /* Count minutes per activity label for today */
-    var usageMap = {};
-    todayEntries.forEach(function (e) {
-      var key = e.label || e.category || "Other";
-      usageMap[key] = (usageMap[key] || 0) + (Number(e.minutes) || 0);
-    });
-
-    /* Build the 4 slots:
-       - Used activities today come first, sorted by minutes desc
-       - Remaining slots filled with unused activities from the list
-       - Always exactly 4 slots shown */
-    var validNames = {};
-    activities.forEach(function (a) { validNames[a.name] = true; });
-
-    /* A deleted (archived) activity can still have usage minutes logged
-       for today — usageMap comes from the log, not the activity list — so
-       without this check it kept showing here (with a wrong fallback
-       emoji, since it could no longer find itself in the real list). */
-    var usedNames = Object.keys(usageMap)
-      .filter(function (n) { return usageMap[n] > 0 && validNames[n]; })
-      .sort(function (a, b) { return usageMap[b] - usageMap[a]; })
-      .slice(0, 4);
-
-    var allNames = activities.map(function (a) { return a.name; });
-    var unusedNames = allNames.filter(function (n) { return usageMap[n] === undefined || usageMap[n] === 0; });
-
-    var slots = usedNames.slice();
-    for (var si = 0; slots.length < 4 && si < unusedNames.length; si++) {
-      slots.push(unusedNames[si]);
-    }
-    /* Only show as many cards as the user actually has activities for —
-       up to 4. No more padding with dimmed "Empty" placeholder cards for
-       activities that were deleted; the row should shrink to match what's
-       really there, and disappear entirely (replaced by an empty-state
-       message) once nothing is left. */
-
-    var existing = document.getElementById("lt-glance-section");
-    if (!existing) {
-      existing = document.createElement("div");
-      existing.id = "lt-glance-section";
-      existing.setAttribute("data-lt-enhancement", "1");
-      existing.style.cssText = "margin:12px 16px 0;box-sizing:border-box";
-      lp.parentNode.insertBefore(existing, lp.nextSibling);
-    }
-
-    var GLANCE_ICONS = ["📖","💼","❤️","👥","⏱️","🏃","🍽️","🚗","📱","👨‍👩‍👧","💤","✏️"];
-    function iconFor(name) {
-      if (!name) return "➕";
-      var act = activities.filter(function (a) { return a.name === name; })[0];
-      if (act && act.emoji) return act.emoji;
-      return GLANCE_ICONS[Math.abs(name.charCodeAt(0)) % GLANCE_ICONS.length];
-    }
-    function fmtMins(m) {
-      if (!m) return "0m";
-      var h = Math.floor(m / 60), min = m % 60;
-      return h > 0 ? h + "h" + (min > 0 ? " " + min + "m" : "") : min + "m";
-    }
-
-    var CARD_COLORS = [
-      { bg:"#FFF8E1", accent:"#F59E0B" },
-      { bg:"#EDE9FE", accent:"#7C3AED" },
-      { bg:"#FEE2E2", accent:"#EF4444" },
-      { bg:"#E0F2FE", accent:"#0284C7" },
-    ];
-
-    var totalMinsToday = todayEntries.reduce(function (s, e) { return s + (Number(e.minutes) || 0); }, 0);
-
-    /* Cards in a single horizontal row, one per remaining activity (max 4).
-       Column count matches the actual slot count so 1 or 2 activities get
-       cards the same size as a full row of 4 — not stretched or shrunk. */
-    var cardsHtml = slots.length === 0
-      ? '<div style="padding:22px 12px;text-align:center;color:hsl(var(--muted-foreground));font-size:13px;font-weight:600;background:hsl(var(--muted));border-radius:12px">No activities found</div>'
-      : '<div style="display:grid;grid-template-columns:repeat(' + slots.length + ',1fr);gap:7px">' +
-      slots.map(function (name, i) {
-        var mins = name ? (usageMap[name] || 0) : 0;
-        var used = mins > 0;
-        var col  = CARD_COLORS[i % CARD_COLORS.length];
-        var pct  = (used && totalMinsToday > 0) ? Math.min(100, Math.round((mins / totalMinsToday) * 100)) : 0;
-        var label = name ? escapeHtml(name.length > 8 ? name.slice(0, 7) + "…" : name) : "Empty";
-        var dimStyle = used ? "" : "opacity:0.55;";
-        return (
-          '<div style="background:' + col.bg + ';border-radius:12px;padding:9px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;' + dimStyle + '">' +
-            '<div style="font-size:20px;line-height:1.2">' + iconFor(name) + '</div>' +
-            '<div style="font-size:12px;font-weight:800;color:#1a1a2e;line-height:1.1">' + fmtMins(mins) + '</div>' +
-            '<div style="font-size:9px;color:#555;text-align:center;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%">' + label + '</div>' +
-            '<div style="width:100%;height:3px;background:rgba(0,0,0,.1);border-radius:20px;overflow:hidden;margin-top:3px">' +
-              '<div style="height:100%;width:' + pct + '%;background:' + col.accent + ';border-radius:20px;transition:width .6s"></div>' +
-            '</div>' +
-          '</div>'
-        );
-      }).join("") +
-    '</div>';
-
-    var viewAllHtml = todayEntries.length > 0 ? '<a style="font-size:13px;font-weight:700;color:hsl(var(--primary));cursor:pointer;text-decoration:none">View All</a>' : '';
-
-    existing.innerHTML =
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
-        '<span style="font-size:18px;font-weight:900;color:hsl(var(--foreground))">Today at a Glance</span>' +
-        viewAllHtml +
-      '</div>' +
-      cardsHtml;
-
-    /* Wire up the "View All" link to switch to the Activity sub-tab */
-    var glanceViewAll = existing.querySelector("a");
-    if (glanceViewAll) {
-      glanceViewAll.addEventListener("click", function (e) {
-        e.preventDefault();
-        _activeSubTab = "activity";
-        applySubTabVisibility();
-        ensureActivityNavTab();
-        upsertRunningBanner();
-      });
-    }
-  }
-
-  function buildQuotePlantSection() {
-    var lp = document.getElementById("lt-life-progress");
-    if (!lp || document.getElementById("lt-quote-section")) return;
-
-    var dayOfLife = (function () {
-      var birthStr = (function () {
-        /* Try to get DOB from settings stored by app */
-        try {
-          var s = localStorage.getItem("lt_settings_v1") || localStorage.getItem("lifetime_settings");
-          if (s) { var p = JSON.parse(s); if (p && p.dob) return p.dob; }
-        } catch (_) {}
-        return null;
-      })();
-      if (!birthStr) return null;
-      var birth = new Date(birthStr);
-      var now   = new Date();
-      return Math.floor((now - birth) / 86400000) + 1;
-    })();
-
-    var quote = '\u201cLost, yesterday, somewhere between sunrise and sunset, two golden hours, each set with sixty diamond minutes. No reward is offered, for they are gone forever.\u201d \u2014 Horace Mann';
-
-    var section = document.createElement("div");
-    section.id = "lt-quote-section";
-    section.style.cssText = "margin:12px 16px 0;box-sizing:border-box";
-    section.innerHTML =
-      '<div style="background:hsl(var(--primary));border-radius:18px;padding:18px 16px;display:flex;align-items:center;gap:14px;min-height:90px">' +
-        '<div style="font-size:48px;line-height:1;flex-shrink:0" aria-hidden="true">🪴</div>' +
-        '<div style="flex:1">' +
-          '<p style="margin:0;font-size:13px;font-weight:600;color:rgba(255,255,255,.85);line-height:1.5">' + escapeHtml(quote) + '</p>' +
-        '</div>' +
-        (dayOfLife ?
-          '<div style="flex-shrink:0;background:rgba(0,0,0,.3);border-radius:12px;padding:8px 10px;text-align:center">' +
-            '<div style="font-size:9px;font-weight:800;letter-spacing:.06em;color:rgba(255,255,255,.6);margin-bottom:2px">DAY</div>' +
-            '<div style="font-size:22px;font-weight:900;color:#fff;line-height:1">🏆</div>' +
-            '<div style="font-size:9px;color:rgba(255,255,255,.6);margin-top:2px">' + dayOfLife.toLocaleString() + '</div>' +
-          '</div>'
-        : '') +
-      '</div>';
-
-    /* Insert after the glance section if it exists, else after lp */
-    var glance = document.getElementById("lt-glance-section");
-    var anchor = glance || lp;
-    anchor.parentNode.insertBefore(section, anchor.nextSibling);
-  }
-
-  /* ── Timer host: a container OUTSIDE React's <main> so React can never
-     destroy our timer-only injections (life-progress, glance, frog) during
-     route changes. Inserted as the first child of <body>, before <main>. */
-  function getOrCreateTimerHost() {
-    var existing = document.getElementById("lt-timer-host");
-    if (existing) return existing;
-    var host = document.createElement("div");
-    host.id = "lt-timer-host";
-    host.style.cssText = "position:relative;z-index:1;";
-    var main = document.querySelector("main");
-    if (main && main.parentNode) {
-      main.parentNode.insertBefore(host, main.nextSibling);
-    } else {
-      document.body.appendChild(host);
-    }
-    return host;
-  }
-
-  function buildLifeProgressCard() {
-    if (location.pathname !== "/") {
-      /* Instead of removing elements (which kills them for good), just hide
-         them — the CSS body[data-lt-route] rule handles visibility. */
-      _activeSubTab = "timer";
-      if (_lifeProgressTimer) { clearInterval(_lifeProgressTimer); _lifeProgressTimer = null; }
-      ensureActivityNavTab();
-      var header = document.getElementById("lt-activity-header");
-      if (header) header.style.display = "none";
-      return;
-    }
-    var profile = getLtProfile();
-    if (!profile) return;
-    var goal = getGoalType();
-    var hasTv = !!tvRateStored();
-
-    var card = document.getElementById("lt-life-progress");
-    if (card) { tickLifeProgressCard(); return; }
-
-    var host = getOrCreateTimerHost();
-    card = document.createElement("div");
-    card.id = "lt-life-progress";
-    card.setAttribute("data-lt-enhancement", "1");
-    host.insertBefore(card, host.firstChild);
-    card.addEventListener("click", function (e) {
-      if (e.target.closest("#lt-lp-viewplan")) clickNavTab("settings");
-
-    });
-
-    card.innerHTML =
-      '<div class="lt-lp-top">' +
-        '<div>' +
-          '<p class="lt-lp-greet">' + greetingWord() + ',</p>' +
-          '<h2 class="lt-lp-name">' + escapeHtml(profile.name) + ' \u2728</h2>' +
-          '<p class="lt-lp-sub">Make today count. Your future is built by what you do now. \uD83D\uDC9B</p>' +
-        '</div>' +
-        '<div class="lt-lp-ringbox">' +
-          '<p class="lt-lp-ringlabel">LIFE PROGRESS</p>' +
-          '<div class="lt-lp-ringwrap">' +
-            '<svg width="88" height="88" viewBox="0 0 100 100" class="lt-lp-ring">' +
-              '<circle cx="50" cy="50" r="44" class="lt-lp-track"/>' +
-              '<circle cx="50" cy="50" r="44" class="lt-lp-fill"/>' +
-            '</svg>' +
-            '<div class="lt-lp-ringtext"><span class="lt-lp-pct" id="lt-lp-pct">0%</span></div>' +
-          '</div>' +
-          '<p class="lt-lp-ringsub">of your life lived</p>' +
-        '</div>' +
-      '</div>' +
-      '<div class="lt-lp-countdown">' +
-        '<div class="lt-lp-cdhead">' +
-          '<div>' +
-            '<p class="lt-lp-cdtitle">' + escapeHtml(profile.name) + '\u2019s Remaining ' + goal.word + ' Time</p>' +
-            '<p class="lt-lp-cddate" style="font-weight:700;font-size:12px;white-space:nowrap"><span style="font-size:16px;margin-right:2px;">\uD83C\uDFC1</span> ' + goal.dateLabel + ': <span style="color:#f5a623;">' + lifeStats(profile).dateLabel + '</span></p>' +
-          '</div>' +
-          '<button id="lt-lp-viewplan" type="button">' + (isPro() ? "\u2B50 " + getPlanName() : "View Plan") + '</button>' +
-        '</div>' +
-        '<div class="lt-lp-grid">' +
-          lpBox("lt-lp-y", "YEARS") + lpBox("lt-lp-d", "DAYS") + lpBox("lt-lp-h", "HOURS") +
-          lpBox("lt-lp-mi", "MIN") + lpBox("lt-lp-s", "SEC", true) +
-        '</div>' +
-      '</div>' +
-      (hasTv ?
-        '<div class="lt-lp-tv" id="lt-lp-tv">' +
-          '<div>' +
-            '<p class="lt-lp-tv-title">Today\u2019s Time Value</p>' +
-            '<p class="lt-lp-tv-sub">Your remaining time</p>' +
-            '<p class="lt-lp-tv-amt" id="lt-lp-tv-amt">' + money(0) + '</p>' +
-            '<p class="lt-lp-tv-left" id="lt-lp-tv-left">\u2014</p>' +
-          '</div>' +
-          '<span class="lt-lp-tv-rate" id="lt-lp-tv-rate"></span>' +
-        '</div>' : "");
-
-    tickLifeProgressCard();
-
-    if (!_lifeProgressTimer) {
-      _lifeProgressTimer = setInterval(function () {
-        if (location.pathname === "/" && document.getElementById("lt-life-progress")) {
-          tickLifeProgressCard();
-          buildGlanceSection();  /* live-update glance every tick */
-          buildEatTheFrogCard();
-        } else {
-          clearInterval(_lifeProgressTimer); _lifeProgressTimer = null;
-        }
-      }, 1000);
-    }
-
-    buildGlanceSection();
-    /* buildQuotePlantSection() intentionally not called — the quote card
-       was removed from the app several versions ago. It was left wired up
-       here (still being built every cycle, then torn down a moment later
-       by applySubTabVisibility()'s cleanup) which is exactly why it could
-       still flash briefly on cold start/first launch, before that cleanup
-       had a chance to run. Not building it at all removes that gap. */
-  }
-  var _lifeProgressTimer = null;
-
-  /* ══════════════════════════════════════════════════════════════════════════
-     Eat the Frog — 3 most-important-tasks-of-the-day card on the Timer tab.
-     Sits in normal document flow right after the glance/life-progress cards,
-     so it automatically shifts position on its own whenever those cards
-     grow/shrink (e.g. the "Today's Time Value" section appearing once
-     someone sets up the Time Value Calculator) — no special handling
-     needed, the page just reflows and scrolls like any other content.
-  ══════════════════════════════════════════════════════════════════════════ */
-
-  function addStyleFrog() {
-    if (injectedFrogStyle) return;
-    injectedFrogStyle = true;
-    var s = document.createElement("style");
-    s.textContent = [
-      "#lt-frog-card{margin:12px 16px 0;padding:16px;border-radius:16px;background:hsl(var(--card));border:1px solid hsl(var(--border));box-sizing:border-box}",
-      "#lt-frog-card .lt-frog-title{font-size:15px;font-weight:800;margin:0;display:flex;align-items:center;gap:6px}",
-      "#lt-frog-card .lt-frog-sub{font-size:12px;opacity:.65;margin:2px 0 12px}",
-      "#lt-frog-card .lt-frog-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid hsl(var(--border))}",
-      "#lt-frog-card .lt-frog-row:first-of-type{border-top:none}",
-      "#lt-frog-card .lt-frog-check{width:22px;height:22px;flex-shrink:0;border-radius:50%;border:2px solid hsl(var(--border));background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;-webkit-tap-highlight-color:transparent}",
-      "#lt-frog-card .lt-frog-check.lt-frog-done{background:#16A34A;border-color:#16A34A}",
-      "#lt-frog-card .lt-frog-check.lt-frog-check-empty{opacity:.35;cursor:default}",
-      "#lt-frog-card .lt-frog-input{flex:1;border:1px solid hsl(var(--border));background:hsl(var(--muted)/0.3);font-size:14px;color:hsl(var(--foreground));outline:none;min-width:0;border-radius:8px;padding:6px 10px}",
-      "#lt-frog-card .lt-frog-input.lt-frog-done-text{text-decoration:line-through;opacity:.5}",
-      "#lt-frog-card .lt-frog-input::placeholder{color:hsl(var(--muted-foreground))}",
-      "#lt-frog-card .lt-frog-unstar{background:none;border:none;color:#f5a623;cursor:pointer;padding:4px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
-      "#lt-frog-card .lt-frog-unstar:active{transform:scale(.9)}",
-      "#lt-frog-card .lt-frog-empty{font-size:13px;color:hsl(var(--muted-foreground));margin:4px 0 0}"
-    ].join("\n");
-    document.head.appendChild(s);
-  }
-
-  /* Eat the Frog always shows exactly MAX_STARRED_TASKS (3) rows.
-     - Filled rows are a view onto whichever tasks (from My Tasks) are
-       starred — starring a task in My Tasks, editing its title here or
-       there, and checking it off here or there all read/write the SAME
-       task object in TASKS_KEY, so every surface stays in sync automatically.
-     - Empty rows (when fewer than 3 tasks are starred) are directly
-       editable right here: typing into one creates a brand-new starred
-       task in that slot on the spot — no need to go add it in My Tasks
-       first. Because it's created already-starred, it can never push the
-       total past MAX_STARRED_TASKS: as soon as all 3 slots are filled
-       (whether typed here or starred over in My Tasks), starring a 4th
-       task from My Tasks hits the normal "Eat the Frog is full" cap in
-       toggleTaskStar(). And if only some slots are filled, starring a
-       task from My Tasks simply lands in the next empty slot, since
-       filled slots always render first (index 0..starred.length-1) and
-       empty slots fill the remainder — there's nothing to "replace",
-       it just naturally shows up there. */
-  var _frogLastSignature = null; /* used to skip rebuilds when nothing changed */
-
-  function frogSignature(tasks) {
-    return tasks.map(function (t) { return t.id + ":" + t.title + ":" + (t.completed ? 1 : 0); }).join("|");
-  }
-
-  function buildEatTheFrogCard() {
-    var onTimerTab = location.pathname === "/" && _activeSubTab !== "activity";
-    var existing = document.getElementById("lt-frog-card");
-    if (!onTimerTab) {
-      if (existing) existing.remove();
-      _frogLastSignature = null;
-      return;
-    }
-
-    var starred = getActiveFrogTasks();
-    autoPromoteQueuedFrog();
-    starred = getActiveFrogTasks();
-    var sig = frogSignature(starred);
-
-    if (existing) {
-      /* Only skip rebuilding when nothing actually changed. (We deliberately
-         do NOT also check "is focus inside this card" here — every local
-         edit path below updates _frogLastSignature itself right after the
-         mutation, so the signature check alone already prevents typing from
-         being interrupted. An extra focus check was here before and it
-         caused a real bug: clicking the checkbox/star button focuses that
-         very button, which sits inside `existing`, so the check blocked
-         the button's own click handler from ever seeing its update take
-         effect — the buttons looked broken even though the data underneath
-         was saving correctly.) */
-      if (sig === _frogLastSignature) return;
-    }
-
-    addStyleFrog();
-    var anchor = document.getElementById("lt-glance-section") || document.getElementById("lt-life-progress");
-    if (!anchor || !anchor.parentNode) return; /* not mounted yet — try again next tick */
-
-    _frogLastSignature = sig;
-
-    var card = existing || document.createElement("div");
-    card.id = "lt-frog-card";
-    card.setAttribute("data-lt-enhancement", "1");
-
-    var rowsHtml = "";
-    for (var i = 0; i < MAX_STARRED_TASKS; i++) {
-      var t = starred[i];
-      if (t) {
-        rowsHtml +=
-          '<div class="lt-frog-row">' +
-            '<button type="button" class="lt-frog-check' + (t.completed ? " lt-frog-done" : "") + '" data-lt-frog-check="' + t.id + '">' + (t.completed ? "\u2713" : "") + '</button>' +
-            '<input type="text" class="lt-frog-input' + (t.completed ? " lt-frog-done-text" : "") + '" data-lt-frog-input="' + t.id + '" placeholder="Task name" value="' + escapeHtml(t.title) + '" />' +
-            '<button type="button" class="lt-frog-unstar" data-lt-frog-unstar="' + t.id + '" title="Remove from Eat the Frog">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
-            '</button>' +
-          '</div>';
-      } else {
-        /* Empty slot — nothing starred here yet. Renders a live, editable
-           row anyway; typing into it creates the task (see the delegated
-           "input" handler below). The check/unstar controls stay inert
-           (no id to act on) until that happens. */
-        rowsHtml +=
-          '<div class="lt-frog-row">' +
-            '<button type="button" class="lt-frog-check lt-frog-check-empty" data-lt-frog-check="" disabled></button>' +
-            '<input type="text" class="lt-frog-input" data-lt-frog-input="" placeholder="Add an important task\u2026" value="" />' +
-            '<button type="button" class="lt-frog-unstar" data-lt-frog-unstar="" style="visibility:hidden" title="Remove from Eat the Frog">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
-            '</button>' +
-          '</div>';
-      }
-    }
-
-    var totalStarred = getStarredTasks().filter(function (t) { return !t.completed; }).length;
-    var queuedCount = isPro() ? Math.max(0, totalStarred - starred.length) : 0;
-    card.innerHTML =
-      '<p class="lt-frog-title">\uD83D\uDC38 Eat the Frog</p>' +
-      '<p class="lt-frog-sub">Your ' + starred.length + ' most important tasks today' +
-        (queuedCount > 0 ? ' <span style="color:#f5a623;font-weight:600">(\u2b50 ' + queuedCount + ' more queued)</span>' : '') +
-      '</p>' +
-      rowsHtml;
-
-    if (!existing) anchor.parentNode.insertBefore(card, anchor.nextSibling);
-
-    /* Delegated listeners, wired once on the card itself rather than per-row
-       on every rebuild — a row's underlying task id can change (an empty
-       slot becomes a real task the moment someone types into it) without
-       needing to re-attach anything, since delegation always reads the
-       current data-* attribute at click/input time. */
-    if (!card.dataset.frogWired) {
-      card.dataset.frogWired = "1";
-
-      card.addEventListener("click", function (e) {
-        var checkBtn = e.target.closest("[data-lt-frog-check]");
-        if (checkBtn) {
-          var cid = checkBtn.getAttribute("data-lt-frog-check");
-          if (!cid) return; /* empty slot — nothing to toggle yet */
-          var task = getAllTasks().find(function (tk) { return tk.id === cid; });
-          if (!task) return;
-          task.completed = !task.completed;
-          upsertTask(task);
-          checkBtn.classList.toggle("lt-frog-done", task.completed);
-          checkBtn.textContent = task.completed ? "\u2713" : "";
-          var rowInput = checkBtn.parentElement.querySelector("[data-lt-frog-input]");
-          if (rowInput) rowInput.classList.toggle("lt-frog-done-text", task.completed);
-          autoPromoteQueuedFrog();
-          /* Force rebuild: clear the cached signature so buildEatTheFrogCard()
-             doesn't skip the DOM update due to the sig-matches guard. */
-          _frogLastSignature = null;
-          buildEatTheFrogCard();
-          return;
-        }
-        var unstarBtn = e.target.closest("[data-lt-frog-unstar]");
-        if (unstarBtn) {
-          var uid = unstarBtn.getAttribute("data-lt-frog-unstar");
-          if (!uid) return; /* empty slot — nothing to unstar */
-          toggleTaskStar(uid);
-          buildEatTheFrogCard();
-        }
-      });
-
-      card.addEventListener("input", function (e) {
-        var input = e.target.closest("[data-lt-frog-input]");
-        if (!input) return;
-        var id = input.getAttribute("data-lt-frog-input");
-
-        if (!id) {
-          /* Empty slot — first keystroke creates the task right here,
-             already starred, so it stays pinned in this exact slot. */
-          var val = input.value;
-          if (!val.trim()) return; /* whitespace-only — not a task yet */
-          if (getStarredTasks().length >= MAX_STARRED_TASKS) return; /* safety net; slot shouldn't exist if full */
-          var newTask = { id: genId(), title: val, date: null, time: null, notes: "", completed: false, starred: true, createdAt: Date.now() };
-          upsertTask(newTask);
-          input.setAttribute("data-lt-frog-input", newTask.id);
-          var row = input.closest(".lt-frog-row");
-          if (row) {
-            var checkBtn2 = row.querySelector("[data-lt-frog-check]");
-            if (checkBtn2) {
-              checkBtn2.setAttribute("data-lt-frog-check", newTask.id);
-              checkBtn2.removeAttribute("disabled");
-              checkBtn2.classList.remove("lt-frog-check-empty");
-            }
-            var unstarBtn2 = row.querySelector("[data-lt-frog-unstar]");
-            if (unstarBtn2) {
-              unstarBtn2.setAttribute("data-lt-frog-unstar", newTask.id);
-              unstarBtn2.style.visibility = "";
-            }
-          }
-          _frogLastSignature = frogSignature(getActiveFrogTasks());
-          return;
-        }
-
-        var task2 = getAllTasks().find(function (tk) { return tk.id === id; });
-        if (!task2) return;
-        task2.title = input.value;
-        upsertTask(task2);
-        _frogLastSignature = frogSignature(getActiveFrogTasks());
-      });
-
-      /* focusout (unlike blur) bubbles, so it works with delegation.
-         If a slot was created here and typed back down to empty, clean the
-         title-less task up instead of leaving an orphaned starred task
-         behind — the slot just goes back to being empty. */
-      card.addEventListener("focusout", function (e) {
-        var input = e.target.closest && e.target.closest("[data-lt-frog-input]");
-        if (!input) return;
-        var id = input.getAttribute("data-lt-frog-input");
-        if (!id) return;
-        var task3 = getAllTasks().find(function (tk) { return tk.id === id; });
-        if (task3 && !task3.title.trim()) {
-          removeTask(id);
-          buildEatTheFrogCard();
-        }
-      });
-    }
-  }
 
 
 
@@ -1877,13 +945,7 @@
       "nav.flex.items-stretch a:active, nav.flex.items-stretch button:active{background:transparent!important}",
       ".lt-navtab-active{position:relative}",
       ".lt-navtab-active::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:16px;height:3px;border-radius:3px;background:hsl(var(--primary))}",
-      "#lt-activity-navtab.lt-navtab-active-custom{color:hsl(var(--primary))}",
       "div.fixed.bottom-0.left-0.right-0.z-50{background:#fff!important;isolation:isolate;pointer-events:auto!important}",
-      /* Dims the real Timer tab ONLY while the pseudo Activity tab is the
-         active one — scoped strictly to the data attribute so it can never
-         linger or fight with React's own route-based styling of that link. */
-      "nav.flex.items-stretch[data-lt-activity-mode=\"1\"] a[href=\"/\"]{color:hsl(var(--muted-foreground))!important}",
-      "nav.flex.items-stretch[data-lt-activity-mode=\"1\"] a[href=\"/\"].lt-navtab-active::after{display:none!important}",
       /* 6 Jars salary edit button + empty state + form */
       ".lt-jars-sum-empty{color:hsl(var(--muted-foreground))!important}",
       ".lt-jars-edit-salary-btn{border:none;cursor:pointer;font-family:inherit;font-weight:800;border-radius:12px;transition:all .15s ease}",
@@ -2200,17 +1262,6 @@
       ".lt-clockpicker-actions{display:flex;justify-content:flex-end;gap:14px}",
       ".lt-clockpicker-actions button{background:none;border:none;color:#0369A1;font-size:13.5px;font-weight:800;cursor:pointer;padding:8px 6px;font-family:inherit;-webkit-tap-highlight-color:transparent}",
       ".lt-clockpicker-actions button.lt-cancel{color:hsl(var(--muted-foreground))}",
-      /* Hide timer-only enhanced elements on non-timer pages via CSS.
-         data-lt-route is set by the route switch handler BEFORE React
-         processes the navigation, so this kicks in instantly with no
-         timing gap. On initial load (no attribute) everything is visible. */
-      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-timer-host," +
-      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-life-progress," +
-      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-glance-section," +
-      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) #lt-frog-card," +
-      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) [data-lt-enhancement='retirement']," +
-      "body[data-lt-route]:not([data-lt-route='/']):not([data-lt-route='timer']) [data-lt-enhancement='saved-value']" +
-      "{display:none!important}",
     ].join("");
     document.head.appendChild(s);
   }
@@ -2239,9 +1290,8 @@
       "#lt-top-status-bar.lt-ts-running .lt-ts-dot{width:11px;height:11px;background:#ff3b30;animation:lt-pulse 1.2s infinite;position:relative}",
       "#lt-top-status-bar.lt-ts-running .lt-ts-dot::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid #ff3b30;animation:lt-ring-pulse 1.6s infinite}",
       "@keyframes lt-ring-pulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.6);opacity:0}}",
-      /* The whole bar also blinks gently (not just the dot) while
-         running, and gets a pointer cursor + tap feedback since it's now
-         tappable (see click handler in upsertRunningBanner). */
+      /* The whole bar also blinks gently while running, and gets
+         a pointer cursor + tap feedback. */
       "#lt-top-status-bar.lt-ts-running{animation:lt-bar-blink 1.6s ease-in-out infinite;cursor:pointer}",
       "@keyframes lt-bar-blink{0%,100%{background:#04091e}50%{background:#160b0b}}",
       "#lt-top-status-bar.lt-ts-running:active{opacity:.85}",
@@ -3641,17 +2691,6 @@
 
   function goToTimeValueTool() {
     closeOverlay();
-    /* This whole hop — close overlay, switch route, wait for Life Hub to
-       paint, hunt the DOM for the calculator tile, click it, wait for THAT
-       screen to paint — used to happen with nothing covering the screen, so
-       the user saw every intermediate frame: the raw native Life Hub grid
-       (with its unstyled search box) flash by, then the calculator's own
-       native screen flash by before our patches applied to it. Cover the
-       whole hop with the nav mask and only lift it once the calculator
-       screen is actually up (or we give up trying). */
-    showNavMaskWithTimeout(3000);
-    _activeSubTab = "timer";
-    applySubTabVisibility();
 
     function findLeaf(text) {
       return Array.prototype.slice.call(document.querySelectorAll("*")).find(function (el) {
@@ -3664,16 +2703,11 @@
         var direct = calculator.closest("button,[role='button'],a");
         if (direct) {
           direct.click();
-          /* Give the calculator screen a moment to actually render before
-             revealing it, then run a couple of enhancement passes so it's
-             fully patched by the time it's shown. */
           setTimeout(function () { runEnhancementsImmediate(); }, 120);
-          setTimeout(function () { runEnhancementsImmediate(); hideNavMask(); }, 280);
+          setTimeout(function () { runEnhancementsImmediate(); }, 280);
           return;
         }
       }
-      /* Life Hub first shows its tile list. Tapping the Time Value tile
-         changes the internal Life Hub view to the calculator screen. */
       var timeTile = findLeaf("Time Value");
       if (timeTile) {
         var tileButton = timeTile.closest("button,[role='button'],a") || timeTile.parentElement;
@@ -3681,10 +2715,6 @@
       }
       if (attemptsLeft > 0) {
         setTimeout(function () { clickCalculator(attemptsLeft - 1); }, 120);
-      } else {
-        /* Ran out of attempts — don't leave the mask stuck up forever,
-           reveal whatever state we ended up in. */
-        hideNavMask();
       }
     }
 
@@ -5148,11 +4178,9 @@
           task.completed = !task.completed;
           upsertTask(task);
           renderTasks();
-          /* After completing a task, promote queued starred tasks and
-             refresh the frog card so completed items drop out. */
+          /* After completing a task, promote queued starred tasks.
+             React EatTheFrog component reads localStorage directly. */
           autoPromoteQueuedFrog();
-          _frogLastSignature = null;
-          buildEatTheFrogCard();
         }
         return;
       }
@@ -5390,61 +4418,15 @@
   }
 
   function userActivityCount() {
-    /* Count directly from DOM — always live, no storage lag after add/delete */
-    var act = findActivityElements();
-    if (act && act.list) {
-      var children = act.list.children;
-      if (children && children.length > 0) {
-        /* The empty-state div ("No activities yet") is also a child element.
-           Only count children that are actual activity cards (not the
-           empty-state placeholder). Activity cards carry an onclick handler
-           or a specific structure; the empty-state div is a centered flex
-           column with "No activities yet" text. */
-        var count = 0;
-        for (var i = 0; i < children.length; i++) {
-          var text = children[i].textContent || "";
-          if (text.indexOf("No activities yet") !== -1) continue;
-          count++;
-        }
-        if (count > 0) return count;
-      }
-    }
-    /* Fallback: storage count (non-default activities only) */
+    /* Storage count (non-default activities only) */
     var db = readJson(LOCAL_DB_KEY, { activities: [] });
     if (!Array.isArray(db.activities)) return 0;
     return db.activities.filter(function (a) { return !a.isDefault; }).length;
   }
 
   function updateActivityLimitBadge() {
-    if (_activeSubTab !== "activity") {
-      var b = document.getElementById("lt-activity-limit");
-      if (b) b.remove();
-      return;
-    }
-    var act = findActivityElements();
-    if (!act || !act.addRow) return;
-    var host = act.addRow.parentElement;
-    if (!host) return;
-    var badge = document.getElementById("lt-activity-limit");
-    if (!badge) {
-      badge = document.createElement("div");
-      badge.id = "lt-activity-limit";
-      badge.setAttribute("data-lt-enhancement", "1");
-      badge.style.cssText = "padding:8px 16px 7px;background:#fff;color:hsl(var(--muted-foreground));font-size:12px;font-weight:700;text-align:right;border-top:1px solid hsl(var(--border));";
-    }
-    /* Always re-assert position — the app's own re-renders can replace addRow
-       and leave the badge stranded at its old spot, so this must run every call. */
-    if (badge.previousElementSibling !== act.addRow || badge.parentElement !== host) {
-      host.insertBefore(badge, act.addRow.nextSibling);
-    }
-    if (isPro()) {
-      badge.textContent = getPlanName() + " \u00B7 Unlimited activities";
-      badge.style.color = "hsl(var(--primary))";
-    } else {
-      var userCount = userActivityCount();
-      badge.textContent = "Free plan \u00B7 " + userCount + "/" + FREE_ACTIVITY_LIMIT + " activities added";
-      badge.style.color = userCount >= FREE_ACTIVITY_LIMIT ? "#c0392b" : "hsl(var(--muted-foreground))";
-    }
+    /* P1+P2 REMOVED: Activity pseudo-tab no longer exists.
+       Activity limit badge is now handled by React. */
   }
 
   document.addEventListener("click", function (e) {
@@ -6213,104 +5195,8 @@
      depending on which tab you were on.
   ══════════════════════════════════════════════════════════════════════════ */
 
-  var _statusBarTimer = null;
-
-  function upsertRunningBanner() {
-    addStyle3();
-    /* The app only marks the page "lt-authed" once the user is actually
-       signed in — before that (the pre-login splash / auth screens) there's
-       no activity data to show a status for at all. It also shouldn't show
-       during the "Your life, in seconds" / "Set up your profile" onboarding
-       that runs after login but before a profile exists — there's nothing
-       to be idle or running yet at that point either. */
-    var hasProfile = false;
-    try { hasProfile = !!localStorage.getItem("lifetime_profile"); } catch (e) {}
-    if (!document.body.classList.contains("lt-authed") || !hasProfile) {
-      var existingBar = document.getElementById("lt-top-status-bar");
-      if (existingBar) existingBar.remove();
-      document.documentElement.classList.remove("lt-has-top-status-bar");
-      if (_statusBarTimer) { clearInterval(_statusBarTimer); _statusBarTimer = null; }
-      return;
-    }
-    var nativeRunning = getNativeRunningBlock();
-    var timerIsRunning = !!nativeRunning || Number(readJson(RUNNING_TIMER_KEY, 0)) > 0;
-
-    document.documentElement.classList.add("lt-has-top-status-bar");
-    var bar = document.getElementById("lt-top-status-bar");
-
-    if (!bar) {
-      bar = document.createElement("div");
-      bar.id = "lt-top-status-bar";
-      bar.innerHTML =
-        '<span class="lt-ts-dot"></span>' +
-        '<span class="lt-ts-time" id="lt-ts-time"></span>' +
-        '<span class="lt-ts-label" id="lt-ts-label">No activity running</span>' +
-        '<button class="lt-ts-stop" id="lt-ts-stop-btn">Stop \u25a0</button>';
-      document.body.appendChild(bar);
-
-      /* Stop the persisted native block directly. Opening a sheet and trying
-         to click a text button was racy and could leave the block running.
-         stopPropagation so this doesn't also trigger the bar's own
-         "jump to Activity" handler below \u2014 Stop should just stop,
-         not navigate anywhere. */
-      document.getElementById("lt-ts-stop-btn").addEventListener("click", function (e) {
-        e.stopPropagation();
-        var block = getNativeRunningBlock();
-        if (block && typeof window.__lifetimeStopActivity === "function") {
-          window.__lifetimeStopActivity(block.id);
-        } else {
-          var stopBtn = Array.prototype.slice.call(document.querySelectorAll("button"))
-            .find(function (b) { return /^stop timer$/i.test(b.textContent.trim()); });
-          if (stopBtn) stopBtn.click();
-        }
-      });
-
-      /* Tapping anywhere else on the bar, while an activity is running,
-         jumps straight to the Activity tab so you can see/manage it \u2014
-         same as tapping the Activity pseudo-tab in the bottom nav. Only
-         active while running (bar has no useful destination while idle). */
-      bar.addEventListener("click", function (e) {
-        if (!bar.classList.contains("lt-ts-running")) return;
-        if (e.target.closest("#lt-ts-stop-btn")) return;
-        var activityTab = document.getElementById("lt-activity-navtab");
-        if (activityTab) activityTab.click();
-      });
-    }
-
-    if (!timerIsRunning) {
-      bar.classList.remove("lt-ts-running");
-      var timeElIdle = document.getElementById("lt-ts-time");
-      var labelElIdle = document.getElementById("lt-ts-label");
-      if (timeElIdle) timeElIdle.textContent = "";
-      if (labelElIdle) labelElIdle.textContent = "No activity running";
-      if (_statusBarTimer) { clearInterval(_statusBarTimer); _statusBarTimer = null; }
-      return;
-    }
-
-    bar.classList.add("lt-ts-running");
-
-    /* Tick elapsed time + activity name */
-    function tickBar() {
-      var startedAt = Number(readJson(RUNNING_TIMER_KEY, 0));
-      var elapsed = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
-      var m = Math.floor(elapsed / 60), s = elapsed % 60;
-      var timeEl = document.getElementById("lt-ts-time");
-      if (timeEl) timeEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;
-
-      var pending = readJson(PENDING_TIMER_CAT_KEY, null);
-      var labelEl = document.getElementById("lt-ts-label");
-      if (labelEl) {
-        labelEl.textContent = (pending && pending.category)
-          ? (pending.activityName || pending.label || pending.category)
-          : "Activity running";
-      }
-    }
-
-    if (!_statusBarTimer) {
-      tickBar();
-      _statusBarTimer = setInterval(tickBar, 1000);
-    }
-  }
+  /* P10 REMOVED: upsertRunningBanner, _statusBarTimer — the running timer
+     banner is now handled by React (LTTimerPanel running indicator). */
 
   /* ── Real OS notification for the running activity (web build) ──────────
      The in-app top bar above only exists while this tab is open and
@@ -7391,7 +6277,6 @@
           badges2.splice(idx, 1);
           saveUserBadges(badges2);
           rebuild();
-          buildTimerAchievements(); /* refresh home-screen slots */
           return;
         }
         /* Tap a milestone card */
@@ -7413,7 +6298,6 @@
             /* Unpin */
             saveUserBadges(badges3.filter(function (b) { return b.milestoneId !== milId; }));
             rebuild();
-            buildTimerAchievements(); /* refresh home-screen slots */
             return;
           }
           if (badges3.length >= 3) {
@@ -7423,7 +6307,6 @@
           badges3.push({ milestoneId: milId, icon: mil.icon, name: mil.label, desc: mil.desc });
           saveUserBadges(badges3);
           rebuild();
-          buildTimerAchievements(); /* refresh home-screen slots immediately */
         }
       };
       activeOverlay.addEventListener("click", activeOverlay._achClickFn);
@@ -7871,7 +6754,7 @@
     /* Force rebuild life-progress card so View Plan button updates */
     var lp = document.getElementById("lt-life-progress");
     if (lp) lp.remove();
-    setTimeout(function () { safeRun(injectAccountCard); safeRun(gateTelegramSettings); buildEatTheFrogCard(); }, 30);
+    setTimeout(function () { safeRun(injectAccountCard); safeRun(gateTelegramSettings); }, 30);
   }
 
   /* ── Gate Telegram settings the same way Budget Tracker is gated: dim it,
@@ -8323,131 +7206,13 @@
     return false;
   };
 
-  /* ── Timer tab: auto-scale content to screen size, no scrolling ───────────
-     Bigger screen  → content zooms UP  to fill it.
-     Smaller screen → content zooms DOWN to fit, nothing cut off.
-     Activity sub-tab is exempt — it keeps normal scroll for its list.
-     All other pages keep normal document scroll restored.
+  /* P12 REMOVED: applyTimerZoom, scheduleZoom, lockTimerPageScroll
+     The Timer tab now uses normal scroll like every other tab.
+     React owns all layout and navigation. */
 
-     RETRY LOGIC: on first app open (and returning from Activity tab) the
-     React framework may not have finished painting when this first fires.
-     We schedule up to MAX_RETRIES re-checks so the zoom always settles
-     correctly without the user needing to switch tabs. */
-  /* ── Timer-tab zoom: reliable single-pass implementation ─────────────────
-     Clears zoom and opens overflow before measuring so scrollHeight always
-     reflects the true 1× content height — not the clipped viewport height.
-     Does NOT touch height/minHeight to avoid collapsing flex children.
-     Returns true on success, false when DOM isn't ready yet.              */
-  function applyTimerZoom() {
-    /* Disabled — the Timer tab now uses plain normal scroll, same as
-       every other tab, instead of this custom zoom-to-fit/no-scroll
-       system. Kept as a no-op (rather than deleted) so the few remaining
-       call sites below don't need to be touched. */
-    return false;
-    // eslint-disable-next-line no-unreachable
-    var main = document.querySelector("main.overflow-y-auto") || document.querySelector("main");
-    if (!main) return false;
-
-    var navBar     = document.querySelector("nav");
-    var navH       = (navBar && navBar.offsetHeight > 0) ? navBar.offsetHeight : 64;
-    var containerH = window.innerHeight - navH;
-    if (containerH <= 50) return false; /* viewport not ready */
-
-    /* Set zoom to "1" (explicit) and open overflow so scrollHeight gives
-       the true natural content height without any clamping. */
-    main.style.zoom      = "1";
-    main.style.overflowY = "visible";
-
-    /* Reading scrollHeight forces a synchronous layout flush in Chromium */
-    var naturalH = main.scrollHeight;
-
-    /* Restore clip immediately */
-    main.style.overflowY = "hidden";
-
-    if (naturalH <= 50) return false; /* content not rendered yet */
-
-    var rawScale = containerH / naturalH;
-    var scale    = Math.max(0.68, Math.min(1.35, rawScale));
-
-    /* If content is so tall that even the smallest allowed shrink (0.68x)
-       still doesn't make it fit, don't keep clamping — that's what was
-       cutting content off with no way to reach it. Fall back to normal
-       scroll at the minimum readable scale instead, so everything is
-       still reachable by scrolling down. */
-    var stillOverflows = (naturalH * scale) > containerH + 1;
-
-    main.style.zoom = String(scale);
-
-    if (stillOverflows) {
-      /* Let the page scroll instead of hiding the overflow. */
-      document.documentElement.style.overflowY = "";
-      document.body.style.overflowY             = "";
-      main.style.overflowY               = "auto";
-      main.style.webkitOverflowScrolling = "touch";
-      main.style.paddingBottom           = "24px";
-      return true;
-    }
-
-    /* Content fits at this scale — lock scroll as before. */
-    document.documentElement.style.overflowY = "hidden";
-    document.body.style.overflowY             = "hidden";
-    window.scrollTo(0, 0);
-    main.style.paddingBottom           = "0";
-    main.style.webkitOverflowScrolling = "";
-    return true;
-  }
-
-  /* Debounced zoom helper — collapses rapid duplicate calls into one */
-  var _ltZoomDebounce = null;
-  function scheduleZoom(delayMs) {
-    clearTimeout(_ltZoomDebounce);
-    _ltZoomDebounce = setTimeout(function () {
-      if (location.pathname === "/" && _activeSubTab !== "activity") {
-        applyTimerZoom();
-      }
-    }, delayMs || 0);
-  }
-
-  function lockTimerPageScroll() {
-    /* The Timer tab used to have its own custom "auto-zoom to fit, no
-       scroll" system (applyTimerZoom) that behaved completely differently
-       from every other tab and was unreliable (mismeasurement, retries,
-       content getting cut off/glitching depending on list length, keyboard,
-       etc). That whole system is now disabled — the Timer tab just scrolls
-       normally like every other tab, so this function unconditionally
-       restores normal scroll everywhere. */
-    var main = document.querySelector("main.overflow-y-auto") || document.querySelector("main");
-    if (!main) return;
-
-    document.documentElement.style.overflowY = "";
-    document.body.style.overflowY             = "";
-    main.style.overflowY               = "";
-    main.style.minHeight               = "";
-    main.style.height                  = "";
-    main.style.zoom                    = "1";
-    main.style.paddingBottom           = "";
-    main.style.webkitOverflowScrolling = "touch";
-
-    /* Reading scrollHeight forces Chromium to flush layout synchronously,
-       so anything that just changed (cards resized/removed, #root's
-       height rule above) is reflected immediately instead of leaving a
-       stale, too-tall scroll range around until some unrelated layout
-       event happens to trigger a recompute. This does NOT hide/replace
-       `main` — an earlier version of this function briefly set
-       `main.style.display = "none"` to force the same flush, but `main`
-       is the actual scrollable element holding the user's scroll
-       position, and hiding a scrollable element resets its scrollTop to
-       0. That silently teleported the page to the top on every
-       enhancement pass while scrolled anywhere. Reading scrollHeight
-       gets the same forced-layout effect with no such side effect. */
-    void main.scrollHeight;
-  }
-
-  /* Keep every user-facing duration on the same unit spelling. The native
-     bundle uses the short "m" form in some refreshed list rows while the
-     enhanced countdown uses "min". Normalizing text nodes at the DOM boundary
-     prevents React re-renders from making the label appear to alternate. */
   function normalizeMinuteUnits() { /* removed — fmtMins uses consistent 'm' everywhere */ }
+
+  /* ── Expose back-button handler for Android's onBackPressed */
 
   /* Every step below patches a live React tree that can re-render out from
      under us mid-pass (an element we looked up a line ago can already be
@@ -8468,6 +7233,8 @@
   function runEnhancements() {
     var p = location.pathname;
     var onHome = p === "/";
+    var onActivity = p === "/activity";
+    var onTimerOrActivity = onHome || onActivity;
     var onLifeHub = p === "/life-hub";
     var onJournal = p === "/journal";
     /* One-time setup — always run */
@@ -8480,21 +7247,14 @@
     safeRun(enforceActivityGraceIfNeeded);
     safeRun(normalizeMinuteUnits);
     /* Timer / Activity page */
-    if (onHome) {
-      safeRun(updateActivityLimitBadge);
+    if (onTimerOrActivity) {
       safeRun(normalizeOriginalLabels);
       safeRun(hijackDateInputs);
       safeRun(ensureActivityActionDescriptions);
-      safeRun(updateSavedTimeValueCard);
       safeRun(pollRunningTimer);
-      safeRun(upsertRunningBanner);
       safeRun(checkIdleNudge);
       safeRun(updateStreak);
-      safeRun(buildLifeProgressCard);
-      safeRun(buildEatTheFrogCard);
-      safeRun(restyleTopNav);
       safeRun(replaceRupeeGlobally);
-      safeRun(lockTimerPageScroll);
     }
     /* Journal page */
     if (onJournal) {
@@ -8533,125 +7293,11 @@
     if (!activeOverlay) runEnhancements();
   }
 
-  /* ── Nav-transition mask ──────────────────────────────────────────────────
-     This whole enhancement layer works by watching the DOM after React has
-     already painted, then hiding/restyling/replacing things a beat later
-     (MutationObserver + a throttled poll). During any navigation — bottom
-     nav taps, or the multi-step "jump to Time Value Calculator" flow — there
-     is a real gap between "React painted the raw native screen" and "our
-     script finished patching it", and in that gap the user briefly sees the
-     unstyled native UI (raw Life Hub grid + its native search box, stray old
-     tiles, etc.) before it's covered up. That's the flicker. Instead of
-     trying to close that gap entirely (impossible with a polling patch),
-     just paper over it visually: drop an opaque mask over the content the
-     instant we know a transition is starting, and only lift it once a fresh
-     enhancement pass has actually run. */
-  var _navMaskEl = null;
-  var _navMaskShownAt = 0;
-  function showNavMask() {
-    if (_navMaskEl) return;
-    _navMaskShownAt = Date.now();
-    _navMaskEl = document.createElement("div");
-    _navMaskEl.id = "lt-nav-mask";
-    /* Fall back to a real color instead of an unresolved CSS var. If
-       document.body isn't fully styled yet (very early in a cold load,
-       before the theme stylesheet has applied), `hsl(var(--background))`
-       can resolve to nothing / black, which itself used to read as a
-       "stuck black/white screen" even after the element was correctly
-       removed on schedule. */
-    var themeBg = "";
-    try { themeBg = getComputedStyle(document.body).backgroundColor; } catch (e) {}
-    _navMaskEl.style.cssText =
-      "position:fixed;inset:0;z-index:2147483000;" +
-      "background:" + (themeBg && themeBg !== "rgba(0, 0, 0, 0)" ? themeBg : "#ffffff") + ";" +
-      "pointer-events:none;";
-    document.body.appendChild(_navMaskEl);
-  }
-  function hideNavMask() {
-    if (!_navMaskEl) return;
-    var el = _navMaskEl;
-    _navMaskEl = null;
-    _navMaskShownAt = 0;
-    if (el.parentNode) el.parentNode.removeChild(el);
-  }
-  /* Safety net: never let the mask get stuck up if something in the
-     transition flow fails to call hideNavMask(). */
-  function showNavMaskWithTimeout(maxMs) {
-    showNavMask();
-    setTimeout(hideNavMask, maxMs || 1500);
-  }
-  /* Second, independent safety net. The per-call setTimeout above is only
-     as reliable as the JS timer queue: if a burst of synchronous work (or
-     another throw somewhere unrelated) delays that specific timer, the
-     mask can still outlive its intended window. This watchdog doesn't
-     depend on any call site remembering to schedule a cleanup — it just
-     polls on its own and force-clears anything left over 2s, no matter
-     what caused it or which code path was supposed to lift it. This is
-     the actual fix for the "Settings screen stuck white" report: previously
-     the *only* things that could lift the mask were the specific timers
-     set up at the moment it was shown, and if any of those got skipped
-     (or threw before reaching hideNavMask()), nothing else in the app
-     would ever check on it again. */
-  setInterval(function () {
-    if (_navMaskEl && Date.now() - _navMaskShownAt > 2000) hideNavMask();
-  }, 500);
-
-  function installOverlayNavGuard() {
-    function handleNav() { if (activeOverlay) closeOverlay(); runEnhancementsImmediate(); }
-    window.addEventListener("popstate", handleNav);
-    window.addEventListener("hashchange", handleNav);
-    var _push = history.pushState;
-    history.pushState = function () { var r = _push.apply(this, arguments); handleNav(); return r; };
-    var _replace = history.replaceState;
-    history.replaceState = function () { var r = _replace.apply(this, arguments); handleNav(); return r; };
-    /* Fallback: bottom nav is plain buttons/links, not always routed via
-       pushState — also close on any click outside the overlay itself. */
-    document.addEventListener("click", function (e) {
-      if (activeOverlay) {
-        if (e.target.closest && e.target.closest("#lt-overlay-root")) return;
-        var navBtn = e.target.closest("nav button, nav a");
-        if (navBtn) closeOverlay();
-      }
-      var navTap = e.target.closest("nav button, nav a");
-      if (navTap) {
-        var isActivityTabTap = navTap.id === "lt-activity-navtab";
-        var targetHref = navTap.getAttribute && navTap.getAttribute("href");
-        var isSameTab = isActivityTabTap
-          ? _activeSubTab === "activity"
-          : (targetHref != null && targetHref === location.pathname && _activeSubTab !== "activity");
-        /* Same exact tab: block React re-render entirely */
-        if (isSameTab) {
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-        /* Timer ↔ Activity is same route (/), just toggle visibility.
-           No mask — toggle display properties instantly. Only run the
-           subset of enhancements needed for each sub-tab. */
-        var isTimerActivitySwitch = (targetHref === "/" || isActivityTabTap) && location.pathname === "/";
-        if (isTimerActivitySwitch) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (isActivityTabTap) {
-            _activeSubTab = "activity";
-          } else {
-            _activeSubTab = "timer";
-          }
-          applySubTabVisibility();
-          syncNavTabStyles();
-          upsertRunningBanner();
-          return;
-        }
-        /* Real route switch: elements now live in #lt-timer-host (outside
-           React's <main>), so React can't destroy them. Just flip the CSS
-           body attribute — zero DOM manipulation, zero delay, zero flash. */
-        var goingToActivity = isActivityTabTap || (targetHref === "/" && _activeSubTab === "activity");
-        _activeSubTab = goingToActivity ? "activity" : "timer";
-        document.body.setAttribute("data-lt-route", targetHref === "/" ? "timer" : targetHref);
-        syncNavTabStyles();
-      }
-    }, true);
-  }
+  /* P3+P4+P5 REMOVED: Nav mask system, installOverlayNavGuard, history patches
+     The nav mask covered the screen during route transitions to hide
+     unstyled React content. With React owning all UI, this is no longer
+     needed. History patches (pushState/replaceState) and click interception
+     are removed — React Router handles all navigation natively. */
 
   function killHighlighting() {
     if (document.getElementById("lt-no-highlight-style")) return;
@@ -8751,9 +7397,9 @@
   setInterval(maybeShowOverlayPermissionModal, 2000);
 
   document.addEventListener("DOMContentLoaded", function () {
-    /* Set initial route attribute so CSS visibility rules work from the start */
-    document.body.setAttribute("data-lt-route", location.pathname === "/" ? "timer" : location.pathname);
-    installOverlayNavGuard();
+    /* P3+P4+P5 REMOVED: installOverlayNavGuard() and initial data-lt-route
+       React Router handles all navigation natively. Body attribute is no
+       longer needed since React owns route-based visibility. */
     killHighlighting();
     runEnhancements();
     setTimeout(maybeShowOverlayPermissionModal, 1200);
@@ -8792,12 +7438,5 @@
       if (fastPolls >= 8) clearInterval(fastTimer); /* ~1.6s at 200ms */
     }, 200);
     setInterval(function () { if (!activeOverlay) runEnhancements(); }, 3000);
-
-    /* Also re-apply zoom whenever the viewport resizes (rotation, etc.) */
-    window.addEventListener("resize", function () {
-      if (location.pathname === "/" && _activeSubTab !== "activity") {
-        scheduleZoom(100);
-      }
-    });
   });
 })();

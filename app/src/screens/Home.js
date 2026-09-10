@@ -1364,55 +1364,451 @@ function formatTime(isoString) {
   });
 }
 
-// ─── Home Screen (EXPORTED) ─────────────────────────────────────────────────
-// Main Timer/Activity screen. Manages activity list, timer state, and all modals.
+// ─── Life Progress Card (P6) ─────────────────────────────────────────────────
+// Replaces enhancements.js buildLifeProgressCard().
+// Shows greeting, SVG life progress ring, countdown, and daily time value.
 
-export function HomeScreen({ profile }) {
+function LifeProgressCard({ profile }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!profile) return null;
+
+  const percentLived = calcPercentLived(profile);
+  const remainingMs = calcRemainingTime(profile);
+  const breakdown = msToBreakdown(remainingMs);
+
+  const circumference = 2 * Math.PI * 36;
+  const offset = circumference - (percentLived / 100) * circumference;
+
+  const h = new Date().getHours();
+  const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+
+  // Time value
+  let tvData = null;
+  try {
+    const stored = JSON.parse(localStorage.getItem('lt_time_value_v1') || 'null');
+    if (stored && stored.perMinute) {
+      const pm = Number(stored.perMinute);
+      const dailyHours = Number(stored.hours) || 8;
+      const nowDate = new Date(now);
+      const secOfDay = nowDate.getHours() * 3600 + nowDate.getMinutes() * 60 + nowDate.getSeconds();
+      const remSecToday = 86400 - secOfDay;
+      const dailyBudget = pm * 60 * dailyHours;
+      const value = Math.max(0, dailyBudget * (remSecToday / 86400));
+      const remHours = Math.floor(remSecToday / 3600);
+      const remMin = Math.floor((remSecToday % 3600) / 60);
+      tvData = { value, remHours, remMin, rate: pm * 60 };
+    }
+  } catch (e) { /* ignore */ }
+
+  return jsxs('div', {
+    className: 'mx-4 mt-3 flex flex-col gap-3',
+    children: [
+      // Top card: greeting + ring
+      jsxs('div', {
+        className: 'flex items-start justify-between gap-3 bg-background border border-border rounded-2xl p-4',
+        children: [
+          jsxs('div', {
+            className: 'flex-1 min-w-0',
+            children: [
+              jsx('p', { className: 'text-sm font-semibold text-foreground/55 mb-1', children: greeting + ',' }),
+              jsxs('h2', { className: 'text-[26px] font-black text-primary mb-2', children: [profile.name, ' \u2728'] }),
+              jsx('p', { className: 'text-[13px] leading-relaxed text-foreground/60', children: 'Make today count. Your future is built by what you do now. \uD83D\uDC9B' })
+            ]
+          }),
+          jsxs('div', {
+            className: 'flex-shrink-0 flex flex-col items-center bg-white border border-border rounded-[14px] px-3 py-2.5',
+            children: [
+              jsx('p', { className: 'text-[9px] font-extrabold tracking-widest text-foreground/40 mb-1', children: 'LIFE PROGRESS' }),
+              jsxs('div', {
+                className: 'relative w-[88px] h-[88px] flex items-center justify-center',
+                children: [
+                  jsx('svg', {
+                    width: 88, height: 88, viewBox: '0 0 100 100',
+                    className: 'block',
+                    style: { transform: 'rotate(-90deg)' },
+                    children: jsxs(Fragment, {
+                      children: [
+                        jsx('circle', { cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--border))', strokeWidth: 8 }),
+                        jsx('circle', { cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--accent))', strokeWidth: 8, strokeLinecap: 'round', strokeDasharray: circumference, strokeDashoffset: offset, style: { transition: 'stroke-dashoffset 0.4s ease' } })
+                      ]
+                    })
+                  }),
+                  jsx('div', {
+                    className: 'absolute inset-0 flex items-center justify-center',
+                    children: jsx('span', { className: 'text-[19px] font-black text-primary', children: Math.round(percentLived) + '%' })
+                  })
+                ]
+              }),
+              jsx('p', { className: 'text-[9px] font-semibold text-foreground/45 mt-1', children: 'of your life lived' })
+            ]
+          })
+        ]
+      }),
+      // Countdown card
+      jsxs('div', {
+        className: 'bg-primary rounded-2xl p-4',
+        children: [
+          jsxs('div', {
+            className: 'flex items-start justify-between gap-2.5 mb-3.5',
+            children: [
+              jsxs('div', {
+                className: 'flex-1 min-w-0',
+                children: [
+                  jsx('p', { className: 'text-sm font-extrabold text-white', children: profile.name + '\u2019s Remaining Retirement Time' }),
+                  jsx('p', { className: 'text-[13px] font-bold text-white/85 mt-0.5', children: '\uD83C\uDFC1 Target: \uD83C\uDFC3 ' + profile.dob })
+                ]
+              })
+            ]
+          }),
+          jsxs('div', {
+            className: 'grid grid-cols-5 gap-1.5',
+            children: [
+              jsx(LifeDigit, { value: breakdown.years, label: 'YEARS' }),
+              jsx(LifeDigit, { value: breakdown.days, label: 'DAYS' }),
+              jsx(LifeDigit, { value: breakdown.hours, label: 'HOURS' }),
+              jsx(LifeDigit, { value: breakdown.minutes, label: 'MIN' }),
+              jsx(LifeDigit, { value: breakdown.seconds, label: 'SEC', accent: true })
+            ]
+          })
+        ]
+      }),
+      // Time value card
+      tvData && jsxs('div', {
+        className: 'border border-accent/30 bg-accent/10 rounded-2xl p-4 flex items-center justify-between gap-2.5',
+        children: [
+          jsxs('div', {
+            children: [
+              jsx('p', { className: 'text-[13px] font-extrabold text-primary', children: 'Today\u2019s Time Value' }),
+              jsx('p', { className: 'text-[11px] text-foreground/50 mt-px', children: 'Your remaining time' }),
+              jsx('p', { className: 'text-[22px] font-black text-accent mt-1.5', children: 'Rs.' + tvData.value.toFixed(2) }),
+              jsx('p', { className: 'text-[11px] text-foreground/50 mt-0.5', children: tvData.remHours + 'h ' + tvData.remMin + 'm left' })
+            ]
+          }),
+          jsx('span', {
+            className: 'flex-shrink-0 bg-accent/15 text-accent rounded-full px-2.5 py-1.5 text-[10px] font-extrabold text-center leading-tight max-w-[96px]',
+            children: 'Rs.' + tvData.rate + '/hour'
+          })
+        ]
+      })
+    ]
+  });
+}
+
+function LifeDigit({ value, label, accent }) {
+  return jsxs('div', {
+    className: 'flex flex-col items-center bg-white/8 rounded-[10px] py-2 px-0.5',
+    children: [
+      jsx('span', {
+        className: cn('text-[17px] font-black text-white tabular-nums leading-none', accent && 'text-accent'),
+        children: String(value).padStart(2, '0')
+      }),
+      jsx('span', {
+        className: 'text-[8px] font-extrabold tracking-widest text-white/40 mt-0.5',
+        children: label
+      })
+    ]
+  });
+}
+
+// ─── Today at a Glance (P7) ──────────────────────────────────────────────────
+// Replaces enhancements.js buildGlanceSection().
+// Shows today's tracked activity usage in a horizontal card grid.
+
+function TodayGlance({ activities, blocks }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate minutes per activity today
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayBlocks = blocks.filter(b => {
+    if (!b.startTime) return false;
+    const start = new Date(b.startTime);
+    const dateStr = start.toISOString().slice(0, 10);
+    if (dateStr !== todayStr) return false;
+    const end = b.endTime ? new Date(b.endTime) : new Date(now);
+    return (end - start) > 0;
+  });
+
+  const activityMinutes = {};
+  todayBlocks.forEach(b => {
+    const end = b.endTime ? new Date(b.endTime) : new Date(now);
+    const mins = Math.max(0, Math.round((end - new Date(b.startTime)) / 60000));
+    activityMinutes[b.activityId] = (activityMinutes[b.activityId] || 0) + mins;
+  });
+
+  const totalMinutes = Object.values(activityMinutes).reduce((s, m) => s + m, 0);
+  if (totalMinutes === 0) return null;
+
+  const tracked = activities
+    .filter(a => activityMinutes[a.id] > 0)
+    .map(a => ({ ...a, minutes: activityMinutes[a.id] }))
+    .sort((a, b) => b.minutes - a.minutes)
+    .slice(0, 4);
+
+  if (tracked.length === 0) return null;
+
+  const formatMins = (m) => {
+    if (m < 60) return m + 'm';
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    return rem > 0 ? h + 'h ' + rem + 'm' : h + 'h';
+  };
+
+  const colors = ['#FEF3C7', '#EDE9FE', '#FEE2E2', '#DCFCE7'];
+
+  return jsxs('div', {
+    className: 'mx-4 mt-3',
+    children: [
+      jsx('p', {
+        className: 'text-[18px] font-black text-foreground mb-2.5',
+        children: 'Today at a Glance'
+      }),
+      jsx('div', {
+        className: 'grid gap-2',
+        style: { gridTemplateColumns: 'repeat(' + Math.min(tracked.length, 4) + ', 1fr)' },
+        children: tracked.map((a, i) => {
+          const pct = Math.round((a.minutes / totalMinutes) * 100);
+          return jsxs('div', {
+            className: 'rounded-xl p-3 flex flex-col items-center gap-1',
+            style: { background: colors[i % colors.length] },
+            children: [
+              jsx('span', { className: 'text-xl', children: a.emoji || '\uD83C\uDFB3' }),
+              jsx('span', { className: 'text-sm font-extrabold text-foreground', children: formatMins(a.minutes) }),
+              jsx('span', {
+                className: 'text-[9px] text-foreground/60 text-center w-full truncate',
+                children: a.name
+              }),
+              jsx('div', {
+                className: 'w-full h-[3px] rounded-full bg-black/10 overflow-hidden mt-0.5',
+                children: jsx('div', {
+                  className: 'h-full rounded-full',
+                  style: { width: pct + '%', background: 'hsl(var(--primary))' }
+                })
+              })
+            ]
+          }, a.id);
+        })
+      })
+    ]
+  });
+}
+
+// ─── Eat the Frog (P8) ──────────────────────────────────────────────────────
+// Replaces enhancements.js buildEatTheFrogCard().
+// Shows top 3 starred tasks with inline editing, checkbox, and unstar.
+
+const TASKS_KEY_RT = 'lt_tasks_v1';
+const MAX_FROG_TASKS = 3;
+
+function EatTheFrog() {
+  const [tasks, setTasks] = useState(() => {
+    try {
+      const raw = localStorage.getItem(TASKS_KEY_RT);
+      return Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
+  const [, setTick] = useState(0);
+
+  const saveTasks = (newTasks) => {
+    localStorage.setItem(TASKS_KEY_RT, JSON.stringify(newTasks));
+    setTasks(newTasks);
+  };
+
+  const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+  const starred = tasks.filter(t => t.starred && !t.completed);
+  const slots = [];
+  for (let i = 0; i < MAX_FROG_TASKS; i++) {
+    slots.push(starred[i] || null);
+  }
+
+  const toggleComplete = (taskId) => {
+    const newTasks = tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t);
+    saveTasks(newTasks);
+    setTick(n => n + 1);
+  };
+
+  const unstarTask = (taskId) => {
+    const newTasks = tasks.map(t => t.id === taskId ? { ...t, starred: false } : t);
+    saveTasks(newTasks);
+    setTick(n => n + 1);
+  };
+
+  const updateTitle = (taskId, title) => {
+    if (!taskId) return; // empty slot
+    const newTasks = tasks.map(t => t.id === taskId ? { ...t, title } : t);
+    saveTasks(newTasks);
+  };
+
+  const createFromSlot = (title) => {
+    if (!title.trim()) return;
+    const newTask = {
+      id: genId(),
+      title: title.trim(),
+      date: null,
+      time: null,
+      notes: '',
+      completed: false,
+      starred: true,
+      createdAt: Date.now()
+    };
+    saveTasks([...tasks, newTask]);
+    setTick(n => n + 1);
+    return newTask.id;
+  };
+
+  if (starred.length === 0 && slots.every(s => s === null)) return null;
+
+  return jsxs('div', {
+    className: 'mx-4 mt-3 p-4 border border-border rounded-2xl bg-background',
+    children: [
+      jsx('p', { className: 'text-[15px] font-extrabold text-foreground flex items-center gap-1.5', children: ['\uD83D\uDC38 Eat the Frog'] }),
+      jsx('p', { className: 'text-xs text-foreground/65 mt-0.5 mb-3', children: 'Your ' + starred.length + ' most important tasks today' }),
+      slots.map((task, i) =>
+        jsx(FrogSlot, {
+          task,
+          index: i,
+          onToggle: toggleComplete,
+          onUnstar: unstarTask,
+          onUpdateTitle: updateTitle,
+          onCreate: createFromSlot
+        }, i)
+      )
+    ]
+  });
+}
+
+function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) {
+  const [localTitle, setLocalTitle] = useState(task ? task.title : '');
+  const [slotTaskId, setSlotTaskId] = useState(task ? task.id : null);
+
+  useEffect(() => {
+    setLocalTitle(task ? task.title : '');
+    setSlotTaskId(task ? task.id : null);
+  }, [task?.id, task?.title]);
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setLocalTitle(val);
+    if (slotTaskId) {
+      onUpdateTitle(slotTaskId, val);
+    } else if (val.trim()) {
+      const newId = onCreate(val);
+      if (newId) setSlotTaskId(newId);
+    }
+  };
+
+  return jsxs('div', {
+    className: 'flex items-center gap-2.5 py-2 border-t border-border first:border-t-0',
+    children: [
+      // Checkbox
+      jsx('button', {
+        type: 'button',
+        onClick: () => slotTaskId && onToggle(slotTaskId),
+        className: cn(
+          'w-[22px] h-[22px] flex-shrink-0 rounded-full border-2 flex items-center justify-center text-xs text-white',
+          task?.completed
+            ? 'bg-green-500 border-green-500'
+            : 'border-border bg-transparent',
+          !slotTaskId && 'opacity-35 cursor-default'
+        ),
+        children: task?.completed ? '\u2713' : null
+      }),
+      // Title input
+      jsx('input', {
+        type: 'text',
+        value: localTitle,
+        onChange: handleInput,
+        placeholder: 'Add an important task\u2026',
+        className: cn(
+          'flex-1 border border-border bg-secondary/30 text-sm text-foreground outline-none rounded-lg px-2.5 py-1.5 min-w-0',
+          task?.completed && 'line-through opacity-50'
+        )
+      }),
+      // Unstar
+      jsx('button', {
+        type: 'button',
+        onClick: () => slotTaskId && onUnstar(slotTaskId),
+        className: cn(
+          'flex-shrink-0 p-1 text-[#f5a623]',
+          !slotTaskId && 'invisible'
+        ),
+        children: jsx('svg', {
+          width: 16, height: 16, viewBox: '0 0 24 24', fill: '#f5a623', stroke: '#f5a623', strokeWidth: 2,
+          strokeLinecap: 'round', strokeLinejoin: 'round',
+          children: jsx('polygon', { points: '12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2' })
+        })
+      })
+    ]
+  });
+}
+
+// ── Timer Screen (EXPORTED) ──────────────────────────────────────────
+// Dashboard: Life Progress, Today at a Glance, Eat the Frog.
+// Pure overview — no activity list, no timer controls.
+
+export function TimerScreen({ profile }) {
+  const { data: activities = [] } = useActivities();
+  const { data: blocks = [] } = useBlocks();
+
+  return jsxs('div', {
+    'data-source-file': 'screens/Home.js',
+    className: 'flex flex-col',
+    children: [
+      jsx(LifeProgressCard, { profile }),
+      jsx(TodayGlance, { activities, blocks }),
+      jsx(EatTheFrog, {})
+    ]
+  });
+}
+
+// ── Activity Screen (EXPORTED) ──────────────────────────────────────────
+// Activity list + timer controls + all modals.
+// Separate from the Timer dashboard to eliminate the old pseudo-tab system.
+
+export function ActivityScreen({ profile }) {
   const queryClient = useQueryClient();
   const { data: activities = [] } = useActivities();
   const { data: blocks = [] } = useBlocks();
-  const runningBlock = blocks.find(b => !b.endTime); // Find currently running block
+  const runningBlock = blocks.find(b => !b.endTime);
 
   const createBlock = useCreateBlock();
   const updateBlock = useUpdateBlock();
 
-  // Modal state: selected activity for action sheet
   const [selectedActivity, setSelectedActivity] = useState(null);
-  // Modal state: active block info for stop/edit sheet
   const [activeBlockInfo, setActiveBlockInfo] = useState(null);
-  // Modal state: editing block for edit modal
   const [editingBlock, setEditingBlock] = useState(null);
-  // Modal state: log time block activity
   const [logBlockActivity, setLogBlockActivity] = useState(null);
 
-  // Handle tapping an activity
   const handleActivityTap = (activity) => {
     if (runningBlock?.activityId === activity.id) {
-      // This activity has a running timer — show stop/edit sheet
       setActiveBlockInfo({ block: runningBlock, activity });
     } else {
-      // No running timer for this activity — show action sheet
       setSelectedActivity(activity);
     }
   };
 
-  // Start timer for an activity
   const startTimer = (activity) => {
     const doCreate = () => {
       createBlock.mutate({
-        data: {
-          activityId: activity.id,
-          startTime: new Date().toISOString()
-        }
+        data: { activityId: activity.id, startTime: new Date().toISOString() }
       }, {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: blocksKey() }); // blocks
-          queryClient.invalidateQueries({ queryKey: todayStatsKey() }); // today-stats
+          queryClient.invalidateQueries({ queryKey: blocksKey() });
+          queryClient.invalidateQueries({ queryKey: todayStatsKey() });
         }
       });
     };
-
-    // If there's already a running block, stop it first
     if (runningBlock) {
       updateBlock.mutate({
         id: runningBlock.id,
@@ -1421,11 +1817,9 @@ export function HomeScreen({ profile }) {
     } else {
       doCreate();
     }
-
     setSelectedActivity(null);
   };
 
-  // Stop the running timer
   const stopTimer = () => {
     if (!activeBlockInfo) return;
     updateBlock.mutate({
@@ -1433,47 +1827,34 @@ export function HomeScreen({ profile }) {
       data: { endTime: new Date().toISOString() }
     }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: blocksKey() }); // blocks
-        queryClient.invalidateQueries({ queryKey: todayStatsKey() }); // today-stats
+        queryClient.invalidateQueries({ queryKey: blocksKey() });
+        queryClient.invalidateQueries({ queryKey: todayStatsKey() });
         setActiveBlockInfo(null);
       }
     });
   };
 
-  // Refresh all queries
   const refreshAll = () => {
-    queryClient.invalidateQueries({ queryKey: blocksKey() }); // blocks
-    queryClient.invalidateQueries({ queryKey: todayStatsKey() }); // today-stats
+    queryClient.invalidateQueries({ queryKey: blocksKey() });
+    queryClient.invalidateQueries({ queryKey: todayStatsKey() });
   };
 
   return jsxs('div', {
     'data-source-file': 'screens/Home.js',
     className: 'flex flex-col',
     children: [
-      // Retirement countdown panel (collapsible)
-      jsx(LTTimerPanel, { profile }),
-      // Daily value bar
-      jsx(LTDailyValueBar, {}),
       // Activity list
       jsxs('div', {
         className: 'flex flex-col divide-y divide-border',
         children: [
-          // Empty state
           activities.length === 0 && jsxs('div', {
             className: 'flex flex-col items-center justify-center py-20 px-8 text-center bg-background',
             children: [
-              jsx(rh, { className: 'w-8 h-8 text-muted-foreground mb-4 opacity-30' }), // Square icon
-              jsx('p', {
-                className: 'text-muted-foreground font-medium',
-                children: 'No activities yet.'
-              }),
-              jsx('p', {
-                className: 'text-sm text-muted-foreground mt-1',
-                children: 'Add one below to start tracking.'
-              })
+              jsx(rh, { className: 'w-8 h-8 text-muted-foreground mb-4 opacity-30' }),
+              jsx('p', { className: 'text-muted-foreground font-medium', children: 'No activities yet.' }),
+              jsx('p', { className: 'text-sm text-muted-foreground mt-1', children: 'Add one below to start tracking.' })
             ]
           }),
-          // Activity rows
           activities.map(activity =>
             jsx(ActivityCard, {
               activity,
@@ -1484,94 +1865,66 @@ export function HomeScreen({ profile }) {
           )
         ]
       }),
-      // Add activity bar
       jsx(AddActivityBar, {}),
 
-      // ─── Modal: Action Sheet (Start Timer / Log Time Block) ─────────────
       selectedActivity && jsxs(BottomSheet, {
         onDismiss: () => setSelectedActivity(null),
         children: [
-          jsx(ModalHeader, {
-            activity: selectedActivity,
-            subtitle: 'How do you want to track this?'
-          }),
+          jsx(ModalHeader, { activity: selectedActivity, subtitle: 'How do you want to track this?' }),
           jsx(ModalOption, {
-            icon: jsx(Ty, { className: 'w-5 h-5' }),     // Timer icon
+            icon: jsx(Ty, { className: 'w-5 h-5' }),
             label: 'Start timer now',
             description: 'Live timer from right now',
             onClick: () => startTimer(selectedActivity)
           }),
           jsx(ModalOption, {
-            icon: jsx(Jb, { className: 'w-5 h-5' }),     // CalendarClock icon
+            icon: jsx(Jb, { className: 'w-5 h-5' }),
             label: 'Log a time block',
             description: 'Set a start and end time manually',
-            onClick: () => {
-              setLogBlockActivity(selectedActivity);
-              setSelectedActivity(null);
-            }
+            onClick: () => { setLogBlockActivity(selectedActivity); setSelectedActivity(null); }
           })
         ]
       }),
 
-      // ─── Modal: Active Timer Sheet (Stop / Edit) ────────────────────────
       activeBlockInfo && jsxs(BottomSheet, {
         onDismiss: () => setActiveBlockInfo(null),
         children: [
-          jsx(ModalHeader, {
-            activity: activeBlockInfo.activity,
-            subtitle: 'Timer is running'
-          }),
+          jsx(ModalHeader, { activity: activeBlockInfo.activity, subtitle: 'Timer is running' }),
           jsx(ModalOption, {
-            icon: jsx(rh, { className: 'w-5 h-5 text-destructive' }), // Square icon (destructive)
+            icon: jsx(rh, { className: 'w-5 h-5 text-destructive' }),
             label: 'Stop timer',
             labelClass: 'text-destructive',
-            description: `Started at ${formatTime(activeBlockInfo.block.startTime)}`,
+            description: 'Started at ' + formatTime(activeBlockInfo.block.startTime),
             onClick: stopTimer
           }),
           jsx(ModalOption, {
-            icon: jsx(tk, { className: 'w-5 h-5' }),     // Pencil icon
+            icon: jsx(tk, { className: 'w-5 h-5' }),
             label: 'Edit time',
             description: 'Adjust start or end time',
-            onClick: () => {
-              setEditingBlock(activeBlockInfo);
-              setActiveBlockInfo(null);
-            }
+            onClick: () => { setEditingBlock(activeBlockInfo); setActiveBlockInfo(null); }
           })
         ]
       }),
 
-      // ─── Modal: Log Time Block ───────────────────────────────────────────
       logBlockActivity && jsx(LogTimeBlockModal, {
         activity: logBlockActivity,
         onClose: () => setLogBlockActivity(null),
         onSave: (startTime, endTime) => {
           const doCreate = () => {
             createBlock.mutate({
-              data: {
-                activityId: logBlockActivity.id,
-                startTime,
-                endTime
-              }
+              data: { activityId: logBlockActivity.id, startTime, endTime }
             }, {
-              onSuccess: () => {
-                refreshAll();
-                setLogBlockActivity(null);
-              }
+              onSuccess: () => { refreshAll(); setLogBlockActivity(null); }
             });
           };
-          // Stop existing running block first
           if (runningBlock) {
-            updateBlock.mutate({
-              id: runningBlock.id,
-              data: { endTime: new Date().toISOString() }
-            }, { onSuccess: doCreate });
+            updateBlock.mutate({ id: runningBlock.id, data: { endTime: new Date().toISOString() } }, { onSuccess: doCreate });
           } else {
             doCreate();
           }
         }
       }),
 
-      // ─── Modal: Edit Time Block ──────────────────────────────────────────
       editingBlock && jsx(EditTimeBlockModal, {
         block: editingBlock.block,
         activity: editingBlock.activity,
@@ -1579,15 +1932,9 @@ export function HomeScreen({ profile }) {
         onSave: (startTime, endTime) => {
           updateBlock.mutate({
             id: editingBlock.block.id,
-            data: {
-              startTime,
-              endTime: endTime || undefined
-            }
+            data: { startTime, endTime: endTime || undefined }
           }, {
-            onSuccess: () => {
-              refreshAll();
-              setEditingBlock(null);
-            }
+            onSuccess: () => { refreshAll(); setEditingBlock(null); }
           });
         }
       })

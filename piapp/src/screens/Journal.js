@@ -1,10 +1,10 @@
-import {
-  Ay,    // useBlocks — useQuery for all time blocks (refetch every 1s)
-  Pe,    // cn — tailwind-merge utility
-  c,     // JSX runtime (React.createElement/jsxs)
-  eh,    // CircleCheckBig icon (lucide)
-  w      // React
-} from '../shared.js';
+import { useState, useMemo, useEffect, Fragment } from 'react';
+import { jsx, jsxs } from 'react/jsx-runtime';
+import { getStore } from '../lib/storage.js';
+import { enrichBlocksForRange } from '../lib/storage.js';
+import { cn } from '../lib/cn.js';
+import { CircleCheckBig as eh } from 'lucide-react';
+import { useBlocks } from '../hooks/useBlocks.js';
 
 /* ─── Helper Functions ──────────────────────────────────────────────────────── */
 
@@ -138,13 +138,13 @@ export function JournalScreen() {
   // ── Data Queries ────────────────────────────────────────────────────────────
 
   // Get all blocks from react-query (auto-refreshes every 1s)
-  var { data: blocks = [] } = Ay();
+  var { data: blocks = [] } = useBlocks();
 
   // Read activities from localStorage (not exported from shared.js)
-  var _activities_state = w.useState([]);
+  var _activities_state = useState([]);
   var _activities = _activities_state[0];
   var setActivities = _activities_state[1];
-  w.useEffect(function() {
+  useEffect(function() {
     try {
       var store = JSON.parse(localStorage.getItem("lifetime_local_db_v1") || "{}");
       setActivities(Array.isArray(store.activities) ? store.activities : []);
@@ -152,7 +152,7 @@ export function JournalScreen() {
   }, []);
 
   // ── State ───────────────────────────────────────────────────────────────────
-  var _expandedDay_state = w.useState(null);
+  var _expandedDay_state = useState(null);
   var expandedDay = _expandedDay_state[0];
   var setExpandedDay = _expandedDay_state[1];
 
@@ -162,7 +162,7 @@ export function JournalScreen() {
   var dayEndMs = dayStartMs + 86400000;
 
   // Today stats: enriched blocks for today, computed locally
-  var todayStats = w.useMemo(function() {
+  var todayStats = useMemo(function() {
     return enrichBlocksForDay(blocks, _activities, dayStartMs, dayEndMs);
   }, [blocks, _activities, dayStartMs, dayEndMs]);
 
@@ -224,36 +224,36 @@ export function JournalScreen() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  return c.jsxs("div", {
+  return jsxs("div", {
     "data-source-file": "screens/Journal_new.js",
     className: "flex flex-col",
     children: [
 
       /* ── 1. Streak & Week Block ────────────────────────────────────────────── */
-      c.jsxs("div", {
+      jsxs("div", {
         className: "px-5 pt-5",
         children: [
 
           // Two cards side by side
-          c.jsxs("div", {
+          jsxs("div", {
             className: "grid grid-cols-2 gap-3 w-full mb-4",
             children: [
 
               // Consistency Streak card
-              c.jsxs("div", {
+              jsxs("div", {
                 className: "rounded-2xl p-4",
                 style: { backgroundColor: "#FEF3E2", border: "1px solid #FBD38D" },
                 children: [
-                  c.jsx("p", {
+                  jsx("p", {
                     className: "text-xs font-bold uppercase tracking-widest mb-1",
                     style: { color: "#B45309" },
                     children: "Consistency Streak"
                   }),
-                  c.jsxs("p", {
+                  jsxs("p", {
                     className: "text-2xl font-black text-foreground",
                     children: [streak, " ", streak === 1 ? "day" : "days"]
                   }),
-                  c.jsx("p", {
+                  jsx("p", {
                     className: "text-xs font-semibold mt-1",
                     style: { color: "#B45309" },
                     children: streak > 0 ? "Keep showing up!" : "Start today!"
@@ -262,18 +262,18 @@ export function JournalScreen() {
               }),
 
               // This Week card
-              c.jsxs("div", {
+              jsxs("div", {
                 className: "rounded-2xl p-4 bg-white border border-border",
                 children: [
-                  c.jsx("p", {
+                  jsx("p", {
                     className: "text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1",
                     children: "This Week"
                   }),
-                  c.jsxs("p", {
+                  jsxs("p", {
                     className: "text-2xl font-black text-foreground",
                     children: [weekLogged, " ", weekLogged === 1 ? "day" : "days", " logged"]
                   }),
-                  c.jsx("p", {
+                  jsx("p", {
                     className: "text-xs text-primary font-semibold mt-1",
                     children: "Stay on track"
                   })
@@ -283,7 +283,7 @@ export function JournalScreen() {
           }),
 
           // Week calendar grid (Mon–Sun)
-          c.jsx("div", {
+          jsx("div", {
             className: "grid grid-cols-7 gap-1 w-full mb-2",
             children: weekDates.map(function(d, i) {
               var isToday = isSameDay(d, now);
@@ -295,16 +295,16 @@ export function JournalScreen() {
                   break;
                 }
               }
-              return c.jsxs("div", {
+              return jsxs("div", {
                 className: "flex flex-col items-center gap-1",
                 children: [
                   // Day name label (Mon, Tue, etc.)
-                  c.jsx("span", {
+                  jsx("span", {
                     className: "text-xs font-bold text-muted-foreground",
                     children: getDayName(d)
                   }),
                   // Day number circle
-                  c.jsx("div", {
+                  jsx("div", {
                     className: "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
                     style: isToday
                       ? { backgroundColor: "#16a34a", color: "#ffffff" }
@@ -312,7 +312,7 @@ export function JournalScreen() {
                     children: getDayNum(d)
                   }),
                   // Tracking dot (green if tracked, transparent if not)
-                  c.jsx("span", {
+                  jsx("span", {
                     className: "w-1 h-1 rounded-full",
                     style: { backgroundColor: tracked ? "#16a34a" : "transparent" }
                   })
@@ -324,29 +324,29 @@ export function JournalScreen() {
       }),
 
       /* ── 2. Today's Time Summary (primary banner) ──────────────────────────── */
-      c.jsxs("div", {
+      jsxs("div", {
         className: "bg-primary text-white px-5 pt-10 pb-6",
         children: [
           // Full date: "Wednesday, September 9"
-          c.jsx("p", {
+          jsx("p", {
             className: "text-xs font-semibold text-white/50 uppercase tracking-widest mb-1",
             children: formatDateLong(now)
           }),
           // Large time display
-          c.jsx("p", {
+          jsx("p", {
             className: "text-4xl font-black",
             children: todayTotalSeconds === 0 ? "0 min" : formatDuration(todayTotalSeconds)
           }),
           // Subtitle
-          c.jsx("p", {
+          jsx("p", {
             className: "text-white/50 text-sm mt-1",
             children: "tracked today"
           }),
           // Activity bar (horizontal segments proportional to time)
-          todayStats.activities.length > 0 && c.jsx("div", {
+          todayStats.activities.length > 0 && jsx("div", {
             className: "mt-4 flex h-1.5 w-full bg-white/10 overflow-hidden",
             children: todayStats.activities.map(function(a) {
-              return c.jsx("div", {
+              return jsx("div", {
                 style: {
                   width: (a.totalSeconds / Math.max(1, todayTotalSeconds) * 100) + "%",
                   backgroundColor: a.activityColor
@@ -359,16 +359,16 @@ export function JournalScreen() {
       }),
 
       /* ── 3. "THIS MONTH" Day List ───────────────────────────────────────────── */
-      c.jsxs("div", {
+      jsxs("div", {
         className: "px-5 pt-5 pb-2",
         children: [
-          c.jsx("h2", {
+          jsx("h2", {
             className: "text-xs font-semibold text-muted-foreground uppercase tracking-widest",
             children: "This month"
           })
         ]
       }),
-      c.jsx("div", {
+      jsx("div", {
         className: "flex flex-col divide-y divide-border border-t border-b border-border",
         children: dayGroups.map(function(dg, idx) {
           var dayDate = days[idx];
@@ -376,46 +376,46 @@ export function JournalScreen() {
           var isOpen = expandedDay === idx;
           var activities = dg.activities;
 
-          return c.jsxs("div", {
+          return jsxs("div", {
             children: [
               // Day row button (tap to expand)
-              c.jsxs("button", {
+              jsxs("button", {
                 type: "button",
                 onClick: function() { setExpandedDay(isOpen ? -1 : idx); },
                 className: "w-full flex items-center justify-between px-5 py-4 bg-white",
                 children: [
-                  c.jsxs("div", {
+                  jsxs("div", {
                     className: "flex items-center gap-2.5",
                     children: [
                       // Animated green dot for today
-                      isToday && c.jsxs("span", {
+                      isToday && jsxs("span", {
                         className: "relative flex h-2.5 w-2.5 shrink-0",
                         children: [
-                          c.jsx("span", {
+                          jsx("span", {
                             className: "animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"
                           }),
-                          c.jsx("span", {
+                          jsx("span", {
                             className: "relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"
                           })
                         ]
                       }),
                       // Date label
-                      c.jsx("span", {
+                      jsx("span", {
                         className: "font-bold text-sm text-foreground",
                         children: formatDate(dayDate)
                       })
                     ]
                   }),
-                  c.jsxs("div", {
+                  jsxs("div", {
                     className: "flex items-center gap-3",
                     children: [
                       // Total time for the day
-                      c.jsx("span", {
+                      jsx("span", {
                         className: "font-mono text-sm font-bold text-muted-foreground",
                         children: dg.totalSeconds > 0 ? formatDuration(dg.totalSeconds) : "\u2014"
                       }),
                       // Expand arrow (rotates when open)
-                      c.jsx("span", {
+                      jsx("span", {
                         className: "text-muted-foreground text-xs transition-transform " + (isOpen ? "rotate-90" : ""),
                         children: "\u25B6"
                       })
@@ -426,28 +426,28 @@ export function JournalScreen() {
 
               // Expanded content: activity groups with individual blocks
               isOpen && (activities.length === 0
-                ? c.jsx("div", {
+                ? jsx("div", {
                     className: "px-5 py-4 text-sm text-muted-foreground bg-secondary",
                     children: "No time logged."
                   })
-                : c.jsx("div", {
+                : jsx("div", {
                     className: "bg-secondary",
                     children: activities.map(function(a, ai) {
                       var activityTotal = a.blocks.reduce(function(sum, b) {
                         return sum + (b.durationSeconds || 0);
                       }, 0);
-                      return c.jsxs("div", {
+                      return jsxs("div", {
                         children: [
                           // Activity header row (colored bar + name + total)
-                          c.jsxs("div", {
+                          jsxs("div", {
                             className: "flex items-center justify-between px-5 py-2.5",
                             style: { borderLeft: "4px solid " + a.activityColor },
                             children: [
-                              c.jsx("span", {
+                              jsx("span", {
                                 className: "font-bold text-sm text-foreground",
                                 children: a.activityName
                               }),
-                              c.jsx("span", {
+                              jsx("span", {
                                 className: "font-mono text-sm font-bold text-muted-foreground",
                                 children: formatDuration(activityTotal)
                               })
@@ -455,25 +455,25 @@ export function JournalScreen() {
                           }),
                           // Individual block rows
                           a.blocks.map(function(b) {
-                            return c.jsxs("div", {
+                            return jsxs("div", {
                               className: "flex items-center justify-between px-5 py-2 pl-8",
                               style: { borderLeft: "4px solid " + a.activityColor + "40" },
                               children: [
-                                c.jsxs("span", {
+                                jsxs("span", {
                                   className: "text-sm text-muted-foreground",
                                   children: [
                                     formatTime12(b.startTime),
                                     // If block started before this day
-                                    b.startedBefore && c.jsx("span", {
+                                    b.startedBefore && jsx("span", {
                                       className: "text-xs italic",
                                       children: " (from prev. day)"
                                     }),
                                     // End time or running indicator
                                     b.continuesAfter
-                                      ? c.jsxs(w.Fragment, {
+                                      ? jsxs(Fragment, {
                                           children: [
                                             " \u2192 " + formatTime12(b.endTime),
-                                            c.jsx("span", {
+                                            jsx("span", {
                                               className: "text-xs italic",
                                               children: " (continues next day)"
                                             })
@@ -484,7 +484,7 @@ export function JournalScreen() {
                                           : " \u00B7 running")
                                   ]
                                 }),
-                                c.jsx("span", {
+                                jsx("span", {
                                   className: "font-mono text-sm font-semibold",
                                   children: b.durationSeconds
                                     ? formatDuration(b.durationSeconds)
@@ -504,7 +504,7 @@ export function JournalScreen() {
       }),
 
       // Bottom spacer
-      c.jsx("div", { className: "h-6" })
+      jsx("div", { className: "h-6" })
     ]
   });
 }

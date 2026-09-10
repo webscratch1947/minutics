@@ -6,7 +6,7 @@ import { getProfile } from '../lib/profile.js';
 import { HC } from './AndroidBridge.js';
 import { ak, dk } from '../_slice_shell.js';
 import { mk } from '../_slice_onboarding.js';
-import { HomeScreen } from '../screens/Home.js';
+import { TimerScreen, ActivityScreen } from '../screens/Home.js';
 import { LifeHubScreen } from '../screens/LifeHub.js';
 import { JournalScreen } from '../screens/Journal.js';
 import { SettingsScreen } from '../screens/Settings.js';
@@ -27,7 +27,8 @@ function AuthenticatedApp({ profile }) {
         jsx(HC, {}),
         jsx(Routes, {
           children: [
-            jsx(Route, { path: '/', element: jsx(HomeScreen, { profile }) }),
+            jsx(Route, { path: '/', element: jsx(TimerScreen, { profile }) }),
+            jsx(Route, { path: '/activity', element: jsx(ActivityScreen, { profile }) }),
             jsx(Route, { path: '/timeline', element: jsx(LifeHubScreen, { profile }) }),
             jsx(Route, { path: '/journal', element: jsx(JournalScreen, {}) }),
             jsx(Route, { path: '/settings', element: jsx(SettingsScreen, {}) }),

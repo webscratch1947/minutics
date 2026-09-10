@@ -1,7 +1,7 @@
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
 import { HashRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getProfile } from './lib/profile.js';
-import { BookOpen, LayoutGrid, Settings, Timer } from 'lucide-react';
+import { BookOpen, LayoutGrid, ListTodo, Settings, Timer } from 'lucide-react';
 import { cn } from './lib/cn.js';
 
 function LTAvatarInitial() {
@@ -32,6 +32,10 @@ const uk = [{
   href: "/",
   icon: Timer,
   label: "Timer"
+}, {
+  href: "/activity",
+  icon: ListTodo,
+  label: "Activity"
 }, {
   href: "/timeline",
   icon: LayoutGrid,

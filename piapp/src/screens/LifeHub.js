@@ -1,44 +1,14 @@
 // Life Hub — Complete screen with 3 views: tool list, time value calculator, and life cost calculator
 
-import {
-  Ho,    // blocksQueryKey — ["local", "blocks"]
-  Kc,    // activitiesQueryKey — ["local", "activities"]
-  NC,    // useCreateBlock — mutation
-  Pe,    // cn — tailwind-merge
-  TC,    // useDeleteActivity — mutation
-  UAC,   // useUpdateActivity — mutation
-  c,     // JSX runtime (c.jsx, c.jsxs)
-  fh,    // COLOR_PALETTE
-  la,    // calcRemainingTime(profile) → ms remaining
-  nk,    // Play icon (lucide)
-  tk,    // Pencil icon (lucide)
-  Xb,    // BookOpen icon (lucide)
-  w      // React
-} from '../shared.js';
+import { useState } from 'react';
+import { jsx, jsxs } from 'react/jsx-runtime';
+import { calcRemainingTime } from '../lib/lifeCalc.js';
+import { getCurrency, getCurrencySymbol } from '../lib/currency.js';
+import { isPro } from '../lib/settings.js';
+import { cn } from '../lib/cn.js';
+import { Play as nk, Pencil as tk, BookOpen as Xb } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Check if user has a non-free plan in localStorage */
-function isProLocal() {
-  try {
-    return JSON.parse(localStorage.getItem("lt_plan_v1") || '"free"') !== "free";
-  } catch { return false; }
-}
-
-/** Get the user's chosen currency symbol from localStorage */
-function getCurrencySymbol() {
-  try {
-    var c = JSON.parse(localStorage.getItem("lt_currency_v1") || '{"code":"INR"}');
-    var currencies = {
-      INR: "Rs.", USD: "$", EUR: "\u20AC", GBP: "\u00A3",
-      JPY: "\u00A5", AED: "AED", SAR: "SAR",
-      AUD: "A$", CAD: "C$", SGD: "S$",
-      PKR: "\u20A8", BDT: "\u09F3", NGN: "\u20A6",
-      BRL: "R$", TRY: "\u20BA"
-    };
-    return currencies[c.code] || "Rs.";
-  } catch { return "Rs."; }
-}
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -95,22 +65,22 @@ var TOOL_COLORS = {
 
 export function LifeHubScreen({ profile }) {
   // ── View state: "list" (default), "time" (Time Value Calc), "life" (Screen Time → Life Cost)
-  var _viewState = w.useState("list");
+  var _viewState = useState("list");
   var view = _viewState[0];
   var setView = _viewState[1];
 
   // ── Search bar state
-  var _searchState = w.useState("");
+  var _searchState = useState("");
   var search = _searchState[0];
   var setSearch = _searchState[1];
 
   // ── Active category filter ("all", "time", "finance", "productivity")
-  var _catState = w.useState("all");
+  var _catState = useState("all");
   var activeCat = _catState[0];
   var setActiveCat = _catState[1];
 
   // ── Time Value Calculator inputs (loaded from localStorage)
-  var _salaryState = w.useState(function () {
+  var _salaryState = useState(function () {
     try {
       var stored = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
       return stored && stored.salary ? String(stored.salary) : "";
@@ -119,7 +89,7 @@ export function LifeHubScreen({ profile }) {
   var salary = _salaryState[0];
   var setSalary = _salaryState[1];
 
-  var _hoursState = w.useState(function () {
+  var _hoursState = useState(function () {
     try {
       var stored = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
       return stored && stored.hours ? String(stored.hours) : "8";
@@ -128,7 +98,7 @@ export function LifeHubScreen({ profile }) {
   var hours = _hoursState[0];
   var setHours = _hoursState[1];
 
-  var _daysState = w.useState(function () {
+  var _daysState = useState(function () {
     try {
       var stored = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
       return stored && stored.days ? String(stored.days) : "";
@@ -147,7 +117,7 @@ export function LifeHubScreen({ profile }) {
   var perDay = perHour * hoursNum;
 
   // ── "Saved" indicator state
-  var _savedState = w.useState(false);
+  var _savedState = useState(false);
   var saved = _savedState[0];
   var setSaved = _savedState[1];
 
@@ -167,13 +137,13 @@ export function LifeHubScreen({ profile }) {
   };
 
   // ── Screen Time → Life Cost input
-  var _screenHoursState = w.useState("");
+  var _screenHoursState = useState("");
   var screenHours = _screenHoursState[0];
   var setScreenHours = _screenHoursState[1];
 
   // ── Life Cost calculated values
   var screenHoursNum = parseFloat(screenHours) || 0;
-  var remainMs = (profile && profile.dob && profile.lifespanYears) ? la(profile) : 0;
+  var remainMs = (profile && profile.dob && profile.lifespanYears) ? calcRemainingTime(profile) : 0;
   var remainDays = remainMs / 86400000;
   var totalScreenHours = screenHoursNum * remainDays;
   var totalScreenYears = totalScreenHours / 24 / 365.25;
@@ -181,7 +151,7 @@ export function LifeHubScreen({ profile }) {
   var monthlyHours = screenHoursNum * 30;
 
   // ── Determine pro status and currency
-  var isPro = isProLocal();
+  // isPro is imported from settings.js
   var currSymbol = getCurrencySymbol();
 
   // ── Apply dynamic colors to tools
@@ -190,7 +160,7 @@ export function LifeHubScreen({ profile }) {
     // Time Value Calculator uses the user's currency symbol
     if (tool.id === "timevalue") tool.symbol = currSymbol;
     // Budget and Life Value are PRO-only
-    if (tool.id === "budget" || tool.id === "lifevalue") tool.locked = !isPro;
+    if (tool.id === "budget" || tool.id === "lifevalue") tool.locked = !isPro();
     return tool;
   });
 
@@ -208,29 +178,29 @@ export function LifeHubScreen({ profile }) {
 
   // ── Shared header component for sub-views (time, life)
   var Header = function (title, desc) {
-    return c.jsxs("div", {
+    return jsxs("div", {
       className: "px-4 pt-5",
       children: [
-        c.jsxs("div", {
+        jsxs("div", {
           className: "flex items-start justify-between gap-3",
           children: [
-            c.jsxs("div", {
+            jsxs("div", {
               children: [
-                c.jsx("p", {
+                jsx("p", {
                   className: "text-[10px] font-extrabold uppercase tracking-[.15em] text-muted-foreground mb-1",
                   children: "Life Hub"
                 }),
-                c.jsx("h1", {
+                jsx("h1", {
                   className: "text-[26px] font-black",
                   children: title
                 }),
-                desc && c.jsx("p", {
+                desc && jsx("p", {
                   className: "text-[13px] text-muted-foreground mt-1",
                   children: desc
                 })
               ]
             }),
-            c.jsx("button", {
+            jsx("button", {
               type: "button",
               onClick: function () { setView("list"); },
               className: "shrink-0 border border-border bg-white px-3 py-2 text-[13px] font-bold hover:bg-secondary",
@@ -246,31 +216,31 @@ export function LifeHubScreen({ profile }) {
   // VIEW: "list" — Tool Grid
   // ═══════════════════════════════════════════════════════════════════════════
   if (view === "list") {
-    return c.jsxs("div", {
+    return jsxs("div", {
       className: "flex flex-col min-h-full bg-background p-4",
       children: [
         // ── Title ──
-        c.jsx("h1", {
+        jsx("h1", {
           className: "text-2xl font-bold mb-4",
           children: "Life Hub"
         }),
 
         // ── Search bar with magnifying glass and clear button ──
-        c.jsxs("div", {
+        jsxs("div", {
           className: "relative mb-3",
           children: [
-            c.jsx("span", {
+            jsx("span", {
               className: "absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm",
               children: "\uD83D\uDD0D"
             }),
-            c.jsx("input", {
+            jsx("input", {
               type: "text",
               value: search,
               onChange: function (ev) { setSearch(ev.target.value); },
               placeholder: "Search tools...",
               className: "w-full bg-secondary border border-border rounded-xl pl-9 pr-9 py-2.5 text-sm font-medium outline-none focus:border-primary"
             }),
-            search && c.jsx("button", {
+            search && jsx("button", {
               type: "button",
               onClick: function () { setSearch(""); },
               className: "absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm",
@@ -280,10 +250,10 @@ export function LifeHubScreen({ profile }) {
         }),
 
         // ── Category filter pills ──
-        c.jsx("div", {
+        jsx("div", {
           className: "flex gap-2 mb-4 overflow-x-auto",
           children: LT_FILTERS.map(function (f) {
-            return c.jsx("button", {
+            return jsx("button", {
               type: "button",
               onClick: function () { setActiveCat(f.key); },
               className: "shrink-0 px-3.5 py-1.5 text-xs font-bold border " +
@@ -296,11 +266,11 @@ export function LifeHubScreen({ profile }) {
         }),
 
         // ── Tool grid (2 columns) ──
-        c.jsx("div", {
+        jsx("div", {
           className: "grid grid-cols-2 gap-3",
           children: filtered.map(function (t) {
             var colors = TOOL_COLORS[t.id] || { bg: "#F3F4F6", fg: "#374151" };
-            return c.jsxs("button", {
+            return jsxs("button", {
               type: "button",
               "data-lifetime-tool": t.id,
               "data-lt-category": t.category,
@@ -308,11 +278,11 @@ export function LifeHubScreen({ profile }) {
               className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_2px_rgba(0,0,0,.04)] gap-2",
               children: [
                 // Colored icon box
-                c.jsx("div", {
+                jsx("div", {
                   className: "w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0",
                   style: { background: colors.bg, color: colors.fg },
                   children: t.id === "sixjars"
-                    ? c.jsx("img", {
+                    ? jsx("img", {
                         src: "assets/icons/jar-savings.png",
                         alt: "",
                         style: { width: "70%", height: "70%", objectFit: "contain", display: "block" }
@@ -320,12 +290,12 @@ export function LifeHubScreen({ profile }) {
                     : t.symbol
                 }),
                 // Label
-                c.jsx("span", {
+                jsx("span", {
                   className: "font-bold text-sm text-foreground",
                   children: t.label
                 }),
                 // Description
-                c.jsx("span", {
+                jsx("span", {
                   className: "text-xs text-muted-foreground leading-[1.3]",
                   children: t.desc
                 })
@@ -335,24 +305,24 @@ export function LifeHubScreen({ profile }) {
         }),
 
         // ── Empty search state ──
-        filtered.length === 0 && lockedTools.length === 0 && c.jsx("div", {
+        filtered.length === 0 && lockedTools.length === 0 && jsx("div", {
           className: "text-center py-10 text-sm text-muted-foreground",
           children: "No tools match your search."
         }),
 
         // ── Premium section (locked tools) ──
-        lockedTools.length > 0 && c.jsxs("div", {
+        lockedTools.length > 0 && jsxs("div", {
           className: "mt-4",
           children: [
-            c.jsx("p", {
+            jsx("p", {
               className: "text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2",
               children: "Premium"
             }),
-            c.jsx("div", {
+            jsx("div", {
               className: "grid grid-cols-2 gap-3",
               children: lockedTools.map(function (t) {
                 var colors = TOOL_COLORS[t.id] || { bg: "#F3F4F6", fg: "#374151" };
-                return c.jsxs("button", {
+                return jsxs("button", {
                   type: "button",
                   onClick: function () {
                     alert("This is a Premium Feature. Upgrade to access it.");
@@ -360,23 +330,23 @@ export function LifeHubScreen({ profile }) {
                   className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_2px_rgba(0,0,0,.04)] gap-2 opacity-55",
                   children: [
                     // Lock icon
-                    c.jsx("span", {
+                    jsx("span", {
                       className: "absolute top-2.5 right-2.5 text-xs",
                       children: "\uD83D\uDD12"
                     }),
                     // Colored icon box
-                    c.jsx("div", {
+                    jsx("div", {
                       className: "w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0",
                       style: { background: colors.bg, color: colors.fg },
                       children: t.symbol
                     }),
                     // Label
-                    c.jsx("span", {
+                    jsx("span", {
                       className: "font-bold text-sm text-foreground",
                       children: t.label
                     }),
                     // Description
-                    c.jsx("span", {
+                    jsx("span", {
                       className: "text-xs text-muted-foreground leading-[1.3]",
                       children: t.desc
                     })
@@ -394,61 +364,61 @@ export function LifeHubScreen({ profile }) {
   // VIEW: "time" — Time Value Calculator
   // ═══════════════════════════════════════════════════════════════════════════
   if (view === "time") {
-    return c.jsxs("div", {
+    return jsxs("div", {
       className: "flex flex-col min-h-full bg-background pb-6",
       children: [
         // ── Header with back button ──
         Header("Time Value Calculator", "Know the value of every minute."),
 
-        c.jsxs("div", {
+        jsxs("div", {
           className: "px-4",
           children: [
             // ── Metadata row ──
-            c.jsxs("div", {
+            jsxs("div", {
               className: "flex justify-between border-t border-b py-3 mb-4",
               children: [
-                c.jsxs("div", {
+                jsxs("div", {
                   className: "flex-1 text-center",
                   children: [
-                    c.jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Type" }),
-                    c.jsx("div", { className: "text-sm font-semibold", children: "Finance" })
+                    jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Type" }),
+                    jsx("div", { className: "text-sm font-semibold", children: "Finance" })
                   ]
                 }),
-                c.jsxs("div", {
+                jsxs("div", {
                   className: "flex-1 text-center",
                   children: [
-                    c.jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Unit" }),
-                    c.jsx("div", { className: "text-sm font-semibold", children: "Per Minute" })
+                    jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Unit" }),
+                    jsx("div", { className: "text-sm font-semibold", children: "Per Minute" })
                   ]
                 }),
-                c.jsxs("div", {
+                jsxs("div", {
                   className: "flex-1 text-center",
                   children: [
-                    c.jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Provider" }),
-                    c.jsx("div", { className: "text-sm font-semibold", children: "Life Hub" })
+                    jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Provider" }),
+                    jsx("div", { className: "text-sm font-semibold", children: "Life Hub" })
                   ]
                 })
               ]
             }),
 
             // ── Section label ──
-            c.jsx("div", {
+            jsx("div", {
               className: "text-sm font-semibold mb-2",
               children: "Detail"
             }),
 
             // ── Input fields ──
-            c.jsxs("div", {
+            jsxs("div", {
               className: "space-y-2 mb-4",
               children: [
                 // Monthly salary input with currency prefix
-                c.jsxs("div", {
+                jsxs("div", {
                   children: [
-                    c.jsx("label", {
+                    jsx("label", {
                       className: "text-sm font-semibold block mb-1",
                       children: "Monthly salary (" + currSymbol + ")"
                     }),
-                    c.jsx("input", {
+                    jsx("input", {
                       type: "number",
                       value: salary,
                       onChange: function (ev) { setSalary(ev.target.value); },
@@ -458,13 +428,13 @@ export function LifeHubScreen({ profile }) {
                   ]
                 }),
                 // Working hours per day
-                c.jsxs("div", {
+                jsxs("div", {
                   children: [
-                    c.jsx("label", {
+                    jsx("label", {
                       className: "text-sm font-semibold block mb-1",
                       children: "Working hours per day"
                     }),
-                    c.jsx("input", {
+                    jsx("input", {
                       type: "number",
                       value: hours,
                       onChange: function (ev) { setHours(ev.target.value); },
@@ -474,13 +444,13 @@ export function LifeHubScreen({ profile }) {
                   ]
                 }),
                 // Working days per month
-                c.jsxs("div", {
+                jsxs("div", {
                   children: [
-                    c.jsx("label", {
+                    jsx("label", {
                       className: "text-sm font-semibold block mb-1",
                       children: "Working days per month"
                     }),
-                    c.jsx("input", {
+                    jsx("input", {
                       type: "number",
                       value: days,
                       onChange: function (ev) { setDays(ev.target.value); },
@@ -493,18 +463,18 @@ export function LifeHubScreen({ profile }) {
             }),
 
             // ── Display card ──
-            c.jsxs("div", {
+            jsxs("div", {
               className: "border rounded-xl p-4 bg-secondary mb-4",
               children: [
-                c.jsx("div", {
+                jsx("div", {
                   className: "text-sm text-muted-foreground mb-1",
                   children: "Your time is worth"
                 }),
-                c.jsxs("div", {
+                jsxs("div", {
                   className: "text-2xl font-bold mb-2",
                   children: [currSymbol, perMinute.toFixed(2), " / minute"]
                 }),
-                c.jsxs("div", {
+                jsxs("div", {
                   className: "text-sm text-muted-foreground",
                   children: [
                     currSymbol, perHour.toFixed(2), " / hour  \u2022  ",
@@ -515,7 +485,7 @@ export function LifeHubScreen({ profile }) {
             }),
 
             // ── Save button ──
-            c.jsx("button", {
+            jsx("button", {
               type: "button",
               onClick: saveTimeValue,
               disabled: perMinute <= 0,
@@ -531,59 +501,59 @@ export function LifeHubScreen({ profile }) {
   // ═══════════════════════════════════════════════════════════════════════════
   // VIEW: "life" — Screen Time → Life Cost
   // ═══════════════════════════════════════════════════════════════════════════
-  return c.jsxs("div", {
+  return jsxs("div", {
     className: "flex flex-col min-h-full bg-background pb-6",
     children: [
       // ── Header with back button ──
       Header("Screen Time \u2192 Life Cost", "See how screen time adds up over a lifetime."),
 
-      c.jsxs("div", {
+      jsxs("div", {
         className: "px-4",
         children: [
           // ── Metadata row ──
-          c.jsxs("div", {
+          jsxs("div", {
             className: "flex justify-between border-t border-b py-3 mb-4",
             children: [
-              c.jsxs("div", {
+              jsxs("div", {
                 className: "flex-1 text-center",
                 children: [
-                  c.jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Type" }),
-                  c.jsx("div", { className: "text-sm font-semibold", children: "Life" })
+                  jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Type" }),
+                  jsx("div", { className: "text-sm font-semibold", children: "Life" })
                 ]
               }),
-              c.jsxs("div", {
+              jsxs("div", {
                 className: "flex-1 text-center",
                 children: [
-                  c.jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Unit" }),
-                  c.jsx("div", { className: "text-sm font-semibold", children: "Years" })
+                  jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Unit" }),
+                  jsx("div", { className: "text-sm font-semibold", children: "Years" })
                 ]
               }),
-              c.jsxs("div", {
+              jsxs("div", {
                 className: "flex-1 text-center",
                 children: [
-                  c.jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Provider" }),
-                  c.jsx("div", { className: "text-sm font-semibold", children: "Life Hub" })
+                  jsx("div", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Provider" }),
+                  jsx("div", { className: "text-sm font-semibold", children: "Life Hub" })
                 ]
               })
             ]
           }),
 
           // ── Section label ──
-          c.jsx("div", {
+          jsx("div", {
             className: "text-sm font-semibold mb-2",
             children: "Detail"
           }),
 
           // ── Input: daily screen time ──
-          c.jsx("div", {
+          jsx("div", {
             className: "space-y-2 mb-4",
-            children: c.jsxs("div", {
+            children: jsxs("div", {
               children: [
-                c.jsx("label", {
+                jsx("label", {
                   className: "text-sm font-semibold block mb-1",
                   children: "Daily screen time (hours)"
                 }),
-                c.jsx("input", {
+                jsx("input", {
                   type: "number",
                   value: screenHours,
                   onChange: function (ev) { setScreenHours(ev.target.value); },
@@ -595,18 +565,18 @@ export function LifeHubScreen({ profile }) {
           }),
 
           // ── Display card ──
-          c.jsxs("div", {
+          jsxs("div", {
             className: "border rounded-xl p-4 bg-secondary",
             children: [
-              c.jsx("div", {
+              jsx("div", {
                 className: "text-sm text-muted-foreground mb-1",
                 children: "At this rate, for the rest of your life you'll spend"
               }),
-              c.jsxs("div", {
+              jsxs("div", {
                 className: "text-2xl font-bold mb-2",
                 children: [totalScreenYears.toFixed(1), " years on your phone"]
               }),
-              c.jsxs("div", {
+              jsxs("div", {
                 className: "text-sm text-muted-foreground",
                 children: [
                   Math.round(weeklyHours), " hrs / week  \u2022  ",

@@ -1,61 +1,54 @@
-import {
-  Ay,      // useBlocks — useQuery for all time blocks (refetch every 1s)
-  Es,      // useQueryClient — for invalidating queries
-  Ho,      // blocksQueryKey — ["local", "blocks"]
-  Jb,      // CalendarClock icon (lucide)
-  Kc,      // activitiesQueryKey — ["local", "activities"]
-  NC,      // useCreateBlock — mutation to create a time block
-  PC,      // useCreateActivity — mutation to create an activity
-  Pe,      // cn — tailwind-merge utility (clsx + twMerge)
-  Qo,      // todayStatsQueryKey — ["local", "today-stats"]
-  TC,      // useDeleteActivity — mutation (archives activity, stops running block)
-  Ty,      // Timer icon (lucide)
-  UAC,     // useUpdateActivity — mutation to update activity name/emoji
-  Zb,      // Clock icon (lucide)
-  c,       // JSX runtime (React.createElement/jsxs)
-  fh,      // COLOR_PALETTE — ["#1B1F3B","#00897B","#D97706","#7C3AED","#1D4ED8","#BE185D","#15803D","#B91C1C"]
-  jC,      // useUpdateBlock — mutation to update a block's times
-  jy,      // calcPercentLived(profile) — returns 0-100 percentage
-  kC,      // useActivities — useQuery for non-archived activities
-  la,      // calcRemainingTime(profile) — returns ms remaining until death date
-  lk,      // Trash2 icon (lucide)
-  nk,      // Play icon (lucide)
-  pk,      // msToBreakdown(ms) — returns { years, days, hours, minutes, seconds, totalMinutes }
-  rh,      // Square icon (lucide) — empty state icon
-  rk,      // Plus icon (lucide) — add button icon
-  tk,      // Pencil icon (lucide) — edit icon
-  w,       // React
-  zh       // React (alternate, same as w)
-} from '../shared.js';
+// React & JSX
+import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
+import { jsx, jsxs } from 'react/jsx-runtime';
+
+// App logic
+import { getStore, setStore, nextId, enrichBlocksForRange } from '../lib/storage.js';
+import { calcRemainingTime, calcPercentLived, msToBreakdown } from '../lib/lifeCalc.js';
+import { getRandomColor } from '../lib/constants.js';
+import { blocksKey, activitiesKey, todayStatsKey } from '../lib/queryKeys.js';
+import { useActivities } from '../hooks/useActivities.js';
+import { useBlocks } from '../hooks/useBlocks.js';
+import { useCreateBlock } from '../hooks/useCreateBlock.js';
+import { useUpdateBlock } from '../hooks/useUpdateBlock.js';
+import { useCreateActivity } from '../hooks/useCreateActivity.js';
+import { useUpdateActivity } from '../hooks/useUpdateActivity.js';
+import { useDeleteActivity } from '../hooks/useDeleteActivity.js';
+import { useTodayStats } from '../hooks/useTodayStats.js';
+import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '../lib/cn.js';
+
+// Icons
+import { Timer as Ty, CalendarClock as Jb, Clock as Zb, Play as nk, Trash2 as lk, Square as rh, Plus as rk, Pencil as tk } from 'lucide-react';
 
 // ─── LT Timer Panel ─────────────────────────────────────────────────────────
 // Collapsible panel containing the retirement countdown timer.
 // Toggles open/closed with a full-width button.
 
 function LTTimerPanel({ profile }) {
-  const [open, setOpen] = w.useState(false); // default collapsed
+  const [open, setOpen] = useState(false); // default collapsed
 
-  return c.jsxs('div', {
+  return jsxs('div', {
     'data-lt-enhancement': 'retirement',
     className: 'relative',
     children: [
       // Toggle button — "v" when open, "^" when closed
-      c.jsx('button', {
+      jsx('button', {
         type: 'button',
         onClick: () => setOpen(!open),
         className: 'w-full h-8 flex items-center justify-center bg-primary text-white transition-colors pointer-events-auto',
         title: open ? 'Hide timer' : 'Show timer',
         'aria-label': open ? 'Hide timer' : 'Show timer',
-        children: c.jsx('span', {
+        children: jsx('span', {
           className: 'text-xs',
           children: open ? 'v' : '^'
         })
       }),
       // Animated container — maxHeight transitions 0 → 320px
-      c.jsx('div', {
+      jsx('div', {
         className: 'overflow-hidden transition-all duration-300 ease-in-out',
         style: { maxHeight: open ? '320px' : '0px' },
-        children: c.jsx(RetirementCountdown, { profile })
+        children: jsx(RetirementCountdown, { profile })
       })
     ]
   });
@@ -66,51 +59,51 @@ function LTTimerPanel({ profile }) {
 // Updates live every 1 second.
 
 function RetirementCountdown({ profile }) {
-  const [remainingMs, setRemainingMs] = w.useState(() => la(profile)); // la = calcRemainingTime
-  const percentLived = jy(profile); // jy = calcPercentLived
+  const [remainingMs, setRemainingMs] = useState(() => calcRemainingTime(profile));
+  const percentLived = calcPercentLived(profile);
 
-  w.useEffect(() => {
-    setRemainingMs(la(profile));
-    const interval = setInterval(() => setRemainingMs(la(profile)), 1000);
+  useEffect(() => {
+    setRemainingMs(calcRemainingTime(profile));
+    const interval = setInterval(() => setRemainingMs(calcRemainingTime(profile)), 1000);
     return () => clearInterval(interval);
   }, [profile]);
 
-  const breakdown = pk(remainingMs); // pk = msToBreakdown
+  const breakdown = msToBreakdown(remainingMs);
 
-  return c.jsxs('div', {
+  return jsxs('div', {
     'data-lt-enhancement': 'retirement',
     className: 'bg-primary text-white px-5 pt-8 pb-6',
     children: [
       // Title
-      c.jsxs('p', {
+      jsxs('p', {
         className: 'text-xs font-semibold text-white/40 uppercase tracking-widest mb-5',
         children: [profile.name, "'s Remaining Retirement Time"]
       }),
       // 5-column grid: years, days, hours, min, sec
-      c.jsxs('div', {
+      jsxs('div', {
         className: 'grid grid-cols-5 gap-2 mb-5',
         children: [
-          c.jsx(TimeDigit, { value: breakdown.years, label: 'years' }),
-          c.jsx(TimeDigit, { value: breakdown.days, label: 'days' }),
-          c.jsx(TimeDigit, { value: breakdown.hours, label: 'hours' }),
-          c.jsx(TimeDigit, { value: breakdown.minutes, label: 'min' }),
-          c.jsx(TimeDigit, { value: breakdown.seconds, label: 'sec', accent: true })
+          jsx(TimeDigit, { value: breakdown.years, label: 'years' }),
+          jsx(TimeDigit, { value: breakdown.days, label: 'days' }),
+          jsx(TimeDigit, { value: breakdown.hours, label: 'hours' }),
+          jsx(TimeDigit, { value: breakdown.minutes, label: 'min' }),
+          jsx(TimeDigit, { value: breakdown.seconds, label: 'sec', accent: true })
         ]
       }),
       // Progress bar
-      c.jsx('div', {
+      jsx('div', {
         className: 'h-1 w-full bg-white/10 overflow-hidden mb-2',
-        children: c.jsx('div', {
+        children: jsx('div', {
           className: 'h-full bg-accent',
           style: { width: `${percentLived}%` }
         })
       }),
       // Footer: percent lived + minutes left
-      c.jsxs('div', {
+      jsxs('div', {
         className: 'flex justify-between text-[11px] text-white/35 font-medium',
         children: [
-          c.jsxs('span', { children: [percentLived.toFixed(1), '% lived'] }),
-          c.jsxs('span', { children: [breakdown.totalMinutes.toLocaleString(), ' min left'] })
+          jsxs('span', { children: [percentLived.toFixed(1), '% lived'] }),
+          jsxs('span', { children: [breakdown.totalMinutes.toLocaleString(), ' min left'] })
         ]
       })
     ]
@@ -121,17 +114,17 @@ function RetirementCountdown({ profile }) {
 // Single digit cell in the countdown grid. Shows value with leading zero pad.
 
 function TimeDigit({ value, label, accent }) {
-  return c.jsxs('div', {
+  return jsxs('div', {
     className: 'flex flex-col items-center bg-white/8 py-3 gap-0.5',
     children: [
-      c.jsx('span', {
-        className: Pe(
+      jsx('span', {
+        className: cn(
           'font-black tabular-nums leading-none',
           accent ? 'text-accent text-2xl' : 'text-white text-2xl'
         ),
         children: String(value).padStart(2, '0')
       }),
-      c.jsx('span', {
+      jsx('span', {
         className: 'text-[10px] font-semibold text-white/40 uppercase tracking-wide',
         children: label
       })
@@ -145,23 +138,23 @@ function TimeDigit({ value, label, accent }) {
 // Live updates every 1 second.
 
 function LTDailyValueBar() {
-  const [perMinute, setPerMinute] = w.useState(() => {
+  const [perMinute, setPerMinute] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('lt_time_value_v1') || 'null');
       return stored && stored.perMinute ? stored.perMinute : 0;
     } catch { return 0; }
   });
 
-  const [dailyHours, setDailyHours] = w.useState(() => {
+  const [dailyHours, setDailyHours] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('lt_time_value_v1') || 'null');
       return stored && stored.hours ? stored.hours : 8;
     } catch { return 8; }
   });
 
-  const [now, setNow] = w.useState(Date.now());
+  const [now, setNow] = useState(Date.now());
 
-  w.useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(() => {
       setNow(Date.now());
       try {
@@ -184,21 +177,21 @@ function LTDailyValueBar() {
   const dailyBudget = perMinute * 60 * dailyHours;
   const valueLeft = dailyBudget * fractionLeft;
 
-  return c.jsxs('div', {
+  return jsxs('div', {
     'data-lt-enhancement': 'saved-value',
     className: 'bg-primary text-white px-5 py-4',
     children: [
-      c.jsx('p', {
+      jsx('p', {
         className: 'text-xs font-semibold text-white/50 uppercase tracking-widest mb-1',
         children: "Today's time value left"
       }),
-      c.jsxs('p', {
+      jsxs('p', {
         className: 'text-2xl font-black',
         children: ['Rs.', valueLeft.toFixed(2)]
       }),
-      c.jsx('div', {
+      jsx('div', {
         className: 'h-1 w-full bg-white/10 overflow-hidden mt-3',
-        children: c.jsx('div', {
+        children: jsx('div', {
           className: 'h-full bg-accent',
           style: { width: `${fractionLeft * 100}%` }
         })
@@ -465,9 +458,9 @@ const EMOJI_CATEGORIES = [
 ];
 
 function LTEmojiPicker({ value, onSelect, onClose }) {
-  const [search, setSearch] = w.useState('');
-  const [activeCat, setActiveCat] = w.useState(0);
-  const [recent, setRecent] = w.useState(() => {
+  const [search, setSearch] = useState('');
+  const [activeCat, setActiveCat] = useState(0);
+  const [recent, setRecent] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('lt_recent_emojis') || '[]');
     } catch {
@@ -501,15 +494,15 @@ function LTEmojiPicker({ value, onSelect, onClose }) {
     onClose();
   };
 
-  return c.jsx(BottomSheet, {
+  return jsx(BottomSheet, {
     onDismiss: onClose,
-    children: c.jsxs('div', {
+    children: jsxs('div', {
       className: 'flex flex-col',
       children: [
         // Search input
-        c.jsx('div', {
+        jsx('div', {
           className: 'px-3 pt-3 pb-2',
-          children: c.jsx('input', {
+          children: jsx('input', {
             type: 'text',
             value: search,
             onChange: (e) => setSearch(e.target.value),
@@ -518,15 +511,15 @@ function LTEmojiPicker({ value, onSelect, onClose }) {
           })
         }),
         // Category tab bar (hidden when searching)
-        !query && c.jsx('div', {
+        !query && jsx('div', {
           className: 'flex border-b border-border',
           style: { overflowX: 'auto', whiteSpace: 'nowrap' },
           children: categories.map((cat, idx) =>
-            c.jsx('button', {
+            jsx('button', {
               type: 'button',
               onClick: () => setActiveCat(idx),
               style: { flexShrink: 0 },
-              className: Pe(
+              className: cn(
                 'px-3 py-2 text-lg border-b',
                 activeCat === idx ? 'text-primary border-primary' : 'text-muted-foreground border-transparent'
               ),
@@ -536,7 +529,7 @@ function LTEmojiPicker({ value, onSelect, onClose }) {
         }),
         // Emoji grid
         shown.length
-          ? c.jsx('div', {
+          ? jsx('div', {
               className: 'px-3 py-3',
               style: {
                 display: 'grid',
@@ -546,10 +539,10 @@ function LTEmojiPicker({ value, onSelect, onClose }) {
                 overflowY: 'auto'
               },
               children: shown.map((emoji, idx) =>
-                c.jsx('button', {
+                jsx('button', {
                   type: 'button',
                   onClick: () => pickEmoji(emoji),
-                  className: Pe(
+                  className: cn(
                     'w-9 h-9 flex items-center justify-center text-xl rounded hover:bg-secondary',
                     value === emoji ? 'bg-secondary' : ''
                   ),
@@ -558,7 +551,7 @@ function LTEmojiPicker({ value, onSelect, onClose }) {
               )
             })
           : // Empty state
-            c.jsx('div', {
+            jsx('div', {
               className: 'text-center text-sm text-muted-foreground py-6',
               children: query ? 'No results' : 'No recent emoji'
             })
@@ -572,19 +565,19 @@ function LTEmojiPicker({ value, onSelect, onClose }) {
 // elapsed time (when active), play/clock button, and trash button.
 
 function ActivityCard({ activity, isActive, activeBlock, onTap }) {
-  const [elapsedSeconds, setElapsedSeconds] = w.useState(0);
-  const deleteActivity = TC();   // TC = useDeleteActivity
-  const queryClient = Es();      // Es = useQueryClient
-  const updateActivity = UAC();  // UAC = useUpdateActivity
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const deleteActivity = useDeleteActivity();
+  const queryClient = useQueryClient();
+  const updateActivity = useUpdateActivity();
 
   // Edit modal state
-  const [showEdit, setShowEdit] = w.useState(false);
-  const [showPicker, setShowPicker] = w.useState(false);
-  const [editName, setEditName] = w.useState(activity.name);
-  const [editEmoji, setEditEmoji] = w.useState(activity.emoji || '');
+  const [showEdit, setShowEdit] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [editName, setEditName] = useState(activity.name);
+  const [editEmoji, setEditEmoji] = useState(activity.emoji || '');
 
   // Live elapsed timer when activity is active
-  w.useEffect(() => {
+  useEffect(() => {
     if (isActive && activeBlock?.startTime) {
       const startTime = new Date(activeBlock.startTime).getTime();
       setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
@@ -614,9 +607,9 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
     if (confirm(`Remove "${activity.name}"? It'll stop appearing in your activity list, but your tracked time for it stays in your Journal.`)) {
       deleteActivity.mutate({ id: activity.id }, {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: Kc() }); // activities
-          queryClient.invalidateQueries({ queryKey: Ho() }); // blocks
-          queryClient.invalidateQueries({ queryKey: Qo() }); // today-stats
+          queryClient.invalidateQueries({ queryKey: activitiesKey() }); // activities
+          queryClient.invalidateQueries({ queryKey: blocksKey() }); // blocks
+          queryClient.invalidateQueries({ queryKey: todayStatsKey() }); // today-stats
         }
       });
     }
@@ -638,18 +631,18 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
       data: { name: editName.trim(), emoji: editEmoji }
     }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: Kc() });
-        queryClient.invalidateQueries({ queryKey: Ho() });
-        queryClient.invalidateQueries({ queryKey: Qo() });
+        queryClient.invalidateQueries({ queryKey: activitiesKey() });
+        queryClient.invalidateQueries({ queryKey: blocksKey() });
+        queryClient.invalidateQueries({ queryKey: todayStatsKey() });
         setShowEdit(false);
       }
     });
   };
 
-  return c.jsxs(w.Fragment, {
+  return jsxs(Fragment, {
     children: [
       // Main row
-      c.jsxs('div', {
+      jsxs('div', {
         role: 'button',
         tabIndex: 0,
         onClick: onTap,
@@ -659,34 +652,34 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
             onTap();
           }
         },
-        className: Pe('group flex items-center w-full cursor-pointer select-none transition-colors bg-white hover:bg-secondary'),
+        className: cn('group flex items-center w-full cursor-pointer select-none transition-colors bg-white hover:bg-secondary'),
         style: { borderLeft: isActive ? `4px solid ${activity.color}` : '4px solid transparent' },
         children: [
           // Left section: emoji/dot + name + edit button
-          c.jsxs('div', {
+          jsxs('div', {
             className: 'flex items-center flex-1 min-w-0 px-5 py-5 gap-4',
             children: [
               // Emoji or colored dot
               activity.emoji
-                ? c.jsx('span', {
+                ? jsx('span', {
                     className: 'text-lg leading-none shrink-0 w-5 text-center',
                     children: activity.emoji
                   })
-                : c.jsx('div', {
-                    className: Pe('w-2.5 h-2.5 shrink-0', isActive && 'animate-pulse'),
+                : jsx('div', {
+                    className: cn('w-2.5 h-2.5 shrink-0', isActive && 'animate-pulse'),
                     style: { backgroundColor: activity.color }
                   }),
               // Activity name
-              c.jsx('span', {
+              jsx('span', {
                 className: 'text-base font-semibold flex-1 min-w-0 text-foreground',
                 children: activity.name
               }),
               // Edit button
-              c.jsx('button', {
+              jsx('button', {
                 onClick: openEdit,
                 className: 'w-8 h-8 flex items-center justify-center border border-transparent hover:border-primary hover:text-primary text-muted-foreground transition-all shrink-0',
                 title: 'Edit',
-                children: c.jsx('span', {
+                children: jsx('span', {
                   className: 'text-sm',
                   children: 'Edit'
                 })
@@ -694,59 +687,59 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
             ]
           }),
           // Right section: elapsed time + play/clock + trash
-          c.jsxs('div', {
+          jsxs('div', {
             className: 'flex items-center gap-2 px-4 shrink-0',
             children: [
               // Elapsed time display (when active)
-              isActive && c.jsx('span', {
+              isActive && jsx('span', {
                 className: 'font-mono text-sm font-bold tabular-nums',
                 style: { color: activity.color },
                 children: formatElapsed(elapsedSeconds)
               }),
               // Play/Clock icon button
-              c.jsx('div', {
-                className: Pe(
+              jsx('div', {
+                className: cn(
                   'w-8 h-8 flex items-center justify-center border transition-colors',
                   isActive ? 'border-current' : 'border-border group-hover:border-foreground'
                 ),
                 style: isActive ? { borderColor: activity.color, color: activity.color } : {},
                 children: isActive
-                  ? c.jsx(Zb, { className: 'w-4 h-4' })        // Clock icon when running
-                  : c.jsx(nk, { className: 'w-4 h-4 text-muted-foreground group-hover:text-foreground' }) // Play icon when stopped
+                  ? jsx(Zb, { className: 'w-4 h-4' })        // Clock icon when running
+                  : jsx(nk, { className: 'w-4 h-4 text-muted-foreground group-hover:text-foreground' }) // Play icon when stopped
               }),
               // Trash button
-              c.jsx('button', {
+              jsx('button', {
                 onClick: handleDelete,
                 className: 'w-8 h-8 flex items-center justify-center border border-transparent hover:border-destructive hover:text-destructive text-muted-foreground transition-all',
-                children: c.jsx(lk, { className: 'w-4 h-4' })
+                children: jsx(lk, { className: 'w-4 h-4' })
               })
             ]
           })
         ]
       }),
       // Edit activity modal
-      showEdit && c.jsx(BottomSheet, {
+      showEdit && jsx(BottomSheet, {
         onDismiss: () => setShowEdit(false),
-        children: c.jsxs('div', {
+        children: jsxs('div', {
           className: 'flex flex-col',
           children: [
             // Header with emoji button
-            c.jsxs('div', {
+            jsxs('div', {
               className: 'px-5 pt-5 pb-3 border-b border-border flex items-center gap-3',
               children: [
-                c.jsx('button', {
+                jsx('button', {
                   type: 'button',
                   onClick: () => setShowPicker(true),
                   className: 'w-11 h-11 flex items-center justify-center text-2xl bg-secondary border border-border shrink-0',
                   children: editEmoji || '+'
                 }),
-                c.jsxs('div', {
+                jsxs('div', {
                   children: [
-                    c.jsx('p', {
+                    jsx('p', {
                       className: 'font-bold text-foreground',
                       children: 'Edit activity'
                     }),
-                    c.jsx('p', {
+                    jsx('p', {
                       className: 'text-xs text-muted-foreground',
                       children: 'Tap the icon to change emoji'
                     })
@@ -755,9 +748,9 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
               ]
             }),
             // Name input
-            c.jsx('div', {
+            jsx('div', {
               className: 'px-5 py-4',
-              children: c.jsx('input', {
+              children: jsx('input', {
                 type: 'text',
                 value: editName,
                 onChange: (e) => setEditName(e.target.value),
@@ -765,15 +758,15 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
               })
             }),
             // Cancel / Save buttons
-            c.jsxs('div', {
+            jsxs('div', {
               className: 'flex border-t border-border',
               children: [
-                c.jsx('button', {
+                jsx('button', {
                   onClick: () => setShowEdit(false),
                   className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
                   children: 'Cancel'
                 }),
-                c.jsx('button', {
+                jsx('button', {
                   onClick: saveEdit,
                   disabled: !editName.trim(),
                   className: 'flex-1 py-4 text-primary font-bold hover:bg-secondary text-sm disabled:opacity-40',
@@ -785,7 +778,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
         })
       }),
       // Emoji picker (when editing)
-      showPicker && c.jsx(LTEmojiPicker, {
+      showPicker && jsx(LTEmojiPicker, {
         value: editEmoji,
         onSelect: setEditEmoji,
         onClose: () => setShowPicker(false)
@@ -798,25 +791,25 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
 // Modal overlay container — fixed overlay with backdrop, bottom-aligned panel.
 
 function BottomSheet({ children, onDismiss }) {
-  return c.jsxs('div', {
+  return jsxs('div', {
     className: 'fixed inset-0 z-[60] flex items-end',
     onClick: onDismiss,
     children: [
       // Backdrop
-      c.jsx('div', {
+      jsx('div', {
         className: 'absolute inset-0 bg-black/50'
       }),
       // Panel
-      c.jsxs('div', {
+      jsxs('div', {
         className: 'relative w-full max-w-[430px] mx-auto bg-white border-t border-border flex flex-col max-h-[80dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
-          c.jsx('div', {
+          jsx('div', {
             className: 'overflow-y-auto flex-1',
             children: children
           }),
           // Bottom spacer for safe area
-          c.jsx('div', {
+          jsx('div', {
             className: 'h-20 bg-white shrink-0'
           })
         ]
@@ -829,27 +822,27 @@ function BottomSheet({ children, onDismiss }) {
 // Activity icon + name + subtitle header for modals.
 
 function ModalHeader({ activity, subtitle }) {
-  return c.jsxs('div', {
+  return jsxs('div', {
     className: 'px-5 pt-5 pb-3 border-b border-border flex items-center gap-3',
     children: [
       // Emoji or colored dot
       activity.emoji
-        ? c.jsx('span', {
+        ? jsx('span', {
             className: 'text-lg leading-none shrink-0 w-5 text-center',
             children: activity.emoji
           })
-        : c.jsx('div', {
+        : jsx('div', {
             className: 'w-3 h-3 shrink-0',
             style: { backgroundColor: activity.color }
           }),
       // Name + subtitle
-      c.jsxs('div', {
+      jsxs('div', {
         children: [
-          c.jsx('p', {
+          jsx('p', {
             className: 'font-bold text-foreground leading-tight',
             children: activity.name
           }),
-          c.jsx('p', {
+          jsx('p', {
             className: 'text-xs text-muted-foreground mt-0.5',
             children: subtitle
           })
@@ -863,21 +856,21 @@ function ModalHeader({ activity, subtitle }) {
 // Clickable option row for modals (icon + label + description).
 
 function ModalOption({ icon, label, description, onClick, labelClass = '' }) {
-  return c.jsxs('button', {
+  return jsxs('button', {
     onClick,
     className: 'w-full flex items-center gap-4 px-5 py-4 border-b border-border hover:bg-secondary transition-colors text-left',
     children: [
-      c.jsx('div', {
+      jsx('div', {
         className: 'shrink-0 text-foreground',
         children: icon
       }),
-      c.jsxs('div', {
+      jsxs('div', {
         children: [
-          c.jsx('p', {
-            className: Pe('font-semibold text-sm', labelClass || 'text-foreground'),
+          jsx('p', {
+            className: cn('font-semibold text-sm', labelClass || 'text-foreground'),
             children: label
           }),
-          c.jsx('p', {
+          jsx('p', {
             className: 'text-xs text-muted-foreground mt-0.5',
             children: description
           })
@@ -894,40 +887,40 @@ function TimePicker({ label, value, onChange }) {
   const time = value ?? { h: 12, m: 0, ampm: 'AM' };
   const inputClass = 'border border-border bg-secondary text-foreground font-bold text-lg px-2 py-2.5 outline-none focus:border-primary appearance-none text-center';
 
-  return c.jsxs('div', {
+  return jsxs('div', {
     className: 'flex-1',
     children: [
-      c.jsx('label', {
+      jsx('label', {
         className: 'block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2',
         children: label
       }),
-      c.jsxs('div', {
+      jsxs('div', {
         className: 'flex items-center gap-1',
         children: [
           // Hour select (1-12)
-          c.jsx('select', {
+          jsx('select', {
             value: time.h,
             onChange: (e) => onChange({ ...time, h: Number(e.target.value) }),
-            className: Pe(inputClass, 'w-14'),
+            className: cn(inputClass, 'w-14'),
             children: Array.from({ length: 12 }, (_, i) => i + 1).map(h =>
-              c.jsx('option', { value: h, children: String(h).padStart(2, '0') }, h)
+              jsx('option', { value: h, children: String(h).padStart(2, '0') }, h)
             )
           }),
-          c.jsx('span', {
+          jsx('span', {
             className: 'font-bold text-foreground text-lg',
             children: ':'
           }),
           // Minute select (0-59)
-          c.jsx('select', {
+          jsx('select', {
             value: time.m,
             onChange: (e) => onChange({ ...time, m: Number(e.target.value) }),
-            className: Pe(inputClass, 'w-14'),
+            className: cn(inputClass, 'w-14'),
             children: Array.from({ length: 60 }, (_, i) => i).map(m =>
-              c.jsx('option', { value: m, children: String(m).padStart(2, '0') }, m)
+              jsx('option', { value: m, children: String(m).padStart(2, '0') }, m)
             )
           }),
           // AM/PM toggle
-          c.jsx('button', {
+          jsx('button', {
             type: 'button',
             onClick: () => onChange({ ...time, ampm: time.ampm === 'AM' ? 'PM' : 'AM' }),
             className: 'border border-border bg-secondary text-foreground font-bold text-sm px-2 py-2.5 w-12 hover:bg-primary hover:text-white transition-colors',
@@ -944,10 +937,10 @@ function TimePicker({ label, value, onChange }) {
 
 function LogTimeBlockModal({ activity, onClose, onSave }) {
   const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
-  const [fromDate, setFromDate] = w.useState(today);
-  const [toDate, setToDate] = w.useState(today);
-  const [fromTime, setFromTime] = w.useState(() => getDefaultTime());
-  const [toTime, setToTime] = w.useState(null);
+  const [fromDate, setFromDate] = useState(today);
+  const [toDate, setToDate] = useState(today);
+  const [fromTime, setFromTime] = useState(() => getDefaultTime());
+  const [toTime, setToTime] = useState(null);
 
   // Get current time in { h, m, ampm } format
   function getDefaultTime() {
@@ -992,33 +985,33 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
     if (toDate < newFromDate) setToDate(newFromDate);
   };
 
-  return c.jsxs('div', {
+  return jsxs('div', {
     className: 'fixed inset-0 z-[60] flex items-end',
     onClick: onClose,
     children: [
-      c.jsx('div', { className: 'absolute inset-0 bg-black/50' }),
-      c.jsxs('div', {
+      jsx('div', { className: 'absolute inset-0 bg-black/50' }),
+      jsxs('div', {
         className: 'relative w-full max-w-[430px] mx-auto bg-white border-t border-border flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
           // Header
-          c.jsxs('div', {
+          jsxs('div', {
             className: 'px-5 pt-5 pb-3 border-b border-border flex items-center justify-between shrink-0',
             children: [
-              c.jsxs('div', {
+              jsxs('div', {
                 className: 'flex items-center gap-3',
                 children: [
-                  c.jsx('div', {
+                  jsx('div', {
                     className: 'w-3 h-3',
                     style: { backgroundColor: activity.color }
                   }),
-                  c.jsxs('div', {
+                  jsxs('div', {
                     children: [
-                      c.jsx('p', {
+                      jsx('p', {
                         className: 'font-bold text-foreground',
                         children: activity.name
                       }),
-                      c.jsx('p', {
+                      jsx('p', {
                         className: 'text-xs text-muted-foreground',
                         children: 'Log a time block'
                       })
@@ -1026,7 +1019,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                   })
                 ]
               }),
-              c.jsx('button', {
+              jsx('button', {
                 onClick: onClose,
                 className: 'text-muted-foreground px-2 py-1 text-sm',
                 children: 'x'
@@ -1034,17 +1027,17 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
             ]
           }),
           // Form content
-          c.jsxs('div', {
+          jsxs('div', {
             className: 'overflow-y-auto flex-1 px-5 py-5 flex flex-col gap-4',
             children: [
               // From date
-              c.jsxs('div', {
+              jsxs('div', {
                 children: [
-                  c.jsx('label', {
+                  jsx('label', {
                     className: 'block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5',
                     children: 'Date'
                   }),
-                  c.jsx('input', {
+                  jsx('input', {
                     type: 'date',
                     value: fromDate,
                     onChange: handleFromDateChange,
@@ -1053,37 +1046,37 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 ]
               }),
               // From time
-              c.jsx(TimePicker, {
+              jsx(TimePicker, {
                 label: 'From',
                 value: fromTime,
                 onChange: setFromTime
               }),
               // Divider
-              c.jsxs('div', {
+              jsxs('div', {
                 className: 'flex items-center gap-3',
                 children: [
-                  c.jsx('div', { className: 'flex-1 h-px bg-border' }),
-                  c.jsx('span', {
+                  jsx('div', { className: 'flex-1 h-px bg-border' }),
+                  jsx('span', {
                     className: 'text-muted-foreground text-sm font-semibold',
                     children: 'TO'
                   }),
-                  c.jsx('div', { className: 'flex-1 h-px bg-border' })
+                  jsx('div', { className: 'flex-1 h-px bg-border' })
                 ]
               }),
               // To date with "Ends next day" badge
-              c.jsxs('div', {
+              jsxs('div', {
                 children: [
-                  c.jsxs('label', {
+                  jsxs('label', {
                     className: 'flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5',
                     children: [
-                      c.jsx('span', { children: 'End date' }),
-                      spansDays && c.jsx('span', {
+                      jsx('span', { children: 'End date' }),
+                      spansDays && jsx('span', {
                         className: 'text-primary normal-case font-bold',
                         children: 'Ends next day'
                       })
                     ]
                   }),
-                  c.jsx('input', {
+                  jsx('input', {
                     type: 'date',
                     value: toDate,
                     min: fromDate,
@@ -1093,15 +1086,15 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 ]
               }),
               // To time
-              c.jsx(TimePicker, {
+              jsx(TimePicker, {
                 label: 'To',
                 value: toTime,
                 onChange: setToTime
               }),
               // Duration preview
-              durationMinutes !== null && durationMinutes > 0 && c.jsx('div', {
+              durationMinutes !== null && durationMinutes > 0 && jsx('div', {
                 className: 'bg-primary/5 border border-primary/20 px-4 py-3 text-center',
-                children: c.jsx('p', {
+                children: jsx('p', {
                   className: 'text-sm font-bold text-primary',
                   children: durationMinutes >= 60
                     ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60}m`
@@ -1109,22 +1102,22 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 })
               }),
               // Validation error
-              toTime && durationMinutes !== null && durationMinutes <= 0 && c.jsx('p', {
+              toTime && durationMinutes !== null && durationMinutes <= 0 && jsx('p', {
                 className: 'text-sm text-destructive font-medium text-center',
                 children: 'End must be after start.'
               })
             ]
           }),
           // Cancel / Log block buttons
-          c.jsxs('div', {
+          jsxs('div', {
             className: 'flex border-t border-border shrink-0',
             children: [
-              c.jsx('button', {
+              jsx('button', {
                 onClick: onClose,
                 className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
                 children: 'Cancel'
               }),
-              c.jsx('button', {
+              jsx('button', {
                 onClick: () => {
                   if (isValid && fromTimestamp && toTimestamp) {
                     onSave(fromTimestamp, toTimestamp);
@@ -1137,7 +1130,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
             ]
           }),
           // Bottom spacer
-          c.jsx('div', { className: 'h-20 bg-white shrink-0' })
+          jsx('div', { className: 'h-20 bg-white shrink-0' })
         ]
       })
     ]
@@ -1158,37 +1151,37 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
   };
 
   const now = new Date();
-  const [startValue, setStartValue] = w.useState(() => toLocalDatetime(block.startTime));
-  const [endValue, setEndValue] = w.useState(() => toLocalDatetime(now.toISOString()));
-  const [keepRunning, setKeepRunning] = w.useState(true); // default checked
+  const [startValue, setStartValue] = useState(() => toLocalDatetime(block.startTime));
+  const [endValue, setEndValue] = useState(() => toLocalDatetime(now.toISOString()));
+  const [keepRunning, setKeepRunning] = useState(true); // default checked
 
-  return c.jsxs('div', {
+  return jsxs('div', {
     className: 'fixed inset-0 z-[60] flex items-end',
     onClick: onClose,
     children: [
-      c.jsx('div', { className: 'absolute inset-0 bg-black/50' }),
-      c.jsxs('div', {
+      jsx('div', { className: 'absolute inset-0 bg-black/50' }),
+      jsxs('div', {
         className: 'relative w-full max-w-[430px] mx-auto bg-white border-t border-border flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
           // Header
-          c.jsxs('div', {
+          jsxs('div', {
             className: 'px-5 pt-5 pb-3 border-b border-border flex items-center justify-between shrink-0',
             children: [
-              c.jsxs('div', {
+              jsxs('div', {
                 className: 'flex items-center gap-3',
                 children: [
-                  c.jsx('div', {
+                  jsx('div', {
                     className: 'w-3 h-3',
                     style: { backgroundColor: activity.color }
                   }),
-                  c.jsxs('div', {
+                  jsxs('div', {
                     children: [
-                      c.jsx('p', {
+                      jsx('p', {
                         className: 'font-bold text-foreground',
                         children: 'Edit time block'
                       }),
-                      c.jsx('p', {
+                      jsx('p', {
                         className: 'text-xs text-muted-foreground',
                         children: activity.name
                       })
@@ -1196,7 +1189,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
                   })
                 ]
               }),
-              c.jsx('button', {
+              jsx('button', {
                 onClick: onClose,
                 className: 'text-muted-foreground px-2 py-1 text-sm',
                 children: 'x'
@@ -1204,17 +1197,17 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
             ]
           }),
           // Form content
-          c.jsxs('div', {
+          jsxs('div', {
             className: 'overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-4',
             children: [
               // Start time input
-              c.jsxs('div', {
+              jsxs('div', {
                 children: [
-                  c.jsx('label', {
+                  jsx('label', {
                     className: 'block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5',
                     children: 'Start time'
                   }),
-                  c.jsx('input', {
+                  jsx('input', {
                     type: 'datetime-local',
                     value: startValue,
                     onChange: (e) => setStartValue(e.target.value),
@@ -1223,29 +1216,29 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
                 ]
               }),
               // "Keep timer running" checkbox
-              c.jsxs('label', {
+              jsxs('label', {
                 className: 'flex items-center gap-3 cursor-pointer select-none',
                 children: [
-                  c.jsx('input', {
+                  jsx('input', {
                     type: 'checkbox',
                     checked: keepRunning,
                     onChange: (e) => setKeepRunning(e.target.checked),
                     className: 'w-4 h-4 accent-primary'
                   }),
-                  c.jsx('span', {
+                  jsx('span', {
                     className: 'text-sm font-medium text-foreground',
                     children: 'Keep timer running'
                   })
                 ]
               }),
               // End time input (hidden when keepRunning is true)
-              !keepRunning && c.jsxs('div', {
+              !keepRunning && jsxs('div', {
                 children: [
-                  c.jsx('label', {
+                  jsx('label', {
                     className: 'block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5',
                     children: 'End time'
                   }),
-                  c.jsx('input', {
+                  jsx('input', {
                     type: 'datetime-local',
                     value: endValue,
                     onChange: (e) => setEndValue(e.target.value),
@@ -1256,15 +1249,15 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
             ]
           }),
           // Cancel / Save buttons
-          c.jsxs('div', {
+          jsxs('div', {
             className: 'flex border-t border-border shrink-0',
             children: [
-              c.jsx('button', {
+              jsx('button', {
                 onClick: onClose,
                 className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
                 children: 'Cancel'
               }),
-              c.jsx('button', {
+              jsx('button', {
                 onClick: () => {
                   const startTime = new Date(startValue).toISOString();
                   const endTime = keepRunning ? null : new Date(endValue).toISOString();
@@ -1276,7 +1269,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
             ]
           }),
           // Bottom spacer
-          c.jsx('div', { className: 'h-20 bg-white shrink-0' })
+          jsx('div', { className: 'h-20 bg-white shrink-0' })
         ]
       })
     ]
@@ -1287,16 +1280,16 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
 // Bottom bar for adding new activities with text input + emoji picker + add button.
 
 function AddActivityBar() {
-  const [name, setName] = w.useState('');
-  const [newEmoji, setNewEmoji] = w.useState('');
-  const [showNewPicker, setShowNewPicker] = w.useState(false);
-  const createActivity = PC();  // PC = useCreateActivity
-  const queryClient = Es();     // Es = useQueryClient
-  const inputRef = zh.useRef(null); // zh = React
+  const [name, setName] = useState('');
+  const [newEmoji, setNewEmoji] = useState('');
+  const [showNewPicker, setShowNewPicker] = useState(false);
+  const createActivity = useCreateActivity();
+  const queryClient = useQueryClient();
+  const inputRef = useRef(null); // zh = React
 
   const handleAdd = () => {
     if (!name.trim()) return;
-    const randomColor = fh[Math.floor(Math.random() * fh.length)]; // fh = COLOR_PALETTE
+    const randomColor = getRandomColor();
     createActivity.mutate({
       data: {
         name: name.trim(),
@@ -1307,20 +1300,20 @@ function AddActivityBar() {
       onSuccess: () => {
         setName('');
         setNewEmoji('');
-        queryClient.invalidateQueries({ queryKey: Kc() }); // activities
+        queryClient.invalidateQueries({ queryKey: activitiesKey() }); // activities
         inputRef.current?.focus();
       }
     });
   };
 
-  return c.jsxs(w.Fragment, {
+  return jsxs(Fragment, {
     children: [
       // Add bar
-      c.jsxs('div', {
+      jsxs('div', {
         className: 'border-t border-border bg-white flex items-center',
         children: [
           // Text input
-          c.jsx('input', {
+          jsx('input', {
             ref: inputRef,
             type: 'text',
             value: name,
@@ -1332,7 +1325,7 @@ function AddActivityBar() {
             className: 'flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none px-2 py-4 text-base font-medium min-w-0'
           }),
           // Emoji picker button (shows selected emoji or 🙂 default)
-          c.jsx('button', {
+          jsx('button', {
             type: 'button',
             onClick: () => setShowNewPicker(true),
             className: 'h-full px-4 py-4 flex items-center justify-center text-xl text-muted-foreground shrink-0',
@@ -1340,19 +1333,19 @@ function AddActivityBar() {
             children: newEmoji || '🙂'
           }),
           // Add button with Plus icon
-          c.jsxs('button', {
+          jsxs('button', {
             onClick: handleAdd,
             disabled: !name.trim() || createActivity.isPending,
             className: 'h-full px-5 py-4 flex items-center gap-2 bg-primary text-white font-semibold text-sm disabled:opacity-40 shrink-0',
             children: [
-              c.jsx(rk, { className: 'w-4 h-4' }), // Plus icon
+              jsx(rk, { className: 'w-4 h-4' }), // Plus icon
               'Add'
             ]
           })
         ]
       }),
       // Emoji picker for new activity
-      showNewPicker && c.jsx(LTEmojiPicker, {
+      showNewPicker && jsx(LTEmojiPicker, {
         value: newEmoji,
         onSelect: setNewEmoji,
         onClose: () => setShowNewPicker(false)
@@ -1371,55 +1364,451 @@ function formatTime(isoString) {
   });
 }
 
-// ─── Home Screen (EXPORTED) ─────────────────────────────────────────────────
-// Main Timer/Activity screen. Manages activity list, timer state, and all modals.
+// ─── Life Progress Card (P6) ─────────────────────────────────────────────────
+// Replaces enhancements.js buildLifeProgressCard().
+// Shows greeting, SVG life progress ring, countdown, and daily time value.
 
-export function HomeScreen({ profile }) {
-  const queryClient = Es();                         // Es = useQueryClient
-  const { data: activities = [] } = kC();           // kC = useActivities
-  const { data: blocks = [] } = Ay();               // Ay = useBlocks
-  const runningBlock = blocks.find(b => !b.endTime); // Find currently running block
+function LifeProgressCard({ profile }) {
+  const [now, setNow] = useState(Date.now());
 
-  const createBlock = NC();     // NC = useCreateBlock
-  const updateBlock = jC();     // jC = useUpdateBlock
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-  // Modal state: selected activity for action sheet
-  const [selectedActivity, setSelectedActivity] = w.useState(null);
-  // Modal state: active block info for stop/edit sheet
-  const [activeBlockInfo, setActiveBlockInfo] = w.useState(null);
-  // Modal state: editing block for edit modal
-  const [editingBlock, setEditingBlock] = w.useState(null);
-  // Modal state: log time block activity
-  const [logBlockActivity, setLogBlockActivity] = w.useState(null);
+  if (!profile) return null;
 
-  // Handle tapping an activity
+  const percentLived = calcPercentLived(profile);
+  const remainingMs = calcRemainingTime(profile);
+  const breakdown = msToBreakdown(remainingMs);
+
+  const circumference = 2 * Math.PI * 36;
+  const offset = circumference - (percentLived / 100) * circumference;
+
+  const h = new Date().getHours();
+  const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+
+  // Time value
+  let tvData = null;
+  try {
+    const stored = JSON.parse(localStorage.getItem('lt_time_value_v1') || 'null');
+    if (stored && stored.perMinute) {
+      const pm = Number(stored.perMinute);
+      const dailyHours = Number(stored.hours) || 8;
+      const nowDate = new Date(now);
+      const secOfDay = nowDate.getHours() * 3600 + nowDate.getMinutes() * 60 + nowDate.getSeconds();
+      const remSecToday = 86400 - secOfDay;
+      const dailyBudget = pm * 60 * dailyHours;
+      const value = Math.max(0, dailyBudget * (remSecToday / 86400));
+      const remHours = Math.floor(remSecToday / 3600);
+      const remMin = Math.floor((remSecToday % 3600) / 60);
+      tvData = { value, remHours, remMin, rate: pm * 60 };
+    }
+  } catch (e) { /* ignore */ }
+
+  return jsxs('div', {
+    className: 'mx-4 mt-3 flex flex-col gap-3',
+    children: [
+      // Top card: greeting + ring
+      jsxs('div', {
+        className: 'flex items-start justify-between gap-3 bg-background border border-border rounded-2xl p-4',
+        children: [
+          jsxs('div', {
+            className: 'flex-1 min-w-0',
+            children: [
+              jsx('p', { className: 'text-sm font-semibold text-foreground/55 mb-1', children: greeting + ',' }),
+              jsxs('h2', { className: 'text-[26px] font-black text-primary mb-2', children: [profile.name, ' \u2728'] }),
+              jsx('p', { className: 'text-[13px] leading-relaxed text-foreground/60', children: 'Make today count. Your future is built by what you do now. \uD83D\uDC9B' })
+            ]
+          }),
+          jsxs('div', {
+            className: 'flex-shrink-0 flex flex-col items-center bg-white border border-border rounded-[14px] px-3 py-2.5',
+            children: [
+              jsx('p', { className: 'text-[9px] font-extrabold tracking-widest text-foreground/40 mb-1', children: 'LIFE PROGRESS' }),
+              jsxs('div', {
+                className: 'relative w-[88px] h-[88px] flex items-center justify-center',
+                children: [
+                  jsx('svg', {
+                    width: 88, height: 88, viewBox: '0 0 100 100',
+                    className: 'block',
+                    style: { transform: 'rotate(-90deg)' },
+                    children: jsxs(Fragment, {
+                      children: [
+                        jsx('circle', { cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--border))', strokeWidth: 8 }),
+                        jsx('circle', { cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--accent))', strokeWidth: 8, strokeLinecap: 'round', strokeDasharray: circumference, strokeDashoffset: offset, style: { transition: 'stroke-dashoffset 0.4s ease' } })
+                      ]
+                    })
+                  }),
+                  jsx('div', {
+                    className: 'absolute inset-0 flex items-center justify-center',
+                    children: jsx('span', { className: 'text-[19px] font-black text-primary', children: Math.round(percentLived) + '%' })
+                  })
+                ]
+              }),
+              jsx('p', { className: 'text-[9px] font-semibold text-foreground/45 mt-1', children: 'of your life lived' })
+            ]
+          })
+        ]
+      }),
+      // Countdown card
+      jsxs('div', {
+        className: 'bg-primary rounded-2xl p-4',
+        children: [
+          jsxs('div', {
+            className: 'flex items-start justify-between gap-2.5 mb-3.5',
+            children: [
+              jsxs('div', {
+                className: 'flex-1 min-w-0',
+                children: [
+                  jsx('p', { className: 'text-sm font-extrabold text-white', children: profile.name + '\u2019s Remaining Retirement Time' }),
+                  jsx('p', { className: 'text-[13px] font-bold text-white/85 mt-0.5', children: '\uD83C\uDFC1 Target: \uD83C\uDFC3 ' + profile.dob })
+                ]
+              })
+            ]
+          }),
+          jsxs('div', {
+            className: 'grid grid-cols-5 gap-1.5',
+            children: [
+              jsx(LifeDigit, { value: breakdown.years, label: 'YEARS' }),
+              jsx(LifeDigit, { value: breakdown.days, label: 'DAYS' }),
+              jsx(LifeDigit, { value: breakdown.hours, label: 'HOURS' }),
+              jsx(LifeDigit, { value: breakdown.minutes, label: 'MIN' }),
+              jsx(LifeDigit, { value: breakdown.seconds, label: 'SEC', accent: true })
+            ]
+          })
+        ]
+      }),
+      // Time value card
+      tvData && jsxs('div', {
+        className: 'border border-accent/30 bg-accent/10 rounded-2xl p-4 flex items-center justify-between gap-2.5',
+        children: [
+          jsxs('div', {
+            children: [
+              jsx('p', { className: 'text-[13px] font-extrabold text-primary', children: 'Today\u2019s Time Value' }),
+              jsx('p', { className: 'text-[11px] text-foreground/50 mt-px', children: 'Your remaining time' }),
+              jsx('p', { className: 'text-[22px] font-black text-accent mt-1.5', children: 'Rs.' + tvData.value.toFixed(2) }),
+              jsx('p', { className: 'text-[11px] text-foreground/50 mt-0.5', children: tvData.remHours + 'h ' + tvData.remMin + 'm left' })
+            ]
+          }),
+          jsx('span', {
+            className: 'flex-shrink-0 bg-accent/15 text-accent rounded-full px-2.5 py-1.5 text-[10px] font-extrabold text-center leading-tight max-w-[96px]',
+            children: 'Rs.' + tvData.rate + '/hour'
+          })
+        ]
+      })
+    ]
+  });
+}
+
+function LifeDigit({ value, label, accent }) {
+  return jsxs('div', {
+    className: 'flex flex-col items-center bg-white/8 rounded-[10px] py-2 px-0.5',
+    children: [
+      jsx('span', {
+        className: cn('text-[17px] font-black text-white tabular-nums leading-none', accent && 'text-accent'),
+        children: String(value).padStart(2, '0')
+      }),
+      jsx('span', {
+        className: 'text-[8px] font-extrabold tracking-widest text-white/40 mt-0.5',
+        children: label
+      })
+    ]
+  });
+}
+
+// ─── Today at a Glance (P7) ──────────────────────────────────────────────────
+// Replaces enhancements.js buildGlanceSection().
+// Shows today's tracked activity usage in a horizontal card grid.
+
+function TodayGlance({ activities, blocks }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate minutes per activity today
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayBlocks = blocks.filter(b => {
+    if (!b.startTime) return false;
+    const start = new Date(b.startTime);
+    const dateStr = start.toISOString().slice(0, 10);
+    if (dateStr !== todayStr) return false;
+    const end = b.endTime ? new Date(b.endTime) : new Date(now);
+    return (end - start) > 0;
+  });
+
+  const activityMinutes = {};
+  todayBlocks.forEach(b => {
+    const end = b.endTime ? new Date(b.endTime) : new Date(now);
+    const mins = Math.max(0, Math.round((end - new Date(b.startTime)) / 60000));
+    activityMinutes[b.activityId] = (activityMinutes[b.activityId] || 0) + mins;
+  });
+
+  const totalMinutes = Object.values(activityMinutes).reduce((s, m) => s + m, 0);
+  if (totalMinutes === 0) return null;
+
+  const tracked = activities
+    .filter(a => activityMinutes[a.id] > 0)
+    .map(a => ({ ...a, minutes: activityMinutes[a.id] }))
+    .sort((a, b) => b.minutes - a.minutes)
+    .slice(0, 4);
+
+  if (tracked.length === 0) return null;
+
+  const formatMins = (m) => {
+    if (m < 60) return m + 'm';
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    return rem > 0 ? h + 'h ' + rem + 'm' : h + 'h';
+  };
+
+  const colors = ['#FEF3C7', '#EDE9FE', '#FEE2E2', '#DCFCE7'];
+
+  return jsxs('div', {
+    className: 'mx-4 mt-3',
+    children: [
+      jsx('p', {
+        className: 'text-[18px] font-black text-foreground mb-2.5',
+        children: 'Today at a Glance'
+      }),
+      jsx('div', {
+        className: 'grid gap-2',
+        style: { gridTemplateColumns: 'repeat(' + Math.min(tracked.length, 4) + ', 1fr)' },
+        children: tracked.map((a, i) => {
+          const pct = Math.round((a.minutes / totalMinutes) * 100);
+          return jsxs('div', {
+            className: 'rounded-xl p-3 flex flex-col items-center gap-1',
+            style: { background: colors[i % colors.length] },
+            children: [
+              jsx('span', { className: 'text-xl', children: a.emoji || '\uD83C\uDFB3' }),
+              jsx('span', { className: 'text-sm font-extrabold text-foreground', children: formatMins(a.minutes) }),
+              jsx('span', {
+                className: 'text-[9px] text-foreground/60 text-center w-full truncate',
+                children: a.name
+              }),
+              jsx('div', {
+                className: 'w-full h-[3px] rounded-full bg-black/10 overflow-hidden mt-0.5',
+                children: jsx('div', {
+                  className: 'h-full rounded-full',
+                  style: { width: pct + '%', background: 'hsl(var(--primary))' }
+                })
+              })
+            ]
+          }, a.id);
+        })
+      })
+    ]
+  });
+}
+
+// ─── Eat the Frog (P8) ──────────────────────────────────────────────────────
+// Replaces enhancements.js buildEatTheFrogCard().
+// Shows top 3 starred tasks with inline editing, checkbox, and unstar.
+
+const TASKS_KEY_RT = 'lt_tasks_v1';
+const MAX_FROG_TASKS = 3;
+
+function EatTheFrog() {
+  const [tasks, setTasks] = useState(() => {
+    try {
+      const raw = localStorage.getItem(TASKS_KEY_RT);
+      return Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
+  const [, setTick] = useState(0);
+
+  const saveTasks = (newTasks) => {
+    localStorage.setItem(TASKS_KEY_RT, JSON.stringify(newTasks));
+    setTasks(newTasks);
+  };
+
+  const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+  const starred = tasks.filter(t => t.starred && !t.completed);
+  const slots = [];
+  for (let i = 0; i < MAX_FROG_TASKS; i++) {
+    slots.push(starred[i] || null);
+  }
+
+  const toggleComplete = (taskId) => {
+    const newTasks = tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t);
+    saveTasks(newTasks);
+    setTick(n => n + 1);
+  };
+
+  const unstarTask = (taskId) => {
+    const newTasks = tasks.map(t => t.id === taskId ? { ...t, starred: false } : t);
+    saveTasks(newTasks);
+    setTick(n => n + 1);
+  };
+
+  const updateTitle = (taskId, title) => {
+    if (!taskId) return; // empty slot
+    const newTasks = tasks.map(t => t.id === taskId ? { ...t, title } : t);
+    saveTasks(newTasks);
+  };
+
+  const createFromSlot = (title) => {
+    if (!title.trim()) return;
+    const newTask = {
+      id: genId(),
+      title: title.trim(),
+      date: null,
+      time: null,
+      notes: '',
+      completed: false,
+      starred: true,
+      createdAt: Date.now()
+    };
+    saveTasks([...tasks, newTask]);
+    setTick(n => n + 1);
+    return newTask.id;
+  };
+
+  if (starred.length === 0 && slots.every(s => s === null)) return null;
+
+  return jsxs('div', {
+    className: 'mx-4 mt-3 p-4 border border-border rounded-2xl bg-background',
+    children: [
+      jsx('p', { className: 'text-[15px] font-extrabold text-foreground flex items-center gap-1.5', children: ['\uD83D\uDC38 Eat the Frog'] }),
+      jsx('p', { className: 'text-xs text-foreground/65 mt-0.5 mb-3', children: 'Your ' + starred.length + ' most important tasks today' }),
+      slots.map((task, i) =>
+        jsx(FrogSlot, {
+          task,
+          index: i,
+          onToggle: toggleComplete,
+          onUnstar: unstarTask,
+          onUpdateTitle: updateTitle,
+          onCreate: createFromSlot
+        }, i)
+      )
+    ]
+  });
+}
+
+function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) {
+  const [localTitle, setLocalTitle] = useState(task ? task.title : '');
+  const [slotTaskId, setSlotTaskId] = useState(task ? task.id : null);
+
+  useEffect(() => {
+    setLocalTitle(task ? task.title : '');
+    setSlotTaskId(task ? task.id : null);
+  }, [task?.id, task?.title]);
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    setLocalTitle(val);
+    if (slotTaskId) {
+      onUpdateTitle(slotTaskId, val);
+    } else if (val.trim()) {
+      const newId = onCreate(val);
+      if (newId) setSlotTaskId(newId);
+    }
+  };
+
+  return jsxs('div', {
+    className: 'flex items-center gap-2.5 py-2 border-t border-border first:border-t-0',
+    children: [
+      // Checkbox
+      jsx('button', {
+        type: 'button',
+        onClick: () => slotTaskId && onToggle(slotTaskId),
+        className: cn(
+          'w-[22px] h-[22px] flex-shrink-0 rounded-full border-2 flex items-center justify-center text-xs text-white',
+          task?.completed
+            ? 'bg-green-500 border-green-500'
+            : 'border-border bg-transparent',
+          !slotTaskId && 'opacity-35 cursor-default'
+        ),
+        children: task?.completed ? '\u2713' : null
+      }),
+      // Title input
+      jsx('input', {
+        type: 'text',
+        value: localTitle,
+        onChange: handleInput,
+        placeholder: 'Add an important task\u2026',
+        className: cn(
+          'flex-1 border border-border bg-secondary/30 text-sm text-foreground outline-none rounded-lg px-2.5 py-1.5 min-w-0',
+          task?.completed && 'line-through opacity-50'
+        )
+      }),
+      // Unstar
+      jsx('button', {
+        type: 'button',
+        onClick: () => slotTaskId && onUnstar(slotTaskId),
+        className: cn(
+          'flex-shrink-0 p-1 text-[#f5a623]',
+          !slotTaskId && 'invisible'
+        ),
+        children: jsx('svg', {
+          width: 16, height: 16, viewBox: '0 0 24 24', fill: '#f5a623', stroke: '#f5a623', strokeWidth: 2,
+          strokeLinecap: 'round', strokeLinejoin: 'round',
+          children: jsx('polygon', { points: '12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2' })
+        })
+      })
+    ]
+  });
+}
+
+// ── Timer Screen (EXPORTED) ──────────────────────────────────────────
+// Dashboard: Life Progress, Today at a Glance, Eat the Frog.
+// Pure overview — no activity list, no timer controls.
+
+export function TimerScreen({ profile }) {
+  const { data: activities = [] } = useActivities();
+  const { data: blocks = [] } = useBlocks();
+
+  return jsxs('div', {
+    'data-source-file': 'screens/Home.js',
+    className: 'flex flex-col',
+    children: [
+      jsx(LifeProgressCard, { profile }),
+      jsx(TodayGlance, { activities, blocks }),
+      jsx(EatTheFrog, {})
+    ]
+  });
+}
+
+// ── Activity Screen (EXPORTED) ──────────────────────────────────────────
+// Activity list + timer controls + all modals.
+// Separate from the Timer dashboard to eliminate the old pseudo-tab system.
+
+export function ActivityScreen({ profile }) {
+  const queryClient = useQueryClient();
+  const { data: activities = [] } = useActivities();
+  const { data: blocks = [] } = useBlocks();
+  const runningBlock = blocks.find(b => !b.endTime);
+
+  const createBlock = useCreateBlock();
+  const updateBlock = useUpdateBlock();
+
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [activeBlockInfo, setActiveBlockInfo] = useState(null);
+  const [editingBlock, setEditingBlock] = useState(null);
+  const [logBlockActivity, setLogBlockActivity] = useState(null);
+
   const handleActivityTap = (activity) => {
     if (runningBlock?.activityId === activity.id) {
-      // This activity has a running timer — show stop/edit sheet
       setActiveBlockInfo({ block: runningBlock, activity });
     } else {
-      // No running timer for this activity — show action sheet
       setSelectedActivity(activity);
     }
   };
 
-  // Start timer for an activity
   const startTimer = (activity) => {
     const doCreate = () => {
       createBlock.mutate({
-        data: {
-          activityId: activity.id,
-          startTime: new Date().toISOString()
-        }
+        data: { activityId: activity.id, startTime: new Date().toISOString() }
       }, {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: Ho() }); // blocks
-          queryClient.invalidateQueries({ queryKey: Qo() }); // today-stats
+          queryClient.invalidateQueries({ queryKey: blocksKey() });
+          queryClient.invalidateQueries({ queryKey: todayStatsKey() });
         }
       });
     };
-
-    // If there's already a running block, stop it first
     if (runningBlock) {
       updateBlock.mutate({
         id: runningBlock.id,
@@ -1428,11 +1817,9 @@ export function HomeScreen({ profile }) {
     } else {
       doCreate();
     }
-
     setSelectedActivity(null);
   };
 
-  // Stop the running timer
   const stopTimer = () => {
     if (!activeBlockInfo) return;
     updateBlock.mutate({
@@ -1440,49 +1827,36 @@ export function HomeScreen({ profile }) {
       data: { endTime: new Date().toISOString() }
     }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: Ho() }); // blocks
-        queryClient.invalidateQueries({ queryKey: Qo() }); // today-stats
+        queryClient.invalidateQueries({ queryKey: blocksKey() });
+        queryClient.invalidateQueries({ queryKey: todayStatsKey() });
         setActiveBlockInfo(null);
       }
     });
   };
 
-  // Refresh all queries
   const refreshAll = () => {
-    queryClient.invalidateQueries({ queryKey: Ho() }); // blocks
-    queryClient.invalidateQueries({ queryKey: Qo() }); // today-stats
+    queryClient.invalidateQueries({ queryKey: blocksKey() });
+    queryClient.invalidateQueries({ queryKey: todayStatsKey() });
   };
 
-  return c.jsxs('div', {
+  return jsxs('div', {
     'data-source-file': 'screens/Home.js',
     className: 'flex flex-col',
     children: [
-      // Retirement countdown panel (collapsible)
-      c.jsx(LTTimerPanel, { profile }),
-      // Daily value bar
-      c.jsx(LTDailyValueBar, {}),
       // Activity list
-      c.jsxs('div', {
+      jsxs('div', {
         className: 'flex flex-col divide-y divide-border',
         children: [
-          // Empty state
-          activities.length === 0 && c.jsxs('div', {
+          activities.length === 0 && jsxs('div', {
             className: 'flex flex-col items-center justify-center py-20 px-8 text-center bg-background',
             children: [
-              c.jsx(rh, { className: 'w-8 h-8 text-muted-foreground mb-4 opacity-30' }), // Square icon
-              c.jsx('p', {
-                className: 'text-muted-foreground font-medium',
-                children: 'No activities yet.'
-              }),
-              c.jsx('p', {
-                className: 'text-sm text-muted-foreground mt-1',
-                children: 'Add one below to start tracking.'
-              })
+              jsx(rh, { className: 'w-8 h-8 text-muted-foreground mb-4 opacity-30' }),
+              jsx('p', { className: 'text-muted-foreground font-medium', children: 'No activities yet.' }),
+              jsx('p', { className: 'text-sm text-muted-foreground mt-1', children: 'Add one below to start tracking.' })
             ]
           }),
-          // Activity rows
           activities.map(activity =>
-            c.jsx(ActivityCard, {
+            jsx(ActivityCard, {
               activity,
               isActive: runningBlock?.activityId === activity.id,
               activeBlock: runningBlock?.activityId === activity.id ? runningBlock : null,
@@ -1491,110 +1865,76 @@ export function HomeScreen({ profile }) {
           )
         ]
       }),
-      // Add activity bar
-      c.jsx(AddActivityBar, {}),
+      jsx(AddActivityBar, {}),
 
-      // ─── Modal: Action Sheet (Start Timer / Log Time Block) ─────────────
-      selectedActivity && c.jsxs(BottomSheet, {
+      selectedActivity && jsxs(BottomSheet, {
         onDismiss: () => setSelectedActivity(null),
         children: [
-          c.jsx(ModalHeader, {
-            activity: selectedActivity,
-            subtitle: 'How do you want to track this?'
-          }),
-          c.jsx(ModalOption, {
-            icon: c.jsx(Ty, { className: 'w-5 h-5' }),     // Timer icon
+          jsx(ModalHeader, { activity: selectedActivity, subtitle: 'How do you want to track this?' }),
+          jsx(ModalOption, {
+            icon: jsx(Ty, { className: 'w-5 h-5' }),
             label: 'Start timer now',
             description: 'Live timer from right now',
             onClick: () => startTimer(selectedActivity)
           }),
-          c.jsx(ModalOption, {
-            icon: c.jsx(Jb, { className: 'w-5 h-5' }),     // CalendarClock icon
+          jsx(ModalOption, {
+            icon: jsx(Jb, { className: 'w-5 h-5' }),
             label: 'Log a time block',
             description: 'Set a start and end time manually',
-            onClick: () => {
-              setLogBlockActivity(selectedActivity);
-              setSelectedActivity(null);
-            }
+            onClick: () => { setLogBlockActivity(selectedActivity); setSelectedActivity(null); }
           })
         ]
       }),
 
-      // ─── Modal: Active Timer Sheet (Stop / Edit) ────────────────────────
-      activeBlockInfo && c.jsxs(BottomSheet, {
+      activeBlockInfo && jsxs(BottomSheet, {
         onDismiss: () => setActiveBlockInfo(null),
         children: [
-          c.jsx(ModalHeader, {
-            activity: activeBlockInfo.activity,
-            subtitle: 'Timer is running'
-          }),
-          c.jsx(ModalOption, {
-            icon: c.jsx(rh, { className: 'w-5 h-5 text-destructive' }), // Square icon (destructive)
+          jsx(ModalHeader, { activity: activeBlockInfo.activity, subtitle: 'Timer is running' }),
+          jsx(ModalOption, {
+            icon: jsx(rh, { className: 'w-5 h-5 text-destructive' }),
             label: 'Stop timer',
             labelClass: 'text-destructive',
-            description: `Started at ${formatTime(activeBlockInfo.block.startTime)}`,
+            description: 'Started at ' + formatTime(activeBlockInfo.block.startTime),
             onClick: stopTimer
           }),
-          c.jsx(ModalOption, {
-            icon: c.jsx(tk, { className: 'w-5 h-5' }),     // Pencil icon
+          jsx(ModalOption, {
+            icon: jsx(tk, { className: 'w-5 h-5' }),
             label: 'Edit time',
             description: 'Adjust start or end time',
-            onClick: () => {
-              setEditingBlock(activeBlockInfo);
-              setActiveBlockInfo(null);
-            }
+            onClick: () => { setEditingBlock(activeBlockInfo); setActiveBlockInfo(null); }
           })
         ]
       }),
 
-      // ─── Modal: Log Time Block ───────────────────────────────────────────
-      logBlockActivity && c.jsx(LogTimeBlockModal, {
+      logBlockActivity && jsx(LogTimeBlockModal, {
         activity: logBlockActivity,
         onClose: () => setLogBlockActivity(null),
         onSave: (startTime, endTime) => {
           const doCreate = () => {
             createBlock.mutate({
-              data: {
-                activityId: logBlockActivity.id,
-                startTime,
-                endTime
-              }
+              data: { activityId: logBlockActivity.id, startTime, endTime }
             }, {
-              onSuccess: () => {
-                refreshAll();
-                setLogBlockActivity(null);
-              }
+              onSuccess: () => { refreshAll(); setLogBlockActivity(null); }
             });
           };
-          // Stop existing running block first
           if (runningBlock) {
-            updateBlock.mutate({
-              id: runningBlock.id,
-              data: { endTime: new Date().toISOString() }
-            }, { onSuccess: doCreate });
+            updateBlock.mutate({ id: runningBlock.id, data: { endTime: new Date().toISOString() } }, { onSuccess: doCreate });
           } else {
             doCreate();
           }
         }
       }),
 
-      // ─── Modal: Edit Time Block ──────────────────────────────────────────
-      editingBlock && c.jsx(EditTimeBlockModal, {
+      editingBlock && jsx(EditTimeBlockModal, {
         block: editingBlock.block,
         activity: editingBlock.activity,
         onClose: () => setEditingBlock(null),
         onSave: (startTime, endTime) => {
           updateBlock.mutate({
             id: editingBlock.block.id,
-            data: {
-              startTime,
-              endTime: endTime || undefined
-            }
+            data: { startTime, endTime: endTime || undefined }
           }, {
-            onSuccess: () => {
-              refreshAll();
-              setEditingBlock(null);
-            }
+            onSuccess: () => { refreshAll(); setEditingBlock(null); }
           });
         }
       })
