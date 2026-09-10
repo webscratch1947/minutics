@@ -55,22 +55,22 @@ function RetirementCountdown({ profile }) {
     children: [
       // Title row with plan badge
       jsxs('div', {
-        className: 'flex items-center justify-between mb-4',
+        className: 'flex items-center gap-2 mb-4 min-w-0',
         children: [
           jsxs('p', {
-            className: 'text-[13px] font-bold text-white/80 m-0 uppercase tracking-wide',
+            className: 'text-[12px] font-bold text-white m-0 uppercase tracking-wide leading-tight truncate',
             children: [profile.name, "'s Remaining Retirement Time"]
           }),
           jsxs('span', {
-            className: 'flex items-center gap-1 bg-white/10 text-white/70 text-[11px] font-bold px-2.5 py-1 rounded-full',
+            className: 'shrink-0 flex items-center gap-1 bg-[#FDE68A]/15 text-[#FDE68A] text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap',
             children: ['\u2605 ', planLabel]
           })
         ]
       }),
       // Retirement date
       retirementDateStr && jsxs('p', {
-        className: 'text-[12px] font-semibold text-white/50 mb-5 flex items-center gap-1.5',
-        children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-white/80', children: retirementDateStr })]
+        className: 'text-[12px] font-semibold text-white/60 mb-5 flex items-center gap-1.5',
+        children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-[#FDE68A]', children: retirementDateStr })]
       }),
       // 5-column grid: years, days, hours, min, sec
       jsxs('div', {
@@ -108,7 +108,7 @@ function RetirementCountdown({ profile }) {
 
 function TimeDigit({ value, label, accent }) {
   return jsxs('div', {
-    className: 'flex flex-col items-center bg-white/8 rounded-xl py-3.5 px-2 gap-1',
+    className: 'flex flex-col items-center bg-white/12 rounded-xl py-3 px-2 gap-1',
     children: [
       jsx('span', {
         className: cn(
@@ -118,7 +118,7 @@ function TimeDigit({ value, label, accent }) {
         children: String(value).padStart(2, '0')
       }),
       jsx('span', {
-        className: 'text-[10px] font-extrabold tracking-widest text-white/40 uppercase',
+        className: 'text-[10px] font-extrabold tracking-widest text-white/50 uppercase',
         children: label
       })
     ]
@@ -1593,13 +1593,13 @@ function TodayGlance({ activities, blocks }) {
         children: display.map((a, i) => {
           const pct = totalMinutes > 0 ? Math.round((a.minutes / totalMinutes) * 100) : 0;
           return jsxs('div', {
-            className: 'rounded-xl p-3 flex flex-col items-center gap-1',
+            className: 'rounded-xl p-2 flex flex-col items-center gap-0.5 min-w-0 overflow-hidden',
             style: { background: colors[i % colors.length] },
             children: [
-              jsx('span', { className: 'text-xl', children: a.emoji || '\uD83C\uDFB3' }),
-              jsx('span', { className: 'text-sm font-extrabold text-foreground', children: formatMins(a.minutes) }),
+              jsx('span', { className: 'text-lg leading-none', children: a.emoji || '\uD83C\uDFB3' }),
+              jsx('span', { className: 'text-[11px] font-extrabold text-foreground leading-tight whitespace-nowrap', children: formatMins(a.minutes) }),
               jsx('span', {
-                className: 'text-[9px] text-foreground/60 text-center w-full truncate',
+                className: 'text-[8px] text-foreground/60 text-center w-full truncate leading-tight',
                 children: a.name
               }),
               jsx('div', {
