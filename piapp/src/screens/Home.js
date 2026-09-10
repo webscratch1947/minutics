@@ -1775,13 +1775,55 @@ export function TimerScreen({ profile }) {
 }
 
 // ── Activity Screen (EXPORTED) ──────────────────────────────────────────
-// Activity list + timer controls + all modals.
-// Separate from the Timer dashboard to eliminate the old pseudo-tab system.
+// Activity list + stats header + timer controls + all modals.
+// Recreates the original compiled Activity tab UI in clean React.
+
+function fmtMins(totalSec) {
+  const m = Math.round(totalSec / 60);
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem > 0 ? h + 'h ' + rem + ' min' : h + 'h';
+}
+
+function calcFocusScore(statsActivities) {
+  if (!statsActivities || statsActivities.length === 0) return 100;
+  const penaltyNames = ['Time Waste', 'Social Media', 'Entertainment'];
+  const boostNames = ['Work', 'Study', 'Exercise', 'Creative', 'Health'];
+  let penaltyMin = 0, boostMin = 0;
+  statsActivities.forEach(function (a) {
+    const m = Math.round(a.totalSeconds / 60);
+    const name = (a.activityName || '').toLowerCase();
+    if (penaltyNames.some(p => name.includes(p.toLowerCase()))) penaltyMin += m;
+    else if (boostNames.some(b => name.includes(b.toLowerCase()))) boostMin += m;
+  });
+  var score = 100 - penaltyMin + (boostMin * 0.25);
+  return Math.min(100, Math.max(0, Math.round(score)));
+}
+
+function StatCard({ icon, iconBg, label, value, suffix }) {
+  return jsxs('div', {
+    className: 'rounded-2xl border border-black/[0.06] bg-card p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]',
+    children: [
+      jsx('div', {
+        className: 'inline-flex items-center justify-center w-[30px] h-[30px] rounded-full text-sm mb-2',
+        style: { background: iconBg },
+        children: icon
+      }),
+      jsx('p', { className: 'text-xs text-muted-foreground mb-0.5', children: label }),
+      jsxs('p', { className: 'text-xl font-extrabold text-foreground m-0', children: [
+        value,
+        suffix && jsx('span', { className: 'text-xs font-semibold text-muted-foreground ml-0.5', children: suffix })
+      ] })
+    ]
+  });
+}
 
 export function ActivityScreen({ profile }) {
   const queryClient = useQueryClient();
   const { data: activities = [] } = useActivities();
   const { data: blocks = [] } = useBlocks();
+  const { data: todayStats } = useTodayStats();
   const runningBlock = blocks.find(b => !b.endTime);
 
   const createBlock = useCreateBlock();
@@ -1791,6 +1833,20 @@ export function ActivityScreen({ profile }) {
   const [activeBlockInfo, setActiveBlockInfo] = useState(null);
   const [editingBlock, setEditingBlock] = useState(null);
   const [logBlockActivity, setLogBlockActivity] = useState(null);
+
+  const todayEntries = todayStats?.activities || [];
+  const totalMinutesTracked = Math.round((todayStats?.totalSeconds || 0) / 60);
+
+  let valueEarned = 0;
+  try {
+    const tv = JSON.parse(localStorage.getItem('lt_time_value_v1') || 'null');
+    if (tv && tv.perMinute) valueEarned = tv.perMinute * totalMinutesTracked;
+  } catch { /* ignore */ }
+
+  const focusScore = calcFocusScore(todayEntries);
+  const dateLabel = new Date().toLocaleDateString(undefined, {
+    weekday: 'long', month: 'short', day: 'numeric', year: 'numeric'
+  });
 
   const handleActivityTap = (activity) => {
     if (runningBlock?.activityId === activity.id) {
@@ -1845,6 +1901,35 @@ export function ActivityScreen({ profile }) {
     'data-source-file': 'screens/Home.js',
     className: 'flex flex-col',
     children: [
+      // Title header
+      jsxs('div', {
+        className: 'flex items-baseline justify-between gap-2.5 px-4 pt-4 pb-1 flex-wrap',
+        children: [
+          jsx('h1', { className: 'text-[26px] font-black text-foreground m-0', children: "Activity's" }),
+          jsx('span', { className: 'text-xs font-semibold text-muted-foreground whitespace-nowrap', children: dateLabel })
+        ]
+      }),
+
+      // 2x2 stats grid
+      jsxs('div', {
+        className: 'grid grid-cols-2 gap-2.5 px-4 pt-3 pb-1',
+        children: [
+          jsx(StatCard, { icon: '\u23F1', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
+          jsx(StatCard, { icon: '\uD83D\uDCB0', iconBg: '#FEF3C7', label: 'Value Earned', value: valueEarned > 0 ? 'Rs.' + valueEarned.toFixed(2) : '--', suffix: valueEarned > 0 ? undefined : '' }),
+          jsx(StatCard, { icon: '\uD83C\uDFAF', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore, suffix: '/100' }),
+          jsx(StatCard, { icon: '\uD83D\uDD25', iconBg: '#EDE9FE', label: 'Activities', value: activities.length })
+        ]
+      }),
+
+      // Section label
+      jsxs('div', {
+        className: 'px-4 pt-3.5 pb-2',
+        children: [
+          jsx('p', { className: 'text-base font-extrabold text-foreground m-0', children: 'Your Activities' }),
+          jsx('p', { className: 'text-[11px] font-semibold text-muted-foreground mt-[-4px] mb-0', children: "Default activities don't count toward achievements" })
+        ]
+      }),
+
       // Activity list
       jsxs('div', {
         className: 'flex flex-col divide-y divide-border',
