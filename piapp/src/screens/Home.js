@@ -1114,6 +1114,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 onClick: (e) => {
                   e.nativeEvent.stopImmediatePropagation();
                   if (isValid && fromTimestamp && toTimestamp) {
+                    onClose();
                     onSave(fromTimestamp, toTimestamp);
                   }
                 },

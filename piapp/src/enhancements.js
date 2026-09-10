@@ -4279,7 +4279,7 @@
   /* ── Free-plan activity cap ────────────────────────────────────────────── */
   var LOCAL_DB_KEY = "lifetime_local_db_v1";
   var DEFAULT_ACTIVITIES_SEEDED_KEY = "lt_default_activities_seeded_v2";
-  var ACTIVITY_COLORS = ["#1B1F3B","#00897B","#D97706","#7C3AED","#1D4ED8","#BE185D","#15803D","#B91C1C"];
+  var ACTIVITY_COLORS = ["#3B82F6","#00897B","#D97706","#7C3AED","#1D4ED8","#BE185D","#15803D","#B91C1C"];
 
   /* Seed the app's common default activities on first run. Defaults remain
      available, but the Free-plan allowance applies to activities the user
@@ -4353,7 +4353,31 @@
     writeJson(DEFAULT_ACTIVITIES_SEEDED_KEY, true);
   }
 
-
+  /* Migration: replace any activity colors that are black / near-black / grey
+     with a vibrant palette color so activity names are always legible. */
+  var COLOR_FIX_KEY = "lt_activity_colors_fixed_v1";
+  function fixDarkActivityColors() {
+    if (readJson(COLOR_FIX_KEY, false)) return;
+    var db = readJson(LOCAL_DB_KEY, { activities: [] });
+    if (!Array.isArray(db.activities)) { writeJson(COLOR_FIX_KEY, true); return; }
+    var bright = ["#3B82F6","#00897B","#D97706","#7C3AED","#1D4ED8","#BE185D","#15803D","#B91C1C"];
+    var changed = false;
+    var nextIdx = 0;
+    db.activities.forEach(function (a) {
+      if (!a.color) return;
+      var r = parseInt(a.color.slice(1,3), 16);
+      var g = parseInt(a.color.slice(3,5), 16);
+      var b = parseInt(a.color.slice(5,7), 16);
+      var lum = (r * 299 + g * 587 + b * 114) / 1000;
+      if (lum < 60) {
+        a.color = bright[nextIdx % bright.length];
+        nextIdx++;
+        changed = true;
+      }
+    });
+    if (changed) writeJson(LOCAL_DB_KEY, db);
+    writeJson(COLOR_FIX_KEY, true);
+  }
 
   function currentActivityCount() {
     var db = readJson(LOCAL_DB_KEY, { activities: [] });
@@ -7245,6 +7269,7 @@
     safeRun(addStyle2);
     safeRun(addStyle3);
     safeRun(seedDefaultActivities);
+    safeRun(fixDarkActivityColors);
     safeRun(enforceActivityGraceIfNeeded);
     safeRun(normalizeMinuteUnits);
     /* Timer / Activity page */

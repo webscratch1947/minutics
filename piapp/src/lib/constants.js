@@ -6,7 +6,7 @@
 
 /** Random color palette for new activities */
 export const COLOR_PALETTE = [
-  "#1B1F3B",
+  "#3B82F6",
   "#00897B",
   "#D97706",
   "#7C3AED",
