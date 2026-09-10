@@ -1451,14 +1451,14 @@ function LifeProgressCard({ profile }) {
         className: 'bg-primary rounded-2xl px-4 py-4',
         children: [
           jsxs('div', {
-            className: 'flex items-center gap-2 mb-2 min-w-0',
+            className: 'flex flex-wrap items-center gap-x-2 gap-y-1 mb-2',
             children: [
-              jsxs('p', {
-                className: 'text-[12px] font-bold text-white m-0 uppercase tracking-wide leading-tight truncate',
+              jsx('p', {
+                className: 'text-[12px] font-bold text-white m-0 uppercase tracking-wide leading-tight',
                 children: [profile.name, "'s Remaining Retirement Time"]
               }),
               jsxs('span', {
-                className: 'shrink-0 flex items-center gap-1 bg-[#FDE68A]/15 text-[#FDE68A] text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap',
+                className: 'flex items-center gap-1 bg-[#FDE68A]/15 text-[#FDE68A] text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap',
                 children: ['\u2605 Basic']
               })
             ]
@@ -1731,7 +1731,7 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
           'w-[22px] h-[22px] flex-shrink-0 rounded-full border-2 flex items-center justify-center text-xs text-white',
           task?.completed
             ? 'bg-green-500 border-green-500'
-            : 'border-border bg-transparent',
+            : 'border-foreground/40 bg-foreground/10',
           !slotTaskId && 'opacity-35 cursor-default'
         ),
         children: task?.completed ? '\u2713' : null
@@ -1743,8 +1743,8 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
         onChange: handleInput,
         placeholder: 'Add an important task\u2026',
         className: cn(
-          'flex-1 border border-border bg-secondary/30 text-sm text-foreground outline-none rounded-lg px-2.5 py-1.5 min-w-0',
-          task?.completed && 'line-through opacity-50'
+          'flex-1 border border-border focus:border-foreground/40 bg-secondary/30 text-sm text-foreground outline-none rounded-lg px-2.5 py-1.5 min-w-0',
+          task?.completed && 'line-through opacity-60'
         )
       }),
       // Unstar
