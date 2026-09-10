@@ -1111,7 +1111,8 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 children: 'Cancel'
               }),
               jsx('button', {
-                onClick: () => {
+                onClick: (e) => {
+                  e.nativeEvent.stopImmediatePropagation();
                   if (isValid && fromTimestamp && toTimestamp) {
                     onSave(fromTimestamp, toTimestamp);
                   }
@@ -1839,6 +1840,7 @@ export function ActivityScreen({ profile }) {
   const createBlock = useCreateBlock();
   const updateBlock = useUpdateBlock();
 
+  const [selectedActivity, setSelectedActivity] = useState(null);
   const [activeBlockInfo, setActiveBlockInfo] = useState(null);
   const [editingBlock, setEditingBlock] = useState(null);
   const [logBlockActivity, setLogBlockActivity] = useState(null);
@@ -1861,7 +1863,7 @@ export function ActivityScreen({ profile }) {
     if (runningBlock?.activityId === activity.id) {
       setActiveBlockInfo({ block: runningBlock, activity });
     } else {
-      startTimer(activity);
+      setSelectedActivity(activity);
     }
   };
 
@@ -1884,6 +1886,7 @@ export function ActivityScreen({ profile }) {
     } else {
       doCreate();
     }
+    setSelectedActivity(null);
     setSelectedActivity(null);
   };
 
@@ -1962,6 +1965,32 @@ export function ActivityScreen({ profile }) {
         ]
       }),
       jsx(AddActivityBar, {}),
+
+      selectedActivity && jsxs(BottomSheet, {
+        onDismiss: () => setSelectedActivity(null),
+        children: [
+          jsx(ModalHeader, { activity: selectedActivity, subtitle: 'How do you want to track this?' }),
+          jsx(ModalOption, {
+            icon: jsx(Ty, { className: 'w-5 h-5' }),
+            label: 'Start timer now',
+            description: 'Live timer from right now',
+            onClick: (e) => {
+              e.nativeEvent.stopImmediatePropagation();
+              startTimer(selectedActivity);
+            }
+          }),
+          jsx(ModalOption, {
+            icon: jsx(Jb, { className: 'w-5 h-5' }),
+            label: 'Log a time block',
+            description: 'Set a start and end time manually',
+            onClick: (e) => {
+              e.nativeEvent.stopImmediatePropagation();
+              setLogBlockActivity(selectedActivity);
+              setSelectedActivity(null);
+            }
+          })
+        ]
+      }),
 
       activeBlockInfo && jsxs(BottomSheet, {
         onDismiss: () => setActiveBlockInfo(null),
