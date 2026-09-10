@@ -44,10 +44,6 @@ var PLANS = {
 
 /* ── small UI components ── */
 
-/**
- * Pill-style toggle switch.
- * @param {{ enabled: boolean, onToggle: () => void }} props
- */
 function Toggle(props) {
   return jsx("button", {
     onClick: props.onToggle,
@@ -66,46 +62,52 @@ function Toggle(props) {
   });
 }
 
-/**
- * Uppercase section heading label.
- */
-function SectionLabel(props) {
+function SectionHeader(props) {
   return jsx("p", {
-    className: "text-xs font-semibold uppercase tracking-wider text-gray-400",
+    className: "text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground px-1",
     children: props.children
   });
 }
 
-/**
- * Settings row: label + description on the left, children (controls) on the right.
- */
-function SettingsRow(props) {
+function Card(props) {
+  return jsx("div", {
+    className: "bg-white border border-border rounded-2xl overflow-hidden",
+    children: props.children
+  });
+}
+
+function CardRow(props) {
   return jsxs("div", {
-    className: "flex items-center justify-between py-2",
+    className: "flex items-center justify-between px-4 py-3.5",
     children: [
       jsxs("div", {
-        className: "flex-1 mr-4",
+        className: "flex-1 min-w-0 mr-3",
         children: [
-          jsx("p", { className: "text-sm font-medium text-gray-900", children: props.label }),
-          props.desc ? jsx("p", { className: "text-xs text-gray-500 mt-0.5", children: props.desc }) : null
+          jsx("p", { className: "text-sm font-semibold text-foreground", children: props.label }),
+          props.desc ? jsx("p", { className: "text-xs text-muted-foreground mt-0.5", children: props.desc }) : null
         ]
       }),
-      jsx("div", { children: props.children })
+      jsx("div", { className: "shrink-0", children: props.children })
     ]
   });
 }
 
+function Divider() {
+  return jsx("div", { className: "h-px bg-border mx-4" });
+}
+
 /* ═══════════════════════════════════════════════════════════════
-   SettingsScreen — main exported component
+   SettingsScreen
    ═══════════════════════════════════════════════════════════════ */
 
 export function SettingsScreen() {
   /* ── profile ── */
   var profile = getProfile();
-  var profileName = (profile && profile.name) ? profile.name : "Signed in";
+  var profileName = (profile && profile.name) ? profile.name : "User";
 
   /* ── plan ── */
   var rawPlan = localStorage.getItem("lt_plan_v1") || "free";
+  try { rawPlan = JSON.parse(rawPlan); } catch { rawPlan = "free"; }
   var isPro = rawPlan === "basic" || rawPlan === "yearly" || rawPlan === "lifetime" || rawPlan === "pro";
   var planLabel = PLANS[rawPlan] || "Free";
 
@@ -215,7 +217,7 @@ export function SettingsScreen() {
   function handleTestTelegram() {
     setTgTestLoading(true);
     setTgTestResult(null);
-    sendTelegramReport(tgToken, tgChatId, "Test from Minutics — your Telegram integration is working!")
+    sendTelegramReport(tgToken, tgChatId, "Test from Minutics \u2014 your Telegram integration is working!")
       .then(function (ok) {
         setTgTestResult(ok ? "success" : "error");
         setTgTestLoading(false);
@@ -226,296 +228,340 @@ export function SettingsScreen() {
       });
   }
 
+  /* ── initials helper ── */
+  function getInitials(name) {
+    return (name || "U").split(" ").map(function (w) { return w.charAt(0); }).join("").toUpperCase().slice(0, 2);
+  }
+
   /* ── render ── */
 
-  return jsx("div", {
-    className: "px-5 py-6 flex flex-col gap-6",
-    children: jsxs(Fragment, {
-      children: [
+  return jsxs("div", {
+    className: "flex flex-col gap-5 pb-8",
+    children: [
 
-        /* ─── a. Account ─── */
-        jsxs("section", {
-          className: "flex flex-col gap-3",
-          children: [
-            jsx(SectionLabel, { children: "Account" }),
-            jsxs(SettingsRow, {
-              label: profileName,
-              desc: "Your data stays on this device",
-              children: null
-            }),
-            jsx("button", {
-              onClick: handleResetProfile,
-              className: "w-full rounded-xl bg-red-50 py-2.5 text-sm font-medium text-red-600 active:bg-red-100 transition",
-              children: "Reset Profile"
-            })
-          ]
-        }),
-
-        /* ─── b. Plan ─── */
-        jsxs("section", {
-          className: "flex flex-col gap-3",
-          children: [
-            jsx(SectionLabel, { children: "Plan" }),
-            jsxs(SettingsRow, {
-              label: planLabel,
-              desc: isPro ? "Pro features unlocked" : "Free tier",
-              children: isPro ? jsx("span", { className: "text-lg", children: "\u2B50" }) : null
-            }),
-            jsx("button", {
-              className: "w-full rounded-xl bg-primary/10 py-2.5 text-sm font-medium text-primary active:bg-primary/20 transition",
-              children: "View Plans"
-            })
-          ]
-        }),
-
-        /* ─── c. Display Currency ─── */
-        jsxs("section", {
-          className: "flex flex-col gap-3",
-          children: [
-            jsx(SectionLabel, { children: "Display Currency" }),
-            jsxs(SettingsRow, {
-              label: currentCurrencyObj.flag + " " + currentCurrencyObj.label,
-              desc: currentCurrencyObj.code + " (" + currentCurrencyObj.symbol + ") \u2022 " + currentCurrencyObj.locale,
-              children: jsx("button", {
-                onClick: function () { setShowPicker(!showPicker); },
-                className: "rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 active:bg-gray-200 transition",
-                children: showPicker ? "Close" : "Change"
-              })
-            }),
-            showPicker ? jsx("div", {
-              className: "flex flex-col gap-1.5 mt-1",
-              children: CURRENCIES.map(function (cur) {
-                var isActive = cur.code === selectedCurrencyCode;
-                return jsx("button", {
-                  onClick: function () { handleCurrencyChange(cur.code); },
-                  className: [
-                    "flex items-center gap-3 rounded-xl px-4 py-3 text-left transition",
-                    isActive ? "bg-primary/10 ring-1 ring-primary" : "bg-white active:bg-gray-50"
-                  ].join(" "),
-                  children: jsxs(Fragment, {
+      /* ─── Profile Card ─── */
+      jsxs("div", {
+        className: "mx-4 mt-4 bg-white border border-border rounded-2xl overflow-hidden",
+        children: [
+          jsxs("div", {
+            className: "bg-primary/5 px-5 pt-5 pb-4",
+            children: [
+              jsxs("div", {
+                className: "flex items-center gap-4",
+                children: [
+                  jsx("div", {
+                    className: "w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0",
+                    children: jsx("span", {
+                      className: "text-lg font-black text-primary",
+                      children: getInitials(profileName)
+                    })
+                  }),
+                  jsxs("div", {
+                    className: "flex-1 min-w-0",
                     children: [
-                      jsx("span", { className: "text-xl", children: cur.flag }),
-                      jsxs("span", {
-                        className: "flex-1",
-                        children: [
-                          jsx("span", { className: "text-sm font-medium text-gray-900", children: cur.label }),
-                          jsx("span", { className: "text-xs text-gray-500 ml-2", children: cur.code + " " + cur.symbol })
-                        ]
-                      }),
-                      isActive ? jsx(eh, { className: "h-4 w-4 text-primary" }) : null
+                      jsx("p", { className: "text-lg font-bold text-foreground truncate", children: profileName }),
+                      jsx("p", { className: "text-xs text-muted-foreground mt-0.5", children: "Your data stays on this device" })
                     ]
                   })
-                });
+                ]
               })
-            }) : null
-          ]
-        }),
-
-        /* ─── d. Goal Type ─── */
-        jsxs("section", {
-          className: "flex flex-col gap-3",
-          children: [
-            jsx(SectionLabel, { children: "Goal Type" }),
-            jsx("div", {
-              className: "grid grid-cols-2 gap-2",
-              children: GOAL_OPTIONS.map(function (opt) {
-                var isActive = goalType === opt.type;
-                return jsx("button", {
-                  onClick: function () { handleGoalChange(opt.type); },
-                  className: [
-                    "rounded-xl py-2.5 px-3 text-sm font-medium transition",
-                    isActive
-                      ? "bg-primary text-white shadow-sm"
-                      : "bg-gray-100 text-gray-600 active:bg-gray-200"
-                  ].join(" "),
-                  children: opt.label
-                });
+            ]
+          }),
+          jsxs("div", {
+            className: "flex border-t border-border",
+            children: [
+              jsx("button", {
+                onClick: handleResetProfile,
+                className: "flex-1 py-3 text-sm font-semibold text-red-500 active:bg-red-50 transition",
+                children: "Reset Profile"
               })
-            }),
-            goalType === "milestone" ? jsx("input", {
-              type: "text",
-              value: milestoneLabel,
-              onChange: function (e) { handleMilestoneLabelChange(e.target.value); },
-              placeholder: "e.g. Buy a house, Pay off mortgage\u2026",
-              className: [
-                "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm",
-                "placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              ].join(" ")
-            }) : null
-          ]
-        }),
+            ]
+          })
+        ]
+      }),
 
-        /* ─── e. Features ─── */
-        jsxs("section", {
-          className: "flex flex-col gap-3",
-          children: [
-            jsx(SectionLabel, { children: "Features" }),
-            jsx(SettingsRow, {
-              label: "Smart Nudges",
-              desc: "Personalized reminders based on your spending",
-              children: jsx(Toggle, { enabled: nudgesEnabled, onToggle: handleNudgesToggle })
-            }),
-            jsxs(SettingsRow, {
-              label: "Website Notifications",
-              desc: notifPermission === "granted"
-                ? "Notifications are enabled"
-                : notifPermission === "denied"
-                  ? "Blocked by browser settings"
-                  : "Receive alerts in your browser",
-              children: notifPermission === "granted"
-                ? jsx("span", {
-                    className: [
-                      "inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1",
-                      "text-xs font-medium text-green-700"
-                    ].join(" "),
-                    children: "On"
-                  })
-                : jsx("button", {
-                    onClick: handleEnableNotifications,
-                    disabled: notifPermission === "denied",
-                    className: [
-                      "rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700",
-                      "active:bg-gray-200 transition",
-                      notifPermission === "denied" ? "opacity-40 cursor-not-allowed" : ""
-                    ].join(" "),
-                    children: "Enable"
-                  })
+      /* ─── Plan ─── */
+      jsxs("div", {
+        className: "mx-4",
+        children: [
+          jsx(SectionHeader, { children: "Plan" }),
+          jsx(Card, {
+            children: jsxs(CardRow, {
+              label: planLabel + " Plan",
+              desc: isPro ? "All premium features unlocked" : "Basic features included",
+              children: jsx("span", {
+                className: [
+                  "inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full",
+                  isPro ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
+                ].join(" "),
+                children: isPro ? "\u2B50 Pro" : "Free"
+              })
             })
-          ]
-        }),
+          })
+        ]
+      }),
 
-        /* ─── f. Telegram Daily Reports ─── */
-        jsxs("section", {
-          className: "flex flex-col gap-3",
-          children: [
-            jsx(SectionLabel, { children: "Telegram Daily Reports" }),
-
-            /* connection status */
-            jsxs("div", {
-              className: [
-                "flex items-center gap-2 rounded-xl px-4 py-3",
-                tgConnected ? "bg-green-50" : "bg-gray-50"
-              ].join(" "),
+      /* ─── Display Currency ─── */
+      jsxs("div", {
+        className: "mx-4",
+        children: [
+          jsx(SectionHeader, { children: "Display Currency" }),
+          jsx(Card, {
+            children: jsxs(Fragment, {
               children: [
-                jsx(eh, {
-                  className: [
-                    "h-5 w-5",
-                    tgConnected ? "text-green-500" : "text-gray-400"
-                  ].join(" ")
-                }),
-                jsx("span", {
-                  className: [
-                    "text-sm font-medium",
-                    tgConnected ? "text-green-700" : "text-gray-500"
-                  ].join(" "),
-                  children: tgConnected ? "Connected" : "Not connected"
-                })
-              ]
-            }),
-
-            /* bot token */
-            jsxs("div", {
-              className: "flex flex-col gap-1",
-              children: [
-                jsx("label", {
-                  className: "text-xs font-medium text-gray-500",
-                  children: "Bot Token"
-                }),
-                jsx("input", {
-                  type: "text",
-                  value: tgToken,
-                  onChange: function (e) { setTgToken(e.target.value); },
-                  placeholder: "123456:ABCdefGHIjklMNOpqrsTUVwxyz",
-                  className: [
-                    "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm",
-                    "placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  ].join(" ")
-                })
-              ]
-            }),
-
-            /* chat ID */
-            jsxs("div", {
-              className: "flex flex-col gap-1",
-              children: [
-                jsx("label", {
-                  className: "text-xs font-medium text-gray-500",
-                  children: "Chat ID"
-                }),
-                jsx("input", {
-                  type: "text",
-                  value: tgChatId,
-                  onChange: function (e) { setTgChatId(e.target.value); },
-                  placeholder: "e.g. 987654321",
-                  className: [
-                    "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm",
-                    "placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  ].join(" ")
-                })
-              ]
-            }),
-
-            /* daily report time */
-            jsxs("div", {
-              className: "flex flex-col gap-1",
-              children: [
-                jsx("label", {
-                  className: "text-xs font-medium text-gray-500",
-                  children: "Daily Report Time"
-                }),
-                jsx("input", {
-                  type: "time",
-                  value: tgTime,
-                  onChange: function (e) { setTgTime(e.target.value); },
-                  className: [
-                    "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm",
-                    "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  ].join(" ")
-                })
-              ]
-            }),
-
-            /* save button */
-            jsx("button", {
-              onClick: handleSaveTelegram,
-              disabled: tgSaving || !tgToken || !tgChatId,
-              className: [
-                "w-full rounded-xl py-2.5 text-sm font-medium transition",
-                tgSaving || !tgToken || !tgChatId
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  : "bg-primary text-white active:bg-primary/90"
-              ].join(" "),
-              children: tgSaving ? "Saving\u2026" : "Save Telegram Settings"
-            }),
-
-            /* test button */
-            jsx("button", {
-              onClick: handleTestTelegram,
-              disabled: tgTestLoading || !tgToken || !tgChatId,
-              className: [
-                "w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium transition",
-                tgTestLoading || !tgToken || !tgChatId
-                  ? "border-gray-200 text-gray-400 cursor-not-allowed"
-                  : "border-gray-300 text-gray-700 active:bg-gray-50"
-              ].join(" "),
-              children: tgTestLoading ? "Sending test\u2026" : "Send Test Report"
-            }),
-
-            /* test result banner */
-            tgTestResult === "success"
-              ? jsx("div", {
-                  className: "rounded-xl bg-green-50 px-4 py-3 text-sm font-medium text-green-700",
-                  children: "Test message sent successfully!"
-                })
-              : tgTestResult === "error"
-                ? jsx("div", {
-                    className: "rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600",
-                    children: "Failed to send test message. Check your token and chat ID."
+                jsxs(CardRow, {
+                  label: currentCurrencyObj.flag + " " + currentCurrencyObj.label,
+                  desc: currentCurrencyObj.code + " (" + currentCurrencyObj.symbol + ") \u2022 " + currentCurrencyObj.locale,
+                  children: jsx("button", {
+                    onClick: function () { setShowPicker(!showPicker); },
+                    className: "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/20 transition",
+                    children: showPicker ? "Close" : "Change"
                   })
-                : null
-          ]
-        })
-      ]
-    })
+                }),
+                showPicker ? jsx("div", {
+                  className: "px-3 pb-3",
+                  children: jsx("div", {
+                    className: "flex flex-col gap-1",
+                    children: CURRENCIES.map(function (cur) {
+                      var isActive = cur.code === selectedCurrencyCode;
+                      return jsx("button", {
+                        onClick: function () { handleCurrencyChange(cur.code); },
+                        className: [
+                          "flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition",
+                          isActive ? "bg-primary/10 ring-1 ring-primary" : "active:bg-gray-50"
+                        ].join(" "),
+                        children: jsxs(Fragment, {
+                          children: [
+                            jsx("span", { className: "text-lg", children: cur.flag }),
+                            jsxs("span", {
+                              className: "flex-1 min-w-0",
+                              children: [
+                                jsx("span", { className: "text-sm font-medium text-foreground block truncate", children: cur.label }),
+                                jsx("span", { className: "text-[11px] text-muted-foreground", children: cur.code + " " + cur.symbol })
+                              ]
+                            }),
+                            isActive ? jsx(eh, { className: "h-4 w-4 text-primary shrink-0" }) : null
+                          ]
+                        })
+                      });
+                    })
+                  })
+                }) : null
+              ]
+            })
+          })
+        ]
+      }),
+
+      /* ─── Goal Type ─── */
+      jsxs("div", {
+        className: "mx-4",
+        children: [
+          jsx(SectionHeader, { children: "Goal Type" }),
+          jsx(Card, {
+            children: jsxs("div", {
+              className: "p-4",
+              children: [
+                jsx("div", {
+                  className: "grid grid-cols-2 gap-2",
+                  children: GOAL_OPTIONS.map(function (opt) {
+                    var isActive = goalType === opt.type;
+                    return jsx("button", {
+                      onClick: function () { handleGoalChange(opt.type); },
+                      className: [
+                        "rounded-xl py-2.5 px-3 text-sm font-semibold transition border",
+                        isActive
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-white text-foreground border-border active:bg-gray-50"
+                      ].join(" "),
+                      children: opt.label
+                    });
+                  })
+                }),
+                goalType === "milestone" ? jsx("input", {
+                  type: "text",
+                  value: milestoneLabel,
+                  onChange: function (e) { handleMilestoneLabelChange(e.target.value); },
+                  placeholder: "e.g. Buy a house, Pay off mortgage\u2026",
+                  className: [
+                    "w-full rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm mt-3",
+                    "placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  ].join(" ")
+                }) : null
+              ]
+            })
+          })
+        ]
+      }),
+
+      /* ─── Features ─── */
+      jsxs("div", {
+        className: "mx-4",
+        children: [
+          jsx(SectionHeader, { children: "Features" }),
+          jsx(Card, {
+            children: jsxs(Fragment, {
+              children: [
+                jsx(CardRow, {
+                  label: "Smart Nudges",
+                  desc: "Personalized reminders based on your activity",
+                  children: jsx(Toggle, { enabled: nudgesEnabled, onToggle: handleNudgesToggle })
+                }),
+                jsx(Divider, {}),
+                jsx(CardRow, {
+                  label: "Website Notifications",
+                  desc: notifPermission === "granted"
+                    ? "Notifications are enabled"
+                    : notifPermission === "denied"
+                      ? "Blocked by browser settings"
+                      : "Receive alerts in your browser",
+                  children: notifPermission === "granted"
+                    ? jsx("span", {
+                        className: "inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-600",
+                        children: "On"
+                      })
+                    : jsx("button", {
+                        onClick: handleEnableNotifications,
+                        disabled: notifPermission === "denied",
+                        className: [
+                          "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary",
+                          "active:bg-primary/20 transition",
+                          notifPermission === "denied" ? "opacity-40 cursor-not-allowed" : ""
+                        ].join(" "),
+                        children: "Enable"
+                      })
+                })
+              ]
+            })
+          })
+        ]
+      }),
+
+      /* ─── Telegram Daily Reports ─── */
+      jsxs("div", {
+        className: "mx-4",
+        children: [
+          jsx(SectionHeader, { children: "Telegram Daily Reports" }),
+          jsx(Card, {
+            children: jsxs("div", {
+              className: "flex flex-col",
+              children: [
+                /* connection status */
+                jsxs("div", {
+                  className: [
+                    "flex items-center gap-2.5 px-4 py-3",
+                    tgConnected ? "bg-green-50" : "bg-gray-50"
+                  ].join(" "),
+                  children: [
+                    jsx(eh, {
+                      className: [
+                        "h-4.5 w-4.5",
+                        tgConnected ? "text-green-500" : "text-gray-400"
+                      ].join(" ")
+                    }),
+                    jsx("span", {
+                      className: [
+                        "text-sm font-semibold",
+                        tgConnected ? "text-green-600" : "text-gray-500"
+                      ].join(" "),
+                      children: tgConnected ? "Connected" : "Not connected"
+                    })
+                  ]
+                }),
+                jsx(Divider, {}),
+                /* bot token */
+                jsx("div", {
+                  className: "px-4 pt-3 pb-1",
+                  children: jsx("input", {
+                    type: "text",
+                    value: tgToken,
+                    onChange: function (e) { setTgToken(e.target.value); },
+                    placeholder: "Bot Token",
+                    className: [
+                      "w-full rounded-xl border border-border bg-secondary px-3.5 py-2.5 text-sm",
+                      "placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    ].join(" ")
+                  })
+                }),
+                /* chat ID */
+                jsx("div", {
+                  className: "px-4 pt-2 pb-1",
+                  children: jsx("input", {
+                    type: "text",
+                    value: tgChatId,
+                    onChange: function (e) { setTgChatId(e.target.value); },
+                    placeholder: "Chat ID",
+                    className: [
+                      "w-full rounded-xl border border-border bg-secondary px-3.5 py-2.5 text-sm",
+                      "placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    ].join(" ")
+                  })
+                }),
+                /* daily report time */
+                jsx("div", {
+                  className: "px-4 pt-2 pb-3",
+                  children: jsx("input", {
+                    type: "time",
+                    value: tgTime,
+                    onChange: function (e) { setTgTime(e.target.value); },
+                    className: [
+                      "w-full rounded-xl border border-border bg-secondary px-3.5 py-2.5 text-sm",
+                      "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    ].join(" ")
+                  })
+                }),
+                jsx(Divider, {}),
+                /* buttons */
+                jsxs("div", {
+                  className: "flex divide-x divide-border",
+                  children: [
+                    jsx("button", {
+                      onClick: handleSaveTelegram,
+                      disabled: tgSaving || !tgToken || !tgChatId,
+                      className: [
+                        "flex-1 py-3 text-sm font-semibold transition",
+                        tgSaving || !tgToken || !tgChatId
+                          ? "text-muted-foreground cursor-not-allowed"
+                          : "text-primary active:bg-primary/5"
+                      ].join(" "),
+                      children: tgSaving ? "Saving\u2026" : "Save"
+                    }),
+                    jsx("button", {
+                      onClick: handleTestTelegram,
+                      disabled: tgTestLoading || !tgToken || !tgChatId,
+                      className: [
+                        "flex-1 py-3 text-sm font-semibold transition",
+                        tgTestLoading || !tgToken || !tgChatId
+                          ? "text-muted-foreground cursor-not-allowed"
+                          : "text-foreground active:bg-gray-50"
+                      ].join(" "),
+                      children: tgTestLoading ? "Sending\u2026" : "Test"
+                    })
+                  ]
+                }),
+                /* test result banner */
+                tgTestResult === "success"
+                  ? jsx("div", {
+                      className: "mx-4 mb-4 rounded-xl bg-green-50 px-4 py-2.5 text-xs font-semibold text-green-600",
+                      children: "Test message sent!"
+                    })
+                  : tgTestResult === "error"
+                    ? jsx("div", {
+                        className: "mx-4 mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-500",
+                        children: "Failed to send. Check your token and chat ID."
+                      })
+                    : null
+              ]
+            })
+          })
+        ]
+      }),
+
+      /* ─── Footer ─── */
+      jsx("p", {
+        className: "text-center text-[11px] text-muted-foreground mt-2",
+        children: "Minutics \u2022 Your time, your value"
+      })
+    ]
   });
 }
