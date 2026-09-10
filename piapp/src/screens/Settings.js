@@ -1,6 +1,6 @@
-import { useState, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
-import { getProfile, clearProfile } from '../lib/profile.js';
+import { getProfile } from '../lib/profile.js';
 import { getTelegramSettings, saveTelegramSettings, sendTelegramReport } from '../lib/telegram.js';
 import { getCurrency, setCurrency } from '../lib/currency.js';
 import { saveGoalType, getGoalType } from '../lib/settings.js';
@@ -101,6 +101,14 @@ function Divider() {
    ═══════════════════════════════════════════════════════════════ */
 
 export function SettingsScreen() {
+  /* ── plan re-render trigger ── */
+  var _planTick = useState(0);
+  useEffect(function () {
+    function onPlanChanged() { _planTick[1](function (n) { return n + 1; }); }
+    window.addEventListener("lt-plan-changed", onPlanChanged);
+    return function () { window.removeEventListener("lt-plan-changed", onPlanChanged); };
+  }, []);
+
   /* ── profile ── */
   var profile = getProfile();
   var profileName = (profile && profile.name) ? profile.name : "User";
@@ -198,9 +206,30 @@ export function SettingsScreen() {
   }
 
   function handleResetProfile() {
-    if (confirm("Are you sure? This will remove all your profile data.")) {
-      clearProfile();
-      window.location.reload();
+    if (confirm("This will log you out and delete all profile + app data on this device. Your plan will be kept. Continue?")) {
+      /* Preserve plan data before clearing localStorage */
+      var planData = {};
+      try {
+        ["lt_plan_v1", "lt_plan_since_v1", "lt_plan_grace_v1"].forEach(function (k) {
+          var v = localStorage.getItem(k);
+          if (v !== null) planData[k] = v;
+        });
+      } catch (e) {}
+
+      /* Clear everything */
+      localStorage.clear();
+
+      /* Restore plan data */
+      Object.keys(planData).forEach(function (k) {
+        localStorage.setItem(k, planData[k]);
+      });
+
+      /* Full logout via Firebase */
+      if (window.LTAuth && window.LTAuth.logout) {
+        window.LTAuth.logout();
+      } else {
+        window.location.reload();
+      }
     }
   }
 

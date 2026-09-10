@@ -6779,15 +6779,14 @@
     });
   }
 
-  /* Re-render every plan-gated UI element after the plan changes */
+  /* Re-render every plan-gated UI element after the plan changes.
+     React now owns the Settings UI — don't inject the compiled account card.
+     Dispatch a custom event so React Settings re-renders with the new plan. */
   function refreshPlanGatedUI() {
-    document.getElementById("lt-account-card") && document.getElementById("lt-account-card").remove();
-    removeTelegramGateVisuals();
     document.querySelectorAll("[data-lt-tile-injected]").forEach(function (el) { el.remove(); });
-    /* Force rebuild life-progress card so View Plan button updates */
     var lp = document.getElementById("lt-life-progress");
     if (lp) lp.remove();
-    setTimeout(function () { safeRun(injectAccountCard); safeRun(gateTelegramSettings); }, 30);
+    try { window.dispatchEvent(new Event("lt-plan-changed")); } catch (e) {}
   }
 
   /* ── Gate Telegram settings the same way Budget Tracker is gated: dim it,
@@ -7280,6 +7279,9 @@
     safeRun(fixDarkActivityColors);
     safeRun(enforceActivityGraceIfNeeded);
     safeRun(normalizeMinuteUnits);
+    /* Remove any stray compiled account card (React now owns Settings) */
+    var stray = document.getElementById("lt-account-card");
+    if (stray && stray.parentNode) stray.parentNode.removeChild(stray);
     /* Timer / Activity page */
     if (onTimerOrActivity) {
       safeRun(normalizeOriginalLabels);
