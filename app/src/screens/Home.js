@@ -108,7 +108,7 @@ function RetirementCountdown({ profile }) {
 
 function TimeDigit({ value, label, accent }) {
   return jsxs('div', {
-    className: 'flex flex-col items-center bg-white/12 rounded-xl py-3 px-2 gap-1',
+    className: 'flex flex-col items-center bg-white/10 border border-white/20 rounded-xl py-3 px-2 gap-1',
     children: [
       jsx('span', {
         className: cn(
@@ -1517,7 +1517,7 @@ function LifeProgressCard({ profile }) {
 
 function LifeDigit({ value, label, accent }) {
   return jsxs('div', {
-    className: 'flex flex-col items-center bg-white/12 rounded-[10px] py-2 px-0.5',
+    className: 'flex flex-col items-center bg-white/10 border border-white/20 rounded-xl py-2.5 px-1',
     children: [
       jsx('span', {
         className: cn('text-[17px] font-black text-white tabular-nums leading-none', accent && 'text-accent'),
@@ -1839,7 +1839,6 @@ export function ActivityScreen({ profile }) {
   const createBlock = useCreateBlock();
   const updateBlock = useUpdateBlock();
 
-  const [selectedActivity, setSelectedActivity] = useState(null);
   const [activeBlockInfo, setActiveBlockInfo] = useState(null);
   const [editingBlock, setEditingBlock] = useState(null);
   const [logBlockActivity, setLogBlockActivity] = useState(null);
@@ -1862,7 +1861,7 @@ export function ActivityScreen({ profile }) {
     if (runningBlock?.activityId === activity.id) {
       setActiveBlockInfo({ block: runningBlock, activity });
     } else {
-      setSelectedActivity(activity);
+      startTimer(activity);
     }
   };
 
@@ -1963,25 +1962,6 @@ export function ActivityScreen({ profile }) {
         ]
       }),
       jsx(AddActivityBar, {}),
-
-      selectedActivity && jsxs(BottomSheet, {
-        onDismiss: () => setSelectedActivity(null),
-        children: [
-          jsx(ModalHeader, { activity: selectedActivity, subtitle: 'How do you want to track this?' }),
-          jsx(ModalOption, {
-            icon: jsx(Ty, { className: 'w-5 h-5' }),
-            label: 'Start timer now',
-            description: 'Live timer from right now',
-            onClick: () => startTimer(selectedActivity)
-          }),
-          jsx(ModalOption, {
-            icon: jsx(Jb, { className: 'w-5 h-5' }),
-            label: 'Log a time block',
-            description: 'Set a start and end time manually',
-            onClick: () => { setLogBlockActivity(selectedActivity); setSelectedActivity(null); }
-          })
-        ]
-      }),
 
       activeBlockInfo && jsxs(BottomSheet, {
         onDismiss: () => setActiveBlockInfo(null),

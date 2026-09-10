@@ -158,7 +158,7 @@ export function LifeHubScreen({ profile }) {
   var tools = LT_TOOLS.map(function (t) {
     var tool = Object.assign({}, t);
     // Time Value Calculator uses the user's currency symbol
-    if (tool.id === "timevalue") tool.symbol = currSymbol;
+    if (tool.id === "timevalue") tool.symbol = "\u23F1\uFE0F";
     // Budget and Life Value are PRO-only
     if (tool.id === "budget" || tool.id === "lifevalue") tool.locked = !isPro();
     return tool;
@@ -251,7 +251,7 @@ export function LifeHubScreen({ profile }) {
 
         // ── Category filter pills ──
         jsx("div", {
-          className: "flex gap-2 mb-4 overflow-x-auto",
+          className: "flex gap-2 mb-4 overflow-x-auto no-scrollbar",
           children: LT_FILTERS.map(function (f) {
             return jsx("button", {
               type: "button",

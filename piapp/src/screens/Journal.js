@@ -387,17 +387,16 @@ export function JournalScreen() {
                   jsxs("div", {
                     className: "flex items-center gap-2.5",
                     children: [
-                      // Animated green dot for today
-                      isToday && jsxs("span", {
-                        className: "relative flex h-2.5 w-2.5 shrink-0",
-                        children: [
-                          jsx("span", {
-                            className: "animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"
-                          }),
-                          jsx("span", {
-                            className: "relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"
-                          })
-                        ]
+                      // Circle indicator: green for today, tracked-color for tracked days, grey outline for empty
+                      jsxs("span", {
+                        className: "flex items-center justify-center w-3 h-3 shrink-0 rounded-full " +
+                          (isToday ? "bg-green-500" : (dg.totalSeconds > 0 ? "" : "border-2 border-muted-foreground/30")),
+                        style: !isToday && dg.totalSeconds > 0
+                          ? { backgroundColor: activities.length > 0 ? activities[0].activityColor : "#16a34a" }
+                          : undefined,
+                        children: isToday && jsx("span", {
+                          className: "relative inline-flex rounded-full h-2 w-2 bg-white"
+                        })
                       }),
                       // Date label
                       jsx("span", {
@@ -444,7 +443,8 @@ export function JournalScreen() {
                             style: { borderLeft: "4px solid " + a.activityColor },
                             children: [
                               jsx("span", {
-                                className: "font-bold text-sm text-foreground",
+                                className: "font-bold text-sm",
+                                style: { color: a.activityColor },
                                 children: a.activityName
                               }),
                               jsx("span", {
