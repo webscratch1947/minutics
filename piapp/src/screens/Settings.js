@@ -329,7 +329,7 @@ export function SettingsScreen() {
                       "inline-flex items-center gap-1 text-xs font-extrabold px-3 py-1.5 rounded-lg border-2",
                       isPro ? "bg-amber-50 text-amber-600 border-amber-400" : "bg-gray-100 text-gray-500 border-gray-200"
                     ].join(" "),
-                    children: isPro ? "\u2B50 Pro" : "Free"
+                    children: isPro ? "\u2B50 " + planLabel : "Free"
                   })
                 }),
                 jsx(Divider, {}),
