@@ -5086,7 +5086,8 @@
   }
 
   function injectJournalFullView() {
-    if (location.pathname.indexOf("journal") === -1) return;
+    var pathCheck = location.pathname + location.hash;
+    if (pathCheck.indexOf("journal") === -1) return;
     var rows = fvFindDateRows();
     var limit = isPro() ? proJournalDays() : FREE_JOURNAL_DAYS;
     rows.forEach(function (row, idx) {

@@ -1,19 +1,64 @@
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getProfile } from './lib/profile.js';
 import { BookOpen, LayoutGrid, ListTodo, Settings, Timer } from 'lucide-react';
 import { cn } from './lib/cn.js';
-
-function LTAvatarInitial() {
-  try {
-    const p = getProfile();
-    if (p && p.name && p.name.trim()) return p.name.trim().charAt(0).toUpperCase();
-  } catch (e) {}
-  return "?";
-}
+import { useBlocks } from './hooks/useBlocks.js';
+import { useActivities } from './hooks/useActivities.js';
+import { useUpdateBlock } from './hooks/useUpdateBlock.js';
+import { useQueryClient } from '@tanstack/react-query';
+import { blocksKey } from './lib/queryKeys.js';
 
 function LTTopNav() {
-  return null;
+  const { data: blocks = [] } = useBlocks();
+  const { data: activities = [] } = useActivities();
+  const updateBlock = useUpdateBlock();
+  const queryClient = useQueryClient();
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const running = blocks.find(b => !b.endTime);
+  if (!running) return null;
+
+  const activity = activities.find(a => a.id === running.activityId);
+  const elapsed = Math.floor((now - new Date(running.startTime).getTime()) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const timeStr = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+
+  const stopTimer = () => {
+    updateBlock.mutate({
+      id: running.id,
+      data: { endTime: new Date().toISOString() }
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: blocksKey });
+      }
+    });
+  };
+
+  return jsxs('div', {
+    className: 'flex items-center gap-2 px-4 py-2 bg-[#04091e] text-white text-xs font-bold',
+    children: [
+      jsx('span', {
+        className: 'w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 animate-pulse'
+      }),
+      jsx('span', {
+        className: 'flex-1 truncate',
+        children: (activity ? activity.name : 'Activity') + ' — ' + timeStr
+      }),
+      jsx('button', {
+        onClick: stopTimer,
+        className: 'bg-white/15 text-white border-none rounded-full px-2.5 py-1 text-[10px] font-extrabold shrink-0',
+        children: 'Stop'
+      })
+    ]
+  });
 }
 
 export function ak({
