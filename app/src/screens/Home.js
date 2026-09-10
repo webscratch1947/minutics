@@ -44,7 +44,6 @@ function RetirementCountdown({ profile }) {
   }, [profile]);
 
   const breakdown = msToBreakdown(remainingMs);
-  const planLabel = (() => { const p = localStorage.getItem('lt_plan_v1'); if (!p) return 'Free'; try { const v = JSON.parse(p); return v === 'basic' ? 'Basic' : v === 'yearly' ? '1 Year' : v === 'lifetime' || v === 'pro' ? 'Lifetime' : 'Free'; } catch { return 'Free'; } })();
   const deathDate = new Date(profile.dob);
   deathDate.setFullYear(deathDate.getFullYear() + (profile.lifespanYears || 80));
   const retirementDateStr = deathDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -1386,6 +1385,8 @@ function LifeProgressCard({ profile }) {
 
   const h = new Date().getHours();
   const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+
+  const planLabel = (() => { const p = localStorage.getItem('lt_plan_v1'); if (!p) return 'Free'; try { const v = JSON.parse(p); return v === 'basic' ? 'Basic' : v === 'yearly' ? '1 Year' : v === 'lifetime' || v === 'pro' ? 'Lifetime' : 'Free'; } catch { return 'Free'; } })();
 
   // Time value
   let tvData = null;
