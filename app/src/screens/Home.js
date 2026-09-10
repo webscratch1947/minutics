@@ -1112,9 +1112,10 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               jsx('button', {
                 onClick: (e) => {
+                  e.stopPropagation();
                   e.nativeEvent.stopImmediatePropagation();
+                  e.nativeEvent.stopPropagation();
                   if (isValid && fromTimestamp && toTimestamp) {
-                    onClose();
                     onSave(fromTimestamp, toTimestamp);
                   }
                 },

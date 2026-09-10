@@ -4532,6 +4532,14 @@
       var live = document.getElementById("lt-tv-live");
       if (live) live.style.display = "";
       _tickLiveTV();
+      /* (Re)start live ticker — on first save the initial setInterval
+         block was skipped because stored.perMinute was falsy, so we
+         must kick it off here.  On re-save just restart to pick up
+         the new perMinute value. */
+      if (_tvCalcTimer) { clearInterval(_tvCalcTimer); _tvCalcTimer = null; }
+      _tvCalcTimer = setInterval(function () {
+        try { _tickLiveTV(); } catch (e) {}
+      }, 1000);
     });
 
     /* Live ticker */
