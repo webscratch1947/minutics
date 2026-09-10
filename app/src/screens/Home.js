@@ -26,32 +26,7 @@ import { Timer as Ty, CalendarClock as Jb, Clock as Zb, Play as nk, Trash2 as lk
 // Toggles open/closed with a full-width button.
 
 function LTTimerPanel({ profile }) {
-  const [open, setOpen] = useState(true); // default expanded like compiled
-
-  return jsxs('div', {
-    'data-lt-enhancement': 'retirement',
-    className: 'relative',
-    children: [
-      // Toggle button — "v" when open, "^" when closed
-      jsx('button', {
-        type: 'button',
-        onClick: () => setOpen(!open),
-        className: 'w-full h-8 flex items-center justify-center bg-primary text-white transition-colors pointer-events-auto',
-        title: open ? 'Hide timer' : 'Show timer',
-        'aria-label': open ? 'Hide timer' : 'Show timer',
-        children: jsx('span', {
-          className: 'text-xs',
-          children: open ? 'v' : '^'
-        })
-      }),
-      // Animated container — maxHeight transitions 0 → 320px
-      jsx('div', {
-        className: 'overflow-hidden transition-all duration-300 ease-in-out',
-        style: { maxHeight: open ? '320px' : '0px' },
-        children: jsx(RetirementCountdown, { profile })
-      })
-    ]
-  });
+  return jsx(RetirementCountdown, { profile });
 }
 
 // ─── Retirement Countdown (MC) ─────────────────────────────────────────────
@@ -76,14 +51,14 @@ function RetirementCountdown({ profile }) {
 
   return jsxs('div', {
     'data-lt-enhancement': 'retirement',
-    className: 'bg-primary text-white px-5 pt-8 pb-6',
+    className: 'bg-primary text-white px-5 pt-6 pb-5 rounded-2xl mx-4',
     children: [
       // Title row with plan badge
       jsxs('div', {
-        className: 'flex items-center justify-between mb-5',
+        className: 'flex items-center justify-between mb-4',
         children: [
           jsxs('p', {
-            className: 'text-xs font-semibold text-white/40 uppercase tracking-widest m-0',
+            className: 'text-[13px] font-bold text-white/80 m-0 uppercase tracking-wide',
             children: [profile.name, "'s Remaining Retirement Time"]
           }),
           jsxs('span', {
@@ -94,12 +69,12 @@ function RetirementCountdown({ profile }) {
       }),
       // Retirement date
       retirementDateStr && jsxs('p', {
-        className: 'text-[11px] font-semibold text-white/50 mb-4 flex items-center gap-1.5',
-        children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-white/70', children: retirementDateStr })]
+        className: 'text-[12px] font-semibold text-white/50 mb-5 flex items-center gap-1.5',
+        children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-white/80', children: retirementDateStr })]
       }),
       // 5-column grid: years, days, hours, min, sec
       jsxs('div', {
-        className: 'grid grid-cols-5 gap-2 mb-5',
+        className: 'grid grid-cols-5 gap-3 mb-5',
         children: [
           jsx(TimeDigit, { value: breakdown.years, label: 'years' }),
           jsx(TimeDigit, { value: breakdown.days, label: 'days' }),
@@ -110,7 +85,7 @@ function RetirementCountdown({ profile }) {
       }),
       // Progress bar
       jsx('div', {
-        className: 'h-1 w-full bg-white/10 overflow-hidden mb-2',
+        className: 'h-1.5 w-full bg-white/10 overflow-hidden mb-2',
         children: jsx('div', {
           className: 'h-full bg-accent',
           style: { width: `${percentLived}%` }
@@ -118,7 +93,7 @@ function RetirementCountdown({ profile }) {
       }),
       // Footer: percent lived + minutes left
       jsxs('div', {
-        className: 'flex justify-between text-[11px] text-white/35 font-medium',
+        className: 'flex justify-between text-[12px] text-white/40 font-medium',
         children: [
           jsxs('span', { children: [percentLived.toFixed(1), '% lived'] }),
           jsxs('span', { children: [breakdown.totalMinutes.toLocaleString(), ' min left'] })
@@ -133,17 +108,17 @@ function RetirementCountdown({ profile }) {
 
 function TimeDigit({ value, label, accent }) {
   return jsxs('div', {
-    className: 'flex flex-col items-center bg-white/8 py-3 gap-0.5',
+    className: 'flex flex-col items-center bg-white/8 rounded-xl py-3.5 px-2 gap-1',
     children: [
       jsx('span', {
         className: cn(
           'font-black tabular-nums leading-none',
-          accent ? 'text-accent text-2xl' : 'text-white text-2xl'
+          accent ? 'text-accent text-[26px]' : 'text-white text-[26px]'
         ),
         children: String(value).padStart(2, '0')
       }),
       jsx('span', {
-        className: 'text-[10px] font-semibold text-white/40 uppercase tracking-wide',
+        className: 'text-[10px] font-extrabold tracking-widest text-white/40 uppercase',
         children: label
       })
     ]
@@ -1464,34 +1439,6 @@ function LifeProgressCard({ profile }) {
                 ]
               }),
               jsx('p', { className: 'text-[9px] font-semibold text-foreground/45 mt-1', children: 'of your life lived' })
-            ]
-          })
-        ]
-      }),
-      // Countdown card
-      jsxs('div', {
-        className: 'bg-primary rounded-2xl p-4',
-        children: [
-          jsxs('div', {
-            className: 'flex items-start justify-between gap-2.5 mb-3.5',
-            children: [
-              jsxs('div', {
-                className: 'flex-1 min-w-0',
-                children: [
-                  jsx('p', { className: 'text-sm font-extrabold text-white', children: profile.name + '\u2019s Remaining Retirement Time' }),
-                  jsx('p', { className: 'text-[13px] font-bold text-white/85 mt-0.5', children: '\uD83C\uDFC1 Target: \uD83C\uDFC3 ' + profile.dob })
-                ]
-              })
-            ]
-          }),
-          jsxs('div', {
-            className: 'grid grid-cols-5 gap-1.5',
-            children: [
-              jsx(LifeDigit, { value: breakdown.years, label: 'YEARS' }),
-              jsx(LifeDigit, { value: breakdown.days, label: 'DAYS' }),
-              jsx(LifeDigit, { value: breakdown.hours, label: 'HOURS' }),
-              jsx(LifeDigit, { value: breakdown.minutes, label: 'MIN' }),
-              jsx(LifeDigit, { value: breakdown.seconds, label: 'SEC', accent: true })
             ]
           })
         ]
