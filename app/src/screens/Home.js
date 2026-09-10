@@ -1451,21 +1451,21 @@ function LifeProgressCard({ profile }) {
         className: 'bg-primary rounded-2xl px-4 py-4',
         children: [
           jsxs('div', {
-            className: 'flex items-center justify-between mb-2',
+            className: 'flex items-center gap-2 mb-2 min-w-0',
             children: [
               jsxs('p', {
-                className: 'text-[12px] font-bold text-white/70 m-0 uppercase tracking-wide',
+                className: 'text-[12px] font-bold text-white m-0 uppercase tracking-wide leading-tight truncate',
                 children: [profile.name, "'s Remaining Retirement Time"]
               }),
               jsxs('span', {
-                className: 'flex items-center gap-1 bg-white/10 text-white/60 text-[10px] font-bold px-2 py-0.5 rounded-full',
+                className: 'shrink-0 flex items-center gap-1 bg-[#FDE68A]/15 text-[#FDE68A] text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap',
                 children: ['\u2605 Basic']
               })
             ]
           }),
           retirementDateStr && jsxs('p', {
-            className: 'text-[11px] font-semibold text-white/45 mb-3',
-            children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-white/65', children: retirementDateStr })]
+            className: 'text-[11px] font-semibold text-white/60 mb-3',
+            children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-[#FDE68A]', children: retirementDateStr })]
           }),
           jsxs('div', {
             className: 'grid grid-cols-5 gap-2',
@@ -1517,14 +1517,14 @@ function LifeProgressCard({ profile }) {
 
 function LifeDigit({ value, label, accent }) {
   return jsxs('div', {
-    className: 'flex flex-col items-center bg-white/8 rounded-[10px] py-2 px-0.5',
+    className: 'flex flex-col items-center bg-white/12 rounded-[10px] py-2 px-0.5',
     children: [
       jsx('span', {
         className: cn('text-[17px] font-black text-white tabular-nums leading-none', accent && 'text-accent'),
         children: String(value).padStart(2, '0')
       }),
       jsx('span', {
-        className: 'text-[8px] font-extrabold tracking-widest text-white/40 mt-0.5',
+        className: 'text-[8px] font-extrabold tracking-widest text-white/50 mt-0.5',
         children: label
       })
     ]
