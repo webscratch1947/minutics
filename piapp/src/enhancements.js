@@ -359,7 +359,7 @@
     var p = getPlanId();
     if (p === "basic") return "Basic";
     if (p === "yearly") return "1 Year";
-    if (p === "lifetime" || p === "pro") return "Lifetime";
+    if (p === "lifetime" || p === "pro") return "Pro";
     return "Free";
   }
   function getPlanPeriod() {

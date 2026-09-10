@@ -38,8 +38,8 @@ var PLANS = {
   free: "Free",
   basic: "Basic",
   yearly: "1 Year",
-  lifetime: "Lifetime",
-  pro: "Lifetime"
+  lifetime: "Pro",
+  pro: "Pro"
 };
 
 /* ── small UI components ── */
@@ -314,7 +314,11 @@ export function SettingsScreen() {
         className: "mx-4",
         children: [
           jsx(SectionHeader, { children: "Plan" }),
-          jsx(Card, {
+          jsx("div", {
+            className: [
+              "bg-white rounded-2xl overflow-hidden border-2",
+              isPro ? "border-amber-400 shadow-md shadow-amber-100" : "border-border"
+            ].join(" "),
             children: jsxs(Fragment, {
               children: [
                 jsxs(CardRow, {
@@ -322,8 +326,8 @@ export function SettingsScreen() {
                   desc: isPro ? "All premium features unlocked" : "Basic features included",
                   children: jsx("span", {
                     className: [
-                      "inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full",
-                      isPro ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
+                      "inline-flex items-center gap-1 text-xs font-extrabold px-3 py-1.5 rounded-lg border-2",
+                      isPro ? "bg-amber-50 text-amber-600 border-amber-400" : "bg-gray-100 text-gray-500 border-gray-200"
                     ].join(" "),
                     children: isPro ? "\u2B50 Pro" : "Free"
                   })
@@ -339,8 +343,13 @@ export function SettingsScreen() {
                         alert("Plans screen is managed from the main app.");
                       }
                     },
-                    className: "w-full rounded-xl bg-primary/10 py-2.5 text-sm font-semibold text-primary active:bg-primary/20 transition",
-                    children: "View Plans"
+                    className: [
+                      "w-full rounded-xl py-2.5 text-sm font-semibold transition border",
+                      isPro
+                        ? "bg-white text-foreground border-border active:bg-gray-50"
+                        : "bg-primary/10 text-primary border-transparent active:bg-primary/20"
+                    ].join(" "),
+                    children: isPro ? "Manage Plan" : "View Plans"
                   })
                 })
               ]

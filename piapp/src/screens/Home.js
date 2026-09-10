@@ -44,7 +44,6 @@ function RetirementCountdown({ profile }) {
   }, [profile]);
 
   const breakdown = msToBreakdown(remainingMs);
-  const planLabel = 'Basic';
   const deathDate = new Date(profile.dob);
   deathDate.setFullYear(deathDate.getFullYear() + (profile.lifespanYears || 80));
   const retirementDateStr = deathDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -1387,6 +1386,8 @@ function LifeProgressCard({ profile }) {
   const h = new Date().getHours();
   const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
 
+  const planLabel = (() => { const p = localStorage.getItem('lt_plan_v1'); if (!p) return 'Free'; try { const v = JSON.parse(p); return v === 'basic' ? 'Basic' : v === 'yearly' ? '1 Year' : v === 'lifetime' || v === 'pro' ? 'Pro' : 'Free'; } catch { return 'Free'; } })();
+
   // Time value
   let tvData = null;
   try {
@@ -1462,7 +1463,7 @@ function LifeProgressCard({ profile }) {
               }),
               jsxs('span', {
                 className: 'flex items-center gap-1 bg-[#FDE68A]/15 text-[#FDE68A] text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap',
-                children: ['\u2605 Basic']
+                children: ['\u2605 ' + planLabel]
               })
             ]
           }),
@@ -1888,6 +1889,7 @@ export function ActivityScreen({ profile }) {
     } else {
       doCreate();
     }
+    setSelectedActivity(null);
     setSelectedActivity(null);
   };
 
