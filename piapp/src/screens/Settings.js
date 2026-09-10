@@ -38,8 +38,8 @@ var PLANS = {
   free: "Free",
   basic: "Basic",
   yearly: "1 Year",
-  lifetime: "Pro",
-  pro: "Pro"
+  lifetime: "Lifetime",
+  pro: "Lifetime"
 };
 
 /* ── small UI components ── */

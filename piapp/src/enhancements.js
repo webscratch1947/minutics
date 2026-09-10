@@ -359,7 +359,7 @@
     var p = getPlanId();
     if (p === "basic") return "Basic";
     if (p === "yearly") return "1 Year";
-    if (p === "lifetime" || p === "pro") return "Pro";
+    if (p === "lifetime" || p === "pro") return "Lifetime";
     return "Free";
   }
   function getPlanPeriod() {
@@ -6643,7 +6643,7 @@
                   '</div>'
               )
           ) +
-          '<button id="lt-plans-close" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:12px;font-size:13px;cursor:pointer;margin-top:4px;font-family:inherit">Close</button>' +
+          '<button id="lt-plans-close" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);border-radius:12px;color:hsl(230 40% 16%);padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;font-family:inherit;transition:background .15s">Close</button>' +
           '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
       '</div>';
