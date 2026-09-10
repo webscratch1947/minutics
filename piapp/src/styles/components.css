@@ -119,6 +119,30 @@
   @apply bg-black bg-opacity-100;
 }
 
+/* Rendered by React from the first paint. This must live in the main
+   stylesheet rather than a delayed enhancement pass, preventing the Edit
+   action from briefly appearing as unstyled text on the Activity screen. */
+.lt-edit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--background));
+  color: hsl(var(--primary));
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lt-edit-button:hover {
+  background: hsl(var(--secondary));
+}
+
 /* Life Hub Components */
 .tool-grid {
   @apply grid grid-cols-2 gap-4;

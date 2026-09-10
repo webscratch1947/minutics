@@ -321,7 +321,7 @@ function renderGate(mode) {
           '<div class="lt-auth-field">' + LOCK_ICON + '<input type="password" id="lt-auth-password" class="lt-auth-has-toggle" placeholder="Enter password" autocomplete="' + (isSignup ? "new-password" : "current-password") + '" required>' +
             '<button type="button" class="lt-auth-pw-toggle" id="lt-auth-pw-toggle" aria-label="Show password">' + EYE_ICON + '</button>' +
           '</div>' +
-          '<p class="lt-auth-hint" id="lt-auth-pw-hint">Minimum 8 characters &amp; alphanumeric</p>' +
+          '<p class="lt-auth-hint" id="lt-auth-pw-hint">Password must be at least 6 characters</p>' +
           (isSignup ? "" : '<p class="lt-auth-forgot"><a id="lt-auth-forgot-link">Forgot password?</a></p>') +
         '</div>' +
         '<div class="lt-auth-submit-wrap">' +
@@ -357,22 +357,6 @@ function renderGate(mode) {
     forgotLink.addEventListener("click", function () { renderGate("forgot"); });
   }
 
-  var pwHint = document.getElementById("lt-auth-pw-hint");
-  var PW_OK = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
-
-  if (isSignup) {
-    pwInput.addEventListener("input", function () {
-      if (!pwInput.value) {
-        pwHint.className = "lt-auth-hint";
-        pwInput.classList.remove("lt-auth-invalid");
-        return;
-      }
-      var ok = PW_OK.test(pwInput.value);
-      pwHint.className = "lt-auth-hint " + (ok ? "lt-auth-valid" : "lt-auth-invalid");
-      pwInput.classList.toggle("lt-auth-invalid", !ok);
-    });
-  }
-
   var form = document.getElementById("lt-auth-form");
   var submitBtn = document.getElementById("lt-auth-submit");
   var submitLabel = document.getElementById("lt-auth-submit-label");
@@ -390,13 +374,6 @@ function renderGate(mode) {
     var email = document.getElementById("lt-auth-email").value.trim();
     var password = pwInput.value;
     hideError();
-
-    if (isSignup && !PW_OK.test(password)) {
-      showError("Password must be at least 8 characters and include both letters and numbers.");
-      pwInput.classList.add("lt-auth-invalid");
-      pwInput.focus();
-      return;
-    }
 
     setLoading(true);
 
@@ -533,7 +510,7 @@ function friendlyError(err) {
   var code = (err && err.code) || "";
   if (code.indexOf("email-already-in-use") !== -1) return "That email already has an account — try logging in instead.";
   if (code.indexOf("invalid-email") !== -1) return "That email address doesn't look right.";
-  if (code.indexOf("weak-password") !== -1) return "Password should be at least 8 characters and include both letters and numbers.";
+  if (code.indexOf("weak-password") !== -1) return "Password must be at least 6 characters.";
   if (code.indexOf("user-not-found") !== -1 || code.indexOf("invalid-credential") !== -1 || code.indexOf("wrong-password") !== -1) return "Incorrect email or password.";
   if (code.indexOf("too-many-requests") !== -1) return "Too many attempts — please wait a moment and try again.";
   if (code.indexOf("network-request-failed") !== -1) return "Network error — check your connection.";
@@ -584,7 +561,6 @@ onAuthStateChanged(auth, function (user) {
        landing back in Settings -- instead of the Timer home screen a
        fresh sign-in should start on. */
     if (gate) {
-      gate.remove();
       if (location.pathname !== "/") {
         history.pushState({}, "", "/");
         window.dispatchEvent(new PopStateEvent("popstate"));
@@ -594,6 +570,13 @@ onAuthStateChanged(auth, function (user) {
     /* Clear ALL inline styles that logout sets on #root (including !important) */
     var root = document.getElementById("root");
     if (root) root.removeAttribute("style");
+    /* Keep the opaque auth gate in place until the authenticated UI has
+       painted. Removing it first caused a brief white frame after sign-up. */
+    if (gate) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { gate.remove(); });
+      });
+    }
   } else {
     console.log("Removing lt-authed class and rendering login gate");
     document.body.classList.remove("lt-authed");

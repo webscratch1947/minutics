@@ -669,8 +669,9 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
               // Edit button
               jsx('button', {
                 onClick: openEdit,
-                className: 'w-8 h-8 flex items-center justify-center border border-transparent hover:border-primary hover:text-primary text-muted-foreground transition-all shrink-0',
+                className: 'lt-edit-button shrink-0',
                 title: 'Edit',
+                'data-lt-edit-replaced': '1',
                 children: jsx('span', {
                   className: 'text-sm',
                   children: 'Edit'

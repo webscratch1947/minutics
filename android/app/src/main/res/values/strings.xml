@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Minutics</string>
+    <string name="asset_host">appassets.androidplatform.net</string>
+</resources>
