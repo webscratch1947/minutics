@@ -1492,7 +1492,7 @@ function LifeProgressCard({ profile }) {
           }),
           jsx('span', {
             className: 'flex-shrink-0 bg-accent/15 text-accent rounded-full px-2.5 py-1.5 text-[10px] font-extrabold text-center leading-tight max-w-[96px]',
-            children: 'Rs.' + tvData.rate + '/hour'
+            children: 'Rs.' + Number(tvData.rate).toFixed(2) + '/hour'
           })
         ]
       })
@@ -1547,15 +1547,14 @@ function TodayGlance({ activities, blocks }) {
   });
 
   const totalMinutes = Object.values(activityMinutes).reduce((s, m) => s + m, 0);
-  if (totalMinutes === 0) return null;
 
-  const tracked = activities
-    .filter(a => activityMinutes[a.id] > 0)
-    .map(a => ({ ...a, minutes: activityMinutes[a.id] }))
-    .sort((a, b) => b.minutes - a.minutes)
-    .slice(0, 4);
-
-  if (tracked.length === 0) return null;
+  const tracked = totalMinutes > 0
+    ? activities
+        .filter(a => activityMinutes[a.id] > 0)
+        .map(a => ({ ...a, minutes: activityMinutes[a.id] }))
+        .sort((a, b) => b.minutes - a.minutes)
+        .slice(0, 4)
+    : [];
 
   const formatMins = (m) => {
     if (m < 60) return m + 'm';
@@ -1573,32 +1572,37 @@ function TodayGlance({ activities, blocks }) {
         className: 'text-[18px] font-black text-foreground mb-2.5',
         children: 'Today at a Glance'
       }),
-      jsx('div', {
-        className: 'grid gap-2',
-        style: { gridTemplateColumns: 'repeat(' + Math.min(tracked.length, 4) + ', 1fr)' },
-        children: tracked.map((a, i) => {
-          const pct = Math.round((a.minutes / totalMinutes) * 100);
-          return jsxs('div', {
-            className: 'rounded-xl p-3 flex flex-col items-center gap-1',
-            style: { background: colors[i % colors.length] },
-            children: [
-              jsx('span', { className: 'text-xl', children: a.emoji || '\uD83C\uDFB3' }),
-              jsx('span', { className: 'text-sm font-extrabold text-foreground', children: formatMins(a.minutes) }),
-              jsx('span', {
-                className: 'text-[9px] text-foreground/60 text-center w-full truncate',
-                children: a.name
-              }),
-              jsx('div', {
-                className: 'w-full h-[3px] rounded-full bg-black/10 overflow-hidden mt-0.5',
-                children: jsx('div', {
-                  className: 'h-full rounded-full',
-                  style: { width: pct + '%', background: 'hsl(var(--primary))' }
+      tracked.length === 0
+        ? jsx('div', {
+            className: 'rounded-xl border border-border bg-background/50 p-4 text-center',
+            children: jsx('p', { className: 'text-sm text-foreground/50', children: 'No activity tracked today yet. Start a timer to see your usage here.' })
+          })
+        : jsx('div', {
+          className: 'grid gap-2',
+          style: { gridTemplateColumns: 'repeat(' + Math.min(tracked.length, 4) + ', 1fr)' },
+          children: tracked.map((a, i) => {
+            const pct = Math.round((a.minutes / totalMinutes) * 100);
+            return jsxs('div', {
+              className: 'rounded-xl p-3 flex flex-col items-center gap-1',
+              style: { background: colors[i % colors.length] },
+              children: [
+                jsx('span', { className: 'text-xl', children: a.emoji || '\uD83C\uDFB3' }),
+                jsx('span', { className: 'text-sm font-extrabold text-foreground', children: formatMins(a.minutes) }),
+                jsx('span', {
+                  className: 'text-[9px] text-foreground/60 text-center w-full truncate',
+                  children: a.name
+                }),
+                jsx('div', {
+                  className: 'w-full h-[3px] rounded-full bg-black/10 overflow-hidden mt-0.5',
+                  children: jsx('div', {
+                    className: 'h-full rounded-full',
+                    style: { width: pct + '%', background: 'hsl(var(--primary))' }
+                  })
                 })
-              })
-            ]
-          }, a.id);
+              ]
+            }, a.id);
+          })
         })
-      })
     ]
   });
 }
@@ -1667,13 +1671,11 @@ function EatTheFrog() {
     return newTask.id;
   };
 
-  if (starred.length === 0 && slots.every(s => s === null)) return null;
-
   return jsxs('div', {
     className: 'mx-4 mt-3 p-4 border border-border rounded-2xl bg-background',
     children: [
       jsx('p', { className: 'text-[15px] font-extrabold text-foreground flex items-center gap-1.5', children: ['\uD83D\uDC38 Eat the Frog'] }),
-      jsx('p', { className: 'text-xs text-foreground/65 mt-0.5 mb-3', children: 'Your ' + starred.length + ' most important tasks today' }),
+      jsx('p', { className: 'text-xs text-foreground/65 mt-0.5 mb-3', children: starred.length > 0 ? starred.length + ' most important task' + (starred.length !== 1 ? 's' : '') + ' today' : 'Add your most important tasks' }),
       slots.map((task, i) =>
         jsx(FrogSlot, {
           task,
