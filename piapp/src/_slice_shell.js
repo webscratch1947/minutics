@@ -23,7 +23,21 @@ function LTTopNav() {
   }, []);
 
   const running = blocks.find(b => !b.endTime);
-  if (!running) return null;
+
+  if (!running) {
+    return jsxs('div', {
+      className: 'flex items-center gap-2 px-4 py-2 bg-[#04091e] text-white/40 text-xs font-bold',
+      children: [
+        jsx('span', {
+          className: 'w-2.5 h-2.5 rounded-full bg-white/20 shrink-0'
+        }),
+        jsx('span', {
+          className: 'flex-1 truncate',
+          children: 'No activity running'
+        })
+      ]
+    });
+  }
 
   const activity = activities.find(a => a.id === running.activityId);
   const elapsed = Math.floor((now - new Date(running.startTime).getTime()) / 1000);

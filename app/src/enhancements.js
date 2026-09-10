@@ -7232,12 +7232,12 @@
   }
 
   function runEnhancements() {
-    var p = location.pathname;
-    var onHome = p === "/";
-    var onActivity = p === "/activity";
-    var onTimerOrActivity = onHome || onActivity;
-    var onLifeHub = p === "/life-hub";
-    var onJournal = p === "/journal";
+    var p = location.pathname + location.hash;
+    var onHome = (location.pathname === "/" && !location.hash) || location.hash === "#/" || location.hash === "#";
+    var onActivity = p.indexOf("/activity") !== -1;
+    var onTimerOrActivity = onHome || onActivity || location.pathname === "/";
+    var onLifeHub = p.indexOf("/life-hub") !== -1 || p.indexOf("/timeline") !== -1;
+    var onJournal = p.indexOf("/journal") !== -1;
     /* One-time setup — always run */
     safeRun(migrateOldProPlan);
     safeRun(checkPlanExpiry);
