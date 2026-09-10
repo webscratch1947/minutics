@@ -26,7 +26,7 @@ import { Timer as Ty, CalendarClock as Jb, Clock as Zb, Play as nk, Trash2 as lk
 // Toggles open/closed with a full-width button.
 
 function LTTimerPanel({ profile }) {
-  const [open, setOpen] = useState(false); // default collapsed
+  const [open, setOpen] = useState(true); // default expanded like compiled
 
   return jsxs('div', {
     'data-lt-enhancement': 'retirement',
@@ -69,15 +69,33 @@ function RetirementCountdown({ profile }) {
   }, [profile]);
 
   const breakdown = msToBreakdown(remainingMs);
+  const planLabel = 'Basic';
+  const deathDate = new Date(profile.dob);
+  deathDate.setFullYear(deathDate.getFullYear() + (profile.lifespanYears || 80));
+  const retirementDateStr = deathDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
   return jsxs('div', {
     'data-lt-enhancement': 'retirement',
     className: 'bg-primary text-white px-5 pt-8 pb-6',
     children: [
-      // Title
-      jsxs('p', {
-        className: 'text-xs font-semibold text-white/40 uppercase tracking-widest mb-5',
-        children: [profile.name, "'s Remaining Retirement Time"]
+      // Title row with plan badge
+      jsxs('div', {
+        className: 'flex items-center justify-between mb-5',
+        children: [
+          jsxs('p', {
+            className: 'text-xs font-semibold text-white/40 uppercase tracking-widest m-0',
+            children: [profile.name, "'s Remaining Retirement Time"]
+          }),
+          jsxs('span', {
+            className: 'flex items-center gap-1 bg-white/10 text-white/70 text-[11px] font-bold px-2.5 py-1 rounded-full',
+            children: ['\u2605 ', planLabel]
+          })
+        ]
+      }),
+      // Retirement date
+      retirementDateStr && jsxs('p', {
+        className: 'text-[11px] font-semibold text-white/50 mb-4 flex items-center gap-1.5',
+        children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-white/70', children: retirementDateStr })]
       }),
       // 5-column grid: years, days, hours, min, sec
       jsxs('div', {
@@ -1517,8 +1535,8 @@ function LifeDigit({ value, label, accent }) {
 }
 
 // ─── Today at a Glance (P7) ──────────────────────────────────────────────────
-// Replaces enhancements.js buildGlanceSection().
-// Shows today's tracked activity usage in a horizontal card grid.
+// Recreates the compiled version's horizontal activity card grid.
+// Always shows the top 4 activities with colored backgrounds and emojis.
 
 function TodayGlance({ activities, blocks }) {
   const [now, setNow] = useState(Date.now());
@@ -1528,7 +1546,6 @@ function TodayGlance({ activities, blocks }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate minutes per activity today
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayBlocks = blocks.filter(b => {
     if (!b.startTime) return false;
@@ -1548,15 +1565,16 @@ function TodayGlance({ activities, blocks }) {
 
   const totalMinutes = Object.values(activityMinutes).reduce((s, m) => s + m, 0);
 
-  const tracked = totalMinutes > 0
-    ? activities
-        .filter(a => activityMinutes[a.id] > 0)
-        .map(a => ({ ...a, minutes: activityMinutes[a.id] }))
-        .sort((a, b) => b.minutes - a.minutes)
-        .slice(0, 4)
-    : [];
+  // Always show top 4 activities — sort by minutes desc, pad rest with 0
+  const display = activities.slice(0, 4).map(a => ({
+    ...a,
+    minutes: activityMinutes[a.id] || 0
+  }));
+
+  if (display.length === 0) return null;
 
   const formatMins = (m) => {
+    if (m === 0) return '0m';
     if (m < 60) return m + 'm';
     const h = Math.floor(m / 60);
     const rem = m % 60;
@@ -1572,37 +1590,32 @@ function TodayGlance({ activities, blocks }) {
         className: 'text-[18px] font-black text-foreground mb-2.5',
         children: 'Today at a Glance'
       }),
-      tracked.length === 0
-        ? jsx('div', {
-            className: 'rounded-xl border border-border bg-background/50 p-4 text-center',
-            children: jsx('p', { className: 'text-sm text-foreground/50', children: 'No activity tracked today yet. Start a timer to see your usage here.' })
-          })
-        : jsx('div', {
-          className: 'grid gap-2',
-          style: { gridTemplateColumns: 'repeat(' + Math.min(tracked.length, 4) + ', 1fr)' },
-          children: tracked.map((a, i) => {
-            const pct = Math.round((a.minutes / totalMinutes) * 100);
-            return jsxs('div', {
-              className: 'rounded-xl p-3 flex flex-col items-center gap-1',
-              style: { background: colors[i % colors.length] },
-              children: [
-                jsx('span', { className: 'text-xl', children: a.emoji || '\uD83C\uDFB3' }),
-                jsx('span', { className: 'text-sm font-extrabold text-foreground', children: formatMins(a.minutes) }),
-                jsx('span', {
-                  className: 'text-[9px] text-foreground/60 text-center w-full truncate',
-                  children: a.name
-                }),
-                jsx('div', {
-                  className: 'w-full h-[3px] rounded-full bg-black/10 overflow-hidden mt-0.5',
-                  children: jsx('div', {
-                    className: 'h-full rounded-full',
-                    style: { width: pct + '%', background: 'hsl(var(--primary))' }
-                  })
+      jsx('div', {
+        className: 'grid gap-2',
+        style: { gridTemplateColumns: 'repeat(' + display.length + ', 1fr)' },
+        children: display.map((a, i) => {
+          const pct = totalMinutes > 0 ? Math.round((a.minutes / totalMinutes) * 100) : 0;
+          return jsxs('div', {
+            className: 'rounded-xl p-3 flex flex-col items-center gap-1',
+            style: { background: colors[i % colors.length] },
+            children: [
+              jsx('span', { className: 'text-xl', children: a.emoji || '\uD83C\uDFB3' }),
+              jsx('span', { className: 'text-sm font-extrabold text-foreground', children: formatMins(a.minutes) }),
+              jsx('span', {
+                className: 'text-[9px] text-foreground/60 text-center w-full truncate',
+                children: a.name
+              }),
+              jsx('div', {
+                className: 'w-full h-[3px] rounded-full bg-black/10 overflow-hidden mt-0.5',
+                children: jsx('div', {
+                  className: 'h-full rounded-full',
+                  style: { width: pct + '%', background: 'hsl(var(--primary))' }
                 })
-              ]
-            }, a.id);
-          })
+              })
+            ]
+          }, a.id);
         })
+      })
     ]
   });
 }
@@ -1768,6 +1781,7 @@ export function TimerScreen({ profile }) {
     className: 'flex flex-col',
     children: [
       jsx(LifeProgressCard, { profile }),
+      jsx(LTTimerPanel, { profile }),
       jsx(TodayGlance, { activities, blocks }),
       jsx(EatTheFrog, {})
     ]
