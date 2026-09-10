@@ -1374,6 +1374,9 @@ function LifeProgressCard({ profile }) {
   const percentLived = calcPercentLived(profile);
   const remainingMs = calcRemainingTime(profile);
   const breakdown = msToBreakdown(remainingMs);
+  const deathDate = new Date(profile.dob);
+  deathDate.setFullYear(deathDate.getFullYear() + (profile.lifespanYears || 80));
+  const retirementDateStr = deathDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
   const circumference = 2 * Math.PI * 36;
   const offset = circumference - (percentLived / 100) * circumference;
@@ -1439,6 +1442,53 @@ function LifeProgressCard({ profile }) {
                 ]
               }),
               jsx('p', { className: 'text-[9px] font-semibold text-foreground/45 mt-1', children: 'of your life lived' })
+            ]
+          })
+        ]
+      }),
+      // Compact countdown card
+      jsxs('div', {
+        className: 'bg-primary rounded-2xl px-4 py-4',
+        children: [
+          jsxs('div', {
+            className: 'flex items-center justify-between mb-2',
+            children: [
+              jsxs('p', {
+                className: 'text-[12px] font-bold text-white/70 m-0 uppercase tracking-wide',
+                children: [profile.name, "'s Remaining Retirement Time"]
+              }),
+              jsxs('span', {
+                className: 'flex items-center gap-1 bg-white/10 text-white/60 text-[10px] font-bold px-2 py-0.5 rounded-full',
+                children: ['\u2605 Basic']
+              })
+            ]
+          }),
+          retirementDateStr && jsxs('p', {
+            className: 'text-[11px] font-semibold text-white/45 mb-3',
+            children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-white/65', children: retirementDateStr })]
+          }),
+          jsxs('div', {
+            className: 'grid grid-cols-5 gap-2',
+            children: [
+              jsx(LifeDigit, { value: breakdown.years, label: 'YEARS' }),
+              jsx(LifeDigit, { value: breakdown.days, label: 'DAYS' }),
+              jsx(LifeDigit, { value: breakdown.hours, label: 'HOURS' }),
+              jsx(LifeDigit, { value: breakdown.minutes, label: 'MIN' }),
+              jsx(LifeDigit, { value: breakdown.seconds, label: 'SEC', accent: true })
+            ]
+          }),
+          jsx('div', {
+            className: 'h-1 w-full bg-white/10 overflow-hidden mt-3',
+            children: jsx('div', {
+              className: 'h-full bg-accent',
+              style: { width: `${percentLived}%` }
+            })
+          }),
+          jsxs('div', {
+            className: 'flex justify-between text-[10px] text-white/35 font-medium mt-1.5',
+            children: [
+              jsxs('span', { children: [percentLived.toFixed(1), '% lived'] }),
+              jsxs('span', { children: [breakdown.totalMinutes.toLocaleString(), ' min left'] })
             ]
           })
         ]
@@ -1728,7 +1778,6 @@ export function TimerScreen({ profile }) {
     className: 'flex flex-col',
     children: [
       jsx(LifeProgressCard, { profile }),
-      jsx(LTTimerPanel, { profile }),
       jsx(TodayGlance, { activities, blocks }),
       jsx(EatTheFrog, {})
     ]
