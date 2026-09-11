@@ -553,12 +553,12 @@ export function SettingsScreen() {
               children: [
                 !isPro && jsxs("button", {
                   type: "button",
-                  onClick: function () { alert("Telegram daily reports are a Premium feature. Choose View Plans above to upgrade."); },
+                  onClick: function () { alert("Telegram daily reports need a paid plan. Click View Plans in Settings, then purchase any plan to unlock them."); },
                   className: "absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 rounded-xl bg-background/90 px-6 text-center",
                   children: [
                     jsx("span", { className: "text-2xl", children: "\uD83D\uDD12" }),
                     jsx("span", { className: "text-sm font-bold text-foreground", children: "Premium feature" }),
-                    jsx("span", { className: "text-xs leading-relaxed text-muted-foreground", children: "Upgrade to unlock Telegram daily reports." })
+                    jsx("span", { className: "text-xs leading-relaxed text-muted-foreground", children: "Click View Plans in Settings, then purchase any plan to unlock Telegram daily reports." })
                   ]
                 }),
                 /* connection status */
