@@ -60,29 +60,32 @@ export function mk({
       '<style>@keyframes lt-spin{to{transform:rotate(360deg)}}</style>';
     (document.body || document.documentElement).appendChild(loader);
 
-    /* Phase 2: after 3s, fire onComplete (renders main app) then poll until
-       enhancements have fully settled, THEN lift the killswitch. */
+    /* Phase 2: render the main app first, but keep this opaque loader over it
+       until React and the enhancement pass have settled. This prevents the
+       white gap that used to appear after “Setting up your app…”. */
     setTimeout(function () {
-      loader.style.opacity = "0";
-      setTimeout(function () {
-        if (loader.parentNode) loader.parentNode.removeChild(loader);
-        e(profileData);
-        /* Poll: wait for enhancements to apply (life-progress card or
-           enhancement markers exist + body has lt-authed) then remove the
-           killswitch so #root finally appears — fully styled. */
-        var checks = 0;
-        var readyTimer = setInterval(function () {
-          checks++;
-          var hasAuth = document.body.classList.contains("lt-authed");
-          var hasProgress = !!document.getElementById("lt-life-progress");
-          var hasGlance = !!document.querySelector("[data-lt-enhancement]");
-          if ((hasAuth && (hasProgress || hasGlance)) || checks > 50) {
-            clearInterval(readyTimer);
-            var ks = document.getElementById("lt-root-killswitch");
-            if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
-          }
-        }, 80);
-      }, 500);
+      e(profileData);
+      /* Poll: wait for enhancements to apply (life-progress card or
+         enhancement markers exist + body has lt-authed), then reveal the
+         app and only afterwards fade the loader away. */
+      var checks = 0;
+      var readyTimer = setInterval(function () {
+        checks++;
+        var hasAuth = document.body.classList.contains("lt-authed");
+        var hasProgress = !!document.getElementById("lt-life-progress");
+        var hasGlance = !!document.querySelector("[data-lt-enhancement]");
+        if ((hasAuth && (hasProgress || hasGlance)) || checks > 50) {
+          clearInterval(readyTimer);
+          var ks = document.getElementById("lt-root-killswitch");
+          if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
+          requestAnimationFrame(function () {
+            loader.style.opacity = "0";
+            setTimeout(function () {
+              if (loader.parentNode) loader.parentNode.removeChild(loader);
+            }, 500);
+          });
+        }
+      }, 80);
     }, 3000);
   }
   return t === "intro" ? jsx("div", {

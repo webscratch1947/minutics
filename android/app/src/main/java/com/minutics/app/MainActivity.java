@@ -2,10 +2,17 @@ package com.minutics.app;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.ViewGroup;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
@@ -16,6 +23,8 @@ import androidx.webkit.WebViewAssetLoader;
 
 /** Hosts the pre-built Minutics web bundle without a hybrid framework. */
 public final class MainActivity extends Activity {
+    private static final String ALERT_CHANNEL_ID = "minutics_alerts";
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 4101;
     private WebView webView;
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -31,6 +40,7 @@ public final class MainActivity extends Activity {
         webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
         webView.getSettings().setAllowFileAccess(false);
         webView.getSettings().setAllowContentAccess(false);
+        webView.addJavascriptInterface(new NativeBridge(), "AndroidBridge");
 
         WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
@@ -67,6 +77,73 @@ public final class MainActivity extends Activity {
             webView.goBack();
         } else {
             super.onBackPressed();
+        }
+    }
+
+    private boolean notificationsGranted() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestNotificationPermission() {
+        if (notificationsGranted()) {
+            dispatchNotificationPermission();
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST) dispatchNotificationPermission();
+    }
+
+    private void dispatchNotificationPermission() {
+        if (webView == null) return;
+        String permission = notificationsGranted() ? "granted" : "denied";
+        webView.post(() -> webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('minutics-notification-permission',{detail:{permission:'" + permission + "'}}));",
+                null));
+    }
+
+    private void showTestNotification() {
+        if (!notificationsGranted()) {
+            requestNotificationPermission();
+            return;
+        }
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    ALERT_CHANNEL_ID, "Minutics alerts", NotificationManager.IMPORTANCE_DEFAULT);
+            channel.setDescription("Alerts and reminders from Minutics");
+            manager.createNotificationChannel(channel);
+        }
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                ? new Notification.Builder(this, ALERT_CHANNEL_ID)
+                : new Notification.Builder(this);
+        builder.setSmallIcon(R.drawable.minutics_logo)
+                .setContentTitle("Minutics")
+                .setContentText("Test alert: notifications are working.")
+                .setAutoCancel(true);
+        manager.notify(9001, builder.build());
+    }
+
+    private final class NativeBridge {
+        @JavascriptInterface
+        public String getNotificationPermission() {
+            return notificationsGranted() ? "granted" : "default";
+        }
+
+        @JavascriptInterface
+        public void requestNotificationPermission() {
+            runOnUiThread(MainActivity.this::requestNotificationPermission);
+        }
+
+        @JavascriptInterface
+        public void showTestNotification() {
+            runOnUiThread(MainActivity.this::showTestNotification);
         }
     }
 }

@@ -96,6 +96,15 @@ function Divider() {
   return jsx("div", { className: "h-px bg-border mx-4" });
 }
 
+function getAlertPermission() {
+  try {
+    if (window.AndroidBridge && window.AndroidBridge.getNotificationPermission) {
+      return window.AndroidBridge.getNotificationPermission();
+    }
+  } catch (e) {}
+  return typeof Notification !== "undefined" ? Notification.permission : "denied";
+}
+
 /* ═══════════════════════════════════════════════════════════════
    SettingsScreen
    ═══════════════════════════════════════════════════════════════ */
@@ -145,10 +154,18 @@ export function SettingsScreen() {
   var nudgesEnabled = _nudgesState[0];
   var setNudgesEnabled = _nudgesState[1];
 
-  /* ── web notifications permission ── */
-  var _notifPermState = useState(typeof Notification !== "undefined" ? Notification.permission : "default");
+  /* ── alert notification permission (browser or Android bridge) ── */
+  var _notifPermState = useState(getAlertPermission());
   var notifPermission = _notifPermState[0];
   var setNotifPermission = _notifPermState[1];
+
+  useEffect(function () {
+    function onPermissionChanged(event) {
+      setNotifPermission((event.detail && event.detail.permission) || getAlertPermission());
+    }
+    window.addEventListener("minutics-notification-permission", onPermissionChanged);
+    return function () { window.removeEventListener("minutics-notification-permission", onPermissionChanged); };
+  }, []);
 
   /* ── telegram ── */
   var tgSettings = getTelegramSettings();
@@ -200,8 +217,24 @@ export function SettingsScreen() {
   }
 
   function handleEnableNotifications() {
-    if (typeof Notification !== "undefined") {
-      Notification.requestPermission().then(function (perm) { setNotifPermission(perm); });
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.requestNotificationPermission) {
+        window.AndroidBridge.requestNotificationPermission();
+        return;
+      }
+    } catch (e) {}
+    if (typeof Notification !== "undefined") Notification.requestPermission().then(function (perm) { setNotifPermission(perm); });
+  }
+
+  function handleTestNotification() {
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.showTestNotification) {
+        window.AndroidBridge.showTestNotification();
+        return;
+      }
+    } catch (e) {}
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      new Notification("Minutics", { body: "Test alert: notifications are working." });
     }
   }
 
@@ -458,18 +491,19 @@ export function SettingsScreen() {
           jsx(SectionHeader, { children: "Features" }),
           jsx(Card, {
             children: jsx(CardRow, {
-              label: "Website Notifications",
+              label: "Alert Notifications",
               desc: notifPermission === "granted"
                 ? "Notifications are enabled"
                 : notifPermission === "denied"
                   ? "Blocked by browser settings"
-                  : "Receive alerts in your browser",
-              children: notifPermission === "granted"
-                ? jsx("span", {
+                  : "Allow reminders and app alerts",
+              children: jsxs("div", {
+                className: "flex items-center gap-2",
+                children: [
+                  notifPermission === "granted" ? jsx("span", {
                     className: "inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-600",
                     children: "On"
-                  })
-                : jsx("button", {
+                  }) : jsx("button", {
                     onClick: handleEnableNotifications,
                     disabled: notifPermission === "denied",
                     className: [
@@ -478,7 +512,18 @@ export function SettingsScreen() {
                       notifPermission === "denied" ? "opacity-40 cursor-not-allowed" : ""
                     ].join(" "),
                     children: "Enable"
+                  }),
+                  jsx("button", {
+                    onClick: handleTestNotification,
+                    disabled: notifPermission !== "granted",
+                    className: [
+                      "rounded-lg border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition",
+                      notifPermission === "granted" ? "active:bg-primary/10" : "opacity-40 cursor-not-allowed"
+                    ].join(" "),
+                    children: "Test"
                   })
+                ]
+              })
             })
           })
         ]
