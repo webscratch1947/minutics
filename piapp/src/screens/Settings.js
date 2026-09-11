@@ -260,9 +260,11 @@ export function SettingsScreen() {
       try {
         var n = new Notification("Minutics", {
           body: "Test alert: notifications are working.",
-          icon: "favicon.png",
+          icon: window.location.origin + "/favicon.png",
+          image: window.location.origin + "/favicon.png",
           tag: "minutics-notification-test",
-          requireInteraction: true
+          requireInteraction: true,
+          silent: false
         });
         window.__minuticsTestNotification = n;
         n.onshow = function () { setNotifTestStatus("sent"); };

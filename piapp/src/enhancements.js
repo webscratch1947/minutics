@@ -43,13 +43,14 @@
       setTimeout(dismiss, 200);
     });
     video.addEventListener("error", dismiss);
-    video.play().catch(function () {});
-    setTimeout(dismiss, MAX_MS);
 
-    document.addEventListener("click", function unmuteOnInteraction() {
-      try { video.muted = false; } catch (e) {}
-      document.removeEventListener("click", unmuteOnInteraction);
-    }, { once: true });
+    video.muted = false;
+    video.play().catch(function () {
+      video.muted = true;
+      video.play().catch(function () {});
+    });
+
+    setTimeout(dismiss, MAX_MS);
   })();
 
   /* ── Storage keys ──────────────────────────────────────────────────────── */
@@ -5280,7 +5281,9 @@
       _runningSystemNotification = new window.Notification("Tracking " + activityName, {
         body: timeStr + " \u2014 tap to return to Minutics.",
         tag: "minutics-running-activity",
-        silent: true
+        icon: window.location.origin + "/favicon.png",
+        requireInteraction: true,
+        silent: false
       });
       _runningSystemNotification.onclick = function () {
         try { window.focus(); } catch (e) {}
@@ -5363,7 +5366,9 @@
         closeIdleSystemNotification();
         _idleSystemNotification = new window.Notification("Still there?", {
           body: "You haven't started an activity in a while — track what you're doing right now.",
-          tag: "minutics-idle-nudge"
+          tag: "minutics-idle-nudge",
+          icon: window.location.origin + "/favicon.png",
+          requireInteraction: true
         });
         _idleSystemNotification.onclose = function () {
           _idleSystemNotification = null;
