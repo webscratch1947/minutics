@@ -6,43 +6,28 @@
      after it ends — if the video is still going once we'd normally cut
      it, we let it finish and freeze on the last frame instead of jumping. */
   var _ltSplashDone = false;
-  if (localStorage.getItem("lt_splash_on_v1") === "off") {
-    _ltSplashDone = true;
-  } else
   (function showStartupSplash() {
-    var MAX_MS = 5000; /* fallback safety cap (video is ~4s) in case video events never fire */
+    var MAX_MS = 4500;
     var splash  = document.createElement("div");
     splash.id   = "lt-startup-splash";
     splash.style.cssText =
       "position:fixed;inset:0;z-index:2147483647;background:hsl(230 40% 16%);" +
       "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
-      "gap:14px;transition:opacity .4s ease;opacity:1;pointer-events:none;overflow:hidden;";
+      "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
 
     var video = document.createElement("video");
     video.id = "lt-startup-splash-video";
     video.src = "assets/lt/minutics_splash.mp4";
     video.autoplay = true;
-    video.muted = true; /* Start muted for autoplay policy */
-    /* Set playsinline as HTML attribute (not just property) for real mobile
-       devices — some WebViews ignore the JS property. Also set webkit
-       variant for older iOS. */
+    video.muted = true;
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
     video.preload = "auto";
     video.loop = false;
-    video.style.cssText = "width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s ease;";
-    video.addEventListener("loadeddata", function () {
-      video.style.opacity = "1";
-      /* Unmute after playback starts so user hears the audio */
-      try { video.muted = false; } catch (e) {}
-    });
+    video.style.cssText = "width:100%;height:100%;object-fit:contain;";
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
 
-    video.play().catch(function () {
-      /* Autoplay blocked — try once more (some WebViews need a retry) */
-      video.play().catch(function () {});
-    });
     var dismissed = false;
     function dismiss() {
       if (dismissed) return;
@@ -51,16 +36,14 @@
       splash.style.opacity = "0";
       setTimeout(function () {
         if (splash.parentNode) splash.parentNode.removeChild(splash);
-      }, 450);
+      }, 550);
     }
 
-    /* "ended" fires once the video finishes its single playthrough — freeze
-       on that last frame for a beat, then dismiss. If the video errors or
-       never starts (codec issue, etc.), MAX_MS still guarantees dismissal. */
     video.addEventListener("ended", function () {
-      setTimeout(dismiss, 150);
+      setTimeout(dismiss, 200);
     });
     video.addEventListener("error", dismiss);
+    video.play().catch(function () {});
     setTimeout(dismiss, MAX_MS);
   })();
 
