@@ -5,7 +5,7 @@ import { getTelegramSettings, saveTelegramSettings, getTelegramReportData, updat
 import { COLOR_PALETTE } from '../lib/constants.js';
 
 export function HC() {
-  return useEffect(() => {
+  useEffect(() => {
     const e = () => {
       const n = getTelegramSettings();
       if (!n.telegramConnected) {
@@ -25,8 +25,24 @@ export function HC() {
       const r = new Date,
         o = `${String(r.getHours()).padStart(2,"0")}:${String(r.getMinutes()).padStart(2,"0")}`,
         s = r.toLocaleDateString("en-CA");
-      o !== n.dailyReportTime || n.lastSummaryDate === s || (updateLastSummaryDate(s), sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()))
+      if (o === n.dailyReportTime && n.lastSummaryDate !== s) {
+        sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()).then(function(result) {
+          if (result && result.success) updateLastSummaryDate(s);
+        });
+      }
     };
+    /* Clear stale lastSummaryDate from old buggy runs so today's report can fire */
+    try {
+      const raw = localStorage.getItem("lifetime_telegram_settings_v1");
+      if (raw) {
+        const data = JSON.parse(raw);
+        const today = new Date().toLocaleDateString("en-CA");
+        if (data.lastSummaryDate === today) {
+          data.lastSummaryDate = null;
+          localStorage.setItem("lifetime_telegram_settings_v1", JSON.stringify(data));
+        }
+      }
+    } catch {}
     e();
     const t = window.setInterval(e, 30 * 1e3);
     return () => window.clearInterval(t)
