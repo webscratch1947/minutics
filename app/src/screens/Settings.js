@@ -237,7 +237,7 @@ export function SettingsScreen() {
     if (typeof Notification !== "undefined") Notification.requestPermission().then(function (perm) { setNotifPermission(perm); });
   }
 
-  function handleTestNotification() {
+  async function handleTestNotification() {
     try {
       if (window.AndroidBridge && window.AndroidBridge.showTestNotification) {
         window.AndroidBridge.showTestNotification();
@@ -245,7 +245,28 @@ export function SettingsScreen() {
       }
     } catch (e) {}
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      new Notification("Minutics", { body: "Test alert: notifications are working." });
+      var options = {
+        body: "Test alert: notifications are working.",
+        icon: new URL("../../favicon.png", import.meta.url).href,
+        tag: "minutics-notification-test",
+        requireInteraction: true
+      };
+      /* Desktop Chrome is more reliable with a service-worker notification
+         than a page-created notification, especially while the tab is open. */
+      try {
+        if (navigator.serviceWorker) {
+          var workerUrl = new URL("./minutics-alerts-sw.js", window.location.href);
+          var registration = await navigator.serviceWorker.register(workerUrl.pathname);
+          await navigator.serviceWorker.ready;
+          await registration.showNotification("Minutics", options);
+          return;
+        }
+      } catch (e) {}
+      try {
+        new Notification("Minutics", options);
+      } catch (e) {
+        alert("Chrome could not display the test notification. Check your system notification settings.");
+      }
     }
   }
 
