@@ -217,7 +217,7 @@ export function LifeHubScreen({ profile }) {
   // ═══════════════════════════════════════════════════════════════════════════
   if (view === "list") {
     return jsxs("div", {
-      className: "flex flex-col min-h-full bg-background p-4 pb-24",
+      className: "flex flex-col bg-background p-4 pb-4",
       children: [
         // ── Title ──
         jsx("h1", {
@@ -365,7 +365,7 @@ export function LifeHubScreen({ profile }) {
   // ═══════════════════════════════════════════════════════════════════════════
   if (view === "time") {
     return jsxs("div", {
-      className: "flex flex-col min-h-full bg-background pb-6",
+      className: "flex flex-col bg-background pb-6",
       children: [
         // ── Header with back button ──
         Header("Time Value Calculator", "Know the value of every minute."),
@@ -502,7 +502,7 @@ export function LifeHubScreen({ profile }) {
   // VIEW: "life" — Screen Time → Life Cost
   // ═══════════════════════════════════════════════════════════════════════════
   return jsxs("div", {
-    className: "flex flex-col min-h-full bg-background pb-6",
+    className: "flex flex-col bg-background pb-6",
     children: [
       // ── Header with back button ──
       Header("Screen Time \u2192 Life Cost", "See how screen time adds up over a lifetime."),
