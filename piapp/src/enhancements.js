@@ -19,7 +19,7 @@
     video.id = "lt-startup-splash-video";
     video.src = "assets/lt/minutics_splash.mp4";
     video.autoplay = true;
-    video.muted = false;
+    video.muted = true; /* Start muted for autoplay policy */
     /* Set playsinline as HTML attribute (not just property) for real mobile
        devices — some WebViews ignore the JS property. Also set webkit
        variant for older iOS. */
@@ -30,6 +30,8 @@
     video.style.cssText = "width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s ease;";
     video.addEventListener("loadeddata", function () {
       video.style.opacity = "1";
+      /* Unmute after playback starts so user hears the audio */
+      try { video.muted = false; } catch (e) {}
     });
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
@@ -1192,7 +1194,7 @@
          to ~78% down before the bottom curves in, glass walls sit at ~17%/16%
          from the left/right edges. Using guessed numbers here previously let
          the liquid box spill out below the visible jar. */
-      ".lt-jar-track{position:absolute;left:17%;right:16%;top:37%;bottom:22%;overflow:hidden;border-radius:0 0 8px 8px}",
+      ".lt-jar-track{display:none}",
       ".lt-jar-liquid{position:absolute;bottom:0;left:0;right:0;height:0%;opacity:.78;transition:height 1.6s cubic-bezier(.4,0,.2,1)}",
       ".lt-jar-shine{position:absolute;top:6px;left:6px;width:5px;height:14px;background:rgba(255,255,255,.4);border-radius:3px;transform:rotate(-15deg);pointer-events:none}",
       ".lt-jar-bubble{position:absolute;bottom:8px;right:6px;width:4px;height:4px;background:rgba(255,255,255,.5);border-radius:50%;animation:lt-jar-bob 2.2s ease-in-out infinite}",
