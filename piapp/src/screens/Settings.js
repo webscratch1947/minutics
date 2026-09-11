@@ -121,11 +121,27 @@ export function SettingsScreen() {
   /* ── profile ── */
   var profile = getProfile();
   var profileName = (profile && profile.name) ? profile.name : "User";
-  var userEmail = "";
+  var _userEmailInit = "";
   try {
     var _authUser = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
-    userEmail = (_authUser && _authUser.email) ? _authUser.email : "";
+    _userEmailInit = (_authUser && _authUser.email) ? _authUser.email : "";
   } catch (e) {}
+  var _userEmailState = useState(_userEmailInit);
+  var userEmail = _userEmailState[0];
+  var setUserEmail = _userEmailState[1];
+  useEffect(function () {
+    function refreshEmail() {
+      try {
+        var u = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
+        var em = (u && u.email) ? u.email : "";
+        if (em) setUserEmail(em);
+      } catch (e) {}
+    }
+    refreshEmail();
+    var t = setInterval(refreshEmail, 2000);
+    setTimeout(function () { clearInterval(t); }, 10000);
+    return function () { clearInterval(t); };
+  }, []);
 
   /* ── plan ── */
   var rawPlan = localStorage.getItem("lt_plan_v1") || "free";
@@ -537,7 +553,9 @@ export function SettingsScreen() {
           jsx(Card, {
             children: jsx(CardRow, {
               label: "Alert Notifications",
-              desc: notifTestStatus === "sent"
+              desc: !window.AndroidBridge
+                ? "Use our official Android app for reliable push notifications"
+                : notifTestStatus === "sent"
                 ? "Test notification sent — check Windows Notification Center"
                 : notifTestStatus === "error"
                   ? "Chrome could not show it — check Windows Do Not Disturb"
@@ -549,7 +567,7 @@ export function SettingsScreen() {
               children: jsxs("div", {
                 className: "flex items-center gap-3",
                 children: [
-                  jsx("button", {
+                  !window.AndroidBridge ? null : jsx("button", {
                     onClick: function () {
                       if (notifPermission === "granted") {
                         var next = !notifEnabled;
@@ -593,7 +611,7 @@ export function SettingsScreen() {
                       }
                     })
                   }),
-                  jsx("button", {
+                  !window.AndroidBridge ? null : jsx("button", {
                     onClick: handleTestNotification,
                     disabled: notifPermission !== "granted",
                     className: [

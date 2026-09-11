@@ -24,7 +24,7 @@
     video.setAttribute("webkit-playsinline", "");
     video.preload = "auto";
     video.loop = false;
-    video.style.cssText = "width:100%;height:100%;object-fit:contain;";
+    video.style.cssText = "width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s ease;";
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
 
@@ -39,6 +39,7 @@
       }, 550);
     }
 
+    video.addEventListener("playing", function () { video.style.opacity = "1"; });
     video.addEventListener("ended", function () {
       setTimeout(dismiss, 200);
     });
