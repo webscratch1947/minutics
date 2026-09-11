@@ -155,7 +155,9 @@ export function mk({
             className: "block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2",
             children: "Date of birth"
           }), (() => {
-            const _maxYear = new Date().getFullYear() - 5;
+            /* Keep the list current without allowing the in-progress year.
+               In 2026 the newest option is 2025; when 2027 begins it becomes 2026. */
+            const _maxYear = new Date().getFullYear() - 1;
             const _minYear = 1920;
             const _selY = dY;
             const _selM = dM;
