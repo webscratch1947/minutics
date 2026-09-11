@@ -25,6 +25,9 @@
     video.preload = "auto";
     video.loop = false;
     video.style.cssText = "width:100%;height:100%;object-fit:contain;";
+    video.addEventListener("canplay", function () {
+      try { video.muted = false; } catch (e) {}
+    });
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
 

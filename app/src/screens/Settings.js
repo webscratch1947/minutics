@@ -570,6 +570,14 @@ export function SettingsScreen() {
                         var next = !notifEnabled;
                         setNotifEnabled(next);
                         localStorage.setItem("lt_alert_notifs_on_v1", next ? "on" : "off");
+                      } else if (notifPermission === "denied") {
+                        handleEnableNotifications();
+                        var toast = document.createElement("div");
+                        toast.textContent = "Click the lock icon in the address bar \u2192 Site settings \u2192 Notifications \u2192 Allow";
+                        toast.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;z-index:2147483646;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.3);max-width:90%;transition:opacity .4s ease;opacity:1;";
+                        document.body.appendChild(toast);
+                        setTimeout(function () { toast.style.opacity = "0"; }, 4000);
+                        setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 4500);
                       } else {
                         handleEnableNotifications();
                       }
