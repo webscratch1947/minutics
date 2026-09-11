@@ -321,7 +321,7 @@ export function SettingsScreen() {
   }
 
   function handleTestTelegram() {
-    if (!isPro) { alert("Telegram daily reports require an active paid plan."); return; }
+    if (!isPro) { setTgTestResult("error"); setTgTestLoading(false); return; }
     setTgTestLoading(true);
     setTgTestResult(null);
     sendTelegramReport(tgToken, tgChatId, "Test from Minutics \u2014 your Telegram integration is working!")

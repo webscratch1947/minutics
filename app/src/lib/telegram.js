@@ -75,9 +75,6 @@ export function saveTelegramSettings(settings) {
 
 /** Send a message via Telegram Bot API through Vercel proxy (was: Iy) */
 export async function sendTelegramReport(token, chatId, text) {
-  if (!isPro()) {
-    return { success: false, message: "Telegram daily reports require an active paid plan." };
-  }
   if (!token || !chatId) {
     return { success: false, message: "Add bot token and chat ID first" };
   }
