@@ -73,19 +73,23 @@ export function saveTelegramSettings(settings) {
   return saved;
 }
 
-/** Send a test message via Telegram Bot API (was: Iy) */
+/** Send a message via Telegram Bot API through Vercel proxy (was: Iy) */
 export async function sendTelegramReport(token, chatId, text) {
   if (!isPro()) {
     return { success: false, message: "Telegram daily reports require an active paid plan." };
   }
+  if (!token || !chatId) {
+    return { success: false, message: "Add bot token and chat ID first" };
+  }
   try {
-    const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const origin = window.location.origin;
+    const resp = await fetch(origin + "/api/telegram-send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" })
+      body: JSON.stringify({ token, chatId, text })
     });
     const data = await resp.json();
-    return { success: data.ok, message: data.ok ? "Test message sent!" : (data.description || "Failed") };
+    return { success: data.ok, message: data.ok ? "Message sent!" : (data.description || "Failed") };
   } catch (err) {
     return { success: false, message: err.message || "Network error" };
   }

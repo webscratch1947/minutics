@@ -16405,7 +16405,7 @@ function RC() {
       day: "numeric"
     });
   const routineLines = ltRoutineReportLines();
-  if (t.activities.length === 0) return [`Lifetime — Daily Summary`, n, "", "No activity was tracked today.", ...routineLines].join("\n");
+  if (t.activities.length === 0) return [`Minutics — Daily Summary`, n, "", "No activity was tracked today.", ...routineLines].join("\n");
   const s = e.blocks.filter(o => Hc(new Date(o.startTime), new Date));
   const r = t.activities.slice().sort((o, i) => i.totalSeconds - o.totalSeconds).map(o => {
     const Ab = s.filter(Eb => Eb.activityId === o.activityId);
@@ -16424,7 +16424,7 @@ function RC() {
     });
     return [`• ${o.activityName} — ${dh(o.totalSeconds)}`, ...Bb].join("\n")
   });
-  return [`Lifetime — Daily Summary`, n, "", `Total time tracked: ${dh(t.totalSeconds)}`, `Activities logged: ${t.activities.length}`, "", ...r, ...routineLines].join(`\n`)
+  return [`Minutics — Daily Summary`, n, "", `Total time tracked: ${dh(t.totalSeconds)}`, `Activities logged: ${t.activities.length}`, "", ...r, ...routineLines].join(`\n`)
 }
 
 function dh(e) {
@@ -16608,10 +16608,26 @@ function Ns() {
       t = e ? JSON.parse(e) : {},
       n = xn(t.telegramBotToken),
       r = xn(t.telegramChatId);
+    let connected = !!(n && r);
+    if (connected) {
+      try {
+        const plan = JSON.parse(localStorage.getItem("lt_plan_v1") || '"free"');
+        const isLifetime = plan === "lifetime" || plan === "pro";
+        const isBasic = plan === "basic" || plan === "yearly";
+        if (isBasic) {
+          const startedAt = JSON.parse(localStorage.getItem("lt_plan_since_v1") || "null");
+          if (!startedAt) connected = false;
+          else {
+            const duration = plan === "basic" ? 30 * 24 * 60 * 60 * 1000 : 365 * 24 * 60 * 60 * 1000;
+            if (Date.now() >= Number(startedAt) + duration) connected = false;
+          }
+        } else if (!isLifetime) connected = false;
+      } catch {}
+    }
     return {
       telegramBotToken: n,
       telegramChatId: r,
-      telegramConnected: !!(n && r),
+      telegramConnected: connected,
       dailyReportTime: t.dailyReportTime || "21:00",
       lastSummaryDate: t.lastSummaryDate || null
     }
@@ -16663,6 +16679,35 @@ async function Iy(e, t = Ns()) {
     success: !1,
     message: "Add bot token and chat ID first"
   };
+  try {
+    const plan = JSON.parse(localStorage.getItem("lt_plan_v1") || '"free"');
+    const isLifetime = plan === "lifetime" || plan === "pro";
+    const isBasic = plan === "basic" || plan === "yearly";
+    let expired = false;
+    if (isBasic) {
+      const startedAt = JSON.parse(localStorage.getItem("lt_plan_since_v1") || "null");
+      if (!startedAt) expired = true;
+      else {
+        const duration = plan === "basic" ? 30 * 24 * 60 * 60 * 1000 : 365 * 24 * 60 * 60 * 1000;
+        expired = Date.now() >= Number(startedAt) + duration;
+      }
+    }
+    if (!isLifetime && !isBasic) expired = true;
+    if (expired) return { success: !1, message: "Subscription expired. Renew to continue Telegram reports." };
+  } catch {}
+  if (typeof window !== "undefined" && window.location && window.location.origin) {
+    try {
+      const resp = await fetch(window.location.origin + "/api/telegram-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: n, chatId: r, text: e })
+      });
+      const data = await resp.json();
+      return data.ok ? { success: !0, message: "Message sent" } : { success: !1, message: data.description || "Telegram rejected the message. Check token and chat ID." };
+    } catch {
+      return { success: !1, message: "Could not reach Telegram" };
+    }
+  }
   try {
     return (await fetch(`https://api.telegram.org/bot${n}/sendMessage`, {
       method: "POST",
@@ -16747,7 +16792,7 @@ function RecoveredSettingsReference() {
         dailyReportTime: i
       });
       t(C);
-      const E = await Iy("Lifetime test message: Telegram is connected.", C);
+      const E = await Iy("Minutics test message: Telegram is connected.", C);
       g(E)
     } catch {
       g({
