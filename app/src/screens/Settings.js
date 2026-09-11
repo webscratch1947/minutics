@@ -303,12 +303,16 @@ export function SettingsScreen() {
         localStorage.setItem(k, planData[k]);
       });
 
-      /* Full logout via Firebase */
+      /* Full logout via Firebase, then reload so the React root re-mounts
+         and re-checks getProfile() — without a reload the old profile stays
+         in React state and the user lands back in the same app. */
       if (window.LTAuth && window.LTAuth.logout) {
         window.LTAuth.logout();
-      } else {
-        window.location.reload();
       }
+      /* Always reload after a short delay to let Firebase sign-out complete.
+         Using setTimeout avoids a race where the reload fires before the
+         auth state change propagates. */
+      setTimeout(function () { window.location.reload(); }, 300);
     }
   }
 

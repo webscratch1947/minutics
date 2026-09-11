@@ -469,11 +469,9 @@ function renderForgotGate() {
     if (!email) { showError("Enter your email first."); return; }
     setLoading(true);
 
-    var apiOrigin = (typeof window.AndroidBridge !== "undefined" ||
-                      location.hostname === "app.local" ||
-                      location.protocol === "file:" || location.protocol === "")
-      ? "https://app.minutics.com" : "";
-    fetch(apiOrigin + "/api/send-reset-email", {
+    /* Always use the full deployed URL so the request works from any
+       context (Android WebView from file://, app.local, custom scheme, etc.) */
+    fetch("https://app.minutics.com/api/send-reset-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: email }),
@@ -485,7 +483,8 @@ function renderForgotGate() {
            account exists — never confirm/deny an email is registered. */
         showError("If an account exists for that email, a reset link is on its way. Check your inbox (and spam folder).", true);
       })
-      .catch(function () {
+      .catch(function (err) {
+        console.error("send-reset-email failed:", err);
         setLoading(false);
         showError("Network error — check your connection and try again.");
       });
