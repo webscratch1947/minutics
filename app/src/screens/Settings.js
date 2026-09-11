@@ -570,8 +570,6 @@ export function SettingsScreen() {
                         var next = !notifEnabled;
                         setNotifEnabled(next);
                         localStorage.setItem("lt_alert_notifs_on_v1", next ? "on" : "off");
-                      } else if (notifPermission === "denied") {
-                        alert("Notifications are blocked. Please enable them in your browser settings (lock icon in address bar).");
                       } else {
                         handleEnableNotifications();
                       }
