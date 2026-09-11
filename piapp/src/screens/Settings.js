@@ -257,37 +257,20 @@ export function SettingsScreen() {
     } catch (e) {}
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       setNotifTestStatus(null);
-      var options = {
-        body: "Test alert: notifications are working.",
-        icon: new URL("../../favicon.png", import.meta.url).href,
-        tag: "minutics-notification-test",
-        requireInteraction: true
-      };
-      function showPageNotification() {
-        /* Keep a reference so Chromium cannot immediately collect the page
-           notification before Windows has shown it. */
-        var notification = new Notification("Minutics", options);
-        window.__minuticsTestNotification = notification;
-        notification.onshow = function () { setNotifTestStatus("sent"); };
-        notification.onerror = function () { setNotifTestStatus("error"); };
-      }
-      /* Desktop Chrome is more reliable with a service-worker notification
-         than a page-created notification, especially while the tab is open. */
       try {
-        if (navigator.serviceWorker) {
-          var workerUrl = new URL("./minutics-alerts-sw.js", window.location.href);
-          var registration = await navigator.serviceWorker.register(workerUrl.pathname);
-          await registration.showNotification("Minutics", options);
-          setNotifTestStatus("sent");
-          return;
-        }
-      } catch (e) { console.warn("Minutics service-worker notification failed:", e); }
-      try {
-        showPageNotification();
+        var n = new Notification("Minutics", {
+          body: "Test alert: notifications are working.",
+          icon: "favicon.png",
+          tag: "minutics-notification-test",
+          requireInteraction: true
+        });
+        window.__minuticsTestNotification = n;
+        n.onshow = function () { setNotifTestStatus("sent"); };
+        n.onerror = function () { setNotifTestStatus("error"); };
+        n.onclick = function () { window.focus(); n.close(); };
       } catch (e) {
-        console.warn("Minutics page notification failed:", e);
+        console.warn("Notification failed:", e);
         setNotifTestStatus("error");
-        alert("Chrome could not display the test notification. Check your system notification settings.");
       }
     }
   }

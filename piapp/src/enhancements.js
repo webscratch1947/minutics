@@ -25,12 +25,6 @@
     video.preload = "auto";
     video.loop = false;
     video.style.cssText = "width:100%;height:100%;object-fit:contain;";
-    video.addEventListener("canplay", function () {
-      try {
-        video.muted = false;
-      } catch (e) {}
-      if (video.paused && !dismissed) video.play().catch(function () {});
-    });
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
 
@@ -51,6 +45,11 @@
     video.addEventListener("error", dismiss);
     video.play().catch(function () {});
     setTimeout(dismiss, MAX_MS);
+
+    document.addEventListener("click", function unmuteOnInteraction() {
+      try { video.muted = false; } catch (e) {}
+      document.removeEventListener("click", unmuteOnInteraction);
+    }, { once: true });
   })();
 
   /* ── Storage keys ──────────────────────────────────────────────────────── */
