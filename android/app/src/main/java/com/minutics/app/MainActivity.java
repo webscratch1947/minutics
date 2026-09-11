@@ -80,6 +80,12 @@ public final class MainActivity extends Activity {
         }
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        dispatchNotificationPermission();
+    }
+
     private boolean notificationsGranted() {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;

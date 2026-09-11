@@ -43,5 +43,10 @@ export function getPlan() {
 /** Check if user is on a paid plan */
 export function isPro() {
   const plan = getPlan();
-  return plan === "basic" || plan === "yearly" || plan === "lifetime" || plan === "pro";
+  if (plan === "lifetime" || plan === "pro") return true;
+  if (plan !== "basic" && plan !== "yearly") return false;
+  const startedAt = readJson("lt_plan_since_v1", null);
+  if (!startedAt) return false;
+  const duration = plan === "basic" ? 30 * 24 * 60 * 60 * 1000 : 365 * 24 * 60 * 60 * 1000;
+  return Date.now() < Number(startedAt) + duration;
 }

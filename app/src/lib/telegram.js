@@ -5,6 +5,7 @@
  *   Iy (sendTelegramReport), RC (getTelegramReportData), UC (updateLastSummaryDate)
  */
 
+
 const TELEGRAM_KEY = "lifetime_telegram_settings_v1";
 
 /** Trim or return null */
@@ -22,7 +23,7 @@ export function getTelegramSettings() {
     return {
       telegramBotToken: token,
       telegramChatId: chatId,
-      telegramConnected: !!(token && chatId),
+      telegramConnected: !!(isPro() && token && chatId),
       dailyReportTime: data.dailyReportTime || "21:00",
       lastSummaryDate: data.lastSummaryDate || null
     };
@@ -45,7 +46,7 @@ export function saveTelegramSettings(settings) {
   const saved = {
     telegramBotToken: token,
     telegramChatId: chatId,
-    telegramConnected: !!(token && chatId),
+    telegramConnected: !!(isPro() && token && chatId),
     dailyReportTime: settings.dailyReportTime || "21:00",
     lastSummaryDate: existing.lastSummaryDate || null
   };
@@ -74,6 +75,9 @@ export function saveTelegramSettings(settings) {
 
 /** Send a test message via Telegram Bot API (was: Iy) */
 export async function sendTelegramReport(token, chatId, text) {
+  if (!isPro()) {
+    return { success: false, message: "Telegram daily reports require an active paid plan." };
+  }
   try {
     const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
@@ -139,3 +143,4 @@ export function updateLastSummaryDate(date) {
     localStorage.setItem(TELEGRAM_KEY, JSON.stringify(settings));
   } catch {}
 }
+import { isPro } from './settings.js';

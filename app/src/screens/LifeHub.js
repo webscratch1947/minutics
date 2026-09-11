@@ -217,7 +217,7 @@ export function LifeHubScreen({ profile }) {
   // ═══════════════════════════════════════════════════════════════════════════
   if (view === "list") {
     return jsxs("div", {
-      className: "flex flex-col min-h-full bg-background p-4",
+      className: "flex flex-col min-h-full bg-background p-4 pb-24",
       children: [
         // ── Title ──
         jsx("h1", {
@@ -312,7 +312,7 @@ export function LifeHubScreen({ profile }) {
 
         // ── Premium section (locked tools) ──
         lockedTools.length > 0 && jsxs("div", {
-          className: "mt-4",
+          className: "mt-4 pb-4",
           children: [
             jsx("p", {
               className: "text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2",

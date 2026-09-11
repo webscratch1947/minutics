@@ -3,7 +3,7 @@ import { jsx, jsxs } from 'react/jsx-runtime';
 import { getProfile } from '../lib/profile.js';
 import { getTelegramSettings, saveTelegramSettings, sendTelegramReport } from '../lib/telegram.js';
 import { getCurrency, setCurrency } from '../lib/currency.js';
-import { saveGoalType, getGoalType } from '../lib/settings.js';
+import { saveGoalType, getGoalType, isPro as hasActivePaidPlan } from '../lib/settings.js';
 import { readJson, writeJson } from '../lib/settings.js';
 import { CircleCheckBig as eh } from 'lucide-react';
 
@@ -125,7 +125,7 @@ export function SettingsScreen() {
   /* ── plan ── */
   var rawPlan = localStorage.getItem("lt_plan_v1") || "free";
   try { rawPlan = JSON.parse(rawPlan); } catch { rawPlan = "free"; }
-  var isPro = rawPlan === "basic" || rawPlan === "yearly" || rawPlan === "lifetime" || rawPlan === "pro";
+  var isPro = hasActivePaidPlan();
   var planLabel = PLANS[rawPlan] || "Free";
 
   /* ── currency ── */
@@ -163,8 +163,18 @@ export function SettingsScreen() {
     function onPermissionChanged(event) {
       setNotifPermission((event.detail && event.detail.permission) || getAlertPermission());
     }
+    function refreshPermission() { setNotifPermission(getAlertPermission()); }
+    function onVisibilityChange() { if (document.visibilityState === "visible") refreshPermission(); }
     window.addEventListener("minutics-notification-permission", onPermissionChanged);
-    return function () { window.removeEventListener("minutics-notification-permission", onPermissionChanged); };
+    window.addEventListener("focus", refreshPermission);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    var permissionPoll = window.setInterval(refreshPermission, 1000);
+    return function () {
+      window.removeEventListener("minutics-notification-permission", onPermissionChanged);
+      window.removeEventListener("focus", refreshPermission);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.clearInterval(permissionPoll);
+    };
   }, []);
 
   /* ── telegram ── */
@@ -172,13 +182,13 @@ export function SettingsScreen() {
   var _tgTokenState = useState((tgSettings && tgSettings.telegramBotToken) || "");
   var tgToken = _tgTokenState[0];
   var setTgToken = _tgTokenState[1];
-  var _tgChatIdState = useState((tgSettings && tgSettings.chatId) || "");
+  var _tgChatIdState = useState((tgSettings && tgSettings.telegramChatId) || "");
   var tgChatId = _tgChatIdState[0];
   var setTgChatId = _tgChatIdState[1];
   var _tgTimeState = useState((tgSettings && tgSettings.dailyReportTime) || "21:00");
   var tgTime = _tgTimeState[0];
   var setTgTime = _tgTimeState[1];
-  var tgConnected = tgSettings && tgSettings.connected;
+  var tgConnected = tgSettings && tgSettings.telegramConnected;
   var _tgSavingState = useState(false);
   var tgSaving = _tgSavingState[0];
   var setTgSaving = _tgSavingState[1];
@@ -211,6 +221,7 @@ export function SettingsScreen() {
     var next = !nudgesEnabled;
     setNudgesEnabled(next);
     writeJson("lt_notifs_enabled_v1", next ? "true" : "false");
+    if (next && getAlertPermission() === "default") handleEnableNotifications();
     if (next && typeof Notification !== "undefined" && Notification.permission === "default") {
       Notification.requestPermission().then(function (perm) { setNotifPermission(perm); });
     }
@@ -267,21 +278,23 @@ export function SettingsScreen() {
   }
 
   function handleSaveTelegram() {
+    if (!isPro) { alert("Telegram daily reports require an active paid plan."); return; }
     setTgSaving(true);
     saveTelegramSettings({
       telegramBotToken: tgToken,
-      chatId: tgChatId,
+      telegramChatId: tgChatId,
       dailyReportTime: tgTime
     });
     setTimeout(function () { setTgSaving(false); }, 600);
   }
 
   function handleTestTelegram() {
+    if (!isPro) { alert("Telegram daily reports require an active paid plan."); return; }
     setTgTestLoading(true);
     setTgTestResult(null);
     sendTelegramReport(tgToken, tgChatId, "Test from Minutics \u2014 your Telegram integration is working!")
-      .then(function (ok) {
-        setTgTestResult(ok ? "success" : "error");
+      .then(function (result) {
+        setTgTestResult(result && result.success ? "success" : "error");
         setTgTestLoading(false);
       })
       .catch(function () {
@@ -609,10 +622,10 @@ export function SettingsScreen() {
                   children: [
                     jsx("button", {
                       onClick: handleSaveTelegram,
-                      disabled: tgSaving || !tgToken || !tgChatId,
+                      disabled: tgSaving || !tgToken || !tgChatId || !isPro,
                       className: [
                         "flex-1 py-3 text-sm font-semibold transition",
-                        tgSaving || !tgToken || !tgChatId
+                        tgSaving || !tgToken || !tgChatId || !isPro
                           ? "text-muted-foreground cursor-not-allowed"
                           : "text-primary active:bg-primary/5"
                       ].join(" "),
@@ -620,10 +633,10 @@ export function SettingsScreen() {
                     }),
                     jsx("button", {
                       onClick: handleTestTelegram,
-                      disabled: tgTestLoading || !tgToken || !tgChatId,
+                      disabled: tgTestLoading || !tgToken || !tgChatId || !isPro,
                       className: [
                         "flex-1 py-3 text-sm font-semibold transition",
-                        tgTestLoading || !tgToken || !tgChatId
+                        tgTestLoading || !tgToken || !tgChatId || !isPro
                           ? "text-muted-foreground cursor-not-allowed"
                           : "text-foreground active:bg-gray-50"
                       ].join(" "),

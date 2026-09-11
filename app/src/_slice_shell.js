@@ -15,6 +15,7 @@ function LTTopNav() {
   const { data: activities = [] } = useActivities();
   const updateBlock = useUpdateBlock();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -45,19 +46,25 @@ function LTTopNav() {
   const secs = elapsed % 60;
   const timeStr = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
 
-  const stopTimer = () => {
+  const stopTimer = (event) => {
+    event.stopPropagation();
     updateBlock.mutate({
       id: running.id,
       data: { endTime: new Date().toISOString() }
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: blocksKey });
+        navigate('/activity');
       }
     });
   };
 
   return jsxs('div', {
-    className: 'flex items-center gap-2 px-4 py-2 bg-[#04091e] text-white text-xs font-bold',
+    className: 'flex items-center gap-2 px-4 py-2 bg-[#04091e] text-white text-xs font-bold cursor-pointer',
+    role: 'button',
+    tabIndex: 0,
+    onClick: () => navigate('/activity'),
+    onKeyDown: (event) => { if (event.key === 'Enter' || event.key === ' ') navigate('/activity'); },
     children: [
       jsx('span', {
         className: 'w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 animate-pulse'
@@ -79,9 +86,9 @@ export function ak({
   children: e
 }) {
   return jsxs("div", {
-    className: "relative mx-auto max-w-[430px] w-full min-h-[100dvh] bg-background flex flex-col",
+    className: "relative mx-auto max-w-[430px] w-full h-[100dvh] overflow-hidden bg-background flex flex-col",
     children: [jsx(LTTopNav, {}), jsx("main", {
-      className: "flex-1 overflow-y-auto pb-[64px] no-scrollbar",
+      className: "flex-1 min-h-0 overflow-y-auto overscroll-contain pb-[88px] no-scrollbar",
       children: e
     }), jsx(ck, {})]
   })
