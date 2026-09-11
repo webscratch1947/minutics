@@ -28,6 +28,7 @@ function LTTopNav() {
   if (!running) {
     return jsxs('div', {
       className: 'flex items-center gap-2 px-4 py-2 bg-[#04091e] text-white/40 text-xs font-bold',
+      style: { paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))' },
       children: [
         jsx('span', {
           className: 'w-2.5 h-2.5 rounded-full bg-white/20 shrink-0'
@@ -61,6 +62,7 @@ function LTTopNav() {
 
   return jsxs('div', {
     className: 'flex items-center gap-2 px-4 py-2 bg-[#04091e] text-white text-xs font-bold cursor-pointer',
+    style: { paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))' },
     role: 'button',
     tabIndex: 0,
     onClick: () => navigate('/activity'),

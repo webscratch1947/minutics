@@ -121,6 +121,11 @@ export function SettingsScreen() {
   /* ── profile ── */
   var profile = getProfile();
   var profileName = (profile && profile.name) ? profile.name : "User";
+  var userEmail = "";
+  try {
+    var _authUser = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
+    userEmail = (_authUser && _authUser.email) ? _authUser.email : "";
+  } catch (e) {}
 
   /* ── plan ── */
   var rawPlan = localStorage.getItem("lt_plan_v1") || "free";
@@ -161,6 +166,9 @@ export function SettingsScreen() {
   var _notifTestState = useState(null);
   var notifTestStatus = _notifTestState[0];
   var setNotifTestStatus = _notifTestState[1];
+  var _notifEnabledState = useState(localStorage.getItem("lt_alert_notifs_on_v1") !== "off");
+  var notifEnabled = _notifEnabledState[0];
+  var setNotifEnabled = _notifEnabledState[1];
 
   useEffect(function () {
     function onPermissionChanged(event) {
@@ -374,7 +382,7 @@ export function SettingsScreen() {
                     className: "flex-1 min-w-0",
                     children: [
                       jsx("p", { className: "text-lg font-bold text-foreground truncate", children: profileName }),
-                      jsx("p", { className: "text-xs text-muted-foreground mt-0.5", children: "Your data stays on this device" })
+                      jsx("p", { className: "text-xs text-muted-foreground mt-0.5 truncate", children: userEmail || "Your data stays on this device" })
                     ]
                   })
                 ]
@@ -556,9 +564,19 @@ export function SettingsScreen() {
               children: jsxs("div", {
                 className: "flex items-center gap-2",
                 children: [
-                  notifPermission === "granted" ? jsx("span", {
-                    className: "inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-600",
-                    children: "On"
+                  notifPermission === "granted" ? jsx("button", {
+                    onClick: function () {
+                      var next = !notifEnabled;
+                      setNotifEnabled(next);
+                      localStorage.setItem("lt_alert_notifs_on_v1", next ? "on" : "off");
+                    },
+                    className: [
+                      "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition cursor-pointer",
+                      notifEnabled
+                        ? "bg-green-50 text-green-600"
+                        : "bg-gray-200 text-gray-500"
+                    ].join(" "),
+                    children: notifEnabled ? "On" : "Off"
                   }) : jsx("button", {
                     onClick: handleEnableNotifications,
                     disabled: notifPermission === "denied",

@@ -19,7 +19,7 @@
     video.id = "lt-startup-splash-video";
     video.src = "assets/lt/minutics_splash.mp4";
     video.autoplay = true;
-    video.muted = true; /* MUST be muted for autoplay in Chrome/WebView */
+    video.muted = false;
     /* Set playsinline as HTML attribute (not just property) for real mobile
        devices — some WebViews ignore the JS property. Also set webkit
        variant for older iOS. */
@@ -140,7 +140,7 @@
 
   /* ── Activity categories (15) ─────────────────────────────────────────── */
   var CATEGORIES = [
-    "Duty / Work", "Time Waste", "Social Media", "Study / Learning",
+    "Job", "Business", "Time Waste", "Social Media", "Study / Learning",
     "Exercise / Fitness", "Sleep / Rest", "Family / Relationships",
     "Household Chores", "Entertainment", "Commute / Travel",
     "Health / Self-care", "Creative / Hobby", "Shopping / Errands",
@@ -1024,7 +1024,7 @@
       ".lt-tile-label{font-size:11px!important;font-weight:600!important;color:hsl(var(--foreground))!important;line-height:1.3!important;max-width:68px!important}",
       /* overlay root */
       "#lt-overlay-root{position:fixed;inset:0;z-index:2147483647;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;background:hsl(var(--background));color:hsl(var(--foreground));box-sizing:border-box}",
-      ".lt-tool-shell{max-width:700px;margin:0 auto;padding:20px 16px 100px;box-sizing:border-box;width:100%}",
+      ".lt-tool-shell{max-width:700px;margin:0 auto;padding:20px 16px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%}",
       ".lt-tool-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px}",
       ".lt-tool-kicker{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:hsl(var(--muted-foreground));font-weight:800;margin:0 0 4px}",
       ".lt-tool-heading{font-size:26px;font-weight:900;margin:0;color:hsl(var(--foreground))}",
@@ -1434,7 +1434,7 @@
       ".lt-cat-reason{width:100%;min-height:70px;resize:vertical;border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:8px;padding:10px;font:inherit;font-size:13px;box-sizing:border-box}",
       ".lt-cat-field-row{display:flex;gap:10px;margin-bottom:10px}",
       ".lt-cat-field-row .lt-field{flex:1}",
-      ".lt-cat-modal-actions{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px 18px;background:hsl(var(--card));border-top:1px solid hsl(var(--border));flex:0 0 auto}",
+      ".lt-cat-modal-actions{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px calc(18px + env(safe-area-inset-bottom, 0px));background:hsl(var(--card));border-top:1px solid hsl(var(--border));flex:0 0 auto}",
       /* Keep user-selected activity emoji in the platform's color emoji
          font. The WebView was inheriting the row's dark text color and
          rendering some emoji as black glyphs. */
@@ -5414,10 +5414,10 @@
   /* ══════════════════════════════════════════════════════════════════════════
      FEATURE 3 — Streaks & Time Master badge
      Tracks consecutive days with ≥60min of "Study / Learning" or
-     "Duty / Work" logged. Awards badge at 7-day streak.
+      "Job", "Business", or "Study / Learning" logged. Awards badge at 7-day streak.
   ══════════════════════════════════════════════════════════════════════════ */
 
-  var SELF_DEV_CATEGORIES = ["Study / Learning", "Duty / Work", "Self Development"];
+   var SELF_DEV_CATEGORIES = ["Study / Learning", "Job", "Business", "Self Development"];
   var SELF_DEV_MIN_MINUTES = 60;
 
   function updateStreak() {
@@ -5661,7 +5661,7 @@
      time: Work / Self-dev / Fitness add points, Time Waste subtracts.
   ══════════════════════════════════════════════════════════════════════════ */
 
-  var PRODSCORE_BOOST = ["Duty / Work", "Study / Learning", "Exercise / Fitness", "Creative / Hobby", "Health / Self-care"];
+   var PRODSCORE_BOOST = ["Job", "Business", "Study / Learning", "Exercise / Fitness", "Creative / Hobby", "Health / Self-care"];
 
   function computeProductivityIndex(entries) {
     var boostMin = 0, wasteMin = 0;
@@ -7007,7 +7007,7 @@
 
   function getJarsConfig() {
     var saved = readJson(JARS_KEY, null);
-    if (!saved || !Array.isArray(saved.jars) || saved.jars.length !== 6) {
+    if (!saved || !Array.isArray(saved.jars) || saved.jars.length < 1) {
       var now = today();
       return {
         jars: JARS_DEFAULTS.map(function (d) {
@@ -7099,7 +7099,7 @@
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
-        toolHeader("6 Jars", "Your monthly salary split across 6 purposeful jars.") +
+        toolHeader("6 Jars", "Your monthly salary split across your purposeful jars.") +
         '<div class="lt-jars-summary">' +
           '<div class="lt-jars-sum-item"><span class="lt-jars-sum-label">Monthly Salary</span>' + salaryValHtml + '</div>' +
           '<div class="lt-jars-sum-item"><span class="lt-jars-sum-label">Allocated</span><span class="lt-jars-sum-val">' + totalPct + '% of salary</span></div>' +
@@ -7157,21 +7157,25 @@
 
   function renderJarSettings() {
     var config = getJarsConfig();
+    var JAR_COLORS = ["#22c55e","#f59e0b","#8b5cf6","#ef4444","#3b82f6","#ec4899","#06b6d4","#f97316","#84cc16","#a855f7"];
 
-    var rowsHtml = config.jars.map(function (jar, i) {
-      return (
-        '<div class="lt-jar-set-row">' +
-          '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">' +
-            '<div class="lt-jar-swatch" style="background:' + jar.color + '"></div>' +
-            '<input class="lt-jar-set-name" data-idx="' + i + '" type="text" value="' + escapeHtml(jar.name) + '" maxlength="20" placeholder="Jar name"/>' +
-          '</div>' +
-          '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
-            '<input class="lt-jar-set-pct" data-idx="' + i + '" type="number" min="0" max="100" step="1" value="' + jar.pct + '"/>' +
-            '<span style="font-size:12px;color:hsl(var(--muted-foreground));font-weight:700">%</span>' +
-          '</div>' +
-        '</div>'
-      );
-    }).join("");
+    function buildRowsHtml(jars) {
+      return jars.map(function (jar, i) {
+        return (
+          '<div class="lt-jar-set-row" data-idx="' + i + '">' +
+            '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">' +
+              '<div class="lt-jar-swatch" style="background:' + jar.color + '"></div>' +
+              '<input class="lt-jar-set-name" data-idx="' + i + '" type="text" value="' + escapeHtml(jar.name) + '" maxlength="20" placeholder="Jar name"/>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+              '<input class="lt-jar-set-pct" data-idx="' + i + '" type="number" min="0" max="100" step="1" value="' + jar.pct + '"/>' +
+              '<span style="font-size:12px;color:hsl(var(--muted-foreground));font-weight:700">%</span>' +
+              '<button class="lt-jar-remove-btn" data-idx="' + i + '" style="border:none;background:transparent;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 4px;line-height:1">&times;</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join("");
+    }
 
     var initTotal = config.jars.reduce(function (s, j) { return s + j.pct; }, 0);
 
@@ -7186,15 +7190,26 @@
           '<button class="lt-tool-close" id="lt-jar-back">\u2190 Back</button>' +
         '</div>' +
         '<div class="lt-tool-card">' +
-          '<p class="lt-card-title">Your 6 jars</p>' +
+          '<p class="lt-card-title">Your ' + config.jars.length + ' jars</p>' +
           '<p class="lt-card-subtitle" id="lt-jar-total-msg">Total: ' + initTotal + '%' + (Math.abs(initTotal - 100) < 0.1 ? ' \u2713' : ' (should be 100%)') + '</p>' +
-          '<div id="lt-jar-set-rows">' + rowsHtml + '</div>' +
+          '<div id="lt-jar-set-rows">' + buildRowsHtml(config.jars) + '</div>' +
+          '<button id="lt-jar-add" style="width:100%;margin-top:12px;padding:10px;border:2px dashed hsl(var(--border));background:transparent;border-radius:10px;font-weight:700;font-size:13px;color:hsl(var(--muted-foreground));cursor:pointer">+ Add Jar</button>' +
         '</div>' +
         '<div class="lt-form-actions">' +
           '<button class="lt-tool-secondary" id="lt-jar-reset">Reset defaults</button>' +
           '<button class="lt-tool-primary" id="lt-jar-save">Save Settings</button>' +
         '</div>' +
       '</div>';
+
+    function refreshRows() {
+      var newConfig = getJarsConfig();
+      var rowsEl = document.getElementById("lt-jar-set-rows");
+      var titleEl = activeOverlay.querySelector(".lt-card-title");
+      if (rowsEl) rowsEl.innerHTML = buildRowsHtml(newConfig.jars);
+      if (titleEl) titleEl.textContent = "Your " + newConfig.jars.length + " jars";
+      updateTotalLabel();
+      bindEvents();
+    }
 
     function updateTotalLabel() {
       var total = 0;
@@ -7205,12 +7220,37 @@
         msg.style.color = Math.abs(total - 100) < 0.1 ? "#22c55e" : "#ef4444";
       }
     }
-    activeOverlay.querySelectorAll('.lt-jar-set-pct').forEach(function (inp) {
-      inp.addEventListener('input', updateTotalLabel);
-    });
+
+    function bindEvents() {
+      activeOverlay.querySelectorAll('.lt-jar-set-pct').forEach(function (inp) {
+        inp.addEventListener('input', updateTotalLabel);
+      });
+      activeOverlay.querySelectorAll('.lt-jar-remove-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var idx = Number(btn.getAttribute('data-idx'));
+          var cfg = getJarsConfig();
+          if (cfg.jars.length <= 1) { alert("You need at least one jar."); return; }
+          cfg.jars.splice(idx, 1);
+          saveJarsConfig(cfg);
+          refreshRows();
+        });
+      });
+    }
+
+    updateTotalLabel();
+    bindEvents();
 
     var backBtn = document.getElementById("lt-jar-back");
     if (backBtn) backBtn.addEventListener("click", renderSixJars);
+
+    var addBtn = document.getElementById("lt-jar-add");
+    if (addBtn) addBtn.addEventListener("click", function () {
+      var cfg = getJarsConfig();
+      var colorIdx = cfg.jars.length % JAR_COLORS.length;
+      cfg.jars.push({ id: "jar_" + Date.now(), name: "New Jar", pct: 0, color: JAR_COLORS[colorIdx], light: "#f3f4f6", setupDate: today() });
+      saveJarsConfig(cfg);
+      refreshRows();
+    });
 
     var resetBtn = document.getElementById("lt-jar-reset");
     if (resetBtn) resetBtn.addEventListener("click", function () {
@@ -7226,12 +7266,12 @@
 
     var saveBtn = document.getElementById("lt-jar-save");
     if (saveBtn) saveBtn.addEventListener("click", function () {
-      var newJars = config.jars.map(function (jar, i) {
+      var cfg = getJarsConfig();
+      var newJars = cfg.jars.map(function (jar, i) {
         var nameEl = activeOverlay.querySelector('.lt-jar-set-name[data-idx="' + i + '"]');
         var pctEl  = activeOverlay.querySelector('.lt-jar-set-pct[data-idx="' + i + '"]');
         var newName = (nameEl ? nameEl.value.trim() : "") || jar.name;
         var newPct  = pctEl ? Math.max(0, Math.min(100, Math.round(Number(pctEl.value) || 0))) : jar.pct;
-        /* Reset setup date only if percentage changed so savings recalculate */
         var setupDate = (newPct !== jar.pct) ? today() : (jar.setupDate || today());
         return { id: jar.id, name: newName, pct: newPct, color: jar.color, light: jar.light, setupDate: setupDate };
       });
@@ -7240,7 +7280,7 @@
         alert("Percentages must add up to 100% or less. Currently: " + total + "%");
         return;
       }
-      saveJarsConfig({ jars: newJars, setupDate: config.setupDate || today() });
+      saveJarsConfig({ jars: newJars, setupDate: cfg.setupDate || today() });
       renderSixJars();
     });
   }
@@ -7251,8 +7291,21 @@
       closeOverlay();
       return true;
     }
+    /* Step back through SPA history */
+    if (window.history && window.history.length > 1) {
+      window.history.back();
+      return true;
+    }
     return false;
   };
+
+  /* Also listen for popstate so Android back button works for SPA navigation
+     even when LTHandleBack is not called directly by the WebView */
+  window.addEventListener("popstate", function () {
+    if (activeOverlay) {
+      closeOverlay();
+    }
+  });
 
   /* P12 REMOVED: applyTimerZoom, scheduleZoom, lockTimerPageScroll
      The Timer tab now uses normal scroll like every other tab.
