@@ -25,7 +25,7 @@ export function HC() {
       const r = new Date,
         o = `${String(r.getHours()).padStart(2,"0")}:${String(r.getMinutes()).padStart(2,"0")}`,
         s = r.toLocaleDateString("en-CA");
-      o !== n.dailyReportTime || n.lastSummaryDate === s || (updateLastSummaryDate(s), sendTelegramReport(getTelegramReportData(), n))
+      o !== n.dailyReportTime || n.lastSummaryDate === s || (updateLastSummaryDate(s), sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()))
     };
     e();
     const t = window.setInterval(e, 30 * 1e3);
