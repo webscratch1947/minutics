@@ -158,6 +158,9 @@ export function SettingsScreen() {
   var _notifPermState = useState(getAlertPermission());
   var notifPermission = _notifPermState[0];
   var setNotifPermission = _notifPermState[1];
+  var _notifTestState = useState(null);
+  var notifTestStatus = _notifTestState[0];
+  var setNotifTestStatus = _notifTestState[1];
 
   useEffect(function () {
     function onPermissionChanged(event) {
@@ -245,26 +248,37 @@ export function SettingsScreen() {
       }
     } catch (e) {}
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      setNotifTestStatus(null);
       var options = {
         body: "Test alert: notifications are working.",
         icon: new URL("../../favicon.png", import.meta.url).href,
         tag: "minutics-notification-test",
         requireInteraction: true
       };
+      function showPageNotification() {
+        /* Keep a reference so Chromium cannot immediately collect the page
+           notification before Windows has shown it. */
+        var notification = new Notification("Minutics", options);
+        window.__minuticsTestNotification = notification;
+        notification.onshow = function () { setNotifTestStatus("sent"); };
+        notification.onerror = function () { setNotifTestStatus("error"); };
+      }
       /* Desktop Chrome is more reliable with a service-worker notification
          than a page-created notification, especially while the tab is open. */
       try {
         if (navigator.serviceWorker) {
           var workerUrl = new URL("./minutics-alerts-sw.js", window.location.href);
           var registration = await navigator.serviceWorker.register(workerUrl.pathname);
-          await navigator.serviceWorker.ready;
           await registration.showNotification("Minutics", options);
+          setNotifTestStatus("sent");
           return;
         }
-      } catch (e) {}
+      } catch (e) { console.warn("Minutics service-worker notification failed:", e); }
       try {
-        new Notification("Minutics", options);
+        showPageNotification();
       } catch (e) {
+        console.warn("Minutics page notification failed:", e);
+        setNotifTestStatus("error");
         alert("Chrome could not display the test notification. Check your system notification settings.");
       }
     }
@@ -526,7 +540,11 @@ export function SettingsScreen() {
           jsx(Card, {
             children: jsx(CardRow, {
               label: "Alert Notifications",
-              desc: notifPermission === "granted"
+              desc: notifTestStatus === "sent"
+                ? "Test notification sent — check Windows Notification Center"
+                : notifTestStatus === "error"
+                  ? "Chrome could not show it — check Windows Do Not Disturb"
+                : notifPermission === "granted"
                 ? "Notifications are enabled"
                 : notifPermission === "denied"
                   ? "Blocked by browser settings"
