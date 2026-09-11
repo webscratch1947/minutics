@@ -6660,7 +6660,6 @@
               )
           ) +
           '<button id="lt-plans-close" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);border-radius:12px;color:hsl(230 40% 16%);padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;font-family:inherit;transition:background .15s">Close</button>' +
-          '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
       '</div>';
     var plansHost = activeOverlay || document.body;
@@ -6733,8 +6732,8 @@
       showUpgradePrompt("You already have an active " + getPlanName() + " subscription. Cancel it first to switch plans.");
       return;
     }
-    var plans = { basic: { label: "Basic", price: "$1", sub: "/month" }, yearly: { label: "1 Year", price: "$9", sub: "/year" }, lifetime: { label: "Lifetime", price: "$99", sub: "" } };
-    var plan = plans[planId] || plans.yearly;
+    var USD_PLANS = { basic: { label: "Basic", price: "$1", sub: "/month" }, yearly: { label: "1 Year", price: "$9", sub: "/year" }, lifetime: { label: "Lifetime", price: "$99", sub: "" } };
+    var plan = USD_PLANS[planId] || USD_PLANS.yearly;
     addStyle3();
     var existing = document.getElementById("lt-checkout-modal");
     if (existing) existing.remove();
@@ -6747,23 +6746,8 @@
         '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px">' + plan.price + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + plan.sub + '</span></p>' +
         '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 22px">Budget Tracker, Telegram reports, full history & more</p>' +
         '<div id="lt-checkout-body">' +
-          '<div style="background:hsl(220 15% 97%);border:1px solid hsl(220 13% 88%);padding:12px 14px;margin-bottom:10px">' +
-            '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:700;text-transform:uppercase;margin:0 0 4px">Card number</p>' +
-            '<p style="color:hsl(230 40% 16%);font-size:14px;margin:0;letter-spacing:.05em">4242 4242 4242 4242</p>' +
-          '</div>' +
-          '<div style="display:flex;gap:10px;margin-bottom:20px">' +
-            '<div style="flex:1;background:hsl(220 15% 97%);border:1px solid hsl(220 13% 88%);padding:12px 14px">' +
-              '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:700;text-transform:uppercase;margin:0 0 4px">Expiry</p>' +
-              '<p style="color:hsl(230 40% 16%);font-size:14px;margin:0">12/29</p>' +
-            '</div>' +
-            '<div style="flex:1;background:hsl(220 15% 97%);border:1px solid hsl(220 13% 88%);padding:12px 14px">' +
-              '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:700;text-transform:uppercase;margin:0 0 4px">CVV</p>' +
-              '<p style="color:hsl(230 40% 16%);font-size:14px;margin:0">\u2022\u2022\u2022</p>' +
-            '</div>' +
-          '</div>' +
-          '<button id="lt-checkout-pay-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Pay ' + plan.price + '</button>' +
+          '<button id="lt-checkout-pay-btn" style="width:100%;background:#FFC107;border:none;color:#1a1a1a;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px">Pay with Pi</button>' +
           '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>' +
-          '<p style="color:hsl(220 10% 68%);font-size:9px;text-align:center;margin:10px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
       '</div>';
     (activeOverlay || document.body).appendChild(modal);
@@ -6771,27 +6755,138 @@
     modal.addEventListener("click", function (e) { if (e.target === modal) modal.remove(); });
     document.getElementById("lt-checkout-pay-btn").addEventListener("click", function () {
       var body = document.getElementById("lt-checkout-body");
-      body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:hsl(230 40% 16%);border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Processing payment...</p></div>';
+      var payBtn = document.getElementById("lt-checkout-pay-btn");
+
+      /* Check Pi SDK is available */
+      if (typeof window.Pi === "undefined") {
+        body.innerHTML = '<p style="color:#DC2626;font-size:13px;text-align:center;padding:12px 0">Pi Network SDK not loaded. Please open this app in the Pi Browser.</p>' +
+          '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>';
+        document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
+        return;
+      }
+
       if (!document.getElementById("lt-spin-kf")) {
         var kf = document.createElement("style");
         kf.id = "lt-spin-kf";
         kf.textContent = "@keyframes lt-spin{to{transform:rotate(360deg)}}";
         document.head.appendChild(kf);
       }
-      setTimeout(function () {
-        body.innerHTML =
-          '<div style="text-align:center;padding:16px 0">' +
-            '<div style="font-size:38px;margin-bottom:10px">\u2705</div>' +
-            '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment successful</p>' +
-            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics ' + plan.label + '</p>' +
-            '<button id="lt-checkout-done-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Done</button>' +
-          '</div>';
-        document.getElementById("lt-checkout-done-btn").addEventListener("click", function () {
-          modal.remove();
-          setPlan(planId);
-          refreshPlanGatedUI();
+
+      /* Step 1: Fetch a quote from our server */
+      body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:#FFC107;border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Fetching Pi price...</p></div>';
+
+      var API_ORIGIN = (function () {
+        return "https://piapp.minutics.com";
+      })();
+
+      fetch(API_ORIGIN + "/api/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ planId: planId }),
+      })
+        .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, data: d }; }); })
+        .then(function (r) {
+          if (!r.ok) {
+            body.innerHTML = '<p style="color:#DC2626;font-size:13px;text-align:center;padding:12px 0">' + (r.data && r.data.error || "Could not get price. Please try again.") + '</p>' +
+              '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>';
+            document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
+            return;
+          }
+
+          var quote = r.data;
+          var piAmount = quote.piAmount;
+          var piLabel = piAmount.toFixed(4) + " \u03C0";
+
+          /* Show Pi amount and pay button */
+          body.innerHTML =
+            '<div style="text-align:center;margin-bottom:16px">' +
+              '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 4px">You pay</p>' +
+              '<p style="color:hsl(230 40% 16%);font-size:28px;font-weight:800;margin:0">' + piLabel + '</p>' +
+              '<p style="color:hsl(220 10% 55%);font-size:11px;margin:4px 0 0">~' + plan.price + ' USD</p>' +
+            '</div>' +
+            '<button id="lt-checkout-pay-btn" style="width:100%;background:#FFC107;border:none;color:#1a1a1a;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px">Pay ' + piLabel + '</button>' +
+            '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>';
+
+          document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
+
+          /* Step 2: Create Pi payment via Pi SDK */
+          document.getElementById("lt-checkout-pay-btn").addEventListener("click", function () {
+            var payBtn2 = document.getElementById("lt-checkout-pay-btn");
+            payBtn2.disabled = true;
+            payBtn2.textContent = "Opening Pi...";
+
+            Pi.createPayment({
+              amount: piAmount,
+              memo: "Minutics " + plan.label,
+              metadata: { planId: planId, orderId: quote.orderId },
+            }, {
+              onReadyForServerApproval: function (paymentId) {
+                body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:#FFC107;border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Approving payment...</p></div>';
+                fetch(API_ORIGIN + "/api/pi/payments/create", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  body: JSON.stringify({ paymentId: paymentId, quote: quote }),
+                }).catch(function (err) {
+                  console.error("Payment approval failed:", err);
+                });
+              },
+              onReadyForServerCompletion: function (paymentId, txid) {
+                body.innerHTML = '<div style="text-align:center;padding:30px 0"><div style="width:32px;height:32px;border:3px solid hsl(220 13% 88%);border-top-color:#16A34A;border-radius:50%;margin:0 auto 14px;animation:lt-spin 0.8s linear infinite"></div><p style="color:hsl(220 10% 50%);font-size:13px;margin:0">Completing payment...</p></div>';
+                fetch(API_ORIGIN + "/api/pi/payments/complete", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  body: JSON.stringify({ paymentId: paymentId, txid: txid, quote: quote }),
+                })
+                  .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, data: d }; }); })
+                  .then(function (r) {
+                    body.innerHTML =
+                      '<div style="text-align:center;padding:16px 0">' +
+                        '<div style="font-size:38px;margin-bottom:10px">\u2705</div>' +
+                        '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment successful</p>' +
+                        '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\'re now on Minutics ' + plan.label + '</p>' +
+                        '<button id="lt-checkout-done-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Done</button>' +
+                      '</div>';
+                    document.getElementById("lt-checkout-done-btn").addEventListener("click", function () {
+                      modal.remove();
+                      setPlan(planId);
+                      refreshPlanGatedUI();
+                    });
+                  })
+                  .catch(function (err) {
+                    console.error("Payment completion failed:", err);
+                    body.innerHTML = '<p style="color:#DC2626;font-size:13px;text-align:center;padding:12px 0">Payment verification failed. Contact support if you were charged.</p>' +
+                      '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Close</button>';
+                    document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
+                  });
+              },
+              onCancel: function () {
+                body.innerHTML =
+                  '<div style="text-align:center;padding:16px 0">' +
+                    '<div style="font-size:38px;margin-bottom:10px">\u274C</div>' +
+                    '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment cancelled</p>' +
+                    '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">No Pi was deducted.</p>' +
+                    '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Close</button>' +
+                  '</div>';
+                document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
+              },
+              onError: function (err) {
+                console.error("Pi payment error:", err);
+                body.innerHTML = '<p style="color:#DC2626;font-size:13px;text-align:center;padding:12px 0">Payment failed. Please try again.</p>' +
+                  '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>';
+                document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
+              },
+            });
+          });
+        })
+        .catch(function (err) {
+          console.error("Quote fetch failed:", err);
+          body.innerHTML = '<p style="color:#DC2626;font-size:13px;text-align:center;padding:12px 0">Network error. Please check your connection.</p>' +
+            '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:hsl(220 10% 55%);padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>';
+          document.getElementById("lt-checkout-cancel-btn").addEventListener("click", function () { modal.remove(); });
         });
-      }, 1400);
     });
   }
 

@@ -303,13 +303,13 @@ export function SettingsScreen() {
         localStorage.setItem(k, planData[k]);
       });
 
-      /* Full logout via Firebase, then reload so the React root re-mounts
+      /* Full logout via Pi auth, then reload so the React root re-mounts
          and re-checks getProfile() — without a reload the old profile stays
          in React state and the user lands back in the same app. */
       if (window.LTAuth && window.LTAuth.logout) {
         window.LTAuth.logout();
       }
-      /* Always reload after a short delay to let Firebase sign-out complete.
+      /* Always reload after a short delay to let Pi session clear complete.
          Using setTimeout avoids a race where the reload fires before the
          auth state change propagates. */
       setTimeout(function () { window.location.reload(); }, 300);
