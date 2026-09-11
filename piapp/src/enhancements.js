@@ -6,6 +6,9 @@
      after it ends — if the video is still going once we'd normally cut
      it, we let it finish and freeze on the last frame instead of jumping. */
   var _ltSplashDone = false;
+  if (localStorage.getItem("lt_splash_on_v1") === "off") {
+    _ltSplashDone = true;
+  } else
   (function showStartupSplash() {
     var MAX_MS = 5000; /* fallback safety cap (video is ~4s) in case video events never fire */
     var splash  = document.createElement("div");

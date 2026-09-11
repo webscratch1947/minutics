@@ -170,6 +170,10 @@ export function SettingsScreen() {
   var notifEnabled = _notifEnabledState[0];
   var setNotifEnabled = _notifEnabledState[1];
 
+  var _splashOnState = useState(localStorage.getItem("lt_splash_on_v1") !== "off");
+  var splashOn = _splashOnState[0];
+  var setSplashOn = _splashOnState[1];
+
   useEffect(function () {
     function onPermissionChanged(event) {
       setNotifPermission((event.detail && event.detail.permission) || getAlertPermission());
@@ -562,7 +566,7 @@ export function SettingsScreen() {
                   ? "Blocked by browser settings"
                   : "Allow reminders and app alerts",
               children: jsxs("div", {
-                className: "flex items-center gap-2",
+                className: "flex items-center gap-3",
                 children: [
                   notifPermission === "granted" ? jsx("button", {
                     onClick: function () {
@@ -570,13 +574,31 @@ export function SettingsScreen() {
                       setNotifEnabled(next);
                       localStorage.setItem("lt_alert_notifs_on_v1", next ? "on" : "off");
                     },
-                    className: [
-                      "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition cursor-pointer",
-                      notifEnabled
-                        ? "bg-green-50 text-green-600"
-                        : "bg-gray-200 text-gray-500"
-                    ].join(" "),
-                    children: notifEnabled ? "On" : "Off"
+                    style: {
+                      position: "relative",
+                      width: "48px",
+                      height: "28px",
+                      borderRadius: "14px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: notifEnabled ? "#22c55e" : "#d1d5db",
+                      transition: "background 0.3s ease",
+                      padding: 0,
+                      flexShrink: 0
+                    },
+                    children: jsx("span", {
+                      style: {
+                        position: "absolute",
+                        top: "3px",
+                        left: notifEnabled ? "23px" : "3px",
+                        width: "22px",
+                        height: "22px",
+                        borderRadius: "50%",
+                        background: "#fff",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                        transition: "left 0.3s ease"
+                      }
+                    })
                   }) : jsx("button", {
                     onClick: handleEnableNotifications,
                     disabled: notifPermission === "denied",
@@ -597,6 +619,51 @@ export function SettingsScreen() {
                     children: "Test"
                   })
                 ]
+              })
+            })
+          })
+        ]
+      }),
+
+      /* ─── Splash Intro ─── */
+      jsxs("div", {
+        className: "mx-4",
+        children: [
+          jsx(Card, {
+            children: jsx(CardRow, {
+              label: "Splash Intro",
+              desc: splashOn ? "Animated intro plays on startup" : "Intro animation disabled",
+              children: jsx("button", {
+                onClick: function () {
+                  var next = !splashOn;
+                  setSplashOn(next);
+                  localStorage.setItem("lt_splash_on_v1", next ? "on" : "off");
+                },
+                style: {
+                  position: "relative",
+                  width: "48px",
+                  height: "28px",
+                  borderRadius: "14px",
+                  border: "none",
+                  cursor: "pointer",
+                  background: splashOn ? "#22c55e" : "#d1d5db",
+                  transition: "background 0.3s ease",
+                  padding: 0,
+                  flexShrink: 0
+                },
+                children: jsx("span", {
+                  style: {
+                    position: "absolute",
+                    top: "3px",
+                    left: splashOn ? "23px" : "3px",
+                    width: "22px",
+                    height: "22px",
+                    borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                    transition: "left 0.3s ease"
+                  }
+                })
               })
             })
           })
