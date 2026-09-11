@@ -80,6 +80,7 @@
   var PLAN_KEY           = "lt_plan_v1";             /* "free" | "basic" | "yearly" | "lifetime" */
   var PLAN_SINCE_KEY     = "lt_plan_since_v1";       /* timestamp when current plan was activated — for expiry checks */
   var PLAN_GRACE_KEY     = "lt_plan_grace_v1";       /* timestamp when expiry grace period started — 1-day window before auto-unstar */
+  var PLAN_CANCELLED_KEY = "lt_subscription_cancelled_v1"; /* cancellation stops renewal; access remains until expiry */
   var GOAL_TYPE_KEY      = "lt_goal_type_v1";        /* { type: "retirement"|"age"|"fire"|"milestone", milestoneLabel: "..." } */
   var PROFILE_KEY        = "lifetime_profile";       /* { name, dob, lifespanYears } — set during onboarding */
   var JARS_KEY           = "lt_6jars_v2";            /* 6-jar money management system config */
@@ -372,6 +373,25 @@
     var p = getPlanId();
     return p === "basic" || p === "yearly";
   }
+  function isSubscriptionCancelled() {
+    return !!readJson(PLAN_CANCELLED_KEY, false);
+  }
+  function cancelSubscription() {
+    /* Keep the current paid plan active. It naturally expires at the end of
+       its billing period; only its renewal is cancelled. */
+    writeJson(PLAN_CANCELLED_KEY, true);
+  }
+  function showCancelSubscriptionDialog(onConfirm) {
+    var existing = document.getElementById("lt-cancel-subscription-dialog");
+    if (existing) existing.remove();
+    var dialog = document.createElement("div");
+    dialog.id = "lt-cancel-subscription-dialog";
+    dialog.style.cssText = "position:fixed;inset:0;z-index:2147483649;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
+    dialog.innerHTML = '<div style="width:100%;max-width:360px;background:#fff;border-radius:18px;padding:24px;box-shadow:0 25px 60px -12px rgba(0,0,0,.3)"><p style="margin:0 0 8px;color:hsl(230 40% 16%);font-size:18px;font-weight:800">Cancel renewal?</p><p style="margin:0 0 20px;color:hsl(220 10% 45%);font-size:14px;line-height:1.5">Your premium features stay active until the end of the current billing period. Only the next renewal will be cancelled.</p><div style="display:flex;gap:10px"><button id="lt-cancel-subscription-back" style="flex:1;background:#fff;border:1px solid hsl(220 13% 85%);border-radius:10px;padding:12px;font:inherit;font-weight:700;color:hsl(230 40% 16%)">Keep plan</button><button id="lt-cancel-subscription-confirm" style="flex:1;background:#c0392b;border:0;border-radius:10px;padding:12px;font:inherit;font-weight:700;color:#fff">Cancel renewal</button></div></div>';
+    (activeOverlay || document.body).appendChild(dialog);
+    document.getElementById("lt-cancel-subscription-back").addEventListener("click", function () { dialog.remove(); });
+    document.getElementById("lt-cancel-subscription-confirm").addEventListener("click", function () { dialog.remove(); onConfirm(); });
+  }
   /* Migrate legacy "pro" plan value to "lifetime" on first load */
   function migrateOldProPlan() {
     var p = readJson(PLAN_KEY, "free");
@@ -387,6 +407,7 @@
       /* Record when the plan was activated — used for expiry checks. */
       writeJson(PLAN_SINCE_KEY, Date.now());
       writeJson(PLAN_GRACE_KEY, null);
+      writeJson(PLAN_CANCELLED_KEY, null);
       /* Re-upgraded (in time or otherwise) — clear any pending grace timer. */
       writeJson(DOWNGRADE_AT_KEY, null);
     } else if (wasPro && nonArchivedActivityCount() > FREE_ACTIVITY_LIMIT) {
@@ -443,6 +464,7 @@
     /* Grace period over — downgrade and enforce cap */
     writeJson(PLAN_KEY, "free");
     writeJson(PLAN_GRACE_KEY, null);
+    writeJson(PLAN_CANCELLED_KEY, null);
     writeJson(PLAN_SINCE_KEY, null);
     enforceStarCap();
     refreshPlanGatedUI();
@@ -6565,10 +6587,10 @@
     var cancelBtn = document.getElementById("lt-plan-cancel-btn");
     if (cancelBtn) {
       cancelBtn.addEventListener("click", function () {
-        if (confirm("Cancel your " + getPlanName() + " subscription? You will lose premium features at the end of your billing period.")) {
-          setPlan("free");
+        showCancelSubscriptionDialog(function () {
+          cancelSubscription();
           refreshPlanGatedUI();
-        }
+        });
       });
     }
 
@@ -6634,7 +6656,9 @@
         '<div style="flex-shrink:0;padding:20px 28px 28px;border-top:1px solid hsl(220 13% 92%);margin-top:16px">' +
           (isPro() && isSubscription()
             ? '<div id="lt-plans-cta-wrap" style="text-align:center">' +
-                '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:#c0392b;border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Cancel Subscription</button>' +
+                (isSubscriptionCancelled()
+                  ? '<p style="color:#16A34A;font-size:13px;font-weight:700;margin:0">Renewal cancelled — premium stays active until this billing period ends.</p>'
+                  : '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:#c0392b;border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Cancel Subscription</button>') +
               '</div>'
             : (isPro()
                 ? '<div id="lt-plans-cta-wrap" style="text-align:center"><p style="color:#16A34A;font-size:13px;font-weight:700;margin:0">You have ' + getPlanName() + ' \u2014 no expiration</p></div>'
@@ -6694,11 +6718,11 @@
     if (ctaBtn) {
       ctaBtn.addEventListener("click", function () {
         if (isPro() && isSubscription()) {
-          if (confirm("Cancel your " + getPlanName() + " subscription? You will lose premium features at the end of your billing period.")) {
+          showCancelSubscriptionDialog(function () {
             modal.remove();
-            setPlan("free");
+            cancelSubscription();
             refreshPlanGatedUI();
-          }
+          });
           return;
         }
         modal.remove();

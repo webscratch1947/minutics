@@ -2,6 +2,7 @@ package com.minutics.app;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -13,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
+import android.webkit.JsResult;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
@@ -46,7 +48,30 @@ public final class MainActivity extends Activity {
                 .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
                 .build();
 
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Minutics")
+                        .setMessage(message)
+                        .setPositiveButton("OK", (dialog, which) -> result.confirm())
+                        .setOnCancelListener(dialog -> result.cancel())
+                        .show();
+                return true;
+            }
+
+            @Override
+            public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Minutics")
+                        .setMessage(message)
+                        .setNegativeButton("Cancel", (dialog, which) -> result.cancel())
+                        .setPositiveButton("OK", (dialog, which) -> result.confirm())
+                        .setOnCancelListener(dialog -> result.cancel())
+                        .show();
+                return true;
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public android.webkit.WebResourceResponse shouldInterceptRequest(
