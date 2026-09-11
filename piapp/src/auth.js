@@ -27,8 +27,16 @@ function startDemoSession(isNew) {
   if (isNew) localStorage.setItem(DEMO_STORAGE_KEY, String(Date.now()));
   var gate = document.getElementById("lt-auth-gate");
   if (gate) gate.remove();
-  document.body.classList.add("lt-authed");
-  showDemoTimer();
+  /* Wait one frame so React (main.js) has time to mount into #root before
+     we make it visible via lt-authed. Without this, #root can appear empty
+     on first load because the module script runs before React finishes its
+     initial render. */
+  requestAnimationFrame(function () {
+    document.body.classList.add("lt-authed");
+    var root = document.getElementById("root");
+    if (root) root.removeAttribute("style");
+    showDemoTimer();
+  });
 }
 function endDemoSession() {
   if (demoTimerInterval) { clearInterval(demoTimerInterval); demoTimerInterval = null; }
@@ -46,7 +54,7 @@ function showDemoTimer() {
   widget.id = "lt-demo-timer";
   widget.innerHTML =
     '<span class="lt-demo-timer-dot"></span>' +
-    '<span>Demo session — <b id="lt-demo-timer-clock">30:00</b> left</span>';
+    '<span>Demo — <b id="lt-demo-timer-clock">30:00</b></span>';
   document.body.appendChild(widget);
   function tick() {
     var remaining = demoTimeRemainingMs();
@@ -71,8 +79,9 @@ function injectDemoTimerStyles() {
       z-index: 999998;
       background: hsl(230 40% 16%); color: #fff;
       font-family: 'Inter', -apple-system, sans-serif; font-size: 12.5px;
-      padding: 8px 14px; display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px; display: flex; align-items: center; gap: 8px;
       border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.18);
+      white-space: nowrap; flex-shrink: 0;
     }
     #lt-demo-timer b { font-variant-numeric: tabular-nums; }
     .lt-demo-timer-dot {
