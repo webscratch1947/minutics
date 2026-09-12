@@ -10,7 +10,7 @@ import { todayStatsKey } from '../lib/queryKeys.js';
 
 export function useTodayStats() {
   return useQuery({
-    queryKey: todayStatsKey,
+    queryKey: todayStatsKey(),
     queryFn: () => {
       const store = getStore();
       const now = new Date();

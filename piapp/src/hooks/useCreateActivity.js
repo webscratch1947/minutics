@@ -18,7 +18,7 @@ export function useCreateActivity() {
       return activity;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: activitiesKey });
+      queryClient.invalidateQueries({ queryKey: activitiesKey() });
     }
   });
 }

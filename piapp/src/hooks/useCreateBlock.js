@@ -18,7 +18,7 @@ export function useCreateBlock() {
       return block;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: blocksKey });
+      queryClient.invalidateQueries({ queryKey: blocksKey() });
     }
   });
 }

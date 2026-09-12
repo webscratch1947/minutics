@@ -26,8 +26,8 @@ export function useDeleteActivity() {
       setStore(store);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: activitiesKey });
-      queryClient.invalidateQueries({ queryKey: blocksKey });
+      queryClient.invalidateQueries({ queryKey: activitiesKey() });
+      queryClient.invalidateQueries({ queryKey: blocksKey() });
     }
   });
 }

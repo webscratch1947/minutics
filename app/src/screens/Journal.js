@@ -229,7 +229,8 @@ export function JournalScreen() {
     className: "flex flex-col",
     children: [
 
-      /* ── 1. Streak & Week Block ────────────────────────────────────────────── */
+      // Inject keyframe animation for today's glowing circle
+      jsx("style", { children: "@keyframes journalPulse { 0%, 100% { box-shadow: 0 0 8px 2px rgba(22,163,74,0.6); } 50% { box-shadow: 0 0 16px 4px rgba(22,163,74,0.9); } }" }),      /* ── 1. Streak & Week Block ────────────────────────────────────────────── */
       jsxs("div", {
         className: "px-5 pt-5",
         children: [
@@ -303,14 +304,14 @@ export function JournalScreen() {
                     className: "text-xs font-bold text-muted-foreground",
                     children: getDayName(d)
                   }),
-                  // Day number circle
-                  jsx("div", {
-                    className: "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
-                    style: isToday
-                      ? { backgroundColor: "#16a34a", color: "#ffffff" }
-                      : { color: "#1f2937" },
-                    children: getDayNum(d)
-                  }),
+                   // Day number circle
+                   jsx("div", {
+                     className: "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
+                     style: isToday
+                       ? { backgroundColor: "#16a34a", color: "#ffffff", boxShadow: "0 0 8px 2px rgba(22,163,74,0.6)", animation: "journalPulse 1.5s ease-in-out infinite" }
+                       : { backgroundColor: "#111827", color: "#ffffff" },
+                     children: getDayNum(d)
+                   }),
                   // Tracking dot (green if tracked, transparent if not)
                   jsx("span", {
                     className: "w-1 h-1 rounded-full",
@@ -387,16 +388,17 @@ export function JournalScreen() {
                   jsxs("div", {
                     className: "flex items-center gap-2.5",
                     children: [
-                      // Circle indicator: green for today, tracked-color for tracked days, grey outline for empty
-                      jsxs("span", {
-                        className: "flex items-center justify-center w-3 h-3 shrink-0 rounded-full " +
-                          (isToday ? "bg-green-500" : (dg.totalSeconds > 0 ? "" : "border-2 border-muted-foreground/30")),
-                        style: !isToday && dg.totalSeconds > 0
-                          ? { backgroundColor: activities.length > 0 ? activities[0].activityColor : "#16a34a" }
-                          : undefined,
-                        children: isToday && jsx("span", {
-                          className: "relative inline-flex rounded-full h-2 w-2 bg-white"
-                        })
+                       // Circle indicator: green for today, tracked-color for tracked days, black for empty
+                       jsxs("span", {
+                         className: "flex items-center justify-center w-3 h-3 shrink-0 rounded-full " +
+                           (isToday ? "bg-green-500" : ""),
+                         style: !isToday
+                           ? { backgroundColor: dg.totalSeconds > 0 ? (activities.length > 0 ? activities[0].activityColor : "#16a34a") : "#111827" }
+                           : isToday ? { boxShadow: "0 0 6px 1px rgba(22,163,74,0.5)", animation: "journalPulse 1.5s ease-in-out infinite" }
+                           : undefined,
+                         children: isToday && jsx("span", {
+                           className: "relative inline-flex rounded-full h-2 w-2 bg-white"
+                         })
                       }),
                       // Date label
                       jsx("span", {

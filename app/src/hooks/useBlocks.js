@@ -10,7 +10,7 @@ import { enrichSingleBlock } from '../lib/storage.js';
 
 export function useBlocks() {
   return useQuery({
-    queryKey: blocksKey,
+    queryKey: blocksKey(),
     queryFn: () => {
       const store = getStore();
       return store.blocks.map(b => enrichSingleBlock(b, store.activities));

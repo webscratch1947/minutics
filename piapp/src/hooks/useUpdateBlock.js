@@ -17,7 +17,7 @@ export function useUpdateBlock() {
       return store.blocks.find(b => b.id === id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: blocksKey });
+      queryClient.invalidateQueries({ queryKey: blocksKey() });
     }
   });
 }

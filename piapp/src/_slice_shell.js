@@ -54,7 +54,7 @@ function LTTopNav() {
       data: { endTime: new Date().toISOString() }
     }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: blocksKey });
+        queryClient.invalidateQueries({ queryKey: blocksKey() });
         navigate('/activity');
       }
     });

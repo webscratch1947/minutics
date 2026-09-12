@@ -17,7 +17,7 @@ export function useUpdateActivity() {
       return store.activities.find(a => a.id === id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: activitiesKey });
+      queryClient.invalidateQueries({ queryKey: activitiesKey() });
     }
   });
 }

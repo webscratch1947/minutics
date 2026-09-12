@@ -6,13 +6,13 @@
  */
 
 /** Query key for time blocks (was: Ho) */
-export const blocksKey = ["local", "blocks"];
+export function blocksKey() { return ["local", "blocks"]; }
 
 /** Query key for activities (was: Kc) */
-export const activitiesKey = ["local", "activities"];
+export function activitiesKey() { return ["local", "activities"]; }
 
 /** Query key for today's stats (was: Qo) */
-export const todayStatsKey = ["local", "today-stats"];
+export function todayStatsKey() { return ["local", "today-stats"]; }
 
 /** Query key for week stats (was: bC) */
-export const weekStatsKey = ["local", "week-stats"];
+export function weekStatsKey() { return ["local", "week-stats"]; }
