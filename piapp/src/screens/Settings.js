@@ -552,10 +552,8 @@ export function SettingsScreen() {
           jsx(SectionHeader, { children: "Features" }),
           jsx(Card, {
             children: jsx(CardRow, {
-              label: "Alert Notifications",
-              desc: !window.AndroidBridge
-                ? "Use our official Android app for reliable push notifications"
-                : notifTestStatus === "sent"
+              label: "Notifications",
+              desc: notifTestStatus === "sent"
                 ? "Test notification sent — check Windows Notification Center"
                 : notifTestStatus === "error"
                   ? "Chrome could not show it — check Windows Do Not Disturb"
@@ -567,7 +565,7 @@ export function SettingsScreen() {
               children: jsxs("div", {
                 className: "flex items-center gap-3",
                 children: [
-                  !window.AndroidBridge ? null : jsx("button", {
+                  jsx("button", {
                     onClick: function () {
                       if (notifPermission === "granted") {
                         var next = !notifEnabled;
@@ -611,7 +609,7 @@ export function SettingsScreen() {
                       }
                     })
                   }),
-                  !window.AndroidBridge ? null : jsx("button", {
+                  jsx("button", {
                     onClick: handleTestNotification,
                     disabled: notifPermission !== "granted",
                     className: [

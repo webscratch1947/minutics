@@ -608,8 +608,8 @@ export function SettingsScreen() {
                         transition: "left 0.3s ease"
                       }
                     })
-                  }),
-                  !window.AndroidBridge ? null : jsx("button", {
+                   }),
+                   jsx("button", {
                     onClick: handleTestNotification,
                     disabled: notifPermission !== "granted",
                     className: [
@@ -617,7 +617,7 @@ export function SettingsScreen() {
                       notifPermission === "granted" ? "active:bg-primary/10" : "opacity-40 cursor-not-allowed"
                     ].join(" "),
                     children: "Test"
-                  })
+                   })
                 ]
               })
             })
