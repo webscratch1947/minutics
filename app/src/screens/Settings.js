@@ -279,32 +279,28 @@ export function SettingsScreen() {
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       setNotifTestStatus(null);
       try {
+        console.log("FCM: requesting token...");
         var fcmToken = await getToken(_fbMessaging, { vapidKey: _VAPID_KEY });
+        console.log("FCM: token received:", fcmToken ? fcmToken.substring(0, 30) + "..." : "null");
         if (!fcmToken) throw new Error("No FCM token received");
         localStorage.setItem("lt_fcm_token", fcmToken);
 
+        console.log("FCM: calling /api/fcm-send...");
         var resp = await fetch("/api/fcm-send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fcmToken: fcmToken })
         });
         var data = await resp.json();
+        console.log("FCM: server response:", resp.status, data);
         if (data.ok) {
           setNotifTestStatus("sent");
         } else {
           console.warn("FCM server error:", data);
-          var reg = await navigator.serviceWorker.ready;
-          await reg.showNotification("Minutics", {
-            body: "Test alert: notifications are working.",
-            icon: window.location.origin + "/favicon.png",
-            tag: "minutics-notification-test",
-            requireInteraction: true,
-            silent: false
-          });
-          setNotifTestStatus("sent");
+          setNotifTestStatus("error");
         }
       } catch (e) {
-        console.warn("Notification failed:", e);
+        console.error("Notification failed:", e);
         setNotifTestStatus("error");
       }
     }
