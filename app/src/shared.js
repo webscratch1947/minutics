@@ -16608,26 +16608,10 @@ function Ns() {
       t = e ? JSON.parse(e) : {},
       n = xn(t.telegramBotToken),
       r = xn(t.telegramChatId);
-    let connected = !!(n && r);
-    if (connected) {
-      try {
-        const plan = JSON.parse(localStorage.getItem("lt_plan_v1") || '"free"');
-        const isLifetime = plan === "lifetime" || plan === "pro";
-        const isBasic = plan === "basic" || plan === "yearly";
-        if (isBasic) {
-          const startedAt = JSON.parse(localStorage.getItem("lt_plan_since_v1") || "null");
-          if (!startedAt) connected = false;
-          else {
-            const duration = plan === "basic" ? 30 * 24 * 60 * 60 * 1000 : 365 * 24 * 60 * 60 * 1000;
-            if (Date.now() >= Number(startedAt) + duration) connected = false;
-          }
-        } else if (!isLifetime) connected = false;
-      } catch {}
-    }
     return {
       telegramBotToken: n,
       telegramChatId: r,
-      telegramConnected: connected,
+      telegramConnected: !!(n && r),
       dailyReportTime: t.dailyReportTime || "21:00",
       lastSummaryDate: t.lastSummaryDate || null
     }
