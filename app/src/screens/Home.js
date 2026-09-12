@@ -1418,7 +1418,7 @@ function LifeProgressCard({ profile }) {
             className: 'flex-1 min-w-0',
             children: [
               jsx('p', { className: 'text-sm font-semibold text-foreground/55 mb-1', children: greeting + ',' }),
-              jsxs('h2', { className: 'text-[26px] font-black text-primary mb-2', children: [profile.name, ' \u2728'] }),
+              jsxs('h2', { className: 'text-[26px] font-black text-primary mb-2 truncate max-w-full', children: [profile.name, ' \u2728'] }),
               jsx('p', { className: 'text-[13px] leading-relaxed text-foreground/60', children: 'Make today count. Your future is built by what you do now. \uD83D\uDC9B' })
             ]
           }),

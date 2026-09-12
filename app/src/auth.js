@@ -53,6 +53,16 @@ function startDemoSession(isNew) {
   if (isNew) {
     localStorage.clear();
     localStorage.setItem(DEMO_STORAGE_KEY, String(Date.now()));
+    /* Seed a demo profile so the app always shows "Demo User" and never
+       leaks the previous account's name/data (especially on Android where
+       React state persists across sign-out without a page reload). */
+    try {
+      localStorage.setItem("lifetime_profile", JSON.stringify({
+        name: "Demo User",
+        dob: "2000-01-01",
+        lifespanYears: 80
+      }));
+    } catch (e) {}
   }
   var gate = document.getElementById("lt-auth-gate");
   if (gate) gate.remove();
