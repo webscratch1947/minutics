@@ -550,6 +550,17 @@ function cleanupEnhancementVisuals() {
   }
 }
 
+/* ── Safety: if IndexedDB crashes and onAuthStateChanged never fires,
+   remove the auth gate after 4s so the user isn't stuck on a grey screen ── */
+setTimeout(function () {
+  var g = document.getElementById("lt-auth-gate");
+  if (g) {
+    console.warn("AUTH SAFETY: removing stale auth gate after timeout");
+    document.body.classList.add("lt-authed");
+    g.remove();
+  }
+}, 4000);
+
 /* ── Auth state watcher: gate blocks the app until signed in ────────────── */
 onAuthStateChanged(auth, function (user) {
   console.log("AUTH STATE CHANGED:", user ? "AUTHENTICATED" : "NOT AUTHENTICATED", user);
