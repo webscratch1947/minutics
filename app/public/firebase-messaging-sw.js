@@ -13,15 +13,33 @@ firebase.initializeApp({
 var messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(function (payload) {
-  var title = payload.notification.title || "Minutics";
-  var options = {
-    body: payload.notification.body || "",
+  var title = (payload.notification && payload.notification.title) || "Minutics";
+  var body = (payload.notification && payload.notification.body) || "";
+  self.registration.showNotification(title, {
+    body: body,
     icon: "/favicon.png",
     badge: "/favicon.png",
-    tag: payload.data && payload.data.tag || "minutics-bg",
+    tag: (payload.data && payload.data.tag) || "minutics-bg",
     requireInteraction: false
-  };
-  self.registration.showNotification(title, options);
+  });
+});
+
+self.addEventListener("push", function (event) {
+  if (!event.data) return;
+  try {
+    var data = event.data.json();
+    var title = (data.notification && data.notification.title) || "Minutics";
+    var body = (data.notification && data.notification.body) || "";
+    event.waitUntil(
+      self.registration.showNotification(title, {
+        body: body,
+        icon: "/favicon.png",
+        badge: "/favicon.png",
+        tag: (data.data && data.data.tag) || "minutics-push",
+        requireInteraction: false
+      })
+    );
+  } catch (e) {}
 });
 
 self.addEventListener("notificationclick", function (event) {
