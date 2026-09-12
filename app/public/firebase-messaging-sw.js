@@ -13,6 +13,7 @@ firebase.initializeApp({
 var messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(function (payload) {
+  console.log("SW: background message received", payload);
   var title = (payload.notification && payload.notification.title) || "Minutics";
   var body = (payload.notification && payload.notification.body) || "";
   self.registration.showNotification(title, {
@@ -20,26 +21,22 @@ messaging.onBackgroundMessage(function (payload) {
     icon: "/favicon.png",
     badge: "/favicon.png",
     tag: (payload.data && payload.data.tag) || "minutics-bg",
-    requireInteraction: false
+    requireInteraction: true,
+    silent: false
   });
 });
 
-self.addEventListener("push", function (event) {
-  if (!event.data) return;
-  try {
-    var data = event.data.json();
-    var title = (data.notification && data.notification.title) || "Minutics";
-    var body = (data.notification && data.notification.body) || "";
-    event.waitUntil(
-      self.registration.showNotification(title, {
-        body: body,
-        icon: "/favicon.png",
-        badge: "/favicon.png",
-        tag: (data.data && data.data.tag) || "minutics-push",
-        requireInteraction: false
-      })
-    );
-  } catch (e) {}
+self.addEventListener("message", function (event) {
+  if (event.data && event.data.type === "SHOW_NOTIFICATION") {
+    self.registration.showNotification(event.data.title || "Minutics", {
+      body: event.data.body || "",
+      icon: "/favicon.png",
+      badge: "/favicon.png",
+      tag: "minutics-direct-" + Date.now(),
+      requireInteraction: true,
+      silent: false
+    });
+  }
 });
 
 self.addEventListener("notificationclick", function (event) {

@@ -13,15 +13,7 @@ var _VAPID_KEY = "BKLC0IM70THg6XTfAm6HBEJXmptMaFaEy4WHVhl_L6MwFFEhOVleExlXV9mrvE
 var _fbMessaging = null;
 try { _fbMessaging = getMessaging(getApp()); } catch (e) { console.warn("FCM init deferred:", e.message); }
 
-function _showInAppToast(title, body) {
-  var toast = document.createElement("div");
-  toast.style.cssText = "position:fixed;top:16px;right:16px;background:#1e293b;color:#fff;padding:14px 20px;border-radius:12px;font-size:14px;z-index:2147483647;max-width:340px;box-shadow:0 8px 30px rgba(0,0,0,0.35);transition:opacity .5s ease;opacity:1;cursor:pointer;";
-  toast.innerHTML = '<div style="font-weight:600;margin-bottom:4px">' + title + '</div><div style="font-size:13px;opacity:0.85">' + body + '</div>';
-  toast.onclick = function () { toast.style.opacity = "0"; setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 500); };
-  document.body.appendChild(toast);
-  setTimeout(function () { toast.style.opacity = "0"; }, 5000);
-  setTimeout(function () { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 5500);
-}
+var _VAPID_KEY = "BKLC0IM70THg6XTfAm6HBEJXmptMaFaEy4WHVhl_L6MwFFEhOVleExlXV9mrvEwurnFPgXFkYHr2fp6iOeeFf0U";
 
 if (_fbMessaging) {
   onMessage(_fbMessaging, function (payload) {
@@ -313,15 +305,12 @@ export function SettingsScreen() {
         console.log("FCM: server response:", resp.status, data);
 
         var reg = await navigator.serviceWorker.ready;
+        reg.active.postMessage({
+          type: "SHOW_NOTIFICATION",
+          title: "Minutics",
+          body: "Test alert: notifications are working."
+        });
         if (data.ok) {
-          await reg.showNotification("Minutics", {
-            body: "Test alert: notifications are working.",
-            icon: window.location.origin + "/favicon.png",
-            badge: window.location.origin + "/favicon.png",
-            tag: "minutics-test-" + Date.now(),
-            requireInteraction: true,
-            silent: false
-          });
           setNotifTestStatus("sent");
         } else {
           console.warn("FCM server error:", data);
