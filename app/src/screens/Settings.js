@@ -7,10 +7,19 @@ import { saveGoalType, getGoalType, isPro as hasActivePaidPlan } from '../lib/se
 import { readJson, writeJson } from '../lib/settings.js';
 import { CircleCheckBig as eh } from 'lucide-react';
 import { getApp } from 'firebase/app';
-import { getMessaging, getToken } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const _fbMessaging = getMessaging(getApp());
 const _VAPID_KEY = "BKLC0IM70THg6XTfAm6HBEJXmptMaFaEy4WHVhl_L6MwFFEhOVleExlXV9mrvEwurnFPgXFkYHr2fp6iOeeFf0U";
+
+onMessage(_fbMessaging, function (payload) {
+  console.log("FCM foreground message:", payload);
+  var title = (payload.notification && payload.notification.title) || "Minutics";
+  var body = (payload.notification && payload.notification.body) || "";
+  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+    new Notification(title, { body: body, icon: window.location.origin + "/favicon.png" });
+  }
+});
 
 /* ── constants ── */
 
