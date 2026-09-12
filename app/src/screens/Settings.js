@@ -344,14 +344,17 @@ export function SettingsScreen() {
 
       /* Full logout via Firebase, then reload so the React root re-mounts
          and re-checks getProfile() — without a reload the old profile stays
-         in React state and the user lands back in the same app. */
+         in React state and the user lands back in the same app.
+         On Android WebView (appassets.androidplatform.net), reload() fails
+         with ERR_INVALID_RESPONSE because it's a local file URL — so we
+         skip reload there and let the auth state watcher in auth.js handle
+         showing the login gate. */
       if (window.LTAuth && window.LTAuth.logout) {
         window.LTAuth.logout();
       }
-      /* Always reload after a short delay to let Firebase sign-out complete.
-         Using setTimeout avoids a race where the reload fires before the
-         auth state change propagates. */
-      setTimeout(function () { window.location.reload(); }, 300);
+      if (!window.AndroidBridge) {
+        setTimeout(function () { window.location.reload(); }, 300);
+      }
     }
   }
 
