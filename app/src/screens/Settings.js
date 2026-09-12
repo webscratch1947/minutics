@@ -16,9 +16,15 @@ onMessage(_fbMessaging, function (payload) {
   console.log("FCM foreground message:", payload);
   var title = (payload.notification && payload.notification.title) || "Minutics";
   var body = (payload.notification && payload.notification.body) || "";
-  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-    new Notification(title, { body: body, icon: window.location.origin + "/favicon.png" });
-  }
+  navigator.serviceWorker.ready.then(function (reg) {
+    reg.showNotification(title, {
+      body: body,
+      icon: window.location.origin + "/favicon.png",
+      badge: window.location.origin + "/favicon.png",
+      tag: "minutics-fg",
+      requireInteraction: false
+    });
+  });
 });
 
 /* ── constants ── */
