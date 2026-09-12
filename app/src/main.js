@@ -43,3 +43,7 @@ const root = createRoot(rootElement);
 console.log("MAIN.JS: React root created:", root);
 root.render(jsx(QC, {}));
 console.log("MAIN.JS: React render called");
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(function () {});
+}

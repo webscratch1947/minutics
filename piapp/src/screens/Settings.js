@@ -274,7 +274,8 @@ export function SettingsScreen() {
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       setNotifTestStatus(null);
       try {
-        var n = new Notification("Minutics", {
+        var reg = await navigator.serviceWorker.ready;
+        await reg.showNotification("Minutics", {
           body: "Test alert: notifications are working.",
           icon: window.location.origin + "/favicon.png",
           image: window.location.origin + "/favicon.png",
@@ -282,10 +283,7 @@ export function SettingsScreen() {
           requireInteraction: true,
           silent: false
         });
-        window.__minuticsTestNotification = n;
-        n.onshow = function () { setNotifTestStatus("sent"); };
-        n.onerror = function () { setNotifTestStatus("error"); };
-        n.onclick = function () { window.focus(); n.close(); };
+        setNotifTestStatus("sent");
       } catch (e) {
         console.warn("Notification failed:", e);
         setNotifTestStatus("error");
