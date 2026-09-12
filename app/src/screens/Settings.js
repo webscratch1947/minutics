@@ -6,18 +6,10 @@ import { getCurrency, setCurrency } from '../lib/currency.js';
 import { saveGoalType, getGoalType, isPro as hasActivePaidPlan } from '../lib/settings.js';
 import { readJson, writeJson } from '../lib/settings.js';
 import { CircleCheckBig as eh } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
+import { getApp } from 'firebase/app';
 import { getMessaging, getToken } from 'firebase/messaging';
 
-const _fbApp = initializeApp({
-  apiKey: "AIzaSyBXruwmDU9SAX4nAe5_Do-x-5qmi_SFh7E",
-  authDomain: "lifetime-a4bde.firebaseapp.com",
-  projectId: "lifetime-a4bde",
-  storageBucket: "lifetime-a4bde.firebasestorage.app",
-  messagingSenderId: "330723236770",
-  appId: "1:330723236770:web:7df53f2dba32fe87b0f0fb"
-});
-const _fbMessaging = getMessaging(_fbApp);
+const _fbMessaging = getMessaging(getApp());
 const _VAPID_KEY = "BKLC0IM70THg6XTfAm6HBEJXmptMaFaEy4WHVhl_L6MwFFEhOVleExlXV9mrvEwurnFPgXFkYHr2fp6iOeeFf0U";
 
 /* ── constants ── */
