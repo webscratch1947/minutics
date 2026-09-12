@@ -554,18 +554,24 @@ function cleanupEnhancementVisuals() {
 }
 
 /* ── Safety: if IndexedDB crashes and onAuthStateChanged never fires,
-   remove the auth gate after 4s so the user isn't stuck on a grey screen ── */
+   remove the auth gate after 4s so the user isn't stuck on a grey screen.
+   Only fires AFTER onAuthStateChanged has run once — if Firebase is still
+   loading, we never touch the gate. ─────────────────────────────────── */
+var _authStateChangedFired = false;
 setTimeout(function () {
-  var g = document.getElementById("lt-auth-gate");
-  if (g) {
-    console.warn("AUTH SAFETY: removing stale auth gate after timeout");
-    document.body.classList.add("lt-authed");
-    g.remove();
+  if (_authStateChangedFired) {
+    var g = document.getElementById("lt-auth-gate");
+    if (g) {
+      console.warn("AUTH SAFETY: removing stale auth gate after timeout");
+      document.body.classList.add("lt-authed");
+      g.remove();
+    }
   }
 }, 4000);
 
 /* ── Auth state watcher: gate blocks the app until signed in ────────────── */
 onAuthStateChanged(auth, function (user) {
+  _authStateChangedFired = true;
   console.log("AUTH STATE CHANGED:", user ? "AUTHENTICATED" : "NOT AUTHENTICATED", user);
   if (isDemoActive()) return; /* demo session takes over the gate entirely */
   var gate = document.getElementById("lt-auth-gate");
