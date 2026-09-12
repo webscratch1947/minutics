@@ -61,7 +61,6 @@ function startDemoSession(isNew) {
     document.body.classList.add("lt-authed");
     var root = document.getElementById("root");
     if (root) root.removeAttribute("style");
-    if (window._ltRemoveSplash) window._ltRemoveSplash();
     showDemoTimer();
   });
 }
@@ -579,8 +578,6 @@ onAuthStateChanged(auth, function (user) {
     /* Clear ALL inline styles that logout sets on #root (including !important) */
     var root = document.getElementById("root");
     if (root) root.removeAttribute("style");
-    /* Remove splash overlay now that the app is visible */
-    if (window._ltRemoveSplash) window._ltRemoveSplash();
     /* Keep the opaque auth gate in place until the authenticated UI has
        painted. Removing it first caused a brief white frame after sign-up. */
     if (gate) {

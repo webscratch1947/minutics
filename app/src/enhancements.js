@@ -33,15 +33,11 @@
       if (dismissed) return;
       dismissed = true;
       _ltSplashDone = true;
-      video.style.opacity = "0";
-      /* Keep the dark overlay visible until React signals it's ready.
-         This prevents a white flash between splash end and first render. */
+      splash.style.opacity = "0";
+      setTimeout(function () {
+        if (splash.parentNode) splash.parentNode.removeChild(splash);
+      }, 550);
     }
-
-    /* React calls this after its first paint to remove the splash overlay */
-    window._ltRemoveSplash = function () {
-      if (splash.parentNode) splash.parentNode.removeChild(splash);
-    };
 
     video.addEventListener("playing", function () { video.style.opacity = "1"; });
     video.addEventListener("ended", function () {
@@ -56,10 +52,6 @@
     });
 
     setTimeout(dismiss, MAX_MS);
-    /* Safety net: remove splash after 8s even if React doesn't signal */
-    setTimeout(function () {
-      if (splash.parentNode) splash.parentNode.removeChild(splash);
-    }, 8000);
   })();
 
   /* ── Storage keys ──────────────────────────────────────────────────────── */

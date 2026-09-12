@@ -37,12 +37,20 @@
     margin: 0;
     padding: 0;
     -webkit-font-smoothing: antialiased;
-    background-color: hsl(var(--background));
+    background-color: hsl(230 40% 16%);
     color: hsl(var(--foreground));
+  }
+
+  body.lt-authed {
+    background-color: hsl(var(--background));
   }
 
   #root {
     @apply min-h-screen;
+    background-color: hsl(230 40% 16%);
+  }
+
+  body.lt-authed #root {
     background-color: hsl(var(--background));
   }
 }
