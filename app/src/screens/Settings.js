@@ -580,10 +580,78 @@ export function SettingsScreen() {
         className: "mx-4",
         children: [
           jsx(SectionHeader, { children: "Features" }),
-          jsx(Card, {
+          !window.AndroidBridge ? jsx(Card, {
             children: jsx(CardRow, {
               label: "Notifications",
               desc: "Please install our official app to use this feature"
+            })
+          }) : jsx(Card, {
+            children: jsx(CardRow, {
+              label: "Notifications",
+              desc: notifTestStatus === "sent"
+                ? "Test notification sent"
+                : notifTestStatus === "error"
+                  ? "Could not send test notification"
+                : notifPermission === "granted"
+                ? "Notifications are enabled"
+                : notifPermission === "denied"
+                  ? "Blocked — enable in system settings"
+                  : "Allow reminders and app alerts",
+              children: jsxs("div", {
+                className: "flex items-center gap-3",
+                children: [
+                  jsx("button", {
+                    onClick: function () {
+                      if (notifPermission === "granted") {
+                        var next = !notifEnabled;
+                        setNotifEnabled(next);
+                        localStorage.setItem("lt_alert_notifs_on_v1", next ? "on" : "off");
+                      } else if (notifPermission === "denied") {
+                        window.AndroidBridge.requestNotificationPermission();
+                      } else {
+                        window.AndroidBridge.requestNotificationPermission();
+                      }
+                    },
+                    style: {
+                      position: "relative",
+                      width: "48px",
+                      height: "28px",
+                      borderRadius: "14px",
+                      border: "none",
+                      cursor: "pointer",
+                      background: notifPermission === "granted" && notifEnabled ? "#22c55e" : notifPermission === "denied" ? "#ef4444" : "#d1d5db",
+                      transition: "background 0.3s ease",
+                      padding: 0,
+                      flexShrink: 0
+                    },
+                    children: jsx("span", {
+                      style: {
+                        position: "absolute",
+                        top: "3px",
+                        left: notifPermission === "granted" && notifEnabled ? "23px" : "3px",
+                        width: "22px",
+                        height: "22px",
+                        borderRadius: "50%",
+                        background: "#fff",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                        transition: "left 0.3s ease"
+                      }
+                    })
+                  }),
+                  jsx("button", {
+                    onClick: function () {
+                      try { window.AndroidBridge.showTestNotification(); } catch (e) {}
+                      setNotifTestStatus("sent");
+                    },
+                    disabled: notifPermission !== "granted",
+                    className: [
+                      "rounded-lg border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition",
+                      notifPermission === "granted" ? "active:bg-primary/10" : "opacity-40 cursor-not-allowed"
+                    ].join(" "),
+                    children: "Test"
+                  })
+                ]
+              })
             })
           })
         ]

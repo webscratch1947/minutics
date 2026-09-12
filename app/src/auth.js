@@ -50,7 +50,10 @@ function demoTimeRemainingMs() {
 }
 
 function startDemoSession(isNew) {
-  if (isNew) localStorage.setItem(DEMO_STORAGE_KEY, String(Date.now()));
+  if (isNew) {
+    localStorage.clear();
+    localStorage.setItem(DEMO_STORAGE_KEY, String(Date.now()));
+  }
   var gate = document.getElementById("lt-auth-gate");
   if (gate) gate.remove();
   /* Wait one frame so React (main.js) has time to mount into #root before
