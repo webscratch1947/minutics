@@ -31,20 +31,11 @@ export default async function handler(req, res) {
 
     const result = await getMessaging().send({
       token: fcmToken,
-      notification: {
+      data: {
         title: "Minutics",
         body: "Test alert: notifications are working.",
-      },
-      webpush: {
-        fcmOptions: { link: "https://app.minutics.com" },
-        notification: {
-          title: "Minutics",
-          body: "Test alert: notifications are working.",
-          icon: "https://app.minutics.com/favicon.png",
-          badge: "https://app.minutics.com/favicon.png",
-          tag: "minutics-notification-test",
-          requireInteraction: true,
-        },
+        tag: "minutics-notification-test",
+        link: "https://app.minutics.com"
       },
     });
 

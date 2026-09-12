@@ -13,9 +13,9 @@ firebase.initializeApp({
 var messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(function (payload) {
-  console.log("SW: background message received", payload);
-  var title = (payload.notification && payload.notification.title) || "Minutics";
-  var body = (payload.notification && payload.notification.body) || "";
+  console.log("SW: background message", payload);
+  var title = (payload.notification && payload.notification.title) || (payload.data && payload.data.title) || "Minutics";
+  var body = (payload.notification && payload.notification.body) || (payload.data && payload.data.body) || "";
   self.registration.showNotification(title, {
     body: body,
     icon: "/favicon.png",
@@ -26,27 +26,40 @@ messaging.onBackgroundMessage(function (payload) {
   });
 });
 
-self.addEventListener("message", function (event) {
-  if (event.data && event.data.type === "SHOW_NOTIFICATION") {
-    self.registration.showNotification(event.data.title || "Minutics", {
-      body: event.data.body || "",
+self.addEventListener("push", function (event) {
+  if (!event.data) return;
+  var payload;
+  try { payload = event.data.json(); } catch (e) { return; }
+
+  var title = (payload.notification && payload.notification.title) || (payload.data && payload.data.title) || "Minutics";
+  var body = (payload.notification && payload.notification.body) || (payload.data && payload.data.body) || "";
+  var tag = (payload.data && payload.data.tag) || "minutics-push";
+  var link = (payload.data && payload.data.link) || "";
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: body,
       icon: "/favicon.png",
       badge: "/favicon.png",
-      tag: "minutics-direct-" + Date.now(),
+      tag: tag,
       requireInteraction: true,
-      silent: false
-    });
-  }
+      silent: false,
+      data: { url: link || "./" }
+    })
+  );
 });
 
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();
+  var url = (event.notification.data && event.notification.data.url) || "./";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (list) {
       for (var i = 0; i < list.length; i++) {
-        if (list[i].focus) return list[i].focus();
+        if (list[i].url.includes(new URL(url, self.location.origin).pathname)) {
+          return list[i].focus();
+        }
       }
-      return clients.openWindow("./");
+      return clients.openWindow(url);
     })
   );
 });
