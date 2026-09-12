@@ -26,12 +26,6 @@ function _showInAppToast(title, body) {
 if (_fbMessaging) {
   onMessage(_fbMessaging, function (payload) {
     console.log("FCM foreground message:", payload);
-    var title = (payload.notification && payload.notification.title) || "Minutics";
-    var body = (payload.notification && payload.notification.body) || "";
-    _showInAppToast(title, body);
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      new Notification(title, { body: body, icon: window.location.origin + "/favicon.png", silent: true });
-    }
   });
 }
 
@@ -317,8 +311,17 @@ export function SettingsScreen() {
         });
         var data = await resp.json();
         console.log("FCM: server response:", resp.status, data);
+
+        var reg = await navigator.serviceWorker.ready;
         if (data.ok) {
-          _showInAppToast("Minutics", "Test notification sent successfully!");
+          await reg.showNotification("Minutics", {
+            body: "Test alert: notifications are working.",
+            icon: window.location.origin + "/favicon.png",
+            badge: window.location.origin + "/favicon.png",
+            tag: "minutics-test-" + Date.now(),
+            requireInteraction: true,
+            silent: false
+          });
           setNotifTestStatus("sent");
         } else {
           console.warn("FCM server error:", data);
