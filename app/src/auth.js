@@ -27,124 +27,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-/* ── Demo account ─────────────────────────────────────────────────────────
-   demo@gmail.com / 12345 — logs straight in from the Login page (no real
-   Firebase account), auto-logs-out after 30 min, and wipes local data
-   (all of localStorage, where Minutics keeps activities/budget/tasks/etc)
-   on that timeout. Blocked from the Sign-up page — tells the user to log
-   in instead. ────────────────────────────────────────────────────────── */
-const DEMO_EMAIL = "demo@gmail.com";
-const DEMO_PASSWORD = "12345";
-const DEMO_DURATION_MS = 30 * 60 * 1000;
-const DEMO_STORAGE_KEY = "lt-demo-session-started";
-let demoTimerInterval = null;
-
-function isDemoActive() {
-  return !!localStorage.getItem(DEMO_STORAGE_KEY);
-}
-
-function demoTimeRemainingMs() {
-  var started = parseInt(localStorage.getItem(DEMO_STORAGE_KEY) || "0", 10);
-  if (!started) return 0;
-  return DEMO_DURATION_MS - (Date.now() - started);
-}
-
-function startDemoSession(isNew) {
-  if (isNew) {
-    localStorage.clear();
-    localStorage.setItem(DEMO_STORAGE_KEY, String(Date.now()));
-    /* Seed a demo profile so the app always shows "Demo User" and never
-       leaks the previous account's name/data (especially on Android where
-       React state persists across sign-out without a page reload). */
-    try {
-      localStorage.setItem("lifetime_profile", JSON.stringify({
-        name: "Demo User",
-        dob: "2000-01-01",
-        lifespanYears: 80
-      }));
-    } catch (e) {}
-  }
-  var gate = document.getElementById("lt-auth-gate");
-  if (gate) gate.remove();
-  /* Wait one frame so React (main.js) has time to mount into #root before
-     we make it visible via lt-authed. Without this, #root can appear empty
-     on first load because the module script runs before React finishes its
-     initial render. */
-  requestAnimationFrame(function () {
-    document.body.classList.add("lt-authed");
-    var root = document.getElementById("root");
-    if (root) root.removeAttribute("style");
-    showDemoTimer();
-  });
-}
-
-function endDemoSession() {
-  if (demoTimerInterval) { clearInterval(demoTimerInterval); demoTimerInterval = null; }
-  var widget = document.getElementById("lt-demo-timer");
-  if (widget) widget.remove();
-  localStorage.clear();
-  document.body.classList.remove("lt-authed");
-  renderGate("login");
-  showError.postClear = true;
-}
-
-function showDemoTimer() {
-  injectDemoTimerStyles();
-  var existing = document.getElementById("lt-demo-timer");
-  if (existing) existing.remove();
-
-  var widget = document.createElement("div");
-  widget.id = "lt-demo-timer";
-  widget.innerHTML =
-    '<span class="lt-demo-timer-dot"></span>' +
-    '<span>Demo — <b id="lt-demo-timer-clock">30:00</b></span>';
-  document.body.appendChild(widget);
-
-  function tick() {
-    var remaining = demoTimeRemainingMs();
-    if (remaining <= 0) {
-      endDemoSession();
-      return;
-    }
-    var totalSec = Math.ceil(remaining / 1000);
-    var min = Math.floor(totalSec / 60);
-    var sec = totalSec % 60;
-    var clockEl = document.getElementById("lt-demo-timer-clock");
-    if (clockEl) clockEl.textContent = min + ":" + (sec < 10 ? "0" : "") + sec;
-  }
-
-  tick();
-  if (demoTimerInterval) clearInterval(demoTimerInterval);
-  demoTimerInterval = setInterval(tick, 1000);
-}
-
-function injectDemoTimerStyles() {
-  if (document.getElementById("lt-demo-timer-styles")) return;
-  var style = document.createElement("style");
-  style.id = "lt-demo-timer-styles";
-  style.textContent = `
-    #lt-demo-timer {
-      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-      z-index: 999998;
-      background: hsl(230 40% 16%); color: #fff;
-      font-family: 'Inter', -apple-system, sans-serif; font-size: 12.5px;
-      padding: 8px 16px; display: flex; align-items: center; gap: 8px;
-      border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.18);
-      white-space: nowrap; flex-shrink: 0;
-    }
-    #lt-demo-timer b { font-variant-numeric: tabular-nums; }
-    .lt-demo-timer-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: hsl(0 80% 60%);
-      animation: lt-demo-pulse 1.2s infinite;
-    }
-    @keyframes lt-demo-pulse {
-      0%, 100% { opacity: 1; } 50% { opacity: .35; }
-    }
-  `;
-  document.head.appendChild(style);
-}
-
 /* Expose logout for the Settings-page "Log out" row (added in lifetime-enhancements.js) */
 window.LTAuth = {
   logout: function () {
@@ -287,10 +169,6 @@ function injectStyles() {
       font-weight: 600; color: #111827; cursor: pointer; text-underline-offset: 2px;
     }
     .lt-auth-switch a:hover { color: #4F46E5; }
-    .lt-auth-demo {
-      margin-top: 24px; padding: 12px 14px; border-radius: 10px;
-      background: #FEF3C7; color: #374151; font-size: 12px; line-height: 1.55;
-    }
     .lt-auth-disclaimer {
       margin-top: 12px; font-size: 10px; line-height: 1.6; color: #6B7280;
     }
@@ -356,7 +234,6 @@ function renderGate(mode) {
       '<p class="lt-auth-switch">' +
         (isSignup ? "Already have an account? " + '<a id="lt-auth-switch-link">Log in</a>' : "Don't have an account? " + '<a id="lt-auth-switch-link">Sign up</a>') +
       '</p>' +
-      '<div class="lt-auth-demo">Want to look around first? Try the demo — <b>' + DEMO_EMAIL + '</b> / <b>' + DEMO_PASSWORD + '</b>' + (isSignup ? " (log in with it, don't sign up)" : "") + '. Auto-logs-out and clears demo data after 30 min.</div>' +
       '<p class="lt-auth-disclaimer"><b>Please note:</b> your data (activities, budget, tasks, journal) is saved only on this device — it never leaves your phone. If you log in on another device, you\u2019ll start fresh there; your data won\u2019t carry over. We don\u2019t store your data on our own servers because we respect your privacy.</p>' +
     '</main>';
   document.body.appendChild(gate);
@@ -398,21 +275,6 @@ function renderGate(mode) {
     hideError();
 
     setLoading(true);
-
-    if (email.toLowerCase() === DEMO_EMAIL) {
-      if (isSignup) {
-        showError("That's the demo account — please log in instead.");
-        setLoading(false);
-        return;
-      }
-      if (password !== DEMO_PASSWORD) {
-        showError("Incorrect email or password.");
-        setLoading(false);
-        return;
-      }
-      startDemoSession(true);
-      return;
-    }
 
     var action = isSignup
       ? createUserWithEmailAndPassword(auth, email, password)
@@ -583,7 +445,6 @@ setTimeout(function () {
 onAuthStateChanged(auth, function (user) {
   _authStateChangedFired = true;
   console.log("AUTH STATE CHANGED:", user ? "AUTHENTICATED" : "NOT AUTHENTICATED", user);
-  if (isDemoActive()) return; /* demo session takes over the gate entirely */
   var gate = document.getElementById("lt-auth-gate");
   if (user) {
     console.log("Removing auth gate and adding lt-authed class");
@@ -629,12 +490,3 @@ onAuthStateChanged(auth, function (user) {
     renderGate("login");
   }
 });
-
-/* Resume an in-progress demo session across page reloads (e.g. app restart) */
-if (isDemoActive()) {
-  if (demoTimeRemainingMs() > 0) {
-    startDemoSession(false);
-  } else {
-    localStorage.clear();
-  }
-}
