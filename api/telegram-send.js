@@ -1,7 +1,21 @@
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+
+function getAdminApp() {
+  if (getApps().length) return getApps()[0];
+  return initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_PROJECT_ID || "lifetime-a4bde",
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+    }),
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") {
     res.status(204).end();
@@ -9,6 +23,22 @@ export default async function handler(req, res) {
   }
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  /* ── Verify Firebase Auth token ──────────────────────────────────────── */
+  const authHeader = req.headers.authorization || "";
+  const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!idToken) {
+    res.status(401).json({ error: "Missing authorization token" });
+    return;
+  }
+
+  try {
+    const app = getAdminApp();
+    await getAuth(app).verifyIdToken(idToken);
+  } catch {
+    res.status(401).json({ error: "Invalid or expired token" });
     return;
   }
 

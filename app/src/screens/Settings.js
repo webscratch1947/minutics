@@ -661,24 +661,14 @@ export function SettingsScreen() {
       }),
 
       /* ─── Telegram Daily Reports ─── */
-      jsxs("div", {
+      isPro ? jsxs("div", {
         className: "mx-4",
         children: [
           jsx(SectionHeader, { children: "Telegram Daily Reports" }),
           jsx(Card, {
             children: jsxs("div", {
-              className: "relative flex flex-col",
+              className: "flex flex-col",
               children: [
-                !isPro && jsxs("button", {
-                  type: "button",
-                  onClick: function () { alert("Telegram daily reports need a paid plan. Click View Plans in Settings, then purchase any plan to unlock them."); },
-                  className: "absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 rounded-xl bg-background/90 px-6 text-center",
-                  children: [
-                    jsx("span", { className: "text-2xl", children: "\uD83D\uDD12" }),
-                    jsx("span", { className: "text-sm font-bold text-foreground", children: "Premium feature" }),
-                    jsx("span", { className: "text-xs leading-relaxed text-muted-foreground", children: "Click View Plans in Settings, then purchase any plan to unlock Telegram daily reports." })
-                  ]
-                }),
                 /* connection status */
                 jsxs("div", {
                   className: [
@@ -706,7 +696,7 @@ export function SettingsScreen() {
                 jsx("div", {
                   className: "px-4 pt-3 pb-1",
                   children: jsx("input", {
-                    type: "text",
+                    type: "password",
                     value: tgToken,
                     onChange: function (e) { setTgToken(e.target.value); },
                     placeholder: "Bot Token",
@@ -750,10 +740,10 @@ export function SettingsScreen() {
                   children: [
                     jsx("button", {
                       onClick: handleSaveTelegram,
-                      disabled: tgSaving || !tgToken || !tgChatId || !isPro,
+                      disabled: tgSaving || !tgToken || !tgChatId,
                       className: [
                         "flex-1 py-3 text-sm font-semibold transition",
-                        tgSaving || !tgToken || !tgChatId || !isPro
+                        tgSaving || !tgToken || !tgChatId
                           ? "text-muted-foreground cursor-not-allowed"
                           : "text-primary active:bg-primary/5"
                       ].join(" "),
@@ -761,10 +751,10 @@ export function SettingsScreen() {
                     }),
                     jsx("button", {
                       onClick: handleTestTelegram,
-                      disabled: tgTestLoading || !tgToken || !tgChatId || !isPro,
+                      disabled: tgTestLoading || !tgToken || !tgChatId,
                       className: [
                         "flex-1 py-3 text-sm font-semibold transition",
-                        tgTestLoading || !tgToken || !tgChatId || !isPro
+                        tgTestLoading || !tgToken || !tgChatId
                           ? "text-muted-foreground cursor-not-allowed"
                           : "text-foreground active:bg-gray-50"
                       ].join(" "),
@@ -784,6 +774,25 @@ export function SettingsScreen() {
                         children: "Failed to send. Check your token and chat ID."
                       })
                     : null
+              ]
+            })
+          })
+        ]
+      }) : jsx("div", {
+        className: "mx-4",
+        children: [
+          jsx(SectionHeader, { children: "Telegram Daily Reports" }),
+          jsx(Card, {
+            children: jsxs("div", {
+              className: "flex items-center gap-3 px-4 py-4",
+              children: [
+                jsx("span", { className: "text-2xl", children: "\uD83D\uDD12" }),
+                jsxs("div", {
+                  children: [
+                    jsx("p", { className: "text-sm font-bold text-foreground", children: "Premium feature" }),
+                    jsx("p", { className: "text-xs text-muted-foreground mt-0.5", children: "Upgrade to unlock Telegram daily reports." })
+                  ]
+                })
               ]
             })
           })

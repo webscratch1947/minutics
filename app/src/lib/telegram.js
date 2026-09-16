@@ -79,10 +79,21 @@ export async function sendTelegramReport(token, chatId, text) {
     return { success: false, message: "Add bot token and chat ID first" };
   }
   try {
+    /* Get Firebase Auth ID token for server-side verification */
+    var idToken = null;
+    if (window.LTAuth && window.LTAuth.getToken) {
+      idToken = await window.LTAuth.getToken();
+    }
+    if (!idToken) {
+      return { success: false, message: "Not authenticated" };
+    }
     const origin = window.location.origin;
     const resp = await fetch(origin + "/api/telegram-send", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + idToken
+      },
       body: JSON.stringify({ token, chatId, text })
     });
     const data = await resp.json();

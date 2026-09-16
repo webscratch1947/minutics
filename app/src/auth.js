@@ -46,6 +46,11 @@ window.LTAuth = {
   currentUser: function () {
     return auth.currentUser;
   },
+  getToken: function () {
+    var user = auth.currentUser;
+    if (!user) return Promise.resolve(null);
+    return user.getIdToken();
+  },
 };
 
 /* ── Styles — matches the supplied Login/Register mock exactly: cream +
