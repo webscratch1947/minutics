@@ -164,13 +164,19 @@ export function mk({
     }, k))
   });
 
-  const img = jsx("img", {
-    key: t,
-    src: IMGS[t],
-    alt: "",
-    draggable: false,
-    className: "w-full max-w-[330px] mx-auto object-contain select-none",
-    style: { maxHeight: "42vh" }
+  /* All four illustrations stay MOUNTED (inactive ones hidden) so a step
+     switch is a pure visibility toggle — never a remount that blanks the
+     <img> for a few frames while it reloads/re-decodes (the 0.3s flicker). */
+  const img = jsxs("div", {
+    className: "relative w-full max-w-[330px] mx-auto h-[42vh]",
+    children: STEPS.map((step) => jsx("img", {
+      src: IMGS[step],
+      alt: "",
+      draggable: false,
+      "aria-hidden": step !== t,
+      className: "absolute inset-0 w-full h-full object-contain select-none",
+      style: { visibility: step === t ? "visible" : "hidden" }
+    }, step))
   });
 
   const label = (text) => jsx("label", {
