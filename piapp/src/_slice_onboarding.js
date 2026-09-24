@@ -1,11 +1,21 @@
 import { useState } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { saveProfile } from './lib/profile.js';
+import { getCurrency, getCurrencySymbol } from './lib/currency.js';
+
+const STEPS = ["welcome", "name", "dob", "salary"];
+const IMGS = {
+  welcome: "./assets/onboarding/welcome.png",
+  name: "./assets/onboarding/name.png",
+  dob: "./assets/onboarding/dob.png",
+  salary: "./assets/onboarding/salary.png"
+};
+const GREEN = "#157347";
 
 export function mk({
   onComplete: e
 }) {
-  const [t, n] = useState("intro"), [r, o] = useState(""), [s, i] = useState(""), [l, a] = useState(85), [dY, setDY] = useState(""), [dM, setDM] = useState(""), [dD, setDD] = useState(""), u = (() => {
+  const [t, n] = useState("welcome"), [r, o] = useState(""), [s, i] = useState(""), [l, a] = useState(85), [dY, setDY] = useState(""), [dM, setDM] = useState(""), [dD, setDD] = useState(""), [sal, setSal] = useState(""), u = (() => {
     if (!s) return null;
     const g = new Date(s),
       v = new Date(g);
@@ -24,20 +34,35 @@ export function mk({
       return `${Math.max(0,l-Ib)} years left`
     }
     return `${l} years`
-  })(), f = (() => {
-    const g = new Date;
-    return g.setFullYear(g.getFullYear() - 5), g.toISOString().slice(0, 10)
-  })(), p = () => {
-    const _dobValid = /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
-    if (!r.trim() || !s || !_dobValid) return;
-    const g = {
+  })(), idx = STEPS.indexOf(t), sym = (() => {
+    try { return getCurrencySymbol(getCurrency().code); } catch { return "Rs."; }
+  })();
+
+  const dobValid = /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
+  const salaryNum = parseFloat(sal) || 0;
+
+  function finish(saveSalary) {
+    if (!r.trim() || !dobValid) return;
+    const profile = {
       name: r.trim(),
       dob: s,
       lifespanYears: l
     };
-    saveProfile(g);
-    showSetupLoader(g);
-  };
+    if (saveSalary && salaryNum > 0) {
+      const hours = 8, days = 22;
+      try {
+        localStorage.setItem("lt_time_value_v1", JSON.stringify({
+          perMinute: salaryNum / (hours * days * 60),
+          salary: salaryNum,
+          hours: hours,
+          days: days,
+          savedAt: Date.now()
+        }));
+      } catch {}
+    }
+    saveProfile(profile);
+    showSetupLoader(profile);
+  }
 
   function showSetupLoader(profileData) {
     /* ─── PHASE 0: inject a CSS override that FORCES #root to stay hidden
@@ -62,7 +87,7 @@ export function mk({
 
     /* Phase 2: render the main app first, but keep this opaque loader over it
        until React and the enhancement pass have settled. This prevents the
-       white gap that used to appear after “Setting up your app…”. */
+       white gap that used to appear after \u201CSetting up your app\u2026". */
     setTimeout(function () {
       e(profileData);
       /* Poll: wait for enhancements to apply (life-progress card or
@@ -88,210 +113,254 @@ export function mk({
       }, 80);
     }, 3000);
   }
-  return t === "intro" ? jsx("div", {
-    className: "min-h-[100dvh] bg-primary flex flex-col items-center justify-center px-8 text-white",
-    children: jsxs("div", {
-      className: "max-w-sm w-full",
-      children: [jsx("div", {
-        className: "w-12 h-12 bg-accent flex items-center justify-center mb-8",
-        children: jsxs("svg", {
-          width: "24",
-          height: "24",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2.5",
-          strokeLinecap: "square",
-          children: [jsx("circle", {
-            cx: "12",
-            cy: "12",
-            r: "10"
-          }), jsx("polyline", {
-            points: "12 6 12 12 16 14"
-          })]
+
+  /* ── shared chrome: back button + progress dots ── */
+  const backBtn = idx > 0
+    ? jsx("button", {
+        type: "button",
+        onClick: () => n(STEPS[idx - 1]),
+        "aria-label": "Go back",
+        className: "w-9 h-9 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 shrink-0",
+        children: jsx("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round", children: jsx("polyline", { points: "15 18 9 12 15 6" }) })
+      })
+    : jsx("div", { className: "w-9 shrink-0" });
+
+  const dots = jsxs("div", {
+    className: "flex items-center justify-center gap-2",
+    children: STEPS.map((_, k) => jsx("span", {
+      className: "rounded-full transition-all",
+      style: k <= idx
+        ? { width: k === idx ? 20 : 8, height: 8, background: GREEN }
+        : { width: 8, height: 8, background: "#E5E7EB" }
+    }, k))
+  });
+
+  const img = jsx("img", {
+    src: IMGS[t],
+    alt: "",
+    draggable: false,
+    className: "w-full max-w-[330px] mx-auto object-contain select-none",
+    style: { maxHeight: "42vh" }
+  });
+
+  const label = (text) => jsx("label", {
+    className: "block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2",
+    children: text
+  });
+
+  const nextBtn = (onClick, disabled, text) => jsx("button", {
+    type: "button",
+    onClick: onClick,
+    disabled: disabled,
+    className: "w-full py-4 rounded-xl font-bold text-base text-white transition-opacity",
+    style: { background: GREEN, opacity: disabled ? 0.4 : 1 },
+    children: text
+  });
+
+  /* ── step bodies ── */
+  let body = null, footer = null;
+
+  if (t === "welcome") {
+    body = jsxs("div", {
+      className: "text-center",
+      children: [
+        img,
+        jsx("p", {
+          className: "text-gray-500 text-sm leading-relaxed mt-2 px-2",
+          children: "A few quick questions and your life countdown will be ready."
         })
-      }), jsxs("h1", {
-        className: "text-4xl font-black tracking-tight mb-4 leading-tight",
-        children: ["Your life,", jsx("br", {}), "in seconds."]
-      }), jsx("p", {
-        className: "text-white/70 text-base leading-relaxed mb-10",
-        children: "Lifetime shows you exactly how much of your remaining time goes into each activity — so every second you spend is a choice, not an accident."
-      }), jsx("button", {
-        onClick: () => n("form"),
-        className: "w-full py-4 bg-accent text-primary font-bold text-base tracking-wide",
-        children: "Start my countdown →"
-      })]
-    })
-  }) : jsxs("div", {
-    className: "min-h-[100dvh] bg-background flex flex-col",
-    children: [jsxs("div", {
-      className: "bg-primary px-6 pt-12 pb-8",
-      children: [jsx("h2", {
-        className: "text-white text-2xl font-bold",
-        children: "Set up your profile"
-      }), jsx("p", {
-        className: "text-white/60 text-sm mt-1",
-        children: "This calculates your life countdown."
-      })]
-    }), jsx("div", {
-      className: "flex-1 overflow-y-auto",
-      children: jsxs("div", {
-        className: "flex flex-col divide-y divide-border",
-        children: [jsxs("div", {
-          className: "bg-card px-6 py-5",
-          children: [jsx("label", {
-            className: "block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2",
-            children: "Your name"
-          }), jsx("input", {
-            type: "text",
-            value: r,
-            onChange: g => o(g.target.value),
-            placeholder: "e.g. Alex",
-            className: "w-full bg-transparent text-foreground text-lg font-semibold outline-none placeholder:text-muted-foreground/50"
-          })]
-        }), jsxs("div", {
-          className: "bg-card px-6 py-5",
-          children: [jsx("label", {
-            className: "block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2",
-            children: "Date of birth"
-          }), (() => {
-            /* Keep the list current without allowing the in-progress year.
-               In 2026 the newest option is 2025; when 2027 begins it becomes 2026. */
-            const _maxYear = new Date().getFullYear() - 1;
-            const _minYear = 1920;
-            const _selY = dY;
-            const _selM = dM;
-            const _selD = dD;
-            const _months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            const _daysInMonth = (_selY && _selM) ? new Date(Number(_selY), Number(_selM), 0).getDate() : 31;
-            const _updateDob = (y, m, d) => {
-              setDY(y);
-              setDM(m);
-              setDD(d);
-              if (y && m && d) {
-                const dd = String(d).padStart(2, "0"),
-                  mm = String(m).padStart(2, "0");
-                i(y + "-" + mm + "-" + dd)
-              } else {
-                i("")
-              }
-            };
-            const _selStyle = "flex-1 bg-muted text-foreground text-base font-bold outline-none border border-border rounded-xl px-3 py-3 text-center focus:border-primary focus:ring-2 focus:ring-primary/30 transition-colors";
-            return jsxs("div", {
-              className: "flex items-center gap-2",
-              children: [jsxs("select", {
-                value: _selD,
-                onChange: g => {
-                  _updateDob(_selY, _selM, g.target.value)
-                },
-                className: _selStyle,
-                children: [jsx("option", {
-                  value: "",
-                  children: "Day"
-                }, ...[]), Array.from({
-                  length: _daysInMonth
-                }, (_, idx) => idx + 1).map(d => jsx("option", {
-                  value: String(d).padStart(2, "0"),
-                  children: String(d).padStart(2, "0")
-                }, d))]
-              }), jsxs("select", {
-                value: _selM,
-                onChange: g => {
-                  _updateDob(_selY, g.target.value, _selD)
-                },
-                className: _selStyle,
-                children: [jsx("option", {
-                  value: "",
-                  children: "Month"
-                }, ...[]), ..._months.map((m, idx) => jsx("option", {
-                  value: String(idx + 1).padStart(2, "0"),
-                  children: m
-                }, idx + 1))]
-              }), jsxs("select", {
-                value: _selY,
-                onChange: g => {
-                  _updateDob(g.target.value, _selM, _selD)
-                },
-                className: _selStyle,
-                children: [jsx("option", {
-                  value: "",
-                  children: "Year"
-                }, ...[]), ...Array.from({
-                  length: _maxYear - _minYear + 1
-                }, (_, idx) => _maxYear - idx).map(y => jsx("option", {
-                  value: String(y),
-                  children: String(y)
-                }, y))]
-              })]
+      ]
+    });
+    footer = nextBtn(() => n("name"), false, "Get Started \u2192");
+  }
+
+  if (t === "name") {
+    body = jsxs("div", {
+      children: [
+        img,
+        jsx("div", { className: "mt-2", children: jsxs("div", {
+          className: "bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4",
+          children: [
+            label("Your name"),
+            jsx("input", {
+              type: "text",
+              value: r,
+              onChange: g => o(g.target.value),
+              placeholder: "e.g. Alex",
+              autoFocus: true,
+              className: "w-full bg-transparent text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-300"
             })
-          })()]
-        }), jsxs("div", {
-          className: "bg-card px-6 py-5",
-          children: [jsxs("label", {
-            className: "block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2",
-            children: ["Retire date — ", jsx("span", {
-              className: "text-primary font-bold",
-              children: d
-            })]
-          }), jsx("input", {
+          ]
+        }) })
+      ]
+    });
+    footer = nextBtn(() => n("dob"), !r.trim(), "Next \u2192");
+  }
+
+  if (t === "dob") {
+    const _maxYear = new Date().getFullYear() - 1;
+    const _minYear = 1920;
+    const _months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const _daysInMonth = (dY && dM) ? new Date(Number(dY), Number(dM), 0).getDate() : 31;
+    const _updateDob = (y, m, dd) => {
+      setDY(y);
+      setDM(m);
+      setDD(dd);
+      if (y && m && dd) {
+        const dayStr = String(dd).padStart(2, "0"),
+          monStr = String(m).padStart(2, "0");
+        i(y + "-" + monStr + "-" + dayStr);
+      } else {
+        i("");
+      }
+    };
+    const _selStyle = "flex-1 bg-white text-gray-900 text-base font-bold outline-none border border-[#E5DFCF] rounded-xl px-2 py-3 text-center focus:border-[#157347] transition-colors min-w-0";
+    body = jsxs("div", {
+      children: [
+        img,
+        jsxs("div", { className: "mt-2 bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4", children: [
+          label("Date of birth"),
+          jsxs("div", {
+            className: "flex items-center gap-2",
+            children: [
+              jsxs("select", {
+                value: dD,
+                onChange: g => _updateDob(dY, dM, g.target.value),
+                className: _selStyle,
+                children: [
+                  jsx("option", { value: "", children: "Day" }, "d0"),
+                  Array.from({ length: _daysInMonth }, (_, ii) => ii + 1).map(dd => jsx("option", { value: String(dd).padStart(2, "0"), children: String(dd).padStart(2, "0") }, dd))
+                ]
+              }),
+              jsxs("select", {
+                value: dM,
+                onChange: g => _updateDob(dY, g.target.value, dD),
+                className: _selStyle,
+                children: [
+                  jsx("option", { value: "", children: "Month" }, "m0"),
+                  ..._months.map((mname, ii) => jsx("option", { value: String(ii + 1).padStart(2, "0"), children: mname }, ii + 1))
+                ]
+              }),
+              jsxs("select", {
+                value: dY,
+                onChange: g => _updateDob(g.target.value, dM, dD),
+                className: _selStyle,
+                children: [
+                  jsx("option", { value: "", children: "Year" }, "y0"),
+                  ...Array.from({ length: _maxYear - _minYear + 1 }, (_, ii) => _maxYear - ii).map(yy => jsx("option", { value: String(yy), children: String(yy) }, yy))
+                ]
+              })
+            ]
+          })
+        ]}),
+        jsxs("div", { className: "mt-3 bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4", children: [
+          jsxs("label", {
+            className: "block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2",
+            children: ["Retire age \u2014 ", jsx("span", { style: { color: GREEN }, children: d })]
+          }),
+          jsx("input", {
             type: "range",
             min: s ? Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / (365.25 * 24 * 3600 * 1000))) : 0,
             max: 100,
             value: l,
             onChange: g => a(Number(g.target.value)),
-            className: "w-full accent-primary"
-          }), jsxs("div", {
-            className: "flex justify-between text-xs text-muted-foreground mt-1",
-            children: [jsx("span", {
-              children: s ? `${Math.max(0,Math.floor((Date.now()-new Date(s).getTime())/(365.25*24*3600*1000)))} yrs` : "0 yrs"
-            }), jsx("span", {
-              children: "100 yrs"
-            })]
-          })]
-        }), u && s && jsxs("div", {
-          className: "bg-card px-6 py-5",
-          children: [jsx("label", {
-            className: "block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3",
-            children: "Your timeline"
-          }), jsxs("div", {
-            className: "flex h-4 w-full border border-border overflow-hidden",
-            children: [jsx("div", {
-              className: "h-full bg-primary",
-              style: {
-                width: `${u.lived/l*100}%`
-              }
-            }), jsx("div", {
-              className: "h-full",
-              style: {
-                width: `${u.left/l*100}%`,
-                backgroundColor: "hsl(var(--accent))",
-                opacity: .3
-              }
-            })]
-          }), jsxs("div", {
-            className: "flex justify-between text-xs text-muted-foreground mt-2",
-            children: [jsxs("span", {
-              children: [Math.floor(u.lived), " yrs lived"]
-            }), jsxs("span", {
-              children: [Math.floor(u.left), " yrs remaining"]
-            })]
-          }), u.left > 0 && jsxs("p", {
-            className: "text-sm text-muted-foreground mt-3 font-medium",
-            children: ["You have ~", jsx("strong", {
-              className: "text-foreground",
-              children: Math.floor(u.left * 365.25).toLocaleString()
-            }), " days left."]
-          })]
-        })]
+            className: "w-full accent-[#157347]"
+          }),
+          jsxs("div", {
+            className: "flex justify-between text-xs text-gray-400 mt-1",
+            children: [
+              jsx("span", { children: s ? `${Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / (365.25 * 24 * 3600 * 1000)))} yrs` : "0 yrs" }),
+              jsx("span", { children: "100 yrs" })
+            ]
+          })
+        ]}),
+        u && s && jsxs("div", { className: "mt-3 bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4", children: [
+          label("Your timeline"),
+          jsxs("div", {
+            className: "flex h-4 w-full border border-[#E5DFCF] overflow-hidden rounded-full",
+            children: [
+              jsx("div", { className: "h-full", style: { width: `${u.lived / l * 100}%`, background: GREEN } }),
+              jsx("div", { className: "h-full", style: { width: `${u.left / l * 100}%`, background: GREEN, opacity: .25 } })
+            ]
+          }),
+          jsxs("div", {
+            className: "flex justify-between text-xs text-gray-400 mt-2",
+            children: [
+              jsxs("span", { children: [Math.floor(u.lived), " yrs lived"] }),
+              jsxs("span", { children: [Math.floor(u.left), " yrs remaining"] })
+            ]
+          }),
+          u.left > 0 && jsxs("p", {
+            className: "text-sm text-gray-500 mt-2 font-medium",
+            children: ["You have ~", jsx("strong", { style: { color: GREEN }, children: Math.floor(u.left * 365.25).toLocaleString() }), " days left."]
+          })
+        ]})
+      ]
+    });
+    footer = nextBtn(() => n("salary"), !dobValid, "Next \u2192");
+  }
+
+  if (t === "salary") {
+    body = jsxs("div", {
+      children: [
+        img,
+        jsx("div", { className: "mt-2", children: jsxs("div", {
+          className: "bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4",
+          children: [
+            label("Your monthly salary"),
+            jsxs("div", {
+              className: "flex items-center gap-2",
+              children: [
+                jsx("span", { className: "text-xl font-black text-gray-400 shrink-0", children: sym }),
+                jsx("input", {
+                  type: "number",
+                  inputMode: "decimal",
+                  min: 0,
+                  value: sal,
+                  onChange: g => setSal(g.target.value),
+                  placeholder: "e.g. 50,000",
+                  autoFocus: true,
+                  className: "w-full bg-transparent text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                })
+              ]
+            }),
+            jsx("p", {
+              className: "text-xs text-gray-400 mt-2 leading-relaxed",
+              children: "Powers your Time Value Calculator \u2014 the value of every minute. You can change this later in Life Hub."
+            })
+          ]
+        }) })
+      ]
+    });
+    footer = jsxs("div", {
+      className: "flex flex-col gap-1",
+      children: [
+        nextBtn(() => finish(true), !(salaryNum > 0), "Next \u2192"),
+        jsx("button", {
+          type: "button",
+          onClick: () => finish(false),
+          className: "w-full py-3 text-sm font-semibold text-gray-400 active:text-gray-600",
+          children: "Skip for now"
+        })
+      ]
+    });
+  }
+
+  return jsxs("div", {
+    className: "min-h-[100dvh] bg-[#FDFBF7] flex flex-col",
+    children: [
+      jsxs("div", {
+        className: "flex items-center gap-2 px-4 pt-10 pb-3",
+        children: [backBtn, dots, jsx("div", { className: "w-9 shrink-0" })]
+      }),
+      jsx("div", {
+        className: "flex-1 overflow-y-auto px-6 pb-4",
+        children: body
+      }),
+      jsx("div", {
+        className: "px-6 pt-3 pb-8 bg-[#FDFBF7]",
+        children: footer
       })
-    }), jsx("div", {
-      className: "border-t border-border bg-white p-4",
-      children: jsx("button", {
-        onClick: p,
-        disabled: !r.trim() || !s,
-        className: "w-full py-4 bg-primary text-white font-bold text-base disabled:opacity-40 transition-opacity",
-        children: "Start my countdown"
-      })
-    })]
-  })
+    ]
+  });
 }
