@@ -12,6 +12,11 @@ const IMGS = {
 };
 const GREEN = "#157347";
 
+/* Preload every step illustration up front — otherwise the browser keeps
+   the previous step's image on screen for ~1-2s while the next PNG
+   downloads (visible when clicking Get Started / Next). */
+Object.values(IMGS).forEach((src) => { const im = new Image(); im.src = src; });
+
 export function mk({
   onComplete: e
 }) {
@@ -126,7 +131,7 @@ export function mk({
     : jsx("div", { className: "w-9 shrink-0" });
 
   const dots = jsxs("div", {
-    className: "flex items-center justify-center gap-2",
+    className: "flex-1 flex items-center justify-center gap-2",
     children: STEPS.map((_, k) => jsx("span", {
       className: "rounded-full transition-all",
       style: k <= idx
@@ -136,6 +141,7 @@ export function mk({
   });
 
   const img = jsx("img", {
+    key: t,
     src: IMGS[t],
     alt: "",
     draggable: false,
