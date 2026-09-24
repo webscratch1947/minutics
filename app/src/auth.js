@@ -96,6 +96,17 @@ function reconcileStorage(user) {
       setMarker(user.uid);
       return true;
     }
+    /* Known account (snapshot exists) → ALWAYS restore it, even if stray
+       live keys are present. After logout, enhancement seeding can write
+       default activities back before re-login; without this check those
+       keys tripped the migration branch below and the account's real
+       database was never restored (user saw onboarding on every re-login). */
+    var hasSnapshot = false;
+    try { hasSnapshot = !!localStorage.getItem(nsKey(user.uid)); } catch (e) {}
+    if (hasSnapshot) {
+      restoreAccount(user.uid);
+      return true;
+    }
     if (appKeys().length > 0) { /* first run of this feature / migration */
       setMarker(user.uid);
       return false;

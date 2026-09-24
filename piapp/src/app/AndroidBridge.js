@@ -16,35 +16,53 @@ export function HC() {
       }
       try {
         const b = window.AndroidBridge;
+        if (b && b.getLastSentDate) {
+          const nativeSent = b.getLastSentDate();
+          if (nativeSent && n.lastSummaryDate !== nativeSent) {
+            updateLastSummaryDate(nativeSent);
+            n.lastSummaryDate = nativeSent;
+          }
+        }
+      } catch {}
+      try {
+        const b = window.AndroidBridge;
         if (b) {
           b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), n.lastSummaryDate || "");
           b.scheduleReport && b.scheduleReport(n.dailyReportTime)
         }
       } catch {}
-      const r = new Date,
-        o = `${String(r.getHours()).padStart(2,"0")}:${String(r.getMinutes()).padStart(2,"0")}`,
-        s = r.toLocaleDateString("en-CA");
-      if (o === n.dailyReportTime && n.lastSummaryDate !== s) {
+      /* Catch-up: fire any time AFTER the scheduled time today (not only
+         on the exact minute — background throttling used to miss it). */
+      const now = new Date();
+      const today = now.toLocaleDateString("en-CA");
+      const parts = (n.dailyReportTime || "21:00").split(":");
+      const scheduled = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+        parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
+      if (now.getTime() >= scheduled.getTime() && n.lastSummaryDate !== today) {
         sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()).then(function(result) {
-          if (result && result.success) updateLastSummaryDate(s);
+          if (result && result.success) {
+            updateLastSummaryDate(today);
+            try {
+              const b = window.AndroidBridge;
+              if (b) {
+                b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), today);
+                b.scheduleReport && b.scheduleReport(n.dailyReportTime);
+              }
+            } catch {}
+          }
         });
       }
     };
-    /* Clear stale lastSummaryDate from old buggy runs so today's report can fire */
-    try {
-      const raw = localStorage.getItem("lifetime_telegram_settings_v1");
-      if (raw) {
-        const data = JSON.parse(raw);
-        const today = new Date().toLocaleDateString("en-CA");
-        if (data.lastSummaryDate === today) {
-          data.lastSummaryDate = null;
-          localStorage.setItem("lifetime_telegram_settings_v1", JSON.stringify(data));
-        }
-      }
-    } catch {}
     e();
     const t = window.setInterval(e, 30 * 1e3);
-    return () => window.clearInterval(t)
+    const onFocus = () => e();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.clearInterval(t);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    }
   }, []);
   useEffect(() => {
     const tick = () => {
