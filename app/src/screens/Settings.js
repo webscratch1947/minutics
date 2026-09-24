@@ -334,8 +334,26 @@ export function SettingsScreen() {
         });
       } catch (e) {}
 
-      /* Clear everything */
-      localStorage.clear();
+      /* Clear this account's live app keys only — keep Firebase auth keys,
+         other accounts' lt_ns_* snapshots, and the active-uid marker so
+         per-account isolation survives the reset. */
+      var toRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k) continue;
+        if (k === "lt_active_uid" || k.indexOf("lt_ns_") === 0 || k.indexOf("firebase:") === 0) continue;
+        toRemove.push(k);
+      }
+      toRemove.forEach(function (key) {
+        try { localStorage.removeItem(key); } catch (e) {}
+      });
+
+      /* Also delete this account's snapshot so the old data is truly gone
+         (the logout below re-parks only the plan keys we just restored). */
+      try {
+        var u = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
+        if (u && u.uid) localStorage.removeItem("lt_ns_" + u.uid);
+      } catch (e) {}
 
       /* Restore plan data */
       Object.keys(planData).forEach(function (k) {

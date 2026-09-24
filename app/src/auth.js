@@ -27,6 +27,98 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
+/* ── Per-account localStorage namespaces ─────────────────────────────────
+   Every Firebase UID owns a private slice of localStorage. On logout /
+   account switch the current app keys are snapshotted into lt_ns_<uid>
+   and wiped; on login the target uid's snapshot is restored. A brand-new
+   account finds no snapshot → completely fresh database → onboarding. */
+var ACTIVE_UID_KEY = "lt_active_uid";
+var _lastSeenUid = null;
+var _justSignedUp = false;
+var _prevAuthState; /* undefined | null | user — genuine-login detection */
+
+function nsKey(uid) { return "lt_ns_" + uid; }
+function isReservedKey(k) {
+  return k === ACTIVE_UID_KEY || k.indexOf("lt_ns_") === 0 || k.indexOf("firebase:") === 0;
+}
+function appKeys() {
+  var out = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && !isReservedKey(k)) out.push(k);
+  }
+  return out;
+}
+function getMarker() {
+  try { return localStorage.getItem(ACTIVE_UID_KEY); } catch (e) { return null; }
+}
+function setMarker(uid) {
+  try {
+    if (uid) localStorage.setItem(ACTIVE_UID_KEY, uid);
+    else localStorage.removeItem(ACTIVE_UID_KEY);
+  } catch (e) {}
+}
+function snapshotAccount(uid) {
+  if (!uid) return;
+  var data = {};
+  appKeys().forEach(function (k) { data[k] = localStorage.getItem(k); });
+  try { localStorage.setItem(nsKey(uid), JSON.stringify(data)); } catch (e) {}
+}
+function clearAppKeys() {
+  appKeys().forEach(function (k) { localStorage.removeItem(k); });
+}
+function restoreAccount(uid) {
+  clearAppKeys();
+  var raw = null;
+  try { raw = localStorage.getItem(nsKey(uid)); } catch (e) {}
+  if (raw) {
+    try {
+      var data = JSON.parse(raw);
+      Object.keys(data).forEach(function (k) { localStorage.setItem(k, data[k]); });
+    } catch (e) {}
+  }
+  setMarker(uid);
+}
+/* Returns true when live app keys were swapped (React must re-read). */
+function reconcileStorage(user) {
+  var marker = getMarker();
+  if (user) {
+    var wasSignup = _justSignedUp;
+    _justSignedUp = false;
+    if (marker === user.uid) return false;
+    if (marker) { /* switching A → B while A's data is live */
+      if (appKeys().length > 0) snapshotAccount(marker); /* never overwrite a blob with empty data */
+      restoreAccount(user.uid);
+      return true;
+    }
+    if (wasSignup) { /* brand-new account: never inherit orphans */
+      clearAppKeys();
+      setMarker(user.uid);
+      return true;
+    }
+    if (appKeys().length > 0) { /* first run of this feature / migration */
+      setMarker(user.uid);
+      return false;
+    }
+    restoreAccount(user.uid);
+    return true;
+  }
+  /* Signed out: park current data under its owner and wipe live keys. */
+  var owner = marker || _lastSeenUid;
+  var changed = false;
+  if (owner) {
+    if (appKeys().length > 0) { snapshotAccount(owner); }
+    clearAppKeys();
+    setMarker(null);
+    changed = true;
+  }
+  _lastSeenUid = null;
+  return changed;
+}
+function announceUserChanged() {
+  try { window.dispatchEvent(new CustomEvent("lt-user-changed")); } catch (e) {}
+}
+
 /* Expose logout for the Settings-page "Log out" row (added in lifetime-enhancements.js) */
 window.LTAuth = {
   logout: function () {
@@ -281,12 +373,15 @@ function renderGate(mode) {
 
     setLoading(true);
 
+    if (isSignup) _justSignedUp = true;
+
     var action = isSignup
       ? createUserWithEmailAndPassword(auth, email, password)
       : signInWithEmailAndPassword(auth, email, password);
 
     action
       .catch(function (err) {
+        _justSignedUp = false;
         showError(friendlyError(err));
         setLoading(false);
       });
@@ -431,44 +526,49 @@ function cleanupEnhancementVisuals() {
 }
 
 /* ── Safety: if IndexedDB crashes and onAuthStateChanged never fires,
-   remove the auth gate after 8s so the user isn't stuck on a grey screen.
-   Only fires when Firebase never responded — if onAuthStateChanged fired
-   (even with null/unauthenticated), the gate stays intact. ──────────── */
+   re-render a working login gate after 8s so the user isn't stuck on a
+   grey screen with no way in. NEVER bypasses auth. Only fires when
+   Firebase never responded. ─────────────────────────────────────────── */
 var _authStateChangedFired = false;
 setTimeout(function () {
   if (!_authStateChangedFired) {
-    var g = document.getElementById("lt-auth-gate");
-    if (g) {
-      console.warn("AUTH SAFETY: Firebase never responded — removing stale auth gate after timeout");
-      document.body.classList.add("lt-authed");
-      g.remove();
-    }
+    console.warn("AUTH SAFETY: Firebase never responded — re-rendering login gate (never bypassing auth)");
+    document.body.classList.remove("lt-authed");
+    renderGate("login");
   }
 }, 8000);
+
+/* Show the login gate immediately so a Firebase/IndexedDB crash can never
+   leave a blank grey screen with no way to sign in. If a session silently
+   restores, onAuthStateChanged removes this gate a moment later. */
+renderGate("login");
 
 /* ── Auth state watcher: gate blocks the app until signed in ────────────── */
 onAuthStateChanged(auth, function (user) {
   _authStateChangedFired = true;
   console.log("AUTH STATE CHANGED:", user ? "AUTHENTICATED" : "NOT AUTHENTICATED", user);
   var gate = document.getElementById("lt-auth-gate");
+  var storageChanged = false;
   if (user) {
     console.log("Removing auth gate and adding lt-authed class");
-    /* This is a real sign-in transition (the login gate was actually on
-       screen a moment ago) only when `gate` is truthy here -- on a normal
-       page load where Firebase silently restores an already-signed-in
-       session, no gate ever gets created before this fires, so `gate` is
-       null and we leave the user exactly on whatever route they loaded
-       (e.g. a refresh on Settings correctly stays on Settings). But on a
-       genuine login, the router's URL had simply been left wherever it was
-       when the user logged out (this overlay never touched routing), so
-       without this the app would silently reopen on that old tab -- e.g.
-       landing back in Settings -- instead of the Timer home screen a
-       fresh sign-in should start on. */
-    if (gate) {
-      if (location.pathname !== "/") {
-        history.pushState({}, "", "/");
-        window.dispatchEvent(new PopStateEvent("popstate"));
-      }
+    /* Swap per-account storage BEFORE any UI reads it. */
+    storageChanged = reconcileStorage(user);
+    _lastSeenUid = user.uid;
+    var genuineLogin = _prevAuthState === null;
+    _prevAuthState = user;
+    if (storageChanged) announceUserChanged();
+    /* A genuine sign-in transition (the login gate was actually on screen
+       a moment ago) must land on the Timer home screen — the router's URL
+       was left wherever it was when the user logged out. On a normal page
+       load where Firebase silently restores a session, _prevAuthState is
+       undefined (not null), so we leave the loaded route alone (a refresh
+       on Settings correctly stays on Settings). App uses HashRouter, so
+       the live route lives in location.hash, not pathname. */
+    var hasRoute = location.pathname !== "/" ||
+      (location.hash && location.hash !== "#/" && location.hash !== "#");
+    if (genuineLogin && hasRoute) {
+      history.pushState({}, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     }
     document.body.classList.add("lt-authed");
     /* Clear ALL inline styles that logout sets on #root (including !important) */
@@ -483,15 +583,16 @@ onAuthStateChanged(auth, function (user) {
     }
   } else {
     console.log("Removing lt-authed class and rendering login gate");
+    /* Park the outgoing account's data under its uid and wipe the live
+       keys so the next account (or a fresh signup) starts clean. */
+    storageChanged = reconcileStorage(null);
+    _prevAuthState = null;
+    if (storageChanged) announceUserChanged();
     document.body.classList.remove("lt-authed");
-    
+
     // Clean up any enhancement visuals before showing login gate to prevent flash
     cleanupEnhancementVisuals();
-    
-    /* No localStorage.clear() here either -- see the note in LTAuth.logout()
-       above. This branch fires on every path to signed-out (token expiry,
-       revoked session, explicit log out, etc.), so clearing here was
-       wiping the device's data just as often as the logout button was. */
+
     renderGate("login");
   }
 });

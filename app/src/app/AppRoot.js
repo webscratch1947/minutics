@@ -42,17 +42,32 @@ function AuthenticatedApp({ profile }) {
 
 export function QC() {
   const [profile, setProfile] = useState(() => getProfile());
+  // Bumped on account switch so onboarding + the whole app remount fresh
+  const [userEpoch, setUserEpoch] = useState(0);
   // First render: check if profile exists
   const profileRef = useRef(profile);
-  
+
   useEffect(() => {
     profileRef.current = getProfile();
     setProfile(profileRef.current);
   }, []);
 
+  // auth.js dispatches this whenever the per-account storage is swapped
+  useEffect(() => {
+    function onUserChanged() {
+      profileRef.current = getProfile();
+      setProfile(profileRef.current);
+      setUserEpoch(n => n + 1);
+      queryClient.clear();
+    }
+    window.addEventListener("lt-user-changed", onUserChanged);
+    return () => window.removeEventListener("lt-user-changed", onUserChanged);
+  }, []);
+
   // No profile → show onboarding
   if (!profile) {
     return jsx(mk, {
+      key: "ob-" + userEpoch,
       onComplete: (newProfile) => {
         setProfile(newProfile);
       }
@@ -63,6 +78,7 @@ export function QC() {
   return jsx(QueryClientProvider, {
     client: queryClient,
     children: jsxs("div", {
+      key: "app-" + userEpoch,
       children: [
         jsx(AuthenticatedApp, { profile })
       ]
