@@ -64,6 +64,13 @@ export function QC() {
     return () => window.removeEventListener("lt-user-changed", onUserChanged);
   }, []);
 
+  // Tell auth.js the remount has committed so it can safely drop the gate
+  // (prevents a flash of stale UI while React is still swapping accounts).
+  useEffect(() => {
+    if (userEpoch === 0) return;
+    try { window.dispatchEvent(new CustomEvent("lt-user-changed-applied")); } catch (e) {}
+  }, [userEpoch]);
+
   // No profile → show onboarding
   if (!profile) {
     return jsx(mk, {

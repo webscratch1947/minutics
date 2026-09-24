@@ -5,10 +5,10 @@ import { getCurrency, getCurrencySymbol } from './lib/currency.js';
 
 const STEPS = ["welcome", "name", "dob", "salary"];
 const IMGS = {
-  welcome: "./assets/onboarding/welcome.png",
-  name: "./assets/onboarding/name.png",
-  dob: "./assets/onboarding/dob.png",
-  salary: "./assets/onboarding/salary.png"
+  welcome: "./assets/onboarding/welcome.webp",
+  name: "./assets/onboarding/name.webp",
+  dob: "./assets/onboarding/dob.webp",
+  salary: "./assets/onboarding/salary.webp"
 };
 const GREEN = "#157347";
 
@@ -168,7 +168,7 @@ export function mk({
 
   if (t === "welcome") {
     body = jsxs("div", {
-      className: "text-center",
+      className: "text-center pt-10",
       children: [
         img,
         jsx("p", {

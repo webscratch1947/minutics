@@ -538,10 +538,19 @@ setTimeout(function () {
   }
 }, 8000);
 
-/* Show the login gate immediately so a Firebase/IndexedDB crash can never
-   leave a blank grey screen with no way to sign in. If a session silently
-   restores, onAuthStateChanged removes this gate a moment later. */
-renderGate("login");
+/* Show a neutral opaque splash immediately so a Firebase/IndexedDB crash
+   can never leave a blank grey screen — and so a signed-in user never
+   flashes the LOGIN FORM on load. The real login form is only rendered
+   once onAuthStateChanged confirms there is no session. */
+(function renderStartupSplash() {
+  injectStyles();
+  var existing = document.getElementById("lt-auth-gate");
+  if (existing) existing.remove();
+  var gate = document.createElement("div");
+  gate.id = "lt-auth-gate";
+  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#Fdfbf7;";
+  document.body.appendChild(gate);
+})();
 
 /* ── Auth state watcher: gate blocks the app until signed in ────────────── */
 onAuthStateChanged(auth, function (user) {
@@ -575,11 +584,29 @@ onAuthStateChanged(auth, function (user) {
     var root = document.getElementById("root");
     if (root) root.removeAttribute("style");
     /* Keep the opaque auth gate in place until the authenticated UI has
-       painted. Removing it first caused a brief white frame after sign-up. */
-    if (gate) {
+       painted. Removing it first caused a brief white frame after sign-up.
+       If storage was just swapped for another account, wait until React
+       confirms the remount (lt-user-changed-applied) so stale UI never
+       flashes between gate removal and the remount commit. */
+    var dropGate = function () {
+      var g = document.getElementById("lt-auth-gate");
+      if (!g) return;
       requestAnimationFrame(function () {
-        requestAnimationFrame(function () { gate.remove(); });
+        requestAnimationFrame(function () { g.remove(); });
       });
+    };
+    if (storageChanged) {
+      var applied = false;
+      var onApplied = function () {
+        if (applied) return;
+        applied = true;
+        window.removeEventListener("lt-user-changed-applied", onApplied);
+        dropGate();
+      };
+      window.addEventListener("lt-user-changed-applied", onApplied);
+      setTimeout(onApplied, 1500); /* safety: never leave the gate stuck */
+    } else {
+      dropGate();
     }
   } else {
     console.log("Removing lt-authed class and rendering login gate");
