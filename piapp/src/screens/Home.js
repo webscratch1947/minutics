@@ -1097,13 +1097,13 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               })
             ]
           }),
-          // Sticky footer: duration + actions (always visible, never scrolled away)
+          // Sticky footer: duration + actions (compact so it never crowds the form)
           jsxs('div', {
-            className: 'shrink-0 bg-white border-t border-border',
+            className: 'shrink-0 bg-white border-t border-border pb-[env(safe-area-inset-bottom)]',
             children: [
               // Duration preview
               durationMinutes !== null && durationMinutes > 0 && jsx('div', {
-                className: 'px-5 pt-3 pb-2 text-center',
+                className: 'px-5 pt-2 pb-1.5 text-center',
                 children: jsx('p', {
                   className: 'text-sm font-bold text-primary',
                   children: durationMinutes >= 60
@@ -1113,7 +1113,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // Validation error
               toTime && durationMinutes !== null && durationMinutes <= 0 && jsx('p', {
-                className: 'px-5 pt-3 pb-2 text-sm text-destructive font-medium text-center',
+                className: 'px-5 pt-2 pb-1.5 text-sm text-destructive font-medium text-center',
                 children: 'End must be after start.'
               }),
               // Cancel / Log block buttons
@@ -1122,7 +1122,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 children: [
                   jsx('button', {
                     onClick: onClose,
-                    className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
+                    className: 'flex-1 py-3 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
                     children: 'Cancel'
                   }),
                   jsx('button', {
@@ -1135,13 +1135,11 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                       }
                     },
                     disabled: !isValid,
-                    className: 'flex-1 py-4 text-primary font-bold hover:bg-secondary text-sm disabled:opacity-40',
+                    className: 'flex-1 py-3 text-primary font-bold hover:bg-secondary text-sm disabled:opacity-40',
                     children: 'Log block'
                   })
                 ]
-              }),
-              // Safe-area spacer
-              jsx('div', { className: 'h-16 bg-white shrink-0' })
+              })
             ]
           })
         ]
