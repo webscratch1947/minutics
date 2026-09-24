@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { saveProfile } from './lib/profile.js';
 import { getCurrency, getCurrencySymbol } from './lib/currency.js';
@@ -12,10 +12,26 @@ const IMGS = {
 };
 const GREEN = "#157347";
 
-/* Preload every step illustration up front — otherwise the browser keeps
-   the previous step's image on screen for ~1-2s while the next PNG
-   downloads (visible when clicking Get Started / Next). */
-Object.values(IMGS).forEach((src) => { const im = new Image(); im.src = src; });
+/* Load every step illustration the moment the app opens (while the auth
+   splash is still on screen). whenImageReady() holds a step transition
+   until that image is downloaded AND decoded, so the next screen never
+   shows a blank/loading pop-in when the user clicks Get Started / Next. */
+const IMG_LOAD = {};
+const IMG_READY = {};
+Object.keys(IMGS).forEach((step) => {
+  IMG_LOAD[step] = new Promise((resolve) => {
+    const im = new Image();
+    const done = () => { IMG_READY[step] = true; resolve(); };
+    im.onload = () => { if (im.decode) im.decode().then(done, done); else done(); };
+    im.onerror = done;
+    im.src = IMGS[step];
+  });
+});
+function whenImageReady(step, cb) {
+  const p = IMG_LOAD[step];
+  if (!p || IMG_READY[step]) { cb(); return; }
+  p.then(cb);
+}
 
 export function mk({
   onComplete: e
@@ -120,10 +136,18 @@ export function mk({
   }
 
   /* ── shared chrome: back button + progress dots ── */
+  // Re-kick the preload when onboarding mounts (covers cache evictions).
+  useEffect(() => {
+    Object.keys(IMGS).forEach((k) => { const im = new Image(); im.src = IMGS[k]; });
+  }, []);
+
+  // Switch steps only once the target image is fully ready.
+  const go = (step) => whenImageReady(step, () => n(step));
+
   const backBtn = idx > 0
     ? jsx("button", {
         type: "button",
-        onClick: () => n(STEPS[idx - 1]),
+        onClick: () => go(STEPS[idx - 1]),
         "aria-label": "Go back",
         className: "w-9 h-9 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 shrink-0",
         children: jsx("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round", children: jsx("polyline", { points: "15 18 9 12 15 6" }) })
@@ -177,7 +201,7 @@ export function mk({
         })
       ]
     });
-    footer = nextBtn(() => n("name"), false, "Get Started \u2192");
+    footer = nextBtn(() => go("name"), false, "Get Started \u2192");
   }
 
   if (t === "name") {
@@ -200,7 +224,7 @@ export function mk({
         }) })
       ]
     });
-    footer = nextBtn(() => n("dob"), !r.trim(), "Next \u2192");
+    footer = nextBtn(() => go("dob"), !r.trim(), "Next \u2192");
   }
 
   if (t === "dob") {
@@ -303,7 +327,7 @@ export function mk({
         ]})
       ]
     });
-    footer = nextBtn(() => n("salary"), !dobValid, "Next \u2192");
+    footer = nextBtn(() => go("salary"), !dobValid, "Next \u2192");
   }
 
   if (t === "salary") {
