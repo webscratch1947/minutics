@@ -453,7 +453,7 @@ export function SettingsScreen() {
                 onClick: function () {
                   if (window.LTAuth && window.LTAuth.logout) window.LTAuth.logout();
                 },
-                className: "flex-1 py-3 text-sm font-semibold text-muted-foreground active:bg-gray-50 transition",
+                className: "flex-1 py-3 text-sm font-semibold text-red-500 active:bg-red-50 transition",
                 children: "Log out"
               })
             ]

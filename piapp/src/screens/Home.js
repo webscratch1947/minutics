@@ -1021,7 +1021,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
           }),
           // Form content
           jsxs('div', {
-            className: 'overflow-y-auto flex-1 px-5 py-5 flex flex-col gap-4',
+            className: 'overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-3',
             children: [
               // From date
               jsxs('div', {
@@ -1084,16 +1084,6 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 value: toTime,
                 onChange: setToTime
               }),
-              // Duration preview
-              durationMinutes !== null && durationMinutes > 0 && jsx('div', {
-                className: 'bg-primary/5 border border-primary/20 px-4 py-3 text-center',
-                children: jsx('p', {
-                  className: 'text-sm font-bold text-primary',
-                  children: durationMinutes >= 60
-                    ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60}m`
-                    : `${durationMinutes}m`
-                })
-              }),
               // Validation error
               toTime && durationMinutes !== null && durationMinutes <= 0 && jsx('p', {
                 className: 'text-sm text-destructive font-medium text-center',
@@ -1101,32 +1091,46 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               })
             ]
           }),
-          // Cancel / Log block buttons
+          // Duration + actions (always visible — no scroll needed)
           jsxs('div', {
-            className: 'flex border-t border-border shrink-0',
+            className: 'shrink-0 border-t border-border',
             children: [
-              jsx('button', {
-                onClick: onClose,
-                className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
-                children: 'Cancel'
+              durationMinutes !== null && durationMinutes > 0 && jsx('div', {
+                className: 'px-5 pt-3 pb-1 text-center',
+                children: jsx('p', {
+                  className: 'text-sm font-bold text-primary',
+                  children: durationMinutes >= 60
+                    ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60}m`
+                    : `${durationMinutes}m`
+                })
               }),
-              jsx('button', {
-                onClick: (e) => {
-                  e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  e.nativeEvent.stopPropagation();
-                  if (isValid && fromTimestamp && toTimestamp) {
-                    onSave(fromTimestamp, toTimestamp);
-                  }
-                },
-                disabled: !isValid,
-                className: 'flex-1 py-4 text-primary font-bold hover:bg-secondary text-sm disabled:opacity-40',
-                children: 'Log block'
+              jsxs('div', {
+                className: 'flex',
+                children: [
+                  jsx('button', {
+                    onClick: onClose,
+                    className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
+                    children: 'Cancel'
+                  }),
+                  jsx('button', {
+                    onClick: (e) => {
+                      e.stopPropagation();
+                      e.nativeEvent.stopImmediatePropagation();
+                      e.nativeEvent.stopPropagation();
+                      if (isValid && fromTimestamp && toTimestamp) {
+                        onSave(fromTimestamp, toTimestamp);
+                      }
+                    },
+                    disabled: !isValid,
+                    className: 'flex-1 py-4 text-primary font-bold hover:bg-secondary text-sm disabled:opacity-40',
+                    children: 'Log block'
+                  })
+                ]
               })
             ]
           }),
-          // Bottom spacer
-          jsx('div', { className: 'h-20 bg-white shrink-0' })
+          // Safe-area spacer (small — only for notched phones)
+          jsx('div', { className: 'h-[env(safe-area-inset-bottom)] bg-white shrink-0' })
         ]
       })
     ]
@@ -1264,8 +1268,8 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
               })
             ]
           }),
-          // Bottom spacer
-          jsx('div', { className: 'h-20 bg-white shrink-0' })
+          // Safe-area spacer (small — only for notched phones)
+          jsx('div', { className: 'h-[env(safe-area-inset-bottom)] bg-white shrink-0' })
         ]
       })
     ]
