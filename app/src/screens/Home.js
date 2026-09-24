@@ -1021,7 +1021,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
           }),
           // Form content
           jsxs('div', {
-            className: 'overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-3',
+            className: 'overflow-y-auto flex-1 px-5 py-5 flex flex-col gap-4',
             children: [
               // From date
               jsxs('div', {
@@ -1084,19 +1084,9 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 value: toTime,
                 onChange: setToTime
               }),
-              // Validation error
-              toTime && durationMinutes !== null && durationMinutes <= 0 && jsx('p', {
-                className: 'text-sm text-destructive font-medium text-center',
-                children: 'End must be after start.'
-              })
-            ]
-          }),
-          // Duration + actions (always visible — no scroll needed)
-          jsxs('div', {
-            className: 'shrink-0 border-t border-border',
-            children: [
+              // Duration preview
               durationMinutes !== null && durationMinutes > 0 && jsx('div', {
-                className: 'px-5 pt-3 pb-1 text-center',
+                className: 'bg-primary/5 border border-primary/20 px-4 py-3 text-center',
                 children: jsx('p', {
                   className: 'text-sm font-bold text-primary',
                   children: durationMinutes >= 60
@@ -1104,33 +1094,39 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                     : `${durationMinutes}m`
                 })
               }),
-              jsxs('div', {
-                className: 'flex',
-                children: [
-                  jsx('button', {
-                    onClick: onClose,
-                    className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
-                    children: 'Cancel'
-                  }),
-                  jsx('button', {
-                    onClick: (e) => {
-                      e.stopPropagation();
-                      e.nativeEvent.stopImmediatePropagation();
-                      e.nativeEvent.stopPropagation();
-                      if (isValid && fromTimestamp && toTimestamp) {
-                        onSave(fromTimestamp, toTimestamp);
-                      }
-                    },
-                    disabled: !isValid,
-                    className: 'flex-1 py-4 text-primary font-bold hover:bg-secondary text-sm disabled:opacity-40',
-                    children: 'Log block'
-                  })
-                ]
+              // Validation error
+              toTime && durationMinutes !== null && durationMinutes <= 0 && jsx('p', {
+                className: 'text-sm text-destructive font-medium text-center',
+                children: 'End must be after start.'
               })
             ]
           }),
-          // Safe-area spacer (small — only for notched phones)
-          jsx('div', { className: 'h-[env(safe-area-inset-bottom)] bg-white shrink-0' })
+          // Cancel / Log block buttons
+          jsxs('div', {
+            className: 'flex border-t border-border shrink-0',
+            children: [
+              jsx('button', {
+                onClick: onClose,
+                className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
+                children: 'Cancel'
+              }),
+              jsx('button', {
+                onClick: (e) => {
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                  e.nativeEvent.stopPropagation();
+                  if (isValid && fromTimestamp && toTimestamp) {
+                    onSave(fromTimestamp, toTimestamp);
+                  }
+                },
+                disabled: !isValid,
+                className: 'flex-1 py-4 text-primary font-bold hover:bg-secondary text-sm disabled:opacity-40',
+                children: 'Log block'
+              })
+            ]
+          }),
+          // Bottom spacer
+          jsx('div', { className: 'h-20 bg-white shrink-0' })
         ]
       })
     ]
@@ -1268,8 +1264,8 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
               })
             ]
           }),
-          // Safe-area spacer (small — only for notched phones)
-          jsx('div', { className: 'h-[env(safe-area-inset-bottom)] bg-white shrink-0' })
+          // Bottom spacer
+          jsx('div', { className: 'h-20 bg-white shrink-0' })
         ]
       })
     ]

@@ -169,6 +169,7 @@
   var catModalRoot     = null;  /* category-selection popup element */
   var catModalMinutes  = 0;
   var catModalLabel    = "";
+  var catModalPushedHistory = false; /* true while our pushState for the category modal is on the history stack */
   var pendingBlockActivityName = ""; /* activity name captured when "Log a time block" is opened, used once the block is actually saved */
   var lifeValueShowCalc = false;
 
@@ -1558,6 +1559,14 @@
         onCancel();
       }
     }
+    /* Drop the history entry we pushed when the modal was opened, except
+       when close was itself caused by popstate (back already consumed it). */
+    if (catModalPushedHistory && reason !== "popstate") {
+      catModalPushedHistory = false;
+      try { history.back(); } catch (e) {}
+    } else if (reason === "popstate") {
+      catModalPushedHistory = false;
+    }
   }
 
   /* Finds the <input> that sits next to a label with exact text labelText
@@ -1895,6 +1904,14 @@
     document.body.appendChild(root);
     catModalRoot = root;
     root.__ltOnCancel = opts.onCancel;
+    /* Push a history state so Android back closes this modal instead of
+       navigating the SPA (or appearing to "open" it via a ghost click). */
+    if (!catModalPushedHistory) {
+      try {
+        history.pushState({ ltCatModal: true }, "");
+        catModalPushedHistory = true;
+      } catch (e) {}
+    }
 
     root.addEventListener("click", function (e) {
       if (e.target.id === "lt-cat-close") {
@@ -4679,7 +4696,11 @@
     var cur = target, depth = 0;
     while (cur && depth < maxDepth) {
       var t = (cur.textContent || "").trim();
-      if (t.indexOf(needle) !== -1 && t.length <= needle.length + 90) return cur;
+      /* Primary label only: the element's text must START with the needle.
+         A mere indexOf match let wrapper rows like "Cancel" + "Log block"
+         (or a sheet backdrop whose subtree merely contains the label) fire
+         the category prompt when the user tapped back/cancel. */
+      if (t.indexOf(needle) === 0 && t.length <= needle.length + 90) return cur;
       cur = cur.parentElement;
       depth++;
     }
@@ -7286,8 +7307,22 @@
 
   /* Expose back-button handler for Android's onBackPressed */
   window.LTHandleBack = function () {
+    /* Category tag sheet first — it sits above every other overlay. */
+    if (catModalRoot) {
+      closeCategoryModal("cancel");
+      return true;
+    }
     if (activeOverlay) {
       closeOverlay();
+      return true;
+    }
+    /* React bottom sheets (activity picker / log block / etc.) — they are
+       fixed full-screen overlays with a backdrop, not activeOverlay. */
+    var reactSheet = document.querySelector('[class*="fixed inset-0"][class*="z-["]');
+    if (reactSheet && reactSheet.offsetParent !== null) {
+      var dismiss = reactSheet;
+      /* Backdrop click dismisses these sheets (same as tapping outside). */
+      try { dismiss.click(); } catch (e) {}
       return true;
     }
     /* Step back through SPA history */
@@ -7301,6 +7336,10 @@
   /* Also listen for popstate so Android back button works for SPA navigation
      even when LTHandleBack is not called directly by the WebView */
   window.addEventListener("popstate", function () {
+    if (catModalRoot) {
+      closeCategoryModal("popstate");
+      return;
+    }
     if (activeOverlay) {
       closeOverlay();
     }
