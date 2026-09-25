@@ -236,6 +236,9 @@ export function SettingsScreen() {
   var _tgTestResultState = useState(null);
   var tgTestResult = _tgTestResultState[0];
   var setTgTestResult = _tgTestResultState[1];
+  var _tgTestMsgState = useState("");
+  var tgTestMsg = _tgTestMsgState[0];
+  var setTgTestMsg = _tgTestMsgState[1];
   var _tgTestLoadingState = useState(false);
   var tgTestLoading = _tgTestLoadingState[0];
   var setTgTestLoading = _tgTestLoadingState[1];
@@ -388,16 +391,19 @@ export function SettingsScreen() {
   }
 
   function handleTestTelegram() {
-    if (!isPro) { setTgTestResult("error"); setTgTestLoading(false); return; }
+    if (!isPro) { setTgTestResult("error"); setTgTestMsg(""); setTgTestLoading(false); return; }
     setTgTestLoading(true);
     setTgTestResult(null);
+    setTgTestMsg("");
     sendTelegramReport(tgToken, tgChatId, "Test from Minutics \u2014 your Telegram integration is working!")
       .then(function (result) {
         setTgTestResult(result && result.success ? "success" : "error");
+        setTgTestMsg(result && result.message ? result.message : "");
         setTgTestLoading(false);
       })
       .catch(function () {
         setTgTestResult("error");
+        setTgTestMsg("");
         setTgTestLoading(false);
       });
   }
@@ -796,7 +802,7 @@ export function SettingsScreen() {
                   : tgTestResult === "error"
                     ? jsx("div", {
                         className: "mx-4 mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-500",
-                        children: "Failed to send. Check your token and chat ID."
+                        children: tgTestMsg || "Failed to send. Check your token and chat ID."
                       })
                     : null
               ]

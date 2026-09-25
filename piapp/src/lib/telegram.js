@@ -8,6 +8,13 @@
 
 const TELEGRAM_KEY = "lifetime_telegram_settings_v1";
 
+/** Turn raw Telegram descriptions into actionable hints */
+function friendlyTgError(desc) {
+  if (/invalid token|unauthorized/i.test(desc)) return "Bot token looks invalid — copy the fresh token from @BotFather.";
+  if (/chat not found/i.test(desc)) return "Chat ID not found — open your bot in Telegram and press Start first, then use your numeric ID from @userinfobot.";
+  return desc;
+}
+
 /** Trim or return null */
 function nullableTrim(str) {
   return (str ?? "").trim() || null;
@@ -73,11 +80,14 @@ export function saveTelegramSettings(settings) {
   return saved;
 }
 
-/** Send a message via Telegram Bot API through Vercel proxy (was: Iy) */
+/** Send a message — Vercel proxy first, direct Telegram API fallback (was: Iy) */
 export async function sendTelegramReport(token, chatId, text) {
   if (!token || !chatId) {
     return { success: false, message: "Add bot token and chat ID first" };
   }
+  /* 1) Server proxy — exists only on the deployed website. In the Android
+        WebView this route 404s, and piapp has no Firebase session so the
+        endpoint may 401; either way we fall through to (2). */
   try {
     const origin = window.location.origin;
     const resp = await fetch(origin + "/api/telegram-send", {
@@ -86,9 +96,29 @@ export async function sendTelegramReport(token, chatId, text) {
       body: JSON.stringify({ token, chatId, text })
     });
     const data = await resp.json();
-    return { success: data.ok, message: data.ok ? "Message sent!" : (data.description || "Failed") };
-  } catch (err) {
-    return { success: false, message: err.message || "Network error" };
+    if (data && data.ok) return { success: true, message: "Message sent!" };
+    if (data && data.description) return { success: false, message: friendlyTgError(data.description) };
+  } catch {} /* proxy unreachable — fall through */
+
+  /* 2) Direct call to Telegram. api.telegram.org sends
+        Access-Control-Allow-Origin: * so this works from the Android
+        WebView and the browser alike, using the user's own bot token. */
+  try {
+    const resp = await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text })
+    });
+    const data = await resp.json();
+    if (data && data.ok) return { success: true, message: "Message sent!" };
+    return {
+      success: false,
+      message: (data && data.description)
+        ? friendlyTgError(data.description)
+        : "Telegram rejected the message. Check token and chat ID."
+    };
+  } catch {
+    return { success: false, message: "Could not reach Telegram" };
   }
 }
 
