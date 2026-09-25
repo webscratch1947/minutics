@@ -15,11 +15,10 @@ function getAdminApp() {
     }),
   });
 }
-
 const MAX_CLAIM_BYTES = 900;
 
 function fitClaims(tgs) {
-  const over = () => Buffer.byteLength(JSON.stringify(tgs), "utf8") - MAX_CLAIM_BYTES;
+  const over = () => new TextEncoder().encode(JSON.stringify(tgs)).length - MAX_CLAIM_BYTES;
   if (over() <= 0) return tgs;
   if (typeof tgs.x === "string") {
     let x = tgs.x;
