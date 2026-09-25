@@ -51,7 +51,7 @@ export function getTelegramSettings() {
 
 /* ── Server schedule snapshot ─────────────────────────────────────────────
    Pushes {bot token, chat id, report time, tz, latest report text, last
-   sent marker} to /api/telegram-store, where it lives in our Firebase
+   sent marker} to /api/telegram, where it lives in our Firebase
    custom claims. The server cron then sends the daily report even when
    this browser/app is closed. No-op without a Firebase session (piapp). */
 var _lastSchedulePush = 0;
@@ -66,7 +66,7 @@ export function pushTelegramSchedule(opts) {
     var s = getTelegramSettings();
     return window.LTAuth.getToken().then(function (idToken) {
       if (!idToken) return false;
-      return fetch(window.location.origin + "/api/telegram-store", {
+      return fetch(window.location.origin + "/api/telegram", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -78,7 +78,7 @@ export function pushTelegramSchedule(opts) {
           time: s.dailyReportTime || "21:00",
           tzOffset: new Date().getTimezoneOffset(),
           text: getTelegramReportData(),
-          connected: !!s.telegramConnected,
+          action: "store", connected: !!s.telegramConnected,
           lastSentDate: s.lastSummaryDate || "",
           lastSentTime: s.lastSummaryTime || ""
         })
