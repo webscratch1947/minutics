@@ -18,34 +18,43 @@ export function HC() {
         const b = window.AndroidBridge;
         if (b && b.getLastSentDate) {
           const nativeSent = b.getLastSentDate();
-          if (nativeSent && n.lastSummaryDate !== nativeSent) {
+          const nativeTime = b.getLastSentTime ? (b.getLastSentTime() || "") : "";
+          if (nativeSent && (n.lastSummaryDate !== nativeSent || (nativeTime && (n.lastSummaryTime || "") !== nativeTime))) {
             updateLastSummaryDate(nativeSent);
             n.lastSummaryDate = nativeSent;
+            n.lastSummaryTime = n.dailyReportTime || "21:00";
           }
         }
       } catch {}
       try {
         const b = window.AndroidBridge;
         if (b) {
-          b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), n.lastSummaryDate || "");
+          b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), n.lastSummaryDate || "", n.lastSummaryTime || "");
           b.scheduleReport && b.scheduleReport(n.dailyReportTime)
         }
       } catch {}
       /* Catch-up: fire any time AFTER the scheduled time today (not only
-         on the exact minute — background throttling used to miss it). */
+         on the exact minute — background throttling used to miss it).
+         Keyed on day + report TIME, not day alone: if the user changes the
+         time after today's report went out, the new time still fires. */
       const now = new Date();
       const today = now.toLocaleDateString("en-CA");
       const parts = (n.dailyReportTime || "21:00").split(":");
       const scheduled = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
         parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
-      if (now.getTime() >= scheduled.getTime() && n.lastSummaryDate !== today) {
+      const notYetSent = n.lastSummaryDate !== today || (n.lastSummaryTime || "") !== (n.dailyReportTime || "21:00");
+      /* On Android the exact native alarm fires first at the scheduled
+         minute; JS only covers after a 90s grace so both paths can't send
+         the same report. On the web there is no native path — send at once. */
+      const graceMs = window.AndroidBridge ? 90 * 1000 : 0;
+      if (now.getTime() >= scheduled.getTime() + graceMs && notYetSent) {
         sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()).then(function(result) {
           if (result && result.success) {
             updateLastSummaryDate(today);
             try {
               const b = window.AndroidBridge;
               if (b) {
-                b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), today);
+                b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), today, n.dailyReportTime || "21:00");
                 b.scheduleReport && b.scheduleReport(n.dailyReportTime);
               }
             } catch {}

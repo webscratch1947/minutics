@@ -32,7 +32,10 @@ export function getTelegramSettings() {
       telegramChatId: chatId,
       telegramConnected: !!(isPro() && token && chatId),
       dailyReportTime: data.dailyReportTime || "21:00",
-      lastSummaryDate: data.lastSummaryDate || null
+      lastSummaryDate: data.lastSummaryDate || null,
+      /* Time-of-day the last report actually went out for — lets a report
+         fire again the same day when the user changes the report time. */
+      lastSummaryTime: data.lastSummaryTime || null
     };
   } catch {
     return {
@@ -40,7 +43,8 @@ export function getTelegramSettings() {
       telegramChatId: null,
       telegramConnected: false,
       dailyReportTime: "21:00",
-      lastSummaryDate: null
+      lastSummaryDate: null,
+      lastSummaryTime: null
     };
   }
 }
@@ -55,7 +59,8 @@ export function saveTelegramSettings(settings) {
     telegramChatId: chatId,
     telegramConnected: !!(isPro() && token && chatId),
     dailyReportTime: settings.dailyReportTime || "21:00",
-    lastSummaryDate: existing.lastSummaryDate || null
+    lastSummaryDate: existing.lastSummaryDate || null,
+    lastSummaryTime: existing.lastSummaryTime || null
   };
   localStorage.setItem(TELEGRAM_KEY, JSON.stringify(saved));
   
@@ -68,7 +73,8 @@ export function saveTelegramSettings(settings) {
           saved.telegramBotToken || "",
           saved.telegramChatId || "",
           getTelegramReportData(),
-          saved.lastSummaryDate || ""
+          saved.lastSummaryDate || "",
+          saved.lastSummaryTime || ""
         );
         bridge.scheduleReport && bridge.scheduleReport(saved.dailyReportTime);
       } else {
@@ -166,11 +172,13 @@ export function getTelegramReportData() {
   }
 }
 
-/** Update last summary date (was: UC) */
+/** Update last summary date (was: UC) — also records WHICH report time the
+    send was for, so changing the time later re-arms the same-day report. */
 export function updateLastSummaryDate(date) {
   try {
     const settings = getTelegramSettings();
     settings.lastSummaryDate = date;
+    settings.lastSummaryTime = settings.dailyReportTime || "21:00";
     localStorage.setItem(TELEGRAM_KEY, JSON.stringify(settings));
   } catch {}
 }
