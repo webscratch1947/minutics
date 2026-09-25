@@ -49,6 +49,46 @@ export function getTelegramSettings() {
   }
 }
 
+/* ── Server schedule snapshot ─────────────────────────────────────────────
+   Pushes {bot token, chat id, report time, tz, latest report text, last
+   sent marker} to /api/telegram-store, where it lives in our Firebase
+   custom claims. The server cron then sends the daily report even when
+   this browser/app is closed. No-op without a Firebase session (piapp). */
+var _lastSchedulePush = 0;
+export function pushTelegramSchedule(opts) {
+  opts = opts || {};
+  try {
+    if (!window.LTAuth || !window.LTAuth.getToken) return Promise.resolve(false);
+    var minGap = opts.force ? 60 * 1000 : 10 * 60 * 1000;
+    var now = Date.now();
+    if (now - _lastSchedulePush < minGap) return Promise.resolve(false);
+    _lastSchedulePush = now;
+    var s = getTelegramSettings();
+    return window.LTAuth.getToken().then(function (idToken) {
+      if (!idToken) return false;
+      return fetch(window.location.origin + "/api/telegram-store", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + idToken
+        },
+        body: JSON.stringify({
+          token: s.telegramBotToken || "",
+          chatId: s.telegramChatId || "",
+          time: s.dailyReportTime || "21:00",
+          tzOffset: new Date().getTimezoneOffset(),
+          text: getTelegramReportData(),
+          connected: !!s.telegramConnected,
+          lastSentDate: s.lastSummaryDate || "",
+          lastSentTime: s.lastSummaryTime || ""
+        })
+      }).then(function (r) { return !!(r && r.ok); }).catch(function () { return false; });
+    }).catch(function () { return false; });
+  } catch {
+    return Promise.resolve(false);
+  }
+}
+
 /** Save telegram settings + sync Android bridge (was: gh) */
 export function saveTelegramSettings(settings) {
   const existing = getTelegramSettings();
@@ -82,7 +122,12 @@ export function saveTelegramSettings(settings) {
       }
     }
   } catch {}
-  
+
+  /* Mirror the new schedule to the server (fire-and-forget) so reports can
+     be sent while this device is closed; also clears the server copy on
+     disconnect. */
+  pushTelegramSchedule({ force: true });
+
   return saved;
 }
 

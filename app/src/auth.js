@@ -149,10 +149,12 @@ window.LTAuth = {
   currentUser: function () {
     return auth.currentUser;
   },
-  getToken: function () {
+  getToken: function (force) {
     var user = auth.currentUser;
     if (!user) return Promise.resolve(null);
-    return user.getIdToken();
+    /* force=true bypasses the 1-hour token cache — needed to read fresh
+       custom claims (the report scheduler's heartbeat / last-sent state). */
+    return force ? user.getIdToken(true) : user.getIdToken();
   },
 };
 

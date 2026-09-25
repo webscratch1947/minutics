@@ -20,9 +20,6 @@
       ]
     }
   ],
-  "crons": [
-    { "path": "/api/telegram-cron", "schedule": "0 12 * * *" }
-  ],
   "rewrites": [
     {
       "source": "/validation-key.txt",

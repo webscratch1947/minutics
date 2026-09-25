@@ -1,7 +1,72 @@
 import { useEffect } from 'react';
 import { getStore, setStore, nextId } from '../lib/storage.js';
 import { COLOR_PALETTE } from '../lib/constants.js';
-import { getTelegramSettings, getTelegramReportData, updateLastSummaryDate, sendTelegramReport } from '../lib/telegram.js';
+import { getTelegramSettings, getTelegramReportData, updateLastSummaryDate, sendTelegramReport, pushTelegramSchedule } from '../lib/telegram.js';
+
+/* ── Server-scheduler state (Firebase custom claims, key `tgs`) ──────────
+   /api/telegram-cron stamps a heartbeat (tgs.b) every time it runs. While
+   that heartbeat is fresh the SERVER owns sending the daily report — we
+   disarm the native alarm, mirror its last-sent marker and skip local
+   sends. When the heartbeat goes stale (no scheduler attached, or it
+   stopped) everything falls back to the local alarm + catch-up path,
+   exactly as before this feature existed. piapp has no Firebase session,
+   so this stays inert there — kept mirrored with the main app. */
+var _srvCache = null; /* {b, sd, st, t} from claims | null */
+var _claimsCheckedAt = 0;
+
+function readTgsClaim(token) {
+  try {
+    var part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    var bytes = Uint8Array.from(atob(part), function (c) { return c.charCodeAt(0); });
+    var payload = JSON.parse(new TextDecoder().decode(bytes));
+    return payload && payload.tgs ? payload.tgs : null;
+  } catch { return null; }
+}
+
+function refreshSrvClaims(force) {
+  try {
+    if (!window.LTAuth || !window.LTAuth.getToken) return Promise.resolve(null);
+    var now = Date.now();
+    if (!force && _claimsCheckedAt && now - _claimsCheckedAt < 120000) {
+      return Promise.resolve(_srvCache);
+    }
+    _claimsCheckedAt = now;
+    return window.LTAuth.getToken(true).then(function (tok) {
+      _srvCache = tok ? readTgsClaim(tok) : null;
+      return _srvCache;
+    }).catch(function () { return _srvCache; });
+  } catch { return Promise.resolve(_srvCache); }
+}
+
+function serverActive() {
+  var b = _srvCache && Number(_srvCache.b);
+  return !!(b && Date.now() - b < 15 * 60 * 1000);
+}
+
+/* Server sent the report (or is about to): adopt its last-sent marker
+   locally + natively and disarm the native alarm so we never double-send. */
+function enterServerMode(n) {
+  var b;
+  try { b = window.AndroidBridge; } catch { b = null; }
+  if (_srvCache && _srvCache.sd &&
+      (n.lastSummaryDate !== _srvCache.sd || (n.lastSummaryTime || "") !== _srvCache.st)) {
+    try {
+      var s = getTelegramSettings();
+      s.lastSummaryDate = _srvCache.sd;
+      s.lastSummaryTime = _srvCache.st || s.dailyReportTime;
+      localStorage.setItem("lifetime_telegram_settings_v1", JSON.stringify(s));
+    } catch {}
+    n.lastSummaryDate = _srvCache.sd;
+    n.lastSummaryTime = _srvCache.st || n.dailyReportTime;
+    try {
+      b && b.syncReportData && b.syncReportData(
+        n.telegramBotToken || "", n.telegramChatId || "",
+        getTelegramReportData(), _srvCache.sd, _srvCache.st || ""
+      );
+    } catch {}
+  }
+  try { b && b.cancelReport && b.cancelReport(); } catch {}
+}
 
 export function HC() {
   useEffect(() => {
@@ -13,6 +78,18 @@ export function HC() {
           b && b.cancelReport && b.cancelReport()
         } catch {}
         return
+      }
+      /* Keep server-scheduler state fresh (throttled to 2 min) and push a
+         schedule/report snapshot every ~10 min so the server always has
+         today's text — plus a force-push when the tab is being hidden. */
+      refreshSrvClaims(false);
+      pushTelegramSchedule();
+      try {
+        if (document.visibilityState === "hidden") pushTelegramSchedule({ force: true });
+      } catch {}
+      if (serverActive()) {
+        enterServerMode(n);
+        return;
       }
       try {
         const b = window.AndroidBridge;
@@ -48,9 +125,20 @@ export function HC() {
          the same report. On the web there is no native path — send at once. */
       const graceMs = window.AndroidBridge ? 90 * 1000 : 0;
       if (now.getTime() >= scheduled.getTime() + graceMs && notYetSent) {
-        sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()).then(function(result) {
+        /* One last fresh claims pull right before sending: if the server
+           scheduler fired within the last minute, it already sent this
+           report and we must not duplicate it. */
+        refreshSrvClaims(true).then(function() {
+          if (serverActive()) {
+            enterServerMode(n);
+            return;
+          }
+          sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()).then(function(result) {
           if (result && result.success) {
             updateLastSummaryDate(today);
+            /* Tell the server scheduler immediately so it won't re-send
+               this report on its next run. */
+            pushTelegramSchedule({ force: true });
             try {
               const b = window.AndroidBridge;
               if (b) {
@@ -59,6 +147,7 @@ export function HC() {
               }
             } catch {}
           }
+          });
         });
       }
     };
