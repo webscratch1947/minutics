@@ -21,6 +21,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/telegram-send", "destination": "/api/telegram?action=send" },
     {
       "source": "/validation-key.txt",
       "destination": "/piapp/validation-key.txt",

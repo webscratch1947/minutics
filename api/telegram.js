@@ -2,6 +2,7 @@
 // Routes (all under /api/telegram):
 //   POST { action: "store", ... }  → saves schedule to user's Firebase custom claims
 //   GET  ?action=cron              → runs daily-report scheduler (external cron hits this)
+//   POST { action: "send", ... }   → sends a Telegram message (legacy /api/telegram-send compat)
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
@@ -165,5 +166,41 @@ export default async function handler(req, res) {
     return;
   }
 
-  res.status(400).json({ error: "Missing or invalid action (expected 'store' or 'cron')" });
+  if (action === "send") {
+    if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+    const authHeader = req.headers.authorization || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!idToken) { res.status(401).json({ error: "Missing authorization token" }); return; }
+
+    let authApi;
+    try {
+      authApi = getAuth(getAdminApp());
+      await authApi.verifyIdToken(idToken);
+    } catch { res.status(401).json({ error: "Invalid or expired token" }); return; }
+
+    let body = req.body;
+    if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
+    const { token, chatId, text } = body || {};
+
+    if (!token || !chatId || !text) {
+      res.status(400).json({ error: "Missing token, chatId, or text" });
+      return;
+    }
+
+    try {
+      const tgRes = await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" })
+      });
+      const data = await tgRes.json();
+      res.status(tgRes.status).json(data);
+      return;
+    } catch {
+      res.status(502).json({ ok: false, description: "Could not reach Telegram" });
+      return;
+    }
+  }
+
+  res.status(400).json({ error: "Missing or invalid action (expected 'store', 'cron', or 'send')" });
 }
