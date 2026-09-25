@@ -5,7 +5,6 @@
 // deleted again when the user disconnects.
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { Buffer } from "buffer";
 
 function getAdminApp() {
   if (getApps().length) return getApps()[0];
