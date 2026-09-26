@@ -43,29 +43,44 @@ function serverActive() {
   return !!(b && Date.now() - b < 15 * 60 * 1000);
 }
 
-/* Server sent the report (or is about to): adopt its last-sent marker
-   locally + natively and disarm the native alarm so we never double-send. */
+/* Adopt server last-sent markers from claims whenever they are newer than
+   local state — NOT gated on heartbeat freshness: another tab, the phone,
+   or the server itself may already have sent today's report. Returns true
+   when claims say the CURRENT configured report already went out today. */
+function adoptClaimsMarkers(n) {
+  try {
+    var c = _srvCache;
+    if (!c || !c.sd) return false;
+    if (n.lastSummaryDate !== c.sd || (n.lastSummaryTime || "") !== (c.st || "")) {
+      try {
+        var s = getTelegramSettings();
+        s.lastSummaryDate = c.sd;
+        s.lastSummaryTime = c.st || s.dailyReportTime;
+        localStorage.setItem("lifetime_telegram_settings_v1", JSON.stringify(s));
+      } catch {}
+      n.lastSummaryDate = c.sd;
+      n.lastSummaryTime = c.st || n.dailyReportTime;
+      try {
+        var b = window.AndroidBridge;
+        b && b.syncReportData && b.syncReportData(
+          n.telegramBotToken || "", n.telegramChatId || "",
+          getTelegramReportData(), c.sd, c.st || ""
+        );
+      } catch {}
+    }
+    var today = new Date().toLocaleDateString("en-CA");
+    return c.sd === today && (c.st || "") === (n.dailyReportTime || "21:00");
+  } catch { return false; }
+}
+
+/* Server sent (or owns) today's report: adopt its marker and disarm the
+   native alarm so the two paths can never double-send. */
 function enterServerMode(n) {
-  var b;
-  try { b = window.AndroidBridge; } catch { b = null; }
-  if (_srvCache && _srvCache.sd &&
-      (n.lastSummaryDate !== _srvCache.sd || (n.lastSummaryTime || "") !== _srvCache.st)) {
-    try {
-      var s = getTelegramSettings();
-      s.lastSummaryDate = _srvCache.sd;
-      s.lastSummaryTime = _srvCache.st || s.dailyReportTime;
-      localStorage.setItem("lifetime_telegram_settings_v1", JSON.stringify(s));
-    } catch {}
-    n.lastSummaryDate = _srvCache.sd;
-    n.lastSummaryTime = _srvCache.st || n.dailyReportTime;
-    try {
-      b && b.syncReportData && b.syncReportData(
-        n.telegramBotToken || "", n.telegramChatId || "",
-        getTelegramReportData(), _srvCache.sd, _srvCache.st || ""
-      );
-    } catch {}
-  }
-  try { b && b.cancelReport && b.cancelReport(); } catch {}
+  adoptClaimsMarkers(n);
+  try {
+    var b = window.AndroidBridge;
+    b && b.cancelReport && b.cancelReport();
+  } catch {}
 }
 
 export function HC() {
@@ -87,6 +102,8 @@ export function HC() {
       try {
         if (document.visibilityState === "hidden") pushTelegramSchedule({ force: true });
       } catch {}
+      /* Pull markers another sender may have written since last tick. */
+      adoptClaimsMarkers(n);
       if (serverActive()) {
         enterServerMode(n);
         return;
@@ -129,6 +146,9 @@ export function HC() {
            scheduler fired within the last minute, it already sent this
            report and we must not duplicate it. */
         refreshSrvClaims(true).then(function() {
+          /* Someone (server cron, other tab, phone) may already have sent
+             today's report — claims are the source of truth. */
+          if (adoptClaimsMarkers(n)) return;
           if (serverActive()) {
             enterServerMode(n);
             return;

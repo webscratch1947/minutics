@@ -140,7 +140,14 @@ export default async function handler(req, res) {
           const local = new Date(now - tz * 60000);
           const date = local.getUTCFullYear() + "-" + pad(local.getUTCMonth() + 1) + "-" + pad(local.getUTCDate());
           const hhmm = pad(local.getUTCHours()) + ":" + pad(local.getUTCMinutes());
-          const due = hhmm >= tgs.t && (tgs.sd !== date || tgs.st !== tgs.t);
+          /* Send only once the scheduled time is at least 2 minutes past:
+             the device's exact-time native alarm gets the first shot at
+             hh:mm:00, and it marks the report here (action=mark) so this
+             cron skips instead of double-sending. */
+          const tParts = tgs.t.split(":");
+          const tMin = parseInt(tParts[0], 10) * 60 + parseInt(tParts[1], 10);
+          const nowMin = local.getUTCHours() * 60 + local.getUTCMinutes();
+          const due = nowMin >= Math.min(tMin + 2, 1439) && (tgs.sd !== date || tgs.st !== tgs.t);
           const inBackoff = tgs.fp && now - tgs.fp < 10 * 60 * 1000;
           const next = Object.assign({}, tgs); next.b = now;
           if (due && !inBackoff) {
@@ -202,6 +209,55 @@ export default async function handler(req, res) {
     }
   }
 
+  if (action === "state" || action === "mark") {
+    /* Auth = possession of the bot token (same secret used to send).
+       state → read the last-sent markers; mark → set them after a
+       device-side send, so this cron and other devices skip. */
+    if (action === "state" && req.method !== "GET") { res.status(405).json({ ok: false, error: "Method not allowed" }); return; }
+    if (action === "mark" && req.method !== "POST") { res.status(405).json({ ok: false, error: "Method not allowed" }); return; }
+
+    let body = req.body;
+    if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
+    body = body || {};
+    const k = action === "state" ? req.query.k : body.k;
+    if (!k) { res.status(400).json({ ok: false, error: "Missing bot token" }); return; }
+
+    let authApi;
+    try { authApi = getAuth(getAdminApp()); } catch { res.status(500).json({ ok: false, error: "Firebase admin not configured" }); return; }
+
+    let pageToken, tgs = null;
+    try {
+      do {
+        const page = await authApi.listUsers(1000, pageToken);
+        for (const user of page.users) {
+          const claims = user.customClaims || {};
+          if (claims.tgs && claims.tgs.k === k) {
+            tgs = claims.tgs;
+            if (action === "mark") {
+              const sd = String(body.sd || "").slice(0, 40);
+              if (sd) {
+                const next = Object.assign({}, tgs);
+                next.sd = sd;
+                next.st = String(body.st || tgs.t).slice(0, 40);
+                await authApi.setCustomUserClaims(user.uid, Object.assign({}, claims, { tgs: next }));
+                tgs = next;
+              }
+            }
+            break;
+          }
+        }
+        if (tgs) break;
+        pageToken = page.pageToken;
+      } while (pageToken);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: "Lookup failed: " + String((e && e.message) || e) });
+      return;
+    }
+    if (!tgs) { res.status(404).json({ ok: false, error: "No schedule found for this token" }); return; }
+    res.status(200).json({ ok: true, sd: tgs.sd || "", st: tgs.st || "", t: tgs.t || "" });
+    return;
+  }
+
   if (action === "health") {
     /* Liveness probe ONLY — never touches Firebase claims, so testing this
        endpoint can't fake the tgs.b heartbeat and disarm the phone alarm. */
@@ -210,5 +266,5 @@ export default async function handler(req, res) {
     return;
   }
 
-  res.status(400).json({ error: "Missing or invalid action (expected 'store', 'cron', 'send', or 'health')" });
+  res.status(400).json({ error: "Missing or invalid action (expected 'store', 'cron', 'send', 'state', 'mark', or 'health')" });
 }

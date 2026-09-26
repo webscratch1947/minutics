@@ -59,7 +59,9 @@ export function pushTelegramSchedule(opts) {
   opts = opts || {};
   try {
     if (!window.LTAuth || !window.LTAuth.getToken) return Promise.resolve(false);
-    var minGap = opts.force ? 60 * 1000 : 10 * 60 * 1000;
+    /* force = push immediately (post-send marker must reach the server
+       before its next cron ping, or the report double-sends). */
+    var minGap = opts.force ? 0 : 10 * 60 * 1000;
     var now = Date.now();
     if (now - _lastSchedulePush < minGap) return Promise.resolve(false);
     _lastSchedulePush = now;
