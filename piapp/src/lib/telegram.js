@@ -66,25 +66,42 @@ export function pushTelegramSchedule(opts) {
     if (now - _lastSchedulePush < minGap) return Promise.resolve(false);
     _lastSchedulePush = now;
     var s = getTelegramSettings();
+    /* Ambient pushes must not wipe the server schedule when this device
+       simply has no settings yet (fresh install). Explicit force pushes
+       (save / disconnect / post-send) still go through. */
+    if (!s.telegramBotToken && !opts.force) return Promise.resolve(false);
     return window.LTAuth.getToken().then(function (idToken) {
       if (!idToken) return false;
-      return fetch(window.location.origin + "/api/telegram", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + idToken
-        },
-        body: JSON.stringify({
-          token: s.telegramBotToken || "",
-          chatId: s.telegramChatId || "",
-          time: s.dailyReportTime || "21:00",
-          tzOffset: new Date().getTimezoneOffset(),
-          text: getTelegramReportData(),
-          action: "store", connected: !!s.telegramConnected,
-          lastSentDate: s.lastSummaryDate || "",
-          lastSentTime: s.lastSummaryTime || ""
-        })
-      }).then(function (r) { return !!(r && r.ok); }).catch(function () { return false; });
+      var payload = JSON.stringify({
+        token: s.telegramBotToken || "",
+        chatId: s.telegramChatId || "",
+        time: s.dailyReportTime || "21:00",
+        tzOffset: new Date().getTimezoneOffset(),
+        text: getTelegramReportData(),
+        action: "store", connected: !!s.telegramConnected,
+        lastSentDate: s.lastSummaryDate || "",
+        lastSentTime: s.lastSummaryTime || ""
+      });
+      var hdrs = {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + idToken
+      };
+      var origin = window.location.origin;
+      var send = function (base) {
+        return fetch(base + "/api/telegram", {
+          method: "POST", headers: hdrs, body: payload
+        }).then(function (r) { return !!(r && r.ok); });
+      };
+      return send(origin).then(function (ok) {
+        if (ok) return true;
+        /* Android WebView origin (appassets.androidplatform.net) has no
+           /api route — without this fallback the phone's time changes and
+           send markers NEVER reach the server cron. */
+        if (origin.indexOf("appassets.androidplatform.net") !== -1) {
+          return send("https://app.minutics.com");
+        }
+        return false;
+      });
     }).catch(function () { return false; });
   } catch {
     return Promise.resolve(false);

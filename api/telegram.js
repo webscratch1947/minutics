@@ -256,7 +256,7 @@ export default async function handler(req, res) {
       return;
     }
     if (!tgs) { res.status(404).json({ ok: false, error: "No schedule found for this token" }); return; }
-    res.status(200).json({ ok: true, sd: tgs.sd || "", st: tgs.st || "", t: tgs.t || "" });
+    res.status(200).json({ ok: true, sd: tgs.sd || "", st: tgs.st || "", t: tgs.t || "", b: tgs.b || 0, fp: tgs.fp || 0, z: tgs.z });
     return;
   }
 
