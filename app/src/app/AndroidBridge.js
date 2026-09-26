@@ -135,6 +135,18 @@ export function HC() {
             enterServerMode(n);
             return;
           }
+          /* Also check if native just attempted (within 5 min) — native
+             retries on failure but only writes lastSent on success. */
+          try {
+            const b = window.AndroidBridge;
+            if (b && b.getLastAttemptTime) {
+              const nativeAttempt = b.getLastAttemptTime();
+              if (nativeAttempt && now.getTime() - nativeAttempt < 5 * 60 * 1000) {
+                /* Native recently tried (success or pending retry) — skip JS send. */
+                return;
+              }
+            }
+          } catch {}
           sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()).then(function(result) {
           if (result && result.success) {
             updateLastSummaryDate(today);

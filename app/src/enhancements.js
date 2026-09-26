@@ -24,7 +24,7 @@
     video.setAttribute("webkit-playsinline", "");
     video.preload = "auto";
     video.loop = false;
-    video.style.cssText = "width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s ease;";
+    video.style.cssText = "width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .15s ease;";
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
 
@@ -3561,8 +3561,9 @@
 
   function clockFieldHtml(id, value, placeholder) {
     var label = value ? formatRoutineTime(value) : (placeholder || "Select time");
+    var dv = value || "";
     return (
-      '<button type="button" id="' + id + '" class="lt-clock-field' + (value ? '' : ' lt-clock-empty') + '" data-value="' + escapeHtml(value || "") + '">' +
+      '<button type="button" id="' + id + '" class="lt-clock-field' + (value ? '' : ' lt-clock-empty') + '" data-value="' + escapeHtml(dv) + '">' +
         '<span>' + escapeHtml(label) + '</span><span class="lt-clock-caret">\u25BC</span>' +
       '</button>'
     );
@@ -3777,8 +3778,9 @@
 
   function clockButtonHtml(id, value) {
     var label = value ? formatRoutineTime(value) : "Select time";
+    var dv = value || "";
     return (
-      '<button type="button" id="' + id + '" class="lt-clock-field' + (value ? '' : ' lt-clock-empty') + '" data-value="' + escapeHtml(value || "") + '">' +
+      '<button type="button" id="' + id + '" class="lt-clock-field' + (value ? '' : ' lt-clock-empty') + '" data-value="' + escapeHtml(dv) + '">' +
         '<span class="lt-clock-icon">\uD83D\uDD52</span><span>' + escapeHtml(label) + '</span><span class="lt-clock-caret">\u25BC</span>' +
       '</button>'
     );
