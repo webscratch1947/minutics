@@ -202,5 +202,13 @@ export default async function handler(req, res) {
     }
   }
 
-  res.status(400).json({ error: "Missing or invalid action (expected 'store', 'cron', or 'send')" });
+  if (action === "health") {
+    /* Liveness probe ONLY — never touches Firebase claims, so testing this
+       endpoint can't fake the tgs.b heartbeat and disarm the phone alarm. */
+    if (req.method !== "GET") { res.status(405).json({ ok: false, error: "Method not allowed" }); return; }
+    res.status(200).json({ ok: true, ts: Date.now() });
+    return;
+  }
+
+  res.status(400).json({ error: "Missing or invalid action (expected 'store', 'cron', 'send', or 'health')" });
 }

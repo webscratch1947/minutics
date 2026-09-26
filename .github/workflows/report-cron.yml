@@ -2,7 +2,7 @@ name: Telegram report cron
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "0-55/5 * * * *"
   workflow_dispatch:
 
 jobs:
