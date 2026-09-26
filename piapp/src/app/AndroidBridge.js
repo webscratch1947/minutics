@@ -13,6 +13,27 @@ import { getTelegramSettings, getTelegramReportData, updateLastSummaryDate, send
    so this stays inert there — kept mirrored with the main app. */
 var _srvCache = null; /* {b, sd, st, t} from claims | null */
 var _claimsCheckedAt = 0;
+var _tgSendPending = false; /* catch-up send in flight — blocks concurrent e() races */
+
+/* Direct bot-token check against the server — works even when the Firebase
+   claims read failed. THIS gap (claims invisible → gate passes → send) is
+   what produced duplicate reports on open. On Android the WebView origin
+   has no /api route, so fall back to the production host. */
+function serverSentCurrentReport(token, today, time) {
+  try {
+    if (!token) return Promise.resolve(false);
+    var path = "/api/telegram?action=state&k=" + encodeURIComponent(token);
+    return fetch(window.location.origin + path, { cache: "no-store" })
+      .then(function (r) { return (r && r.ok) ? r.json() : null; })
+      .then(function (j) { return !!(j && j.ok && j.sd === today && j.st === time); })
+      .catch(function () {
+        return fetch("https://app.minutics.com" + path, { cache: "no-store" })
+          .then(function (r) { return (r && r.ok) ? r.json() : null; })
+          .then(function (j) { return !!(j && j.ok && j.sd === today && j.st === time); })
+          .catch(function () { return false; });
+      });
+  } catch { return Promise.resolve(false); }
+}
 
 function readTgsClaim(token) {
   try {
@@ -141,34 +162,51 @@ export function HC() {
          minute; JS only covers after a 90s grace so both paths can't send
          the same report. On the web there is no native path — send at once. */
       const graceMs = window.AndroidBridge ? 90 * 1000 : 0;
-      if (now.getTime() >= scheduled.getTime() + graceMs && notYetSent) {
+      if (now.getTime() >= scheduled.getTime() + graceMs && notYetSent && !_tgSendPending) {
+        _tgSendPending = true;
+        var release = function () { _tgSendPending = false; };
         /* One last fresh claims pull right before sending: if the server
            scheduler fired within the last minute, it already sent this
            report and we must not duplicate it. */
         refreshSrvClaims(true).then(function() {
           /* Someone (server cron, other tab, phone) may already have sent
              today's report — claims are the source of truth. */
-          if (adoptClaimsMarkers(n)) return;
+          if (adoptClaimsMarkers(n)) { release(); return; }
           if (serverActive()) {
             enterServerMode(n);
+            release();
             return;
           }
-          sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()).then(function(result) {
-          if (result && result.success) {
-            updateLastSummaryDate(today);
-            /* Tell the server scheduler immediately so it won't re-send
-               this report on its next run. */
-            pushTelegramSchedule({ force: true });
-            try {
-              const b = window.AndroidBridge;
-              if (b) {
-                b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), today, n.dailyReportTime || "21:00");
-                b.scheduleReport && b.scheduleReport(n.dailyReportTime);
-              }
-            } catch {}
-          }
-          });
-        });
+          /* Belt: ask the server directly with the bot token (independent of
+             Firebase claims) before daring to send. */
+          serverSentCurrentReport(n.telegramBotToken, today, n.dailyReportTime || "21:00").then(function(onServer) {
+            if (onServer) {
+              updateLastSummaryDate(today);
+              try {
+                const b = window.AndroidBridge;
+                b && b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), today, n.dailyReportTime || "21:00");
+              } catch {}
+              release();
+              return;
+            }
+            sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()).then(function(result) {
+            if (result && result.success) {
+              updateLastSummaryDate(today);
+              /* Tell the server scheduler immediately so it won't re-send
+                 this report on its next run. */
+              pushTelegramSchedule({ force: true });
+              try {
+                const b = window.AndroidBridge;
+                if (b) {
+                  b.syncReportData && b.syncReportData(n.telegramBotToken || "", n.telegramChatId || "", getTelegramReportData(), today, n.dailyReportTime || "21:00");
+                  b.scheduleReport && b.scheduleReport(n.dailyReportTime);
+                }
+              } catch {}
+            }
+            release();
+            }).catch(release);
+          }).catch(release);
+        }).catch(release);
       }
     };
     e();

@@ -140,14 +140,16 @@ export default async function handler(req, res) {
           const local = new Date(now - tz * 60000);
           const date = local.getUTCFullYear() + "-" + pad(local.getUTCMonth() + 1) + "-" + pad(local.getUTCDate());
           const hhmm = pad(local.getUTCHours()) + ":" + pad(local.getUTCMinutes());
-          /* Send only once the scheduled time is at least 2 minutes past:
+          /* Send only once the scheduled time is at least 1 minute past:
              the device's exact-time native alarm gets the first shot at
-             hh:mm:00, and it marks the report here (action=mark) so this
-             cron skips instead of double-sending. */
+             hh:mm:00 (finishes in well under a minute), and it marks the
+             report here (action=mark) so this cron skips instead of
+             double-sending. The pinger runs every minute, so a fully
+             closed device still gets the report within ~1-2 minutes. */
           const tParts = tgs.t.split(":");
           const tMin = parseInt(tParts[0], 10) * 60 + parseInt(tParts[1], 10);
           const nowMin = local.getUTCHours() * 60 + local.getUTCMinutes();
-          const due = nowMin >= Math.min(tMin + 2, 1439) && (tgs.sd !== date || tgs.st !== tgs.t);
+          const due = nowMin >= Math.min(tMin + 1, 1439) && (tgs.sd !== date || tgs.st !== tgs.t);
           const inBackoff = tgs.fp && now - tgs.fp < 10 * 60 * 1000;
           const next = Object.assign({}, tgs); next.b = now;
           if (due && !inBackoff) {
