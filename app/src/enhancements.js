@@ -597,6 +597,9 @@
     "lt_extra_defaults_removed_v1", "lt_commute_renamed_v1",
     "lt_default_activities_seeded_v2", "lt_prod_toast_last_v1"
   ].forEach(function (k) { NATIVE_BRIDGE_KEYS[k] = true; });
+  /* Exposed so dataTransfer.js can mirror Load-Data writes into native
+     storage (readJson prefers the bridge — stale native = stale data). */
+  window.LT_NATIVE_KEYS = NATIVE_BRIDGE_KEYS;
 
   function hasBridge() {
     return typeof window.AndroidBridge !== "undefined" &&

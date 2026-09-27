@@ -5,6 +5,7 @@ import { getTelegramSettings, saveTelegramSettings, sendTelegramReport } from '.
 import { getCurrency, setCurrency } from '../lib/currency.js';
 import { saveGoalType, getGoalType, isPro as hasActivePaidPlan } from '../lib/settings.js';
 import { readJson, writeJson } from '../lib/settings.js';
+import { buildBackup, loadDataFile } from '../lib/dataTransfer.js';
 import { CircleCheckBig as eh } from 'lucide-react';
 import { getApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
@@ -408,6 +409,45 @@ export function SettingsScreen() {
       });
   }
 
+  /* ── data download / load ── */
+  function handleDownloadData() {
+    if (!isPro) { alert("This feature is only available for the 1 Year Plan."); return; }
+    try {
+      var backup = buildBackup();
+      var blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "minutics-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+    } catch (e) {
+      alert("Could not download data: " + ((e && e.message) || e));
+    }
+  }
+
+  function handleLoadData() {
+    if (!isPro) { alert("This feature is only available for the 1 Year Plan."); return; }
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.onchange = function () {
+      var f = input.files && input.files[0];
+      if (!f) return;
+      loadDataFile(f).then(function (res) {
+        alert(res.message);
+        if (res.ok) {
+          /* Full remount from fresh localStorage — works on web AND the
+             Android WebView (location.reload() is broken there). */
+          try { window.dispatchEvent(new CustomEvent("lt-user-changed")); } catch (e) {}
+        }
+      });
+    };
+    input.click();
+  }
+
   /* ── initials helper ── */
   function getInitials(name) {
     return (name || "U").split(" ").map(function (w) { return w.charAt(0); }).join("").toUpperCase().slice(0, 2);
@@ -508,6 +548,39 @@ export function SettingsScreen() {
                         : "bg-primary/10 text-primary border-transparent active:bg-primary/20"
                     ].join(" "),
                     children: isPro ? "Manage Plan" : "View Plans"
+                  })
+                })
+              ]
+            })
+          })
+        ]
+      }),
+
+      /* ─── Data (Download / Load) ─── */
+      jsxs("div", {
+        className: "mx-4",
+        children: [
+          jsx(SectionHeader, { children: "Data" }),
+          jsx(Card, {
+            children: jsxs(Fragment, {
+              children: [
+                jsx(CardRow, {
+                  label: "Download Data",
+                  desc: isPro ? "Save your complete Minutics data to a file" : "Available with a paid plan",
+                  children: jsx("button", {
+                    onClick: handleDownloadData,
+                    className: "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/20 transition",
+                    children: "Download"
+                  })
+                }),
+                jsx(Divider, {}),
+                jsx(CardRow, {
+                  label: "Load Data",
+                  desc: isPro ? "Restore a backup file — everything, same to same" : "Available with a paid plan",
+                  children: jsx("button", {
+                    onClick: handleLoadData,
+                    className: "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/20 transition",
+                    children: "Load"
                   })
                 })
               ]
