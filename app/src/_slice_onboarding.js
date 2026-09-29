@@ -28,8 +28,26 @@ Object.keys(IMGS).forEach((step) => {
   });
 });
 /* Warm the setup-loader background NOW (app open), not when the loader
-   appears â€” the "Setting up your appâ€¦" screen must never pop in bare. */
+   appears â€" the "Setting up your appâ€¦" screen must never pop in bare. */
 try { const _sr = new Image(); _sr.src = "./assets/onboarding/setup-robot.png"; } catch {}
+/* The idle animation is created + fetched AT APP OPEN (not when the loader
+   shows). showSetupLoader() MOVES this same element into the loader, so its
+   bytes and first frame are already warm — the animation starts instantly
+   instead of showing the static poster for seconds first. */
+const SETUP_ANIM = (() => {
+  try {
+    const v = document.createElement("video");
+    v.preload = "auto";
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    v.poster = "./assets/onboarding/setup-robot.png";
+    v.src = "./assets/onboarding/setup-anim.mp4";
+    v.load();
+    return v;
+  } catch { return null; }
+})();
 function whenImageReady(step, cb) {
   const p = IMG_LOAD[step];
   if (!p || IMG_READY[step]) { cb(); return; }
@@ -99,7 +117,8 @@ export function mk({
     killSwitch.textContent = "body.lt-authed #root{display:none!important}";
     (document.head || document.documentElement).appendChild(killSwitch);
 
-    /* Phase 1: looping idle-animation video + boot-accurate progress bar.
+    /* Phase 1: single playthrough of the idle animation (NO loop — when it
+       ends, setup ends) + a progress bar that mirrors the playhead.
        Background set with
        LONGHAND properties â€” the old single-line `background:` shorthand
        silently failed to parse in some engines and left the loader
@@ -110,45 +129,63 @@ export function mk({
       "display:flex;flex-direction:column;align-items:center;justify-content:flex-end;" +
       "padding-bottom:26vh;gap:13px;transition:opacity .5s ease;opacity:1;";
     loader.style.backgroundColor = "#EEF1F7";
-    /* Static art stays behind the video (also its poster): if the video
-       fails to decode we show the artwork, never a blank screen. */
+    /* Static art behind the video as last-resort fallback layer. */
     loader.style.backgroundImage = "url('./assets/onboarding/setup-robot.png')," +
       "radial-gradient(130% 95% at 50% 18%, #FFFFFF 0%, #E9EDF5 55%, #DCE2EE 100%)";
     loader.style.backgroundSize = "cover, cover";
     loader.style.backgroundPosition = "center 35%, center";
     loader.style.backgroundRepeat = "no-repeat, no-repeat";
     loader.innerHTML =
-      '<video class="lt-setup-video" src="./assets/onboarding/setup-anim.mp4" poster="./assets/onboarding/setup-robot.png" muted loop autoplay playsinline preload="auto"></video>' +
       '<p style="color:#3B4252;font-size:15px;font-weight:600;margin:0;font-family:inherit;text-shadow:0 1px 6px rgba(255,255,255,.85);position:relative">Setting up your app...</p>' +
       '<div class="lt-setup-bar" style="position:relative"><span class="lt-setup-bar-fill"></span></div>' +
       '<style>' +
-      '.lt-setup-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}' +
       '.lt-setup-bar{width:min(240px,64vw);height:7px;border-radius:99px;background:rgba(17,24,39,.12);overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.07)}' +
       '.lt-setup-bar-fill{position:absolute;left:0;top:0;width:0%;height:100%;border-radius:99px;background:linear-gradient(90deg,#4F46E5,#7C3AED);transition:width .15s linear;box-shadow:0 0 8px rgba(79,70,229,.45)}' +
       '</style>';
-    var vid = loader.querySelector("video");
+    /* Move the module-warmed video INTO the loader as the FIRST child (so
+       the text/bar paint above it). It was created + fetched at app open,
+       so its bytes and first frame are already warm here — the animation
+       starts immediately instead of showing the static poster for seconds.
+       Single playthrough (loop=false): "ended" finishes the setup. */
+    var vid = SETUP_ANIM, videoDone = false;
     if (vid) {
+      loader.insertBefore(vid, loader.firstChild);
+      vid.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:0";
+      vid.loop = false;
       vid.muted = true;
       vid.defaultMuted = true;
+      vid.addEventListener("ended", function () { videoDone = true; tryFinish(); });
+      vid.addEventListener("error", function () {
+        vid.style.display = "none";
+        videoDone = true;
+        tryFinish();
+      });
       try { var pl = vid.play(); if (pl && pl.catch) pl.catch(function () {}); } catch {}
-      vid.addEventListener("error", function () { vid.style.display = "none"; });
+    } else {
+      videoDone = true;
     }
     (document.body || document.documentElement).appendChild(loader);
 
-    /* Progress bar — mapped to the REAL boot timeline so it is exact every
-       time: 0→55% across the fixed 3s pre-render phase, creeping to 95%
-       while waiting for React + enhancements, then forced to exactly 100%
-       the moment loading is done. The loader does not begin fading until
-       the bar is full, so it can never stall at 99% or "finish" at 90%. */
+    /* Progress bar — mirrors the REAL animation playhead (0→98% across the
+       5s playthrough; boot-time curve as fallback when metadata is missing).
+       It is forced to exactly 100% only by finishBar() at the moment BOTH
+       the animation and the boot are done — the loader never fades on a
+       non-full bar, so it can't stall at 99% or "finish" at 90%. */
     var fill = loader.querySelector(".lt-setup-bar-fill");
     var barDone = false;
     var barT0 = (window.performance && performance.now()) || 0;
     (function barTick(now) {
       if (barDone || !fill) return;
-      var el = (now || 0) - barT0;
-      var p = el < 3000
-        ? (el / 3000) * 55
-        : 55 + 40 * (1 - Math.exp(-(el - 3000) / 4500));
+      var p;
+      if (vid && vid.duration > 0 && isFinite(vid.duration)) {
+        p = (vid.currentTime / vid.duration) * 98;
+      } else {
+        var el = (now || 0) - barT0;
+        p = el < 3000
+          ? (el / 3000) * 55
+          : 55 + 40 * (1 - Math.exp(-(el - 3000) / 4500));
+      }
+      if (p > 98) p = 98;
       fill.style.width = p.toFixed(2) + "%";
       requestAnimationFrame(barTick);
     })(barT0);
@@ -159,14 +196,46 @@ export function mk({
       fill.style.width = "100%";
     }
 
-    /* Phase 2: render the main app first, but keep this opaque loader over it
-       until React and the enhancement pass have settled. This prevents the
-       white gap that used to appear after \u201CSetting up your app\u2026". */
+    /* Finish ONLY when both are true: the animation completed its single
+       playthrough (no loop, so users never see it restart) AND the app is
+       ready. Bar hits 100% exactly at that instant, settles, then fades. */
+    var appReady = false, finished = false;
+    function tryFinish() {
+      if (finished || !videoDone || !appReady) return;
+      finished = true;
+      finishBar();
+      setTimeout(function () {
+        requestAnimationFrame(function () {
+          loader.style.opacity = "0";
+          setTimeout(function () {
+            if (loader.parentNode) loader.parentNode.removeChild(loader);
+          }, 500);
+        });
+      }, 420);
+    }
+    /* Safety: broken/unsupported media must never hang the loader — after
+       15s fall back to boot-time alone. Re-armed with the REAL duration on
+       metadata so a longer animation is never cut off early. */
+    var mediaSafety = setTimeout(function () { videoDone = true; tryFinish(); }, 15000);
+    function armMediaSafety() {
+      clearTimeout(mediaSafety);
+      mediaSafety = setTimeout(function () { videoDone = true; tryFinish(); },
+        Math.max(15000, ((vid && vid.duration) || 0) * 1000 + 2500));
+    }
+    if (vid) {
+      vid.addEventListener("loadedmetadata", armMediaSafety);
+      if (vid.readyState >= 1) armMediaSafety(); /* metadata fetched at app open */
+    }
+
+    /* Phase 2: render the main app first, but keep this opaque loader over
+       it until React and the enhancement pass have settled. The loader only
+       leaves when BOTH conditions hold — boot ready AND the animation
+       finished its single playthrough. */
     setTimeout(function () {
       e(profileData);
       /* Poll: wait for enhancements to apply (life-progress card or
          enhancement markers exist + body has lt-authed), then reveal the
-         app and only afterwards fade the loader away. */
+         app underneath the still-opaque loader. */
       var checks = 0;
       var readyTimer = setInterval(function () {
         checks++;
@@ -177,15 +246,8 @@ export function mk({
           clearInterval(readyTimer);
           var ks = document.getElementById("lt-root-killswitch");
           if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
-          finishBar(); /* bar reaches exactly 100% here; settle, then fade */
-          setTimeout(function () {
-            requestAnimationFrame(function () {
-              loader.style.opacity = "0";
-              setTimeout(function () {
-                if (loader.parentNode) loader.parentNode.removeChild(loader);
-              }, 500);
-            });
-          }, 420);
+          appReady = true;
+          tryFinish();
         }
       }, 80);
     }, 3000);
@@ -425,13 +487,13 @@ export function mk({
       ]
     });
     footer = jsxs("div", {
-      className: "flex flex-col gap-1",
+      className: "flex flex-col gap-2",
       children: [
         nextBtn(() => finish(true), !(salaryNum > 0), "Next \u2192"),
         jsx("button", {
           type: "button",
           onClick: () => finish(false),
-          className: "w-full py-3 text-sm font-bold text-red-500 border-2 border-red-500 rounded-xl active:bg-red-50 transition-colors",
+          className: "w-full py-3 text-sm font-semibold text-gray-400 rounded-xl transition-colors active:text-gray-700 active:bg-gray-100",
           children: "Skip for now"
         })
       ]
