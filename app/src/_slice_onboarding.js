@@ -27,6 +27,9 @@ Object.keys(IMGS).forEach((step) => {
     im.src = IMGS[step];
   });
 });
+/* Warm the setup-loader background NOW (app open), not when the loader
+   appears â€” the "Setting up your appâ€¦" screen must never pop in bare. */
+try { const _sr = new Image(); _sr.src = "./assets/onboarding/setup-robot.png"; } catch {}
 function whenImageReady(step, cb) {
   const p = IMG_LOAD[step];
   if (!p || IMG_READY[step]) { cb(); return; }
@@ -86,9 +89,9 @@ export function mk({
   }
 
   function showSetupLoader(profileData) {
-    /* ─── PHASE 0: inject a CSS override that FORCES #root to stay hidden
+    /* â”€â”€â”€ PHASE 0: inject a CSS override that FORCES #root to stay hidden
        even after lt-authed is added. This prevents the flash of unstyled
-       content that happens because React renders asynchronously — lt-authed
+       content that happens because React renders asynchronously â€” lt-authed
        gets added, #root becomes display:block, but enhancements haven't
        applied yet. We remove this rule only after enhancements are done. */
     var killSwitch = document.createElement("style");
@@ -96,17 +99,22 @@ export function mk({
     killSwitch.textContent = "body.lt-authed #root{display:none!important}";
     (document.head || document.documentElement).appendChild(killSwitch);
 
-    /* Phase 1: robot artwork (if shipped) + 3-dot loading indicator
-       positioned below the robot, above the planet. The background image
-       is optional — when assets/onboarding/setup-robot.png is missing the
-       space gradient shows on its own. */
+    /* Phase 1: robot artwork (shipped) + 3-dot loading indicator
+       positioned below the robot, above the planet. Background set with
+       LONGHAND properties â€” the old single-line `background:` shorthand
+       silently failed to parse in some engines and left the loader
+       transparent (you saw the bare cream page instead of space). */
     var loader = document.createElement("div");
     loader.id = "lt-signin-loader";
     loader.style.cssText = "position:fixed;inset:0;z-index:2147483647;" +
-      "background:#0b0620 url('./assets/onboarding/setup-robot.png') center 32%/cover no-repeat," +
-      "radial-gradient(130% 95% at 50% 18%, #34206b 0%, #1a0f3f 45%, #0b0620 100%);" +
       "display:flex;flex-direction:column;align-items:center;justify-content:flex-end;" +
       "padding-bottom:26vh;gap:13px;transition:opacity .5s ease;opacity:1;";
+    loader.style.backgroundColor = "#0b0620";
+    loader.style.backgroundImage = "url('./assets/onboarding/setup-robot.png')," +
+      "radial-gradient(130% 95% at 50% 18%, #34206b 0%, #1a0f3f 45%, #0b0620 100%)";
+    loader.style.backgroundSize = "cover, cover";
+    loader.style.backgroundPosition = "center 32%, center";
+    loader.style.backgroundRepeat = "no-repeat, no-repeat";
     loader.innerHTML =
       '<div class="lt-setup-dots"><span></span><span></span><span></span></div>' +
       '<p style="color:rgba(255,255,255,.88);font-size:15px;font-weight:600;margin:0;font-family:inherit;text-shadow:0 2px 10px rgba(0,0,0,.55)">Setting up your app...</p>' +
@@ -133,7 +141,7 @@ export function mk({
         var hasAuth = document.body.classList.contains("lt-authed");
         var hasProgress = !!document.getElementById("lt-life-progress");
         var hasGlance = !!document.querySelector("[data-lt-enhancement]");
-        if ((hasAuth && (hasProgress || hasGlance)) || checks > 50) {
+        if ((hasAuth && (hasProgress || hasGlance)) || checks > 150) {
           clearInterval(readyTimer);
           var ks = document.getElementById("lt-root-killswitch");
           if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
@@ -148,7 +156,7 @@ export function mk({
     }, 3000);
   }
 
-  /* ── shared chrome: back button + progress dots ── */
+  /* â”€â”€ shared chrome: back button + progress dots â”€â”€ */
   // Re-kick the preload when onboarding mounts (covers cache evictions).
   useEffect(() => {
     Object.keys(IMGS).forEach((k) => { const im = new Image(); im.src = IMGS[k]; });
@@ -178,7 +186,7 @@ export function mk({
   });
 
   /* All four illustrations stay MOUNTED (inactive ones hidden) so a step
-     switch is a pure visibility toggle — never a remount that blanks the
+     switch is a pure visibility toggle â€” never a remount that blanks the
      <img> for a few frames while it reloads/re-decodes (the 0.3s flicker). */
   const img = jsxs("div", {
     className: "relative w-full max-w-[330px] mx-auto h-[42vh]",
@@ -206,7 +214,7 @@ export function mk({
     children: text
   });
 
-  /* ── step bodies ── */
+  /* â”€â”€ step bodies â”€â”€ */
   let body = null, footer = null;
 
   if (t === "welcome") {
@@ -228,16 +236,16 @@ export function mk({
       children: [
         img,
         jsx("div", { className: "mt-2", children: jsxs("div", {
-          className: "bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4",
+          className: "bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4",
           children: [
             label("Your name"),
             jsx("input", {
               type: "text",
               value: r,
-              onChange: g => o(g.target.value),
+              onChange: g => o(g.target.value.replace(/[^A-Za-z\s]/g, "")),
               placeholder: "e.g. Alex",
               autoFocus: true,
-              className: "w-full bg-transparent text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-300"
+              className: "w-full bg-gray-200 text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-400 rounded-lg px-3 py-2"
             })
           ]
         }) })
@@ -263,11 +271,11 @@ export function mk({
         i("");
       }
     };
-    const _selStyle = "flex-1 bg-white text-gray-900 text-base font-bold outline-none border border-[#E5DFCF] rounded-xl px-2 py-3 text-center focus:border-[#157347] transition-colors min-w-0";
+    const _selStyle = "flex-1 bg-gray-200 text-gray-900 text-base font-bold outline-none border border-gray-300 rounded-xl px-2 py-3 text-center focus:border-[#157347] transition-colors min-w-0";
     body = jsxs("div", {
       children: [
         img,
-        jsxs("div", { className: "mt-2 bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4", children: [
+        jsxs("div", { className: "mt-2 bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4", children: [
           label("Date of birth"),
           jsxs("div", {
             className: "flex items-center gap-2",
@@ -302,7 +310,7 @@ export function mk({
             ]
           })
         ]}),
-        jsxs("div", { className: "mt-3 bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4", children: [
+        jsxs("div", { className: "mt-3 bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4", children: [
           jsxs("label", {
             className: "block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2",
             children: ["Retire age \u2014 ", jsx("span", { style: { color: GREEN }, children: d })]
@@ -323,7 +331,7 @@ export function mk({
             ]
           })
         ]}),
-        u && s && jsxs("div", { className: "mt-3 bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4", children: [
+        u && s && jsxs("div", { className: "mt-3 bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4", children: [
           label("Your timeline"),
           jsxs("div", {
             className: "flex h-4 w-full border border-[#E5DFCF] overflow-hidden rounded-full",
@@ -354,7 +362,7 @@ export function mk({
       children: [
         img,
         jsx("div", { className: "mt-2", children: jsxs("div", {
-          className: "bg-white border border-[#E5DFCF] rounded-2xl px-4 py-4",
+          className: "bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4",
           children: [
             label("Your monthly salary"),
             jsxs("div", {
@@ -369,7 +377,7 @@ export function mk({
                   onChange: g => setSal(g.target.value),
                   placeholder: "e.g. 50,000",
                   autoFocus: true,
-                  className: "w-full bg-transparent text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className: "w-full bg-gray-200 rounded-lg px-3 py-2 text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-400 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 })
               ]
             }),
@@ -388,7 +396,7 @@ export function mk({
         jsx("button", {
           type: "button",
           onClick: () => finish(false),
-          className: "w-full py-3 text-sm font-semibold text-gray-400 active:text-gray-600",
+          className: "w-full py-3 text-sm font-bold text-red-500 border-2 border-red-500 rounded-xl active:bg-red-50 transition-colors",
           children: "Skip for now"
         })
       ]

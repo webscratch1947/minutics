@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { jsx } from 'react/jsx-runtime';
 import { getStore, setStore, nextId } from '../lib/storage.js';
-import { getTelegramSettings, saveTelegramSettings, getTelegramReportData, updateLastSummaryDate, sendTelegramReport, pushTelegramSchedule } from '../lib/telegram.js';
+import { getTelegramSettings, saveTelegramSettings, getTelegramReportData, updateLastSummaryDate, sendTelegramReport, pushTelegramSchedule, markServerSent } from '../lib/telegram.js';
 import { COLOR_PALETTE } from '../lib/constants.js';
 
 /* ── Server-scheduler state (Firebase custom claims, key `tgs`) ──────────
@@ -18,21 +18,37 @@ var _tgSendPending = false; /* catch-up send in flight — blocks concurrent e()
 /* Direct bot-token check against the server — works even when the Firebase
    claims read failed. THIS gap (claims invisible → gate passes → send) is
    what produced duplicate reports on open. On Android the WebView origin
-   has no /api route, so fall back to the production host. */
+   has no /api route, so fall back to the production host.
+
+   Returns {known, sent}:
+     known=true,  sent=true  → server already has today's marker → skip send
+     known=true,  sent=false → server reachable, nothing sent → safe to send
+     known=false             → server state UNREACHABLE → caller must NOT
+                               send this tick; a blind send on lookup
+                               failure is exactly how duplicates happen.
+                               Next tick (30s) retries the lookup. */
 function serverSentCurrentReport(token, today, time) {
   try {
-    if (!token) return Promise.resolve(false);
+    if (!token) return Promise.resolve({ known: true, sent: false });
     var path = "/api/telegram?action=state&k=" + encodeURIComponent(token);
+    var parse = function (r) {
+      if (!r) return null;
+      if (r.status === 404) return { known: true, sent: false }; /* no schedule stored yet */
+      if (!r.ok) return null;
+      return r.json().then(function (j) {
+        if (!j || !j.ok) return { known: true, sent: false };
+        return { known: true, sent: j.sd === today && j.st === time };
+      }).catch(function () { return null; });
+    };
     return fetch(window.location.origin + path, { cache: "no-store" })
-      .then(function (r) { return (r && r.ok) ? r.json() : null; })
-      .then(function (j) { return !!(j && j.ok && j.sd === today && j.st === time); })
-      .catch(function () {
-        return fetch("https://app.minutics.com" + path, { cache: "no-store" })
-          .then(function (r) { return (r && r.ok) ? r.json() : null; })
-          .then(function (j) { return !!(j && j.ok && j.sd === today && j.st === time); })
-          .catch(function () { return false; });
-      });
-  } catch { return Promise.resolve(false); }
+      .then(parse)
+      .then(function (res) {
+        if (res) return res;
+        return fetch("https://app.minutics.com" + path, { cache: "no-store" }).then(parse);
+      })
+      .then(function (res) { return res || { known: false, sent: false }; })
+      .catch(function () { return { known: false, sent: false }; });
+  } catch { return Promise.resolve({ known: false, sent: false }); }
 }
 
 function readTgsClaim(token) {
@@ -64,15 +80,34 @@ function serverActive() {
   return !!(b && Date.now() - b < 15 * 60 * 1000);
 }
 
-/* Adopt server last-sent markers from claims whenever they are newer than
-   local state — NOT gated on heartbeat freshness: another tab, the phone,
-   or the server itself may already have sent today's report. Returns true
-   when claims say the CURRENT configured report already went out today. */
+/* Adopt server last-sent markers from claims. Returns true when EITHER
+   local or claims say the CURRENT configured report already went out today.
+
+   Two rules prevent the old duplicate-send loop:
+   1. If LOCAL already has today's marker for the configured time, that
+      wins instantly — never let a stale claims cache (refreshSrvClaims is
+      throttled to 2 min and a freshly-opened tab starts with an empty or
+      pre-send cache) roll the marker back to yesterday.
+   2. Claims only overwrite local when they are STRICTLY NEWER (later
+      date), or when local has no time recorded for the same date. The old
+      code adopted ANY difference — server-stale always clobbered
+      local-correct, re-arming the catch-up send on every app open. */
 function adoptClaimsMarkers(n) {
   try {
+    var today = new Date().toLocaleDateString("en-CA");
+    var localDate = n.lastSummaryDate || "";
+    var localTime = n.lastSummaryTime || "";
+    var configured = n.dailyReportTime || "21:00";
+    /* Local already sent the configured report today → done, regardless
+       of what (possibly stale) claims say. */
+    if (localDate === today && localTime === configured) return true;
+
     var c = _srvCache;
     if (!c || !c.sd) return false;
-    if (n.lastSummaryDate !== c.sd || (n.lastSummaryTime || "") !== (c.st || "")) {
+
+    var claimsNewer = c.sd > localDate ||
+      (c.sd === localDate && !localTime && c.st);
+    if (claimsNewer) {
       try {
         var s = getTelegramSettings();
         s.lastSummaryDate = c.sd;
@@ -89,8 +124,7 @@ function adoptClaimsMarkers(n) {
         );
       } catch {}
     }
-    var today = new Date().toLocaleDateString("en-CA");
-    return c.sd === today && (c.st || "") === (n.dailyReportTime || "21:00");
+    return c.sd === today && ((c.st || "") === configured || !c.st);
   } catch { return false; }
 }
 
@@ -159,7 +193,13 @@ export function HC() {
       const parts = (n.dailyReportTime || "21:00").split(":");
       const scheduled = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
         parseInt(parts[0], 10) || 0, parseInt(parts[1], 10) || 0, 0, 0);
-      const notYetSent = n.lastSummaryDate !== today || (n.lastSummaryTime || "") !== (n.dailyReportTime || "21:00");
+      /* Due only when: no marker for today at all, OR today's marker was
+         recorded for a DIFFERENT configured time (user changed the time
+         after today's report went out → re-arm is intended). A date=today
+         marker with an EMPTY time (legacy writes) counts as already sent —
+         the old comparison ("empty !== configured") re-sent on every open. */
+      const notYetSent = n.lastSummaryDate !== today ||
+        ((n.lastSummaryTime || "") !== "" && (n.lastSummaryTime || "") !== (n.dailyReportTime || "21:00"));
       /* On Android the exact native alarm fires first at the scheduled
          minute; JS only covers after a 90s grace so both paths can't send
          the same report. On the web there is no native path — send at once. */
@@ -194,8 +234,14 @@ export function HC() {
           } catch {}
           /* Belt: ask the server directly with the bot token (independent of
              Firebase claims) before daring to send. */
-          serverSentCurrentReport(n.telegramBotToken, today, n.dailyReportTime || "21:00").then(function(onServer) {
-            if (onServer) {
+          serverSentCurrentReport(n.telegramBotToken, today, n.dailyReportTime || "21:00").then(function(chk) {
+            if (!chk.known) {
+              /* Server state unreachable — never send blind; the next tick
+                 (30s) retries the lookup. */
+              release();
+              return;
+            }
+            if (chk.sent) {
               updateLastSummaryDate(today);
               try {
                 const b = window.AndroidBridge;
@@ -207,8 +253,11 @@ export function HC() {
             sendTelegramReport(n.telegramBotToken, n.telegramChatId, getTelegramReportData()).then(function(result) {
             if (result && result.success) {
               updateLastSummaryDate(today);
-              /* Tell the server scheduler immediately so it won't re-send
-                 this report on its next run. */
+              /* Tell the server through BOTH paths, mark-first: action=mark
+                 authenticates with the bot token alone, so today's marker
+                 lands even if the ID-token claims push (store) fails —
+                 that mismatch was the root of "re-sends on every open". */
+              markServerSent(n.telegramBotToken, today, n.dailyReportTime || "21:00");
               pushTelegramSchedule({ force: true });
               try {
                 const b = window.AndroidBridge;

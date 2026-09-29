@@ -254,8 +254,10 @@ function injectStyles() {
     #lt-auth-gate {
       position: fixed; inset: 0; z-index: 999999;
       background: #Fdfbf7; color: #111827;
-      display: flex; flex-direction: column; justify-content: flex-end;
-      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      overflow-y: auto; overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding: 28px 20px;
       font-family: 'Geist', -apple-system, sans-serif;
       /* NOTE: no opacity animation on this element itself. It has to be
          100% opaque from the very first painted frame -- whatever screen
@@ -263,83 +265,98 @@ function injectStyles() {
          stale "Pro" badge, etc.) is still mounted behind this overlay for
          a beat, and animating THIS element's opacity made that stale
          screen bleed through as a visible flash during the fade. Only the
-         children fade now; the opaque background never does. */
+         children animate; the opaque background never does. */
     }
     #lt-auth-gate * { box-sizing: border-box; }
-    #lt-auth-gate > * { animation: lt-auth-fade .35s ease; }
     @keyframes lt-auth-fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes lt-auth-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+    @keyframes lt-auth-float { from { transform: translate3d(0,0,0); } to { transform: translate3d(20px,28px,0); } }
     @keyframes lt-auth-shake {
       10%, 90% { transform: translateX(-1px); }
       20%, 80% { transform: translateX(2px); }
       30%, 50%, 70% { transform: translateX(-4px); }
       40%, 60% { transform: translateX(4px); }
     }
-    .lt-auth-blob {
-      position: absolute; top: 0; left: 0; width: 100%; height: 60%;
-      background: #fef3c7; border-radius: 0 0 50% 50%;
-      transform: scale(1.5) translateY(-20%); z-index: -1;
+    /* Ambient backdrop: two blurred orbs + a fading grid. Replaces the old
+       single yellow blob + hero image half-screen. */
+    .lt-auth-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; animation: lt-auth-fade .5s ease; }
+    .lt-auth-orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .55; }
+    .lt-auth-orb-a { width: 340px; height: 340px; top: -110px; left: -90px; background: radial-gradient(circle, #c7d2fe 0%, rgba(199,210,254,0) 70%); animation: lt-auth-float 9s ease-in-out infinite alternate; }
+    .lt-auth-orb-b { width: 380px; height: 380px; bottom: -140px; right: -110px; background: radial-gradient(circle, #fde68a 0%, rgba(253,230,138,0) 70%); animation: lt-auth-float 12s ease-in-out infinite alternate-reverse; }
+    .lt-auth-grid {
+      position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(17,24,39,.05) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(17,24,39,.05) 1px, transparent 1px);
+      background-size: 34px 34px;
+      -webkit-mask-image: radial-gradient(75% 55% at 50% 42%, #000 0%, transparent 100%);
+      mask-image: radial-gradient(75% 55% at 50% 42%, #000 0%, transparent 100%);
     }
-    .lt-auth-hero {
-      flex: 1; display: flex; align-items: center; justify-content: center;
-      padding: 40px 24px 32px; background: #FFFBEB; min-height: 0;
-    }
-    .lt-auth-hero img {
-      width: 100%; max-width: 280px; object-fit: contain;
-      animation: lt-auth-fade .5s ease;
-    }
-    .lt-auth-card {
-      background: #ffffff; border-radius: 24px 24px 0 0;
-      box-shadow: 0 -10px 40px -15px rgba(0,0,0,.1);
-      padding: 32px 24px 48px; z-index: 10;
-      width: 100%; max-width: 420px; margin: 0 auto;
-      max-height: 65vh; overflow-y: auto;
+    .lt-auth-panel {
+      position: relative; z-index: 1; width: 100%; max-width: 430px;
       display: flex; flex-direction: column;
+      background: rgba(255,255,255,.93);
+      border: 1px solid rgba(17,24,39,.07);
+      border-radius: 28px;
+      box-shadow: 0 24px 60px -24px rgba(17,24,39,.28), 0 4px 16px -8px rgba(17,24,39,.08);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+      padding: 32px 26px 26px;
+      animation: lt-auth-rise .45s cubic-bezier(.22,1,.36,1);
     }
-    .lt-auth-head { text-align: center; margin-bottom: 32px; }
-    .lt-auth-title { font-size: 24px; font-weight: 600; color: #111827; margin: 0; }
-    .lt-auth-sub { font-size: 14px; color: #6B7280; margin: 4px 0 0; }
-    #lt-auth-form { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+    .lt-auth-brand { display: flex; flex-direction: column; align-items: center; gap: 9px; margin-bottom: 20px; }
+    .lt-auth-mark { width: 52px; height: 52px; display: block; filter: drop-shadow(0 10px 20px rgba(99,102,241,.4)); }
+    .lt-auth-word { font-size: 12px; font-weight: 700; letter-spacing: .24em; text-transform: uppercase; color: #6B7280; }
+    .lt-auth-head { text-align: center; margin-bottom: 22px; }
+    .lt-auth-title { font-size: 27px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; color: #111827; margin: 0; }
+    .lt-auth-title .lt-auth-g { background: linear-gradient(120deg, #4F46E5, #9333EA); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .lt-auth-sub { font-size: 14.5px; color: #6B7280; margin: 8px 0 0; }
+    #lt-auth-form { display: flex; flex-direction: column; gap: 14px; }
+    .lt-auth-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .lt-auth-label { display: block; font-size: 12.5px; font-weight: 600; color: #374151; margin-bottom: 7px; }
+    .lt-auth-row .lt-auth-label { margin-bottom: 0; }
+    .lt-auth-forgot { font-size: 12.5px; font-weight: 600; color: #4F46E5; cursor: pointer; text-underline-offset: 2px; }
+    .lt-auth-forgot:hover { text-decoration: underline; }
     .lt-auth-field { position: relative; }
     .lt-auth-field-icon {
-      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
-      width: 20px; height: 20px; color: #6B7280; pointer-events: none;
+      position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
+      width: 19px; height: 19px; color: #9CA3AF; pointer-events: none;
+      transition: color .15s;
     }
     .lt-auth-field input {
-      width: 100%; padding: 14px 12px 14px 44px;
-      border: 1px solid #D1D5DB; border-radius: 12px;
-      color: #111827; background: #fff; font-size: 15px; outline: none;
-      font-family: 'Geist', sans-serif; transition: border-color .15s, box-shadow .15s;
+      width: 100%; padding: 14.5px 14px 14.5px 44px;
+      border: 1.5px solid #E5E1D8; border-radius: 14px;
+      color: #111827; background: #FAFAF8; font-size: 15.5px; outline: none;
+      font-family: 'Geist', sans-serif;
+      transition: border-color .15s, box-shadow .15s, background .15s;
     }
-    .lt-auth-field input::placeholder { color: #9CA3AF; }
-    .lt-auth-field input:focus {
-      border-color: #4F46E5; box-shadow: 0 0 0 2px rgba(79,70,229,.35);
-    }
+    .lt-auth-field input::placeholder { color: #B9B3A5; }
+    .lt-auth-field input:focus { border-color: #4F46E5; background: #fff; box-shadow: 0 0 0 4px rgba(79,70,229,.14); }
+    .lt-auth-field:focus-within .lt-auth-field-icon { color: #4F46E5; }
     .lt-auth-field input.lt-auth-invalid { border-color: #dc2626; }
-    .lt-auth-field input.lt-auth-has-toggle { padding-right: 44px; }
+    .lt-auth-field input.lt-auth-has-toggle { padding-right: 46px; }
     .lt-auth-pw-toggle {
-      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-      background: none; border: none; padding: 0; cursor: pointer; color: #6B7280;
-      -webkit-tap-highlight-color: transparent;
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+      background: none; border: none; padding: 0; cursor: pointer; color: #9CA3AF;
+      -webkit-tap-highlight-color: transparent; transition: color .15s;
     }
+    .lt-auth-pw-toggle:hover { color: #111827; }
     .lt-auth-pw-toggle svg { width: 20px; height: 20px; }
-    .lt-auth-forgot { text-align: right; margin-top: 8px; }
-    .lt-auth-forgot a {
-      font-size: 13px; font-weight: 600; color: #4F46E5; cursor: pointer; text-underline-offset: 2px;
-    }
-    .lt-auth-forgot a:hover { text-decoration: underline; }
-    .lt-auth-hint { margin-top: 8px; padding-left: 4px; font-size: 12px; color: #6B7280; }
+    .lt-auth-hint { margin-top: -6px; padding-left: 4px; font-size: 12px; color: #9CA3AF; }
     .lt-auth-hint.lt-auth-invalid { color: #dc2626; }
     .lt-auth-hint.lt-auth-valid { color: #16a34a; }
-    .lt-auth-submit-wrap { padding-top: 8px; }
+    .lt-auth-submit-wrap { padding-top: 6px; }
     .lt-auth-submit {
-      width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
-      background: #111827; border: none; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.05);
-      color: #fff; font-size: 16px; font-weight: 600; padding: 16px;
-      cursor: pointer; font-family: 'Geist', sans-serif; transition: background .15s, opacity .15s;
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 9px;
+      background: linear-gradient(135deg, #4F46E5 0%, #9333EA 100%);
+      border: none; border-radius: 14px;
+      color: #fff; font-size: 16px; font-weight: 600; letter-spacing: .01em; padding: 16px;
+      cursor: pointer; font-family: 'Geist', sans-serif;
+      box-shadow: 0 12px 26px -12px rgba(99,102,241,.7);
+      transition: transform .15s, box-shadow .15s, filter .15s, opacity .15s;
     }
-    .lt-auth-submit:hover:not(:disabled) { background: #000; }
-    .lt-auth-submit:disabled { opacity: .6; cursor: default; }
+    .lt-auth-submit:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 16px 32px -12px rgba(99,102,241,.8); }
+    .lt-auth-submit:active:not(:disabled) { transform: translateY(0); }
+    .lt-auth-submit:disabled { opacity: .65; cursor: default; box-shadow: none; }
     .lt-auth-spinner {
       width: 16px; height: 16px; border-radius: 50%;
       border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
@@ -354,15 +371,25 @@ function injectStyles() {
     }
     .lt-auth-error.lt-auth-shown { display: block; animation: lt-auth-shake .4s; }
     .lt-auth-error.lt-success { background: #F0FDF4; border-color: #BBF7D0; color: #16A34A; }
-    .lt-auth-switch { margin-top: 24px; text-align: center; font-size: 14px; color: #4B5563; }
+    .lt-auth-switch { margin-top: 20px; text-align: center; font-size: 14px; color: #6B7280; }
     .lt-auth-switch a {
-      font-weight: 600; color: #111827; cursor: pointer; text-underline-offset: 2px;
+      font-weight: 700; color: #4F46E5; cursor: pointer; text-underline-offset: 2px;
     }
-    .lt-auth-switch a:hover { color: #4F46E5; }
+    .lt-auth-switch a:hover { text-decoration: underline; }
     .lt-auth-disclaimer {
-      margin-top: 12px; font-size: 10px; line-height: 1.6; color: #6B7280;
+      margin-top: 18px; padding-top: 14px; border-top: 1px dashed #E5E1D8;
+      font-size: 10.5px; line-height: 1.65; color: #9CA3AF;
     }
-    .lt-auth-disclaimer b { font-weight: 600; color: #374151; }
+    .lt-auth-disclaimer b { font-weight: 600; color: #6B7280; }
+    @media (max-height: 700px) {
+      .lt-auth-panel { padding-top: 24px; }
+      .lt-auth-mark { width: 44px; height: 44px; }
+      .lt-auth-title { font-size: 24px; }
+      .lt-auth-brand { margin-bottom: 14px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .lt-auth-bg, .lt-auth-panel, .lt-auth-orb-a, .lt-auth-orb-b { animation: none !important; }
+    }
   `;
   document.head.appendChild(style);
 }
@@ -389,31 +416,38 @@ function renderGate(mode) {
   var LOCK_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
   var EYE_ICON = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
   var EYE_OFF_ICON = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
-  var heroSrc = isSignup ? "./assets/auth/create-account.png" : "./assets/auth/welcome-back.png";
-  var heroAlt = isSignup ? "Create account illustration" : "Welcome back illustration";
+  /* Brand mark — custom SVG (replaces the welcome-back.png / create-account.png
+     hero images entirely: no remote assets, crisp at any size). */
+  var MARK_SVG = '<svg class="lt-auth-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">' +
+    '<defs><linearGradient id="lt-auth-mark-g" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="#6366F1"/><stop offset="1" stop-color="#9333EA"/></linearGradient></defs>' +
+    '<rect x="1" y="1" width="30" height="30" rx="9.5" fill="url(#lt-auth-mark-g)"/>' +
+    '<circle cx="16" cy="16" r="8.5" stroke="#fff" stroke-width="2.2" opacity=".95"/>' +
+    '<path d="M16 11.2V16l3.6 2.1" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>' +
+    '</svg>';
 
   var gate = document.createElement("div");
   gate.id = "lt-auth-gate";
   // Ensure the gate is fully opaque immediately to prevent any flash of underlying content
-  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#Fdfbf7;color:#111827;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
+  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#Fdfbf7;color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
   gate.innerHTML =
-    '<div class="lt-auth-blob"></div>' +
-    '<div class="lt-auth-hero"><img src="' + heroSrc + '" alt="' + heroAlt + '" /></div>' +
-    '<main class="lt-auth-card">' +
+    '<div class="lt-auth-bg" aria-hidden="true"><span class="lt-auth-orb lt-auth-orb-a"></span><span class="lt-auth-orb lt-auth-orb-b"></span><span class="lt-auth-grid"></span></div>' +
+    '<main class="lt-auth-panel">' +
+      '<div class="lt-auth-brand">' + MARK_SVG + '<span class="lt-auth-word">Minutics</span></div>' +
       '<div class="lt-auth-head">' +
-        '<h1 class="lt-auth-title">' + (isSignup ? "Create Account" : "Welcome back") + '</h1>' +
-        '<p class="lt-auth-sub">Log in to continue</p>' +
+        '<h1 class="lt-auth-title">' + (isSignup ? 'Create <span class="lt-auth-g">your account</span>' : 'Welcome <span class="lt-auth-g">back</span>') + '</h1>' +
+        '<p class="lt-auth-sub">' + (isSignup ? "A better day starts in minutes" : "Log in to continue to your day") + '</p>' +
       '</div>' +
       '<div class="lt-auth-error" id="lt-auth-error"></div>' +
       '<form id="lt-auth-form" novalidate>' +
-        '<div class="lt-auth-field">' + MAIL_ICON + '<input type="email" id="lt-auth-email" placeholder="Enter email" autocomplete="email" required></div>' +
-        '<div>' +
-          '<div class="lt-auth-field">' + LOCK_ICON + '<input type="password" id="lt-auth-password" class="lt-auth-has-toggle" placeholder="Enter password" autocomplete="' + (isSignup ? "new-password" : "current-password") + '" required>' +
-            '<button type="button" class="lt-auth-pw-toggle" id="lt-auth-pw-toggle" aria-label="Show password">' + EYE_ICON + '</button>' +
-          '</div>' +
-          '<p class="lt-auth-hint" id="lt-auth-pw-hint">Password must be at least 6 characters</p>' +
-          (isSignup ? "" : '<p class="lt-auth-forgot"><a id="lt-auth-forgot-link">Forgot password?</a></p>') +
+        '<div class="lt-auth-row"><label class="lt-auth-label" for="lt-auth-email">Email</label></div>' +
+        '<div class="lt-auth-field">' + MAIL_ICON + '<input type="email" id="lt-auth-email" placeholder="you@example.com" autocomplete="email" required></div>' +
+        '<div class="lt-auth-row"><label class="lt-auth-label" for="lt-auth-password">Password</label>' +
+          (isSignup ? "" : '<a class="lt-auth-forgot" id="lt-auth-forgot-link">Forgot password?</a>') + '</div>' +
+        '<div class="lt-auth-field">' + LOCK_ICON + '<input type="password" id="lt-auth-password" class="lt-auth-has-toggle" placeholder="Enter your password" autocomplete="' + (isSignup ? "new-password" : "current-password") + '" required>' +
+          '<button type="button" class="lt-auth-pw-toggle" id="lt-auth-pw-toggle" aria-label="Show password">' + EYE_ICON + '</button>' +
         '</div>' +
+        '<p class="lt-auth-hint" id="lt-auth-pw-hint">Password must be at least 6 characters</p>' +
         '<div class="lt-auth-submit-wrap">' +
           '<button class="lt-auth-submit" type="submit" id="lt-auth-submit">' +
             '<span class="lt-auth-spinner"></span>' +
@@ -498,22 +532,30 @@ function renderForgotGate() {
   cleanupEnhancementVisuals();
 
   var MAIL_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
+  var MARK_SVG = '<svg class="lt-auth-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">' +
+    '<defs><linearGradient id="lt-auth-mark-g" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="#6366F1"/><stop offset="1" stop-color="#9333EA"/></linearGradient></defs>' +
+    '<rect x="1" y="1" width="30" height="30" rx="9.5" fill="url(#lt-auth-mark-g)"/>' +
+    '<circle cx="16" cy="16" r="8.5" stroke="#fff" stroke-width="2.2" opacity=".95"/>' +
+    '<path d="M16 11.2V16l3.6 2.1" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>' +
+    '</svg>';
 
   var gate = document.createElement("div");
   gate.id = "lt-auth-gate";
   // Ensure the gate is fully opaque immediately to prevent any flash of underlying content
-  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#Fdfbf7;color:#111827;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
+  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#Fdfbf7;color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
   gate.innerHTML =
-    '<div class="lt-auth-blob"></div>' +
-    '<div class="lt-auth-hero"><img src="./assets/auth/welcome-back.png" alt="Reset password illustration" /></div>' +
-    '<main class="lt-auth-card">' +
+    '<div class="lt-auth-bg" aria-hidden="true"><span class="lt-auth-orb lt-auth-orb-a"></span><span class="lt-auth-orb lt-auth-orb-b"></span><span class="lt-auth-grid"></span></div>' +
+    '<main class="lt-auth-panel">' +
+      '<div class="lt-auth-brand">' + MARK_SVG + '<span class="lt-auth-word">Minutics</span></div>' +
       '<div class="lt-auth-head">' +
-        '<h1 class="lt-auth-title">Reset password</h1>' +
-        '<p class="lt-auth-sub">We\u2019ll email you a link to reset it</p>' +
+        '<h1 class="lt-auth-title">Reset <span class="lt-auth-g">password</span></h1>' +
+        '<p class="lt-auth-sub">Enter your email — we\u2019ll send you a reset link</p>' +
       '</div>' +
       '<div class="lt-auth-error" id="lt-auth-error"></div>' +
       '<form id="lt-forgot-form" novalidate>' +
-        '<div class="lt-auth-field">' + MAIL_ICON + '<input type="email" id="lt-forgot-email" placeholder="Enter email" autocomplete="email" required></div>' +
+        '<div class="lt-auth-row"><label class="lt-auth-label" for="lt-forgot-email">Email</label></div>' +
+        '<div class="lt-auth-field">' + MAIL_ICON + '<input type="email" id="lt-forgot-email" placeholder="you@example.com" autocomplete="email" required></div>' +
         '<div class="lt-auth-submit-wrap">' +
           '<button class="lt-auth-submit" type="submit" id="lt-forgot-submit">' +
             '<span class="lt-auth-spinner"></span>' +
@@ -521,7 +563,7 @@ function renderForgotGate() {
           '</button>' +
         '</div>' +
       '</form>' +
-      '<p class="lt-auth-switch"><a id="lt-forgot-back-link">Back to login</a></p>' +
+      '<p class="lt-auth-switch"><a id="lt-forgot-back-link">Back to log in</a></p>' +
     '</main>';
   document.body.appendChild(gate);
 

@@ -45,11 +45,12 @@
     });
     video.addEventListener("error", dismiss);
 
-    video.muted = false;
-    video.play().catch(function () {
-      video.muted = true;
-      video.play().catch(function () {});
-    });
+    /* ALWAYS muted — decision: no splash audio, ever. Autoplay-with-sound
+       is blocked without a user gesture, so audio used to play only after
+       a recent click / in some WebViews ("sometimes I hear it, sometimes
+       not"). One consistent behavior: silent. */
+    video.muted = true;
+    video.play().catch(function () {});
 
     setTimeout(dismiss, MAX_MS);
   })();
@@ -7454,8 +7455,12 @@
     s.textContent =
       "*{-webkit-tap-highlight-color:transparent!important;" +
       "outline:none!important;box-shadow:none!important;}" +
-      "*:focus,*:active,*:focus-visible{outline:none!important;" +
-      "box-shadow:none!important;border-color:transparent!important;}";
+      /* NO :active here and NO border-color kill — holding a box (selected
+         onboarding cards, Eat the Frog, selects) must keep its outline/border
+         until release. Focus keeps outline suppressed (design) but borders
+         stay visible so focused inputs/selects still show their state. */
+      "*:focus,*:focus-visible{outline:none!important;" +
+      "box-shadow:none!important;}";
     document.head.appendChild(s);
   }
 

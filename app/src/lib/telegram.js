@@ -101,11 +101,51 @@ export function pushTelegramSchedule(opts) {
           return send("https://app.minutics.com");
         }
         return false;
+      }).then(function (ok) {
+        /* A FAILED force push is how duplicates are born: the local marker
+           says "sent today" while the server still thinks yesterday, and
+           the next stale-claims adoption rolls local back → re-send on the
+           next app open. Retry once shortly after; the periodic 10-min
+           push (which reads the same local markers) heals anything else. */
+        if (!ok && opts.force && !opts._retry) {
+          setTimeout(function () {
+            pushTelegramSchedule({ force: true, _retry: true });
+          }, 4000);
+        }
+        return ok;
       });
     }).catch(function () { return false; });
   } catch {
     return Promise.resolve(false);
   }
+}
+
+/* Belt #2: record "report for <date> at <time> already went out" directly
+   on the server via action=mark — authenticated by possession of the bot
+   token, NOT the Firebase ID token, so it works even when the ID-token
+   claims push (action=store) fails. serverSentCurrentReport reads exactly
+   this marker before any catch-up send, so this closes the
+   "local says sent, server says not-sent → duplicate on next open" gap. */
+export function markServerSent(token, date, time) {
+  try {
+    if (!token || !date) return Promise.resolve(false);
+    var origin = window.location.origin;
+    var payload = JSON.stringify({ action: "mark", k: token, sd: date, st: time || "" });
+    var send = function (base) {
+      return fetch(base + "/api/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload
+      }).then(function (r) { return !!(r && r.ok); });
+    };
+    return send(origin).then(function (ok) {
+      if (ok) return true;
+      if (origin.indexOf("appassets.androidplatform.net") !== -1) {
+        return send("https://app.minutics.com");
+      }
+      return false;
+    }).catch(function () { return false; });
+  } catch { return Promise.resolve(false); }
 }
 
 /** Save telegram settings + sync Android bridge (was: gh) */
