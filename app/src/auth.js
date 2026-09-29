@@ -233,6 +233,9 @@ window.LTAuth = {
        custom claims (the report scheduler's heartbeat / last-sent state). */
     return force ? user.getIdToken(true) : user.getIdToken();
   },
+  /* Absolute API origin for endpoints called from Settings ("" on web,
+     https://app.minutics.com from the Android WebView / any non-app host). */
+  apiOrigin: function () { return apiOrigin(); },
 };
 
 /* ── Styles — matches the supplied Login/Register mock exactly: cream +

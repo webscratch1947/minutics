@@ -327,57 +327,64 @@ export function SettingsScreen() {
     }
   }
 
-  function handleResetProfile() {
-    if (confirm("This will log you out and delete all profile + app data on this device. Your plan will be kept. Continue?")) {
-      /* Preserve plan data before clearing localStorage */
-      var planData = {};
-      try {
-        ["lt_plan_v1", "lt_plan_since_v1", "lt_plan_grace_v1"].forEach(function (k) {
-          var v = localStorage.getItem(k);
-          if (v !== null) planData[k] = v;
-        });
-      } catch (e) {}
-
-      /* Clear this account's live app keys only — keep Firebase auth keys,
-         other accounts' lt_ns_* snapshots, and the active-uid marker so
-         per-account isolation survives the reset. */
-      var toRemove = [];
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (!k) continue;
-        if (k === "lt_active_uid" || k.indexOf("lt_ns_") === 0 || k.indexOf("firebase:") === 0) continue;
-        toRemove.push(k);
-      }
-      toRemove.forEach(function (key) {
-        try { localStorage.removeItem(key); } catch (e) {}
-      });
-
-      /* Also delete this account's snapshot so the old data is truly gone
-         (the logout below re-parks only the plan keys we just restored). */
-      try {
-        var u = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
-        if (u && u.uid) localStorage.removeItem("lt_ns_" + u.uid);
-      } catch (e) {}
-
-      /* Restore plan data */
-      Object.keys(planData).forEach(function (k) {
-        localStorage.setItem(k, planData[k]);
-      });
-
-      /* Full logout via Firebase, then reload so the React root re-mounts
-         and re-checks getProfile() — without a reload the old profile stays
-         in React state and the user lands back in the same app.
-         On Android WebView (appassets.androidplatform.net), reload() fails
-         with ERR_INVALID_RESPONSE because it's a local file URL — so we
-         skip reload there and let the auth state watcher in auth.js handle
-         showing the login gate. */
-      if (window.LTAuth && window.LTAuth.logout) {
-        window.LTAuth.logout();
-      }
-      if (!window.AndroidBridge) {
-        setTimeout(function () { window.location.reload(); }, 300);
-      }
+  /* ── delete account ────────────────────────────────────────────────
+     Server first: DELETE /api/session removes the Firebase Auth user that
+     owns the presented ID token (only that uid — never anyone else's).
+     Only after the server confirms do we wipe this account's local data:
+     live app keys, plan, identity, the lt_ns_<uid> snapshot, lt_active_uid,
+     firebase session keys, fcm token — everything. Other accounts' lt_ns_*
+     snapshots on this device are NOT this account's data and are kept.
+     Local-only failure (offline / server error) aborts before any wipe. */
+  function wipeAccountStorage(uid) {
+    var deadSnapshot = "lt_ns_" + uid;
+    var toRemove = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (!k) continue;
+      if (k.indexOf("lt_ns_") === 0 && k !== deadSnapshot) continue;
+      toRemove.push(k);
     }
+    toRemove.forEach(function (key) {
+      try { localStorage.removeItem(key); } catch (e) {}
+    });
+  }
+
+  function handleDeleteAccount() {
+    var u = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
+    if (!u || !u.uid) { alert("No account is signed in."); return; }
+    if (!confirm("Delete your account permanently?\n\n• Your account is deleted from Firebase — you can never log in with it again\n• ALL data for this account is erased on this device: activities, budget, tasks, journal, profile AND your subscription plan\n\nThis cannot be undone.")) return;
+    if (!confirm("Last confirmation: delete this account and everything in it?")) return;
+
+    var origin = (window.LTAuth && window.LTAuth.apiOrigin) ? window.LTAuth.apiOrigin() : "";
+    (window.LTAuth && window.LTAuth.getToken ? window.LTAuth.getToken(false) : Promise.resolve(null))
+      .then(function (tok) {
+        if (!tok) throw new Error("Not signed in — log in again first.");
+        return fetch(origin + "/api/session", {
+          method: "DELETE",
+          headers: { "Authorization": "Bearer " + tok }
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            if (r.status !== 200 || !d || d.ok !== true) {
+              throw new Error((d && d.error) || ("server error " + r.status));
+            }
+          });
+        });
+      })
+      .then(function () {
+        /* Server confirmed — now (and only now) destroy the local data. */
+        wipeAccountStorage(u.uid);
+        if (window.LTAuth && window.LTAuth.logout) window.LTAuth.logout();
+        /* Second pass while sign-out settles, in case an enhancement
+           seeder or the SDK re-wrote a key during the async gap. */
+        setTimeout(function () { wipeAccountStorage(u.uid); }, 800);
+        alert("Your account and all of its data have been deleted.");
+        if (!window.AndroidBridge) {
+          setTimeout(function () { window.location.reload(); }, 300);
+        }
+      })
+      .catch(function (e) {
+        alert("Could not delete account: " + ((e && e.message) || e) + "\n\nNothing was removed from this device.");
+      });
   }
 
   function handleSaveTelegram() {
@@ -491,9 +498,9 @@ export function SettingsScreen() {
             className: "flex border-t border-border",
             children: [
               jsx("button", {
-                onClick: handleResetProfile,
+                onClick: handleDeleteAccount,
                 className: "flex-1 py-3 text-sm font-semibold text-red-500 active:bg-red-50 transition border-r border-border",
-                children: "Reset Profile"
+                children: "Delete account"
               }),
               jsx("button", {
                 onClick: function () {

@@ -1,12 +1,17 @@
-// Single-device session enforcement.
+// Single-device session enforcement + account deletion.
 //
-// POST /api/session  { deviceId }  (Authorization: Bearer <Firebase ID token>)
+// POST    /api/session  { deviceId }  (Authorization: Bearer <Firebase ID token>)
+// DELETE  /api/session                 (Authorization: Bearer <Firebase ID token>)
 //
-// Stores the calling device's id in the user's Firebase custom claim
+// POST stores the calling device's id in the user's Firebase custom claim
 // `sessionDevice` (merged with existing claims, e.g. the telegram schedule).
 // The claim is the registry — no extra database needed. Clients poll their
 // own token every minute; if `sessionDevice` names a different device they
 // sign themselves out (last login wins).
+//
+// DELETE permanently removes the calling user's Firebase Auth account
+// (admin.deleteUser on the token's OWN uid only — the client then wipes
+// that account's localStorage itself).
 //
 // Part of the Vercel Hobby 12-function budget (kept small on purpose).
 
@@ -50,11 +55,11 @@ function fitClaims(claims) {
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
-  if (req.method !== "POST") { res.status(405).json({ ok: false, error: "Method not allowed" }); return; }
+  if (req.method !== "POST" && req.method !== "DELETE") { res.status(405).json({ ok: false, error: "Method not allowed" }); return; }
 
   const authHeader = req.headers.authorization || "";
   const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
@@ -69,6 +74,28 @@ export default async function handler(req, res) {
     res.status(401).json({ ok: false, error: "Invalid or expired token" });
     return;
   }
+
+  /* ── DELETE: permanently delete this user's Firebase account ─────────
+     Only ever deletes the uid bound to the presented token — there is no
+     uid in the request, so one user can never delete another. An account
+     already gone (retry after a dropped response) reports success so the
+     client can finish its local wipe. */
+  if (req.method === "DELETE") {
+    try {
+      await authApi.deleteUser(uid);
+      res.status(200).json({ ok: true });
+    } catch (e) {
+      if (e && e.code === "auth/user-not-found") {
+        res.status(200).json({ ok: true });
+        return;
+      }
+      console.error("account delete failed:", e && e.message);
+      res.status(500).json({ ok: false, error: "Could not delete account" });
+    }
+    return;
+  }
+
+  /* ── POST: claim this device ─────────────────────────────────────── */
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
