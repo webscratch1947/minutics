@@ -492,6 +492,10 @@ export function SettingsScreen() {
                 })
               ]
             })
+          }),
+          jsx("p", {
+            className: "px-1 mt-2.5 text-[11px] leading-relaxed font-medium text-amber-600",
+            children: "Warning: If you delete this app's local storage (clear app data / reinstall), your subscription will be removed and you'll need to purchase it again."
           })
         ]
       }),
@@ -525,6 +529,10 @@ export function SettingsScreen() {
                 })
               ]
             })
+          }),
+          jsx("p", {
+            className: "px-1 mt-2.5 text-[11px] leading-relaxed text-muted-foreground",
+            children: "Note: Name, email and subscription are never included in the downloaded data — they stay tied to your login and can't be shared or copied from a file."
           })
         ]
       }),

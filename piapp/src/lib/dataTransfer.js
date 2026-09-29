@@ -113,8 +113,23 @@ function applyData(data) {
   var bridge = window.AndroidBridge;
   var canNative = !!(bridge && typeof bridge.savePersistent === "function");
 
+  /* ANTI-TAMPER: capture plan / identity / session keys first and restore
+     them byte-for-byte afterwards. However a backup file is crafted, it
+     can NEVER create, alter or remove these keys — the subscription and
+     the device's own name/email are physically unreachable for imports. */
+  var protectedKeys = PLAN_KEYS.concat(IDENTITY_KEYS, ["lt_active_uid"]);
+  var savedPresent = {};
+  var savedValue = {};
+  for (var pi = 0; pi < protectedKeys.length; pi++) {
+    var pk = protectedKeys[pi];
+    var pv = null;
+    try { pv = localStorage.getItem(pk); } catch (e) {}
+    savedPresent[pk] = pv !== null;
+    savedValue[pk] = pv;
+  }
+
   /* 1. Remove every live app key (same reservation rules as Reset:
-        keep session, plan, and lt_ns_* snapshots on this device). */
+        keep session, plan, identity, and lt_ns_* snapshots on this device). */
   var toRemove = [];
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
@@ -145,6 +160,15 @@ function applyData(data) {
       try { bridge.savePersistent(k, v); } catch (e) {}
     }
   });
+
+  /* 3. Restore the protected keys exactly as they were before the import. */
+  for (var si = 0; si < protectedKeys.length; si++) {
+    var sk = protectedKeys[si];
+    try {
+      if (savedPresent[sk]) localStorage.setItem(sk, savedValue[sk]);
+      else localStorage.removeItem(sk);
+    } catch (e) {}
+  }
   return written;
 }
 

@@ -96,14 +96,27 @@ export function mk({
     killSwitch.textContent = "body.lt-authed #root{display:none!important}";
     (document.head || document.documentElement).appendChild(killSwitch);
 
-    /* Phase 1: loading spinner */
+    /* Phase 1: robot artwork (if shipped) + 3-dot loading indicator
+       positioned below the robot, above the planet. The background image
+       is optional — when assets/onboarding/setup-robot.png is missing the
+       space gradient shows on its own. */
     var loader = document.createElement("div");
     loader.id = "lt-signin-loader";
-    loader.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:hsl(230 40% 16%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;transition:opacity .5s ease;opacity:1;";
+    loader.style.cssText = "position:fixed;inset:0;z-index:2147483647;" +
+      "background:#0b0620 url('./assets/onboarding/setup-robot.png') center 32%/cover no-repeat," +
+      "radial-gradient(130% 95% at 50% 18%, #34206b 0%, #1a0f3f 45%, #0b0620 100%);" +
+      "display:flex;flex-direction:column;align-items:center;justify-content:flex-end;" +
+      "padding-bottom:26vh;gap:13px;transition:opacity .5s ease;opacity:1;";
     loader.innerHTML =
-      '<div style="width:48px;height:48px;border:3px solid rgba(255,255,255,.15);border-top-color:#fff;border-radius:50%;animation:lt-spin .8s linear infinite"></div>' +
-      '<p style="color:rgba(255,255,255,.8);font-size:15px;font-weight:600;margin:0;font-family:inherit">Setting up your app...</p>' +
-      '<style>@keyframes lt-spin{to{transform:rotate(360deg)}}</style>';
+      '<div class="lt-setup-dots"><span></span><span></span><span></span></div>' +
+      '<p style="color:rgba(255,255,255,.88);font-size:15px;font-weight:600;margin:0;font-family:inherit;text-shadow:0 2px 10px rgba(0,0,0,.55)">Setting up your app...</p>' +
+      '<style>' +
+      '@keyframes lt-setup-dot{0%,80%,100%{transform:translateY(0);opacity:.45}40%{transform:translateY(-8px);opacity:1}}' +
+      '.lt-setup-dots{display:flex;gap:9px;align-items:center;justify-content:center}' +
+      '.lt-setup-dots span{width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 0 10px rgba(255,255,255,.5);animation:lt-setup-dot 1.1s ease-in-out infinite}' +
+      '.lt-setup-dots span:nth-child(2){animation-delay:.15s}' +
+      '.lt-setup-dots span:nth-child(3){animation-delay:.3s}' +
+      '</style>';
     (document.body || document.documentElement).appendChild(loader);
 
     /* Phase 2: render the main app first, but keep this opaque loader over it

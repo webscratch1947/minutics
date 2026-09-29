@@ -58,6 +58,83 @@ function setMarker(uid) {
     else localStorage.removeItem(ACTIVE_UID_KEY);
   } catch (e) {}
 }
+
+/* ── Single-device sessions ─────────────────────────────────────────────
+   Every genuine login/register claims THIS device in the Firebase custom
+   claim `sessionDevice` (POST /api/session — the claim itself is the
+   registry, no database needed). Every signed-in client refreshes its ID
+   token once a minute; when the refreshed claims name a different device
+   it signs itself out (last login wins). The claim travels inside the ID
+   token, so nothing extra is stored on the server. ─────────────────────── */
+var DEVICE_ID_KEY = "lt_device_id_v1";
+var _sessionWatchTimer = null;
+var _claimGraceUntil = 0;
+
+function getDeviceId() {
+  try {
+    var id = localStorage.getItem(DEVICE_ID_KEY);
+    if (id && /^[A-Za-z0-9_-]{8,64}$/.test(id)) return id;
+    id = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+    localStorage.setItem(DEVICE_ID_KEY, id);
+    return id;
+  } catch (e) { return "d-fallback-device"; }
+}
+
+function apiOrigin() {
+  var o = location.origin || "";
+  if (o.indexOf("minutics.com") !== -1) return "";        /* production — same origin */
+  if (o.indexOf("localhost") !== -1 || o.indexOf("127.0.0.1") !== -1) return "";
+  return "https://app.minutics.com";                      /* Android WebView (appassets) etc. */
+}
+
+function claimSessionNow() {
+  var u = auth.currentUser;
+  if (!u) return;
+  _claimGraceUntil = Date.now() + 20000; /* grace: never kick a device racing its own claim */
+  u.getIdToken(false).then(function (tok) {
+    return fetch(apiOrigin() + "/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+      body: JSON.stringify({ deviceId: getDeviceId() })
+    });
+  }).catch(function () { /* offline — the claim lands on the next successful login */ });
+}
+
+function forceLogoutSingleSession() {
+  stopSessionWatch();
+  signOut(auth).then(function () {
+    setTimeout(function () {
+      alert("This account is only allowed on one device. You were signed out here — log in again on this device to take over.");
+    }, 400);
+  }).catch(function () {});
+}
+
+function checkSessionClaim() {
+  var u = auth.currentUser;
+  if (!u) return;
+  u.getIdTokenResult(true).then(function (r) {
+    var d = r && r.claims ? r.claims.sessionDevice : null;
+    if (!d || d === getDeviceId()) return;
+    if (Date.now() < _claimGraceUntil) { claimSessionNow(); return; } /* still registering this device */
+    forceLogoutSingleSession();
+  }).catch(function () { /* transient refresh/network failure — never sign out on this */ });
+}
+
+function _sessionOnVisible() { if (!document.hidden) checkSessionClaim(); }
+
+function startSessionWatch() {
+  if (_sessionWatchTimer) return;
+  _sessionWatchTimer = setInterval(checkSessionClaim, 60000);
+  document.addEventListener("visibilitychange", _sessionOnVisible);
+  setTimeout(checkSessionClaim, 8000);
+}
+
+function stopSessionWatch() {
+  if (_sessionWatchTimer) { clearInterval(_sessionWatchTimer); _sessionWatchTimer = null; }
+  document.removeEventListener("visibilitychange", _sessionOnVisible);
+}
 function snapshotAccount(uid) {
   if (!uid) return;
   var data = {};
@@ -579,6 +656,10 @@ onAuthStateChanged(auth, function (user) {
     var genuineLogin = _prevAuthState === null;
     _prevAuthState = user;
     if (storageChanged) announceUserChanged();
+    /* Single-device session: an explicit login/register claims this device;
+       the watch kicks us out the moment another device takes the claim. */
+    if (genuineLogin) claimSessionNow();
+    startSessionWatch();
     /* A genuine sign-in transition (the login gate was actually on screen
        a moment ago) must land on the Timer home screen — the router's URL
        was left wherever it was when the user logged out. On a normal page
@@ -627,6 +708,7 @@ onAuthStateChanged(auth, function (user) {
        keys so the next account (or a fresh signup) starts clean. */
     storageChanged = reconcileStorage(null);
     _prevAuthState = null;
+    stopSessionWatch();
     if (storageChanged) announceUserChanged();
     document.body.classList.remove("lt-authed");
 
