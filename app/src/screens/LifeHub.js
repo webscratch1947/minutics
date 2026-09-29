@@ -6,7 +6,7 @@ import { calcRemainingTime } from '../lib/lifeCalc.js';
 import { getCurrency, getCurrencySymbol } from '../lib/currency.js';
 import { isPro } from '../lib/settings.js';
 import { cn } from '../lib/cn.js';
-import { Play as nk, Pencil as tk, BookOpen as Xb } from 'lucide-react';
+import { Play as nk, Pencil as tk } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

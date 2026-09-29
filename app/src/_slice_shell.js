@@ -2,7 +2,7 @@ import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
 import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getProfile } from './lib/profile.js';
-import { BookOpen, LayoutGrid, ListTodo, Settings, Timer } from 'lucide-react';
+import { LayoutGrid, ListTodo, Play, Settings, Square, Timer } from 'lucide-react';
 import { cn } from './lib/cn.js';
 import { useBlocks } from './hooks/useBlocks.js';
 import { useActivities } from './hooks/useActivities.js';
@@ -84,12 +84,24 @@ function LTTopNav() {
   });
 }
 
+/* Fires a window event on every route change so enhancements.js can run its
+   pass immediately. The MutationObserver path is throttled to one run per
+   500ms, so a fast tab switch right after another one dropped the new
+   screen's pass and painted the previous screen's injected UI. */
+function RouteWatcher() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    try { window.dispatchEvent(new CustomEvent('lt-route-change', { detail: pathname })); } catch (e) {}
+  }, [pathname]);
+  return null;
+}
+
 export function ak({
   children: e
 }) {
   return jsxs("div", {
     className: "relative mx-auto max-w-[430px] w-full h-[100dvh] overflow-hidden bg-background flex flex-col",
-    children: [jsx(LTTopNav, {}), jsx("main", {
+    children: [jsx(RouteWatcher, {}), jsx(LTTopNav, {}), jsx("main", {
       className: "flex-1 min-h-0 overflow-y-auto overscroll-contain pb-[88px] no-scrollbar",
       children: e
     }), jsx(ck, {})]
@@ -109,58 +121,83 @@ const uk = [{
   icon: LayoutGrid,
   label: "Life Hub"
 }, {
-  href: "/journal",
-  icon: BookOpen,
-  label: "Journal"
-}, {
   href: "/settings",
   icon: Settings,
   label: "Settings"
 }];
 
+/* Floating pill bottom nav — lifted off the screen edge like the reference
+   design, with an elevated centre circle as a quick timer control:
+   idle → jump to Activity (where timers start), running → stop the block. */
 export function ck() {
   const { pathname: e } = useLocation();
-  return jsx("div", {
-    className: "fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border",
+  const navigate = useNavigate();
+  const { data: blocks = [] } = useBlocks();
+  const updateBlock = useUpdateBlock();
+  const queryClient = useQueryClient();
+  const running = blocks.find(b => !b.endTime);
+
+  const onFab = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!running) {
+      navigate('/activity');
+      return;
+    }
+    updateBlock.mutate({
+      id: running.id,
+      data: { endTime: new Date().toISOString() }
+    }, {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: blocksKey() })
+    });
+  };
+
+  const renderTab = ({ href: t, icon: n, label: r }) => {
+    const o = t === "/" ? e === "/" : e.startsWith(t);
+    return jsxs(Link, {
+      to: t,
+      className: cn("flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-full transition-colors text-[10px] font-semibold tracking-wide", o ? "text-primary bg-secondary" : "text-muted-foreground active:text-muted-foreground"),
+      children: [jsx(n, {
+        className: cn("w-[18px] h-[18px]", o && "stroke-[2.5]")
+      }), jsx('span', { className: 'w-full text-center truncate', children: r })]
+    }, t);
+  };
+
+  const leftTabs = uk.slice(0, 2).map(renderTab);
+  const rightTabs = uk.slice(2).map(renderTab);
+
+  const fab = jsx("button", {
+    key: 'fab',
+    type: 'button',
+    onClick: onFab,
+    'aria-label': running ? 'Stop timer' : 'Start timer',
+    className: 'relative shrink-0 -mt-11 w-[54px] h-[54px] rounded-full flex items-center justify-center text-white border-[3px] border-white',
     style: {
-      backgroundColor: "#ffffff",
-      boxShadow: "0 -2px 10px rgba(0,0,0,0.1)"
+      background: running ? '#DC2626' : 'hsl(var(--primary))',
+      boxShadow: '0 8px 18px rgba(4, 9, 30, 0.35)'
     },
-    children: jsx("div", {
-      className: "max-w-[430px] mx-auto",
-      style: {
-        backgroundColor: "#ffffff",
-        position: "relative",
-        zIndex: 51
-      },
-      children: jsx("nav", {
-        className: "flex items-stretch",
-        style: {
-          backgroundColor: "#ffffff",
-          position: "relative",
-          zIndex: 52
-        },
-        children:         uk.map(({
-          href: t,
-          icon: n,
-          label: r
-        }) => {
-          const o = t === "/" ? e === "/" : e.startsWith(t);
-          return jsxs(Link, {
-            to: t,
-            className: cn("flex flex-col items-center justify-center gap-0.5 flex-1 py-2 transition-colors text-[10px] font-semibold tracking-wide", o ? "text-primary lt-navtab-active" : "text-muted-foreground active:text-muted-foreground"),
-            style: {
-              position: "relative",
-              zIndex: 53
-            },
-            children: [jsx(n, {
-              className: cn("w-5 h-5", o && "stroke-[2.5]")
-            }), r]
-          }, t)
+    children: running
+      ? jsxs(Fragment, {
+          children: [
+            jsx('span', { className: 'absolute inset-0 rounded-full border-2 border-red-400/70 animate-ping' }),
+            jsx(Square, { className: 'w-5 h-5 relative', fill: 'currentColor' })
+          ]
         })
-      })
+      : jsx(Play, { className: 'w-6 h-6 relative ml-0.5', fill: 'currentColor' })
+  });
+
+  return jsx("div", {
+    className: "fixed inset-x-0 z-50 px-3",
+    style: {
+      bottom: "calc(10px + env(safe-area-inset-bottom, 0px))",
+      pointerEvents: "none"
+    },
+    children: jsx("nav", {
+      className: "pointer-events-auto mx-auto w-full max-w-[406px] bg-white rounded-full border border-border px-2 py-1.5 flex items-center justify-between",
+      style: { boxShadow: "0 10px 30px rgba(4, 9, 30, 0.18)" },
+      children: [leftTabs[0], leftTabs[1], fab, rightTabs[0], rightTabs[1]]
     })
-  })
+  });
 }
 
 export function dk() {

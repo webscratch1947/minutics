@@ -596,7 +596,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
   // Delete activity handler
   const handleDelete = (e) => {
     e.stopPropagation();
-    if (confirm(`Remove "${activity.name}"? It'll stop appearing in your activity list, but your tracked time for it stays in your Journal.`)) {
+    if (confirm(`Remove "${activity.name}"? It'll stop appearing in your activity list — your tracked time for it is kept.`)) {
       deleteActivity.mutate({ id: activity.id }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: activitiesKey() }); // activities
@@ -1396,7 +1396,7 @@ function LifeProgressCard({ profile }) {
   deathDate.setFullYear(deathDate.getFullYear() + (profile.lifespanYears || 80));
   const retirementDateStr = deathDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const circumference = 2 * Math.PI * 36;
+  const circumference = 2 * Math.PI * 44;
   const offset = circumference - (percentLived / 100) * circumference;
 
   const h = new Date().getHours();
@@ -1425,45 +1425,56 @@ function LifeProgressCard({ profile }) {
   return jsxs('div', {
     className: 'mx-4 mt-3 flex flex-col gap-3',
     children: [
-      // Top card: greeting + ring
+      // Top card: greeting + big clock dial (hero)
       jsxs('div', {
-        className: 'flex items-start justify-between gap-3 bg-background border border-border rounded-2xl p-4',
+        className: 'bg-background border border-border rounded-2xl p-4 flex flex-col items-center',
         children: [
           jsxs('div', {
-            className: 'flex-1 min-w-0',
+            className: 'w-full flex items-baseline justify-between gap-3',
             children: [
-              jsx('p', { className: 'text-sm font-semibold text-foreground/55 mb-1', children: greeting + ',' }),
-              jsxs('h2', { className: 'text-[26px] font-black text-primary mb-2 truncate max-w-full', children: [profile.name, ' \u2728'] }),
-              jsx('p', { className: 'text-[13px] leading-relaxed text-foreground/60', children: 'Make today count. Your future is built by what you do now. \uD83D\uDC9B' })
+              jsx('p', { className: 'text-sm font-semibold text-foreground/55', children: greeting + ',' }),
+              jsx('p', { className: 'text-[10px] font-extrabold tracking-widest text-foreground/40', children: 'LIFE PROGRESS' })
             ]
           }),
+          jsx('h2', { className: 'w-full text-[26px] font-black text-primary truncate max-w-full mt-0.5 mb-1', children: profile.name }),
           jsxs('div', {
-            className: 'flex-shrink-0 flex flex-col items-center bg-white border border-border rounded-[14px] px-3 py-2.5',
+            className: 'relative w-[150px] h-[150px] flex items-center justify-center my-1',
             children: [
-              jsx('p', { className: 'text-[9px] font-extrabold tracking-widest text-foreground/40 mb-1', children: 'LIFE PROGRESS' }),
-              jsxs('div', {
-                className: 'relative w-[88px] h-[88px] flex items-center justify-center',
-                children: [
-                  jsx('svg', {
-                    width: 88, height: 88, viewBox: '0 0 100 100',
-                    className: 'block',
-                    style: { transform: 'rotate(-90deg)' },
-                    children: jsxs(Fragment, {
-                      children: [
-                        jsx('circle', { cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--border))', strokeWidth: 8 }),
-                        jsx('circle', { cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--accent))', strokeWidth: 8, strokeLinecap: 'round', strokeDasharray: circumference, strokeDashoffset: offset, style: { transition: 'stroke-dashoffset 0.4s ease' } })
-                      ]
+              jsx('svg', {
+                width: 150, height: 150, viewBox: '0 0 100 100',
+                className: 'block',
+                children: jsxs(Fragment, {
+                  children: [
+                    jsx('circle', { key: 'track', cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--border))', strokeWidth: 7 }),
+                    jsx('circle', { key: 'arc', cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--accent))', strokeWidth: 7, strokeLinecap: 'round', strokeDasharray: circumference, strokeDashoffset: offset, transform: 'rotate(-90 50 50)', style: { transition: 'stroke-dashoffset 0.4s ease' } }),
+                    Array.from({ length: 60 }, (_, i) => {
+                      const rad = (i * 6 - 90) * Math.PI / 180;
+                      const major = i % 5 === 0;
+                      const inner = major ? 34.5 : 37;
+                      const outer = 40;
+                      const lit = (i / 60) * 100 <= percentLived;
+                      return jsx('line', {
+                        key: 't' + i,
+                        x1: 50 + inner * Math.cos(rad), y1: 50 + inner * Math.sin(rad),
+                        x2: 50 + outer * Math.cos(rad), y2: 50 + outer * Math.sin(rad),
+                        stroke: lit ? 'hsl(var(--accent))' : 'hsl(var(--border))',
+                        strokeWidth: major ? 1.8 : 1,
+                        strokeLinecap: 'round'
+                      }, 't' + i);
                     })
-                  }),
-                  jsx('div', {
-                    className: 'absolute inset-0 flex items-center justify-center',
-                    children: jsx('span', { className: 'text-[19px] font-black text-primary', children: Math.round(percentLived) + '%' })
-                  })
-                ]
+                  ]
+                })
               }),
-              jsx('p', { className: 'text-[9px] font-semibold text-foreground/45 mt-1', children: 'of your life lived' })
+              jsxs('div', {
+                className: 'absolute inset-0 flex flex-col items-center justify-center',
+                children: [
+                  jsx('span', { className: 'text-[32px] font-black text-primary leading-none tabular-nums', children: Math.round(percentLived) + '%' }),
+                  jsx('span', { className: 'text-[8px] font-extrabold tracking-[0.1em] text-foreground/45 mt-1.5', children: 'OF LIFE LIVED' })
+                ]
+              })
             ]
-          })
+          }),
+          jsx('p', { className: 'text-[13px] leading-relaxed text-foreground/60 mt-2 text-center', children: 'Make today count. Your future is built by what you do now.' })
         ]
       }),
       // Compact countdown card
@@ -1485,7 +1496,7 @@ function LifeProgressCard({ profile }) {
           }),
           retirementDateStr && jsxs('p', {
             className: 'text-[11px] font-semibold text-white/60 mb-3',
-            children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-[#FDE68A]', children: retirementDateStr })]
+            children: ['Retirement date: ', jsx('span', { className: 'text-[#FDE68A]', children: retirementDateStr })]
           }),
           jsxs('div', {
             className: 'grid grid-cols-5 gap-2',
@@ -1598,36 +1609,60 @@ function TodayGlance({ activities, blocks }) {
     return rem > 0 ? h + 'h ' + rem + 'm' : h + 'h';
   };
 
-  const colors = ['#FEF3C7', '#EDE9FE', '#FEE2E2', '#DCFCE7'];
+  const palette = ['#4F46E5', '#0EA5E9', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444'];
 
   return jsxs('div', {
     className: 'mx-4 mt-3',
     children: [
-      jsx('p', {
-        className: 'text-[18px] font-black text-foreground mb-2.5',
-        children: 'Today at a Glance'
+      jsxs('div', {
+        className: 'flex items-center justify-between mb-2.5',
+        children: [
+          jsx('p', {
+            className: 'text-[18px] font-black text-foreground',
+            children: 'Today at a Glance'
+          }),
+          jsx('span', {
+            className: 'text-[11px] font-extrabold text-foreground/45 tabular-nums',
+            children: formatMins(totalMinutes) + ' tracked'
+          })
+        ]
       }),
       jsx('div', {
-        className: 'grid gap-2',
-        style: { gridTemplateColumns: 'repeat(' + display.length + ', 1fr)' },
+        className: 'flex flex-col gap-2',
         children: display.map((a, i) => {
           const pct = totalMinutes > 0 ? Math.round((a.minutes / totalMinutes) * 100) : 0;
+          const color = a.color && /^#|hsl|rgb/i.test(a.color) ? a.color : palette[i % palette.length];
+          const letter = (a.name || '?').trim().charAt(0).toUpperCase();
           return jsxs('div', {
-            className: 'rounded-xl p-2 flex flex-col items-center gap-0.5 min-w-0 overflow-hidden',
-            style: { background: colors[i % colors.length] },
+            className: 'flex items-center gap-3 bg-background border border-border rounded-xl px-3 py-2.5',
             children: [
-              jsx('span', { className: 'text-lg leading-none', children: a.emoji || '\uD83C\uDFB3' }),
-              jsx('span', { className: 'text-[11px] font-extrabold text-foreground leading-tight whitespace-nowrap', children: formatMins(a.minutes) }),
-              jsx('span', {
-                className: 'text-[8px] text-foreground/60 text-center w-full truncate leading-tight',
-                children: a.name
-              }),
               jsx('div', {
-                className: 'w-full h-[3px] rounded-full bg-black/10 overflow-hidden mt-0.5',
-                children: jsx('div', {
-                  className: 'h-full rounded-full',
-                  style: { width: pct + '%', background: 'hsl(var(--primary))' }
-                })
+                className: 'w-9 h-9 rounded-full flex items-center justify-center text-white text-[15px] font-black shrink-0',
+                style: { background: color },
+                children: letter
+              }),
+              jsxs('div', {
+                className: 'flex-1 min-w-0',
+                children: [
+                  jsxs('div', {
+                    className: 'flex items-baseline justify-between gap-2',
+                    children: [
+                      jsx('span', { className: 'text-[13px] font-bold text-foreground truncate', children: a.name }),
+                      jsx('span', { className: 'text-[13px] font-black text-foreground tabular-nums shrink-0', children: formatMins(a.minutes) })
+                    ]
+                  }),
+                  jsx('div', {
+                    className: 'h-1.5 w-full rounded-full bg-border overflow-hidden mt-1.5',
+                    children: jsx('div', {
+                      className: 'h-full rounded-full',
+                      style: { width: pct + '%', background: color, transition: 'width .4s ease' }
+                    })
+                  })
+                ]
+              }),
+              jsx('span', {
+                className: 'text-[11px] font-extrabold text-foreground/45 tabular-nums shrink-0 w-[34px] text-right',
+                children: pct + '%'
               })
             ]
           }, a.id);
@@ -1704,7 +1739,7 @@ function EatTheFrog() {
   return jsxs('div', {
     className: 'mx-4 mt-3 p-4 border border-border rounded-2xl bg-background',
     children: [
-      jsx('p', { className: 'text-[15px] font-extrabold text-foreground flex items-center gap-1.5', children: ['\uD83D\uDC38 Eat the Frog'] }),
+      jsx('p', { className: 'text-[15px] font-extrabold text-foreground flex items-center gap-1.5', children: 'Eat the Frog' }),
       jsx('p', { className: 'text-xs text-foreground/65 mt-0.5 mb-3', children: starred.length > 0 ? starred.length + ' most important task' + (starred.length !== 1 ? 's' : '') + ' today' : 'Add your most important tasks' }),
       slots.map((task, i) =>
         jsx(FrogSlot, {

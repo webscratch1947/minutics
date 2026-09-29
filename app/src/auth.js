@@ -545,7 +545,7 @@ function renderGate(mode) {
             '<span id="lt-auth-submit-label">' + (isSignup ? "Sign up" : "Login") + '</span>' +
           '</button>' +
         '</form>' +
-        '<p class="lt-auth-disclaimer"><b>Please note:</b> your data (activities, budget, tasks, journal) is saved only on this device — it never leaves your phone. If you log in on another device, you\u2019ll start fresh there; your data won\u2019t carry over. We don\u2019t store your data on our own servers because we respect your privacy.</p>' +
+        '<p class="lt-auth-disclaimer"><b>Please note:</b> your data (activities, budget, tasks) is saved only on this device — it never leaves your phone. If you log in on another device, you\u2019ll start fresh there; your data won\u2019t carry over. We don\u2019t store your data on our own servers because we respect your privacy.</p>' +
       '</section>' +
     '</main>';
   document.body.appendChild(gate);

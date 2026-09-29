@@ -7555,6 +7555,15 @@
        longer needed since React owns route-based visibility. */
     killHighlighting();
     runEnhancements();
+    /* React Router swapped screens (nav tap) → run the pass right now. The
+       MutationObserver path above is throttled to one run per 500ms, so a
+       fast tab switch right after another one dropped the new screen's
+       pass entirely and painted the previous screen's injected UI for up
+       to the next poll. RouteWatcher in _slice_shell.js dispatches this on
+       every pathname change. */
+    window.addEventListener("lt-route-change", function () {
+      runEnhancementsImmediate();
+    });
     setTimeout(maybeShowOverlayPermissionModal, 1200);
     /* Guard against a feedback loop: runEnhancements() itself writes to the
        DOM (restyled nav, replaced currency text, etc.), some of which is

@@ -352,7 +352,7 @@ export function SettingsScreen() {
   function handleDeleteAccount() {
     var u = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
     if (!u || !u.uid) { alert("No account is signed in."); return; }
-    if (!confirm("Delete your account permanently?\n\n• Your account is deleted from Firebase — you can never log in with it again\n• ALL data for this account is erased on this device: activities, budget, tasks, journal, profile AND your subscription plan\n\nThis cannot be undone.")) return;
+    if (!confirm("Delete your account permanently?\n\n• Your account is deleted from Firebase — you can never log in with it again\n• ALL data for this account is erased from this device: activities, budget, tasks, profile AND your subscription plan\n\nThis cannot be undone.")) return;
     if (!confirm("Last confirmation: delete this account and everything in it?")) return;
 
     var origin = (window.LTAuth && window.LTAuth.apiOrigin) ? window.LTAuth.apiOrigin() : "";

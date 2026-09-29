@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getProfile } from '../lib/profile.js';
 import { HC } from './AndroidBridge.js';
 import { ak, dk } from '../_slice_shell.js';
 import { mk } from '../_slice_onboarding.js';
 import { TimerScreen, ActivityScreen } from '../screens/Home.js';
 import { LifeHubScreen } from '../screens/LifeHub.js';
-import { JournalScreen } from '../screens/Journal.js';
 import { SettingsScreen } from '../screens/Settings.js';
 
 const queryClient = new QueryClient({
@@ -30,7 +29,7 @@ function AuthenticatedApp({ profile }) {
             jsx(Route, { path: '/', element: jsx(TimerScreen, { profile }) }),
             jsx(Route, { path: '/activity', element: jsx(ActivityScreen, { profile }) }),
             jsx(Route, { path: '/timeline', element: jsx(LifeHubScreen, { profile }) }),
-            jsx(Route, { path: '/journal', element: jsx(JournalScreen, {}) }),
+            jsx(Route, { path: '/journal', element: jsx(Navigate, { to: '/', replace: true }) }),
             jsx(Route, { path: '/settings', element: jsx(SettingsScreen, {}) }),
             jsx(Route, { path: '*', element: jsx(dk, {}) })
           ]
