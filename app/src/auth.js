@@ -420,9 +420,11 @@ function injectStyles() {
       width: 94px; height: 94px; border-radius: 50%; background: #fff;
       display: flex; align-items: center; justify-content: center;
       box-shadow: 0 20px 44px -16px rgba(20,22,46,.5);
-      animation: lt-auth-rise .6s cubic-bezier(.22,1,.36,1) .12s backwards;
+      /* no entrance animation: the rise keyframes overrode the badge's
+         translateX(-50%) centering, so it rendered off-center and then
+         snapped into place when the animation ended. Static = correct. */
     }
-    .lt-auth-mark { width: 52px; height: 52px; display: block; }
+    .lt-auth-badge-logo { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; display: block; }
     .lt-auth-wtext { text-align: center; padding: 78px 30px 0; }
     .lt-auth-wtitle { font-size: clamp(33px, 9vw, 40px); font-weight: 800; letter-spacing: -.03em; color: #14162E; margin: 0; }
     .lt-auth-wsub { font-size: 15.5px; line-height: 1.55; color: #6B7280; margin: 13px auto 0; max-width: 320px; }
@@ -513,8 +515,8 @@ function renderGate(mode) {
     '<div class="lt-auth-darkbg" aria-hidden="true"></div>' +
     '<main class="lt-auth-scr">' +
       '<button type="button" class="lt-auth-back" id="lt-auth-back-btn" aria-label="Back">' + BACK_ICON + '</button>' +
-      '<h1 class="lt-auth-h1">Go ahead and set up your account</h1>' +
-      '<p class="lt-auth-sub2">Sign in or create an account to continue your Minutics journey</p>' +
+      '<h1 class="lt-auth-h1" id="lt-auth-h1">' + (isSignup ? "Go ahead and create your account" : "Welcome back to Minutics") + '</h1>' +
+      '<p class="lt-auth-sub2" id="lt-auth-sub2">' + (isSignup ? "Sign up in seconds and start owning every minute" : "Log in to continue your Minutics journey") + '</p>' +
       '<section class="lt-auth-card">' +
         '<div class="lt-auth-error" id="lt-auth-error"></div>' +
         '<div class="lt-auth-tabs" data-active="' + (isSignup ? "signup" : "login") + '">' +
@@ -536,8 +538,8 @@ function renderGate(mode) {
             '</div>' +
             '<button type="button" class="lt-auth-pw-toggle" id="lt-auth-pw-toggle" aria-label="Show password">' + EYE_ICON + '</button>' +
           '</div>' +
-          (isSignup ? '<p class="lt-auth-hint" id="lt-auth-pw-hint">Password must be at least 6 characters</p>' : "") +
-          (isSignup ? "" : '<div class="lt-auth-frow"><a class="lt-auth-forgot" id="lt-auth-forgot-link">Forgot Password?</a></div>') +
+          '<p class="lt-auth-hint" id="lt-auth-pw-hint" style="display:' + (isSignup ? "block" : "none") + '">Password must be at least 6 characters</p>' +
+          '<div class="lt-auth-frow" id="lt-auth-frow" style="display:' + (isSignup ? "none" : "flex") + '"><a class="lt-auth-forgot" id="lt-auth-forgot-link">Forgot Password?</a></div>' +
           '<button class="lt-auth-submit" type="submit" id="lt-auth-submit">' +
             '<span class="lt-auth-spinner"></span>' +
             '<span id="lt-auth-submit-label">' + (isSignup ? "Sign up" : "Login") + '</span>' +
@@ -553,16 +555,30 @@ function renderGate(mode) {
     saveDraft();
     renderGate("welcome");
   });
-  document.getElementById("lt-auth-tab-login").addEventListener("click", function () {
-    if (!isSignup) return;
-    saveDraft();
-    renderGate("login");
-  });
-  document.getElementById("lt-auth-tab-signup").addEventListener("click", function () {
-    if (isSignup) return;
-    saveDraft();
-    renderGate("signup");
-  });
+  /* Tab switch happens IN PLACE — never re-render the gate (the full
+     re-render made the card/heading disappear and reappear with the rise
+     animation replaying). Values stay because nothing is recreated. */
+  var tabLogin = document.getElementById("lt-auth-tab-login");
+  var tabSignup = document.getElementById("lt-auth-tab-signup");
+  function switchTab(toSignup) {
+    if (isSignup === toSignup) return;
+    isSignup = toSignup;
+    document.querySelector("#lt-auth-gate .lt-auth-tabs").dataset.active = toSignup ? "signup" : "login";
+    tabLogin.classList.toggle("lt-auth-tab-on", !toSignup);
+    tabSignup.classList.toggle("lt-auth-tab-on", toSignup);
+    document.getElementById("lt-auth-h1").textContent =
+      toSignup ? "Go ahead and create your account" : "Welcome back to Minutics";
+    document.getElementById("lt-auth-sub2").textContent =
+      toSignup ? "Sign up in seconds and start owning every minute" : "Log in to continue your Minutics journey";
+    document.getElementById("lt-auth-password").autocomplete =
+      toSignup ? "new-password" : "current-password";
+    document.getElementById("lt-auth-pw-hint").style.display = toSignup ? "block" : "none";
+    document.getElementById("lt-auth-frow").style.display = toSignup ? "none" : "flex";
+    submitLabel.textContent = toSignup ? "Sign up" : "Login";
+    hideError();
+  }
+  tabLogin.addEventListener("click", function () { switchTab(false); });
+  tabSignup.addEventListener("click", function () { switchTab(true); });
 
   var pwInput = document.getElementById("lt-auth-password");
   var pwToggle = document.getElementById("lt-auth-pw-toggle");
@@ -622,14 +638,8 @@ function renderWelcomeGate() {
   var existing = document.getElementById("lt-auth-gate");
   if (existing) existing.remove();
 
-  var MARK_SVG = '<svg class="lt-auth-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">' +
-    '<defs><linearGradient id="lt-auth-mark-g" x1="0" y1="0" x2="1" y2="1">' +
-    '<stop offset="0" stop-color="#6366F1"/><stop offset="1" stop-color="#9333EA"/></linearGradient></defs>' +
-    '<rect x="1" y="1" width="30" height="30" rx="9.5" fill="url(#lt-auth-mark-g)"/>' +
-    '<circle cx="16" cy="16" r="8.5" stroke="#fff" stroke-width="2.2" opacity=".95"/>' +
-    '<path d="M16 11.2V16l3.6 2.1" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>' +
-    '</svg>';
   var ARROW_ICON = '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  try { var pre = new Image(); pre.src = "./assets/icons/logo-512.png"; } catch {}
 
   var STAR_PTS = [
     [18,62,1.3,.75],[52,30,.9,.45],[88,96,1.5,.85],[122,46,1,.55],[150,124,1.2,.65],
@@ -653,7 +663,7 @@ function renderWelcomeGate() {
         '<div class="lt-auth-hero">' +
           '<svg class="lt-auth-stars" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + stars + '</svg>' +
         '</div>' +
-        '<div class="lt-auth-badge">' + MARK_SVG + '</div>' +
+        '<div class="lt-auth-badge"><img class="lt-auth-badge-logo" src="./assets/icons/logo-512.png" alt="Minutics logo"></div>' +
       '</div>' +
       '<div class="lt-auth-wtext">' +
         '<h1 class="lt-auth-wtitle">Minutics</h1>' +

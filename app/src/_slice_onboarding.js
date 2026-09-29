@@ -109,19 +109,19 @@ export function mk({
     loader.style.cssText = "position:fixed;inset:0;z-index:2147483647;" +
       "display:flex;flex-direction:column;align-items:center;justify-content:flex-end;" +
       "padding-bottom:26vh;gap:13px;transition:opacity .5s ease;opacity:1;";
-    loader.style.backgroundColor = "#0b0620";
+    loader.style.backgroundColor = "#EEF1F7";
     loader.style.backgroundImage = "url('./assets/onboarding/setup-robot.png')," +
-      "radial-gradient(130% 95% at 50% 18%, #34206b 0%, #1a0f3f 45%, #0b0620 100%)";
+      "radial-gradient(130% 95% at 50% 18%, #FFFFFF 0%, #E9EDF5 55%, #DCE2EE 100%)";
     loader.style.backgroundSize = "cover, cover";
-    loader.style.backgroundPosition = "center 32%, center";
+    loader.style.backgroundPosition = "center 35%, center";
     loader.style.backgroundRepeat = "no-repeat, no-repeat";
     loader.innerHTML =
       '<div class="lt-setup-dots"><span></span><span></span><span></span></div>' +
-      '<p style="color:rgba(255,255,255,.88);font-size:15px;font-weight:600;margin:0;font-family:inherit;text-shadow:0 2px 10px rgba(0,0,0,.55)">Setting up your app...</p>' +
+      '<p style="color:#3B4252;font-size:15px;font-weight:600;margin:0;font-family:inherit;text-shadow:0 1px 6px rgba(255,255,255,.85)">Setting up your app...</p>' +
       '<style>' +
       '@keyframes lt-setup-dot{0%,80%,100%{transform:translateY(0);opacity:.45}40%{transform:translateY(-8px);opacity:1}}' +
       '.lt-setup-dots{display:flex;gap:9px;align-items:center;justify-content:center}' +
-      '.lt-setup-dots span{width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 0 10px rgba(255,255,255,.5);animation:lt-setup-dot 1.1s ease-in-out infinite}' +
+      '.lt-setup-dots span{width:11px;height:11px;border-radius:50%;background:#4F46E5;box-shadow:0 0 10px rgba(79,70,229,.45);animation:lt-setup-dot 1.1s ease-in-out infinite}' +
       '.lt-setup-dots span:nth-child(2){animation-delay:.15s}' +
       '.lt-setup-dots span:nth-child(3){animation-delay:.3s}' +
       '</style>';
