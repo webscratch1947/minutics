@@ -46,4 +46,22 @@ console.log("MAIN.JS: React render called");
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/firebase-messaging-sw.js").catch(function () {});
+  /* Legacy cleanup: older builds registered extra workers (sw.js,
+     minutics-alerts-sw.js) that could keep stale app shells around and
+     flash old UI. Keep only the messaging worker and drop any Cache
+     Storage left behind by retired workers. */
+  navigator.serviceWorker.getRegistrations().then(function (regs) {
+    regs.forEach(function (r) {
+      try {
+        var s = r.active || r.installing || r.waiting;
+        var u = (s && s.scriptURL) || "";
+        if (u.indexOf("firebase-messaging-sw.js") === -1) r.unregister();
+      } catch (e) {}
+    });
+  }).catch(function () {});
+  if (window.caches && caches.keys) {
+    caches.keys().then(function (ks) {
+      ks.forEach(function (k) { caches.delete(k).catch(function () {}); });
+    }).catch(function () {});
+  }
 }

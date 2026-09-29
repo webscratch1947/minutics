@@ -556,8 +556,8 @@ export function SettingsScreen() {
         ]
       }),
 
-      /* ─── Data (Download / Load) ─── */
-      jsxs("div", {
+      /* ─── Data (Download / Load) — paid plans only, hidden entirely on free ─── */
+      isPro && jsxs("div", {
         className: "mx-4",
         children: [
           jsx(SectionHeader, { children: "Data" }),
@@ -566,7 +566,7 @@ export function SettingsScreen() {
               children: [
                 jsx(CardRow, {
                   label: "Download Data",
-                  desc: isPro ? "Save your complete Minutics data to a file" : "Available with a paid plan",
+                  desc: "Save your complete Minutics data to a file",
                   children: jsx("button", {
                     onClick: handleDownloadData,
                     className: "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/20 transition",
@@ -576,7 +576,7 @@ export function SettingsScreen() {
                 jsx(Divider, {}),
                 jsx(CardRow, {
                   label: "Load Data",
-                  desc: isPro ? "Restore a backup file — everything, same to same" : "Available with a paid plan",
+                  desc: "Restore a backup file — everything, same to same",
                   children: jsx("button", {
                     onClick: handleLoadData,
                     className: "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/20 transition",

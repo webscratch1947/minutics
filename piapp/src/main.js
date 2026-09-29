@@ -46,4 +46,20 @@ console.log("MAIN.JS: React render called");
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(function () {});
+  /* Legacy cleanup: drop retired workers (minutics-alerts-sw) and any
+     Cache Storage they left behind; keep our ./sw.js notification worker. */
+  navigator.serviceWorker.getRegistrations().then(function (regs) {
+    regs.forEach(function (r) {
+      try {
+        var s = r.active || r.installing || r.waiting;
+        var u = (s && s.scriptURL) || "";
+        if (u.indexOf("minutics-alerts-sw.js") !== -1) r.unregister();
+      } catch (e) {}
+    });
+  }).catch(function () {});
+  if (window.caches && caches.keys) {
+    caches.keys().then(function (ks) {
+      ks.forEach(function (k) { caches.delete(k).catch(function () {}); });
+    }).catch(function () {});
+  }
 }

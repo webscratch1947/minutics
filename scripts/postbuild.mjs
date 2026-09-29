@@ -71,8 +71,8 @@ if (target === "piapp") {
   copy(join(projectRoot, 'app', 'robots.txt'), join(appOutDir, 'robots.txt'));
   copy(join(projectRoot, 'app', 'life_hub_banner.png'), join(appOutDir, 'life_hub_banner.png'));
 
-  // Service workers must live at the site root (scope = /), not inside /app/
-  copy(join(appOutDir, 'sw.js'), join(outDir, 'sw.js'));
+  // Service workers must live at the site root (scope = /), not inside /app/.
+  // (Legacy sw.js copy removed — only firebase-messaging-sw.js is registered.)
   copy(join(appOutDir, 'firebase-messaging-sw.js'), join(outDir, 'firebase-messaging-sw.js'));
 
   console.log('[postbuild] Normal app postbuild complete');

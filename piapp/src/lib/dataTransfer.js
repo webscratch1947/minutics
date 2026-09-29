@@ -22,6 +22,9 @@
 import { isPro } from "./settings.js";
 
 var PLAN_KEYS = ["lt_plan_v1", "lt_plan_since_v1", "lt_plan_grace_v1", "lt_downgrade_at_v1"];
+/* Identity data never travels in a file: name (and email — which only ever
+   lives in Firebase auth) come from login/register on the target device. */
+var IDENTITY_KEYS = ["lifetime_profile"];
 var FREE_ACTIVITY_LIMIT = 5;
 var FREE_STARRED_LIMIT = 3;
 
@@ -31,6 +34,9 @@ function isSessionKey(k) {
 function isPlanKey(k) {
   return PLAN_KEYS.indexOf(k) !== -1;
 }
+function isIdentityKey(k) {
+  return IDENTITY_KEYS.indexOf(k) !== -1;
+}
 function parseJson(str) {
   try { return JSON.parse(str); } catch (e) { return null; }
 }
@@ -39,12 +45,14 @@ function nonEmptyStored(v) {
   if (v && typeof v === "object") return Object.keys(v).length > 0;
   return v !== null && v !== undefined && v !== "" && v !== false;
 }
-/* Plan keys must not survive inside lt_ns_* account snapshots (a hand-
-   edited file could otherwise smuggle lt_plan_v1 through a nested blob). */
+/* Plan keys and identity (profile name/email) must not survive inside
+   lt_ns_* account snapshots — a hand-edited file could otherwise smuggle
+   them through a nested blob. */
 function stripPlanKeysInSnapshot(str) {
   var obj = parseJson(str);
   if (obj && typeof obj === "object" && !Array.isArray(obj)) {
     for (var i = 0; i < PLAN_KEYS.length; i++) delete obj[PLAN_KEYS[i]];
+    for (var j = 0; j < IDENTITY_KEYS.length; j++) delete obj[IDENTITY_KEYS[j]];
     return JSON.stringify(obj);
   }
   return str;
@@ -55,7 +63,7 @@ export function buildBackup() {
   var data = {};
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
-    if (!k || isSessionKey(k) || isPlanKey(k)) continue;
+    if (!k || isSessionKey(k) || isPlanKey(k) || isIdentityKey(k)) continue;
     var v = localStorage.getItem(k);
     if (k.indexOf("lt_ns_") === 0) v = stripPlanKeysInSnapshot(v);
     data[k] = v;
@@ -111,7 +119,7 @@ function applyData(data) {
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
     if (!k) continue;
-    if (isSessionKey(k) || isPlanKey(k) || k.indexOf("lt_ns_") === 0) continue;
+    if (isSessionKey(k) || isPlanKey(k) || isIdentityKey(k) || k.indexOf("lt_ns_") === 0) continue;
     toRemove.push(k);
   }
   for (var r = 0; r < toRemove.length; r++) {
@@ -128,7 +136,7 @@ function applyData(data) {
   var written = 0;
   Object.keys(data).forEach(function (k) {
     var v = data[k];
-    if (k === "lt_active_uid" || isPlanKey(k) || k.indexOf("firebase:") === 0) return;
+    if (k === "lt_active_uid" || isPlanKey(k) || isIdentityKey(k) || k.indexOf("firebase:") === 0) return;
     if (v === null || v === undefined) return;
     if (typeof v !== "string") { try { v = JSON.stringify(v); } catch (e) { return; } }
     if (k.indexOf("lt_ns_") === 0) v = stripPlanKeysInSnapshot(v);
