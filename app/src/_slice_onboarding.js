@@ -99,8 +99,8 @@ export function mk({
     killSwitch.textContent = "body.lt-authed #root{display:none!important}";
     (document.head || document.documentElement).appendChild(killSwitch);
 
-    /* Phase 1: robot artwork (shipped) + 3-dot loading indicator
-       positioned below the robot, above the planet. Background set with
+    /* Phase 1: looping idle-animation video + boot-accurate progress bar.
+       Background set with
        LONGHAND properties â€” the old single-line `background:` shorthand
        silently failed to parse in some engines and left the loader
        transparent (you saw the bare cream page instead of space). */
@@ -110,22 +110,54 @@ export function mk({
       "display:flex;flex-direction:column;align-items:center;justify-content:flex-end;" +
       "padding-bottom:26vh;gap:13px;transition:opacity .5s ease;opacity:1;";
     loader.style.backgroundColor = "#EEF1F7";
+    /* Static art stays behind the video (also its poster): if the video
+       fails to decode we show the artwork, never a blank screen. */
     loader.style.backgroundImage = "url('./assets/onboarding/setup-robot.png')," +
       "radial-gradient(130% 95% at 50% 18%, #FFFFFF 0%, #E9EDF5 55%, #DCE2EE 100%)";
     loader.style.backgroundSize = "cover, cover";
     loader.style.backgroundPosition = "center 35%, center";
     loader.style.backgroundRepeat = "no-repeat, no-repeat";
     loader.innerHTML =
-      '<div class="lt-setup-dots"><span></span><span></span><span></span></div>' +
-      '<p style="color:#3B4252;font-size:15px;font-weight:600;margin:0;font-family:inherit;text-shadow:0 1px 6px rgba(255,255,255,.85)">Setting up your app...</p>' +
+      '<video class="lt-setup-video" src="./assets/onboarding/setup-anim.mp4" poster="./assets/onboarding/setup-robot.png" muted loop autoplay playsinline preload="auto"></video>' +
+      '<p style="color:#3B4252;font-size:15px;font-weight:600;margin:0;font-family:inherit;text-shadow:0 1px 6px rgba(255,255,255,.85);position:relative">Setting up your app...</p>' +
+      '<div class="lt-setup-bar" style="position:relative"><span class="lt-setup-bar-fill"></span></div>' +
       '<style>' +
-      '@keyframes lt-setup-dot{0%,80%,100%{transform:translateY(0);opacity:.45}40%{transform:translateY(-8px);opacity:1}}' +
-      '.lt-setup-dots{display:flex;gap:9px;align-items:center;justify-content:center}' +
-      '.lt-setup-dots span{width:11px;height:11px;border-radius:50%;background:#4F46E5;box-shadow:0 0 10px rgba(79,70,229,.45);animation:lt-setup-dot 1.1s ease-in-out infinite}' +
-      '.lt-setup-dots span:nth-child(2){animation-delay:.15s}' +
-      '.lt-setup-dots span:nth-child(3){animation-delay:.3s}' +
+      '.lt-setup-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}' +
+      '.lt-setup-bar{width:min(240px,64vw);height:7px;border-radius:99px;background:rgba(17,24,39,.12);overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.07)}' +
+      '.lt-setup-bar-fill{position:absolute;left:0;top:0;width:0%;height:100%;border-radius:99px;background:linear-gradient(90deg,#4F46E5,#7C3AED);transition:width .15s linear;box-shadow:0 0 8px rgba(79,70,229,.45)}' +
       '</style>';
+    var vid = loader.querySelector("video");
+    if (vid) {
+      vid.muted = true;
+      vid.defaultMuted = true;
+      try { var pl = vid.play(); if (pl && pl.catch) pl.catch(function () {}); } catch {}
+      vid.addEventListener("error", function () { vid.style.display = "none"; });
+    }
     (document.body || document.documentElement).appendChild(loader);
+
+    /* Progress bar — mapped to the REAL boot timeline so it is exact every
+       time: 0→55% across the fixed 3s pre-render phase, creeping to 95%
+       while waiting for React + enhancements, then forced to exactly 100%
+       the moment loading is done. The loader does not begin fading until
+       the bar is full, so it can never stall at 99% or "finish" at 90%. */
+    var fill = loader.querySelector(".lt-setup-bar-fill");
+    var barDone = false;
+    var barT0 = (window.performance && performance.now()) || 0;
+    (function barTick(now) {
+      if (barDone || !fill) return;
+      var el = (now || 0) - barT0;
+      var p = el < 3000
+        ? (el / 3000) * 55
+        : 55 + 40 * (1 - Math.exp(-(el - 3000) / 4500));
+      fill.style.width = p.toFixed(2) + "%";
+      requestAnimationFrame(barTick);
+    })(barT0);
+    function finishBar() {
+      if (barDone || !fill) return;
+      barDone = true;
+      fill.style.transition = "width .3s ease-out";
+      fill.style.width = "100%";
+    }
 
     /* Phase 2: render the main app first, but keep this opaque loader over it
        until React and the enhancement pass have settled. This prevents the
@@ -145,12 +177,15 @@ export function mk({
           clearInterval(readyTimer);
           var ks = document.getElementById("lt-root-killswitch");
           if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
-          requestAnimationFrame(function () {
-            loader.style.opacity = "0";
-            setTimeout(function () {
-              if (loader.parentNode) loader.parentNode.removeChild(loader);
-            }, 500);
-          });
+          finishBar(); /* bar reaches exactly 100% here; settle, then fade */
+          setTimeout(function () {
+            requestAnimationFrame(function () {
+              loader.style.opacity = "0";
+              setTimeout(function () {
+                if (loader.parentNode) loader.parentNode.removeChild(loader);
+              }, 500);
+            });
+          }, 420);
         }
       }, 80);
     }, 3000);
