@@ -13,6 +13,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
+import { Alignment, Fit, Layout, Rive } from "@rive-app/canvas";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBXruwmDU9SAX4nAe5_Do-x-5qmi_SFh7E",
@@ -415,6 +416,10 @@ function injectStyles() {
       border-bottom-right-radius: 50% 96px;
     }
     .lt-auth-stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .lt-auth-rive-mascot {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      pointer-events: none;
+    }
     .lt-auth-badge {
       position: absolute; left: 50%; bottom: -46px; transform: translateX(-50%);
       width: 94px; height: 94px; border-radius: 50%; background: #fff;
@@ -465,6 +470,31 @@ function injectStyles() {
 /* Typed email/password survive tab switches and back-navigation (the whole
    gate re-renders on every mode change). Cleared once a user signs in. */
 var _gateDraft = { email: "", pw: "" };
+var _welcomeMascot = null;
+
+function mountWelcomeMascot() {
+  var canvas = document.getElementById("lt-auth-rive-mascot");
+  var stars = document.querySelector("#lt-auth-gate .lt-auth-stars");
+  if (!canvas) return;
+
+  if (stars) stars.style.visibility = "hidden";
+  if (_welcomeMascot) _welcomeMascot.cleanup();
+
+  _welcomeMascot = new Rive({
+    src: "./assets/mascot.riv",
+    canvas: canvas,
+    autoplay: true,
+    layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
+    onLoad: function () {
+      _welcomeMascot.resizeDrawingSurfaceToCanvas();
+    },
+    onLoadError: function () {
+      if (stars) stars.style.visibility = "visible";
+      canvas.remove();
+    }
+  });
+}
+
 function saveDraft() {
   try {
     var e = document.getElementById("lt-auth-email");
@@ -662,6 +692,7 @@ function renderWelcomeGate() {
       '<div class="lt-auth-herowrap">' +
         '<div class="lt-auth-hero">' +
           '<svg class="lt-auth-stars" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + stars + '</svg>' +
+          '<canvas class="lt-auth-rive-mascot" id="lt-auth-rive-mascot" aria-label="Animated Minutics mascot"></canvas>' +
         '</div>' +
         '<div class="lt-auth-badge"><img class="lt-auth-badge-logo" src="./assets/icons/logo-512.png" alt="Minutics logo"></div>' +
       '</div>' +
@@ -675,6 +706,7 @@ function renderWelcomeGate() {
       '</div>' +
     '</main>';
   document.body.appendChild(gate);
+  mountWelcomeMascot();
 
   document.getElementById("lt-auth-get-started").addEventListener("click", function () {
     renderGate("signup");
