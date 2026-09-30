@@ -430,7 +430,7 @@ function injectStyles() {
       /* Sits inside the dome, centred above the white logo badge and never
          touching it (18px gap) — the badge owns the curve. */
       position: absolute; left: 50%; bottom: 66px; transform: translateX(-50%);
-      width: 132px; height: 157px; pointer-events: none;
+      width: 180px; height: 214px; pointer-events: none;
       filter: drop-shadow(0 22px 30px rgba(20,22,46,.45));
       /* Hidden until the first real artboard frame lands — while the
          wasm/artboard is still loading the runtime paints an opaque black
@@ -467,6 +467,9 @@ function injectStyles() {
 
     @media (max-height: 680px) {
       .lt-auth-hero { height: 260px; }
+      /* Short dome: shrink just enough that the bigger mascot still clears
+         the top of the curve (260 - 66 bottom - 178 = 16px headroom). */
+      .lt-auth-mascot { width: 150px; height: 178px; }
       .lt-auth-wtext { padding-top: 100px; }
       .lt-auth-scr { padding-top: 34px; }
     }
