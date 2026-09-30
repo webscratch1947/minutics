@@ -2,7 +2,7 @@ import { jsx, jsxs } from 'react/jsx-runtime';
 import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getProfile } from './lib/profile.js';
-import { LayoutGrid, ListTodo, Settings, Timer } from 'lucide-react';
+import { BookOpen, LayoutGrid, ListTodo, Settings, Timer } from 'lucide-react';
 import { cn } from './lib/cn.js';
 import { useBlocks } from './hooks/useBlocks.js';
 import { useActivities } from './hooks/useActivities.js';
@@ -117,45 +117,23 @@ const uk = [{
   icon: ListTodo,
   label: "Activity"
 }, {
+  href: "/timeline",
+  icon: LayoutGrid,
+  label: "Life Hub"
+}, {
+  href: "/journal",
+  icon: BookOpen,
+  label: "Journal"
+}, {
   href: "/settings",
   icon: Settings,
   label: "Settings"
 }];
 
-/* Floating pill bottom nav — lifted off the screen edge, two tabs left,
-   Life Hub as the elevated centre button, Settings right. Journal lives
-   inside Life Hub (tool tile), not in the nav. */
+/* Floating pill bottom nav — five equal flat tabs, no elevated centre
+   button: Timer, Activity, Life Hub, Journal, Settings. */
 export function ck() {
   const { pathname: e } = useLocation();
-  const hubActive = e.startsWith('/timeline');
-
-  const renderTab = ({ href: t, icon: n, label: r }) => {
-    const o = t === "/" ? e === "/" : e.startsWith(t);
-    return jsxs(Link, {
-      to: t,
-      className: cn("flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-full transition-colors text-[10px] font-semibold tracking-wide", o ? "text-primary bg-secondary" : "text-muted-foreground active:text-muted-foreground"),
-      children: [jsx(n, {
-        className: cn("w-[18px] h-[18px]", o && "stroke-[2.5]")
-      }), jsx('span', { className: 'w-full text-center truncate', children: r })]
-    }, t);
-  };
-
-  const leftTabs = uk.slice(0, 2).map(renderTab);
-  const rightTab = renderTab(uk[2]);
-
-  const hub = jsx(Link, {
-    key: 'hub',
-    to: '/timeline',
-    'aria-label': 'Life Hub',
-    className: 'shrink-0 -mt-8 w-[54px] h-[54px] rounded-full flex items-center justify-center text-white border-[3px] border-white',
-    style: {
-      background: 'hsl(var(--primary))',
-      boxShadow: '0 8px 18px rgba(4, 9, 30, 0.35)',
-      outline: hubActive ? '2px solid hsl(var(--accent))' : 'none',
-      outlineOffset: '3px'
-    },
-    children: jsx(LayoutGrid, { className: 'w-6 h-6' })
-  });
 
   return jsx("div", {
     className: "fixed inset-x-0 z-50 px-3",
@@ -166,11 +144,16 @@ export function ck() {
     children: jsx("nav", {
       className: "pointer-events-auto mx-auto w-full max-w-[406px] bg-white rounded-full border border-border px-2 py-1.5 flex items-center",
       style: { boxShadow: "0 10px 30px rgba(4, 9, 30, 0.18)" },
-      children: [
-        jsx("div", { key: 'left', className: 'flex-1 flex items-center', children: leftTabs }),
-        hub,
-        jsx("div", { key: 'right', className: 'flex-1 flex items-center', children: rightTab })
-      ]
+      children: uk.map(({ href: t, icon: n, label: r }) => {
+        const o = t === "/" ? e === "/" : e.startsWith(t);
+        return jsxs(Link, {
+          to: t,
+          className: cn("flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-full transition-colors text-[10px] font-semibold tracking-wide", o ? "text-primary bg-secondary" : "text-muted-foreground active:text-muted-foreground"),
+          children: [jsx(n, {
+            className: cn("w-[18px] h-[18px]", o && "stroke-[2.5]")
+          }), jsx('span', { className: 'w-full text-center truncate', children: r })]
+        }, t);
+      })
     })
   });
 }
