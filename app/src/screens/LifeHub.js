@@ -6,6 +6,7 @@ import { calcRemainingTime } from '../lib/lifeCalc.js';
 import { getCurrency, getCurrencySymbol } from '../lib/currency.js';
 import { isPro } from '../lib/settings.js';
 import { cn } from '../lib/cn.js';
+import { JournalScreen } from './Journal.js';
 import { Play as nk, Pencil as tk } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -14,6 +15,7 @@ import { Play as nk, Pencil as tk } from 'lucide-react';
 
 /** All available tools in the Life Hub */
 var LT_TOOLS = [
+  { id: "journal",     symbol: "\uD83D\uDCD3", label: "Journal",                desc: "Day-by-day history of your time",   category: "time",         locked: false },
   { id: "timevalue",   symbol: "timevalue",  label: "Time Value Calculator",     desc: "Know the value of every minute",          category: "time",         locked: false },
   { id: "budget",      symbol: "\uD83D\uDCB3", label: "Budget Tracker",          desc: "Manage income, expenses and balance",     category: "finance",      locked: true  },
   { id: "emi",         symbol: "\uD83E\uDDEE", label: "EMI Calculator",          desc: "Plan loans and calculate EMI",           category: "finance",      locked: false },
@@ -43,6 +45,7 @@ var LT_FILTERS = [
 // ─── Color Palettes for Tool Tiles ───────────────────────────────────────────
 
 var TOOL_COLORS = {
+  journal:     { bg: "#EDE9FE", fg: "#6D28D9" },
   timevalue:   { bg: "#DBEAFE", fg: "#2563EB" },
   budget:      { bg: "#FEF3C7", fg: "#B45309" },
   emi:         { bg: "#E0E7FF", fg: "#4338CA" },
@@ -272,7 +275,8 @@ export function LifeHubScreen({ profile }) {
             var colors = TOOL_COLORS[t.id] || { bg: "#F3F4F6", fg: "#374151" };
             return jsxs("button", {
               type: "button",
-              "data-lifetime-tool": t.id,
+              onClick: t.id === "journal" ? function (ev) { ev.stopPropagation(); setView("journal"); } : undefined,
+              "data-lifetime-tool": t.id === "journal" ? undefined : t.id,
               "data-lt-category": t.category,
               "data-lt-tile-injected": "1",
               className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_2px_rgba(0,0,0,.04)] gap-2",
@@ -356,6 +360,19 @@ export function LifeHubScreen({ profile }) {
             })
           ]
         })
+      ]
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VIEW: "journal" — Journal (lives here inside Life Hub, not in the nav)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (view === "journal") {
+    return jsxs("div", {
+      className: "flex flex-col bg-background pb-6",
+      children: [
+        Header("Journal", "Day-by-day history of your time."),
+        jsx(JournalScreen, {})
       ]
     });
   }

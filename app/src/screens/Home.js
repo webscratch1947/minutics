@@ -4,7 +4,7 @@ import { jsx, jsxs } from 'react/jsx-runtime';
 
 // App logic
 import { getStore, setStore, nextId, enrichBlocksForRange } from '../lib/storage.js';
-import { calcRemainingTime, calcPercentLived, msToBreakdown } from '../lib/lifeCalc.js';
+import { calcRemainingTime, msToBreakdown } from '../lib/lifeCalc.js';
 import { getRandomColor } from '../lib/constants.js';
 import { blocksKey, activitiesKey, todayStatsKey } from '../lib/queryKeys.js';
 import { useActivities } from '../hooks/useActivities.js';
@@ -20,109 +20,6 @@ import { cn } from '../lib/cn.js';
 
 // Icons
 import { Timer as Ty, CalendarClock as Jb, Clock as Zb, Play as nk, Trash2 as lk, Square as rh, Plus as rk, Pencil as tk } from 'lucide-react';
-
-// ─── LT Timer Panel ─────────────────────────────────────────────────────────
-// Collapsible panel containing the retirement countdown timer.
-// Toggles open/closed with a full-width button.
-
-function LTTimerPanel({ profile }) {
-  return jsx(RetirementCountdown, { profile });
-}
-
-// ─── Retirement Countdown (MC) ─────────────────────────────────────────────
-// Displays remaining life time with 5-column grid (years, days, hours, min, sec).
-// Updates live every 1 second.
-
-function RetirementCountdown({ profile }) {
-  const [remainingMs, setRemainingMs] = useState(() => calcRemainingTime(profile));
-  const percentLived = calcPercentLived(profile);
-
-  useEffect(() => {
-    setRemainingMs(calcRemainingTime(profile));
-    const interval = setInterval(() => setRemainingMs(calcRemainingTime(profile)), 1000);
-    return () => clearInterval(interval);
-  }, [profile]);
-
-  const breakdown = msToBreakdown(remainingMs);
-  const deathDate = new Date(profile.dob);
-  deathDate.setFullYear(deathDate.getFullYear() + (profile.lifespanYears || 80));
-  const retirementDateStr = deathDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-
-  return jsxs('div', {
-    'data-lt-enhancement': 'retirement',
-    className: 'bg-primary text-white px-5 pt-6 pb-5 rounded-2xl mx-4',
-    children: [
-      // Title row with plan badge
-      jsxs('div', {
-        className: 'flex items-center gap-2 mb-4 min-w-0',
-        children: [
-          jsxs('p', {
-            className: 'text-[12px] font-bold text-white m-0 uppercase tracking-wide leading-tight truncate',
-            children: [profile.name, "'s Remaining Retirement Time"]
-          }),
-          jsxs('span', {
-            className: 'shrink-0 flex items-center gap-1 bg-[#FDE68A]/15 text-[#FDE68A] text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap',
-            children: ['\u2605 ', planLabel]
-          })
-        ]
-      }),
-      // Retirement date
-      retirementDateStr && jsxs('p', {
-        className: 'text-[12px] font-semibold text-white/60 mb-5 flex items-center gap-1.5',
-        children: ['\uD83C\uDFAF Retirement date: ', jsx('span', { className: 'text-[#FDE68A]', children: retirementDateStr })]
-      }),
-      // 5-column grid: years, days, hours, min, sec
-      jsxs('div', {
-        className: 'grid grid-cols-5 gap-3 mb-5',
-        children: [
-          jsx(TimeDigit, { value: breakdown.years, label: 'years' }),
-          jsx(TimeDigit, { value: breakdown.days, label: 'days' }),
-          jsx(TimeDigit, { value: breakdown.hours, label: 'hours' }),
-          jsx(TimeDigit, { value: breakdown.minutes, label: 'min' }),
-          jsx(TimeDigit, { value: breakdown.seconds, label: 'sec', accent: true })
-        ]
-      }),
-      // Progress bar
-      jsx('div', {
-        className: 'h-1.5 w-full bg-white/10 overflow-hidden mb-2',
-        children: jsx('div', {
-          className: 'h-full bg-accent',
-          style: { width: `${percentLived}%` }
-        })
-      }),
-      // Footer: percent lived + minutes left
-      jsxs('div', {
-        className: 'flex justify-between text-[12px] text-white/40 font-medium',
-        children: [
-          jsxs('span', { children: [percentLived.toFixed(1), '% lived'] }),
-          jsxs('span', { children: [breakdown.totalMinutes.toLocaleString(), ' min left'] })
-        ]
-      })
-    ]
-  });
-}
-
-// ─── Time Digit (jo) ────────────────────────────────────────────────────────
-// Single digit cell in the countdown grid. Shows value with leading zero pad.
-
-function TimeDigit({ value, label, accent }) {
-  return jsxs('div', {
-    className: 'flex flex-col items-center bg-white/10 border border-white/20 rounded-xl py-3 px-2 gap-1',
-    children: [
-      jsx('span', {
-        className: cn(
-          'font-black tabular-nums leading-none',
-          accent ? 'text-accent text-[26px]' : 'text-white text-[26px]'
-        ),
-        children: String(value).padStart(2, '0')
-      }),
-      jsx('span', {
-        className: 'text-[10px] font-extrabold tracking-widest text-white/50 uppercase',
-        children: label
-      })
-    ]
-  });
-}
 
 // ─── LT Daily Value Bar ─────────────────────────────────────────────────────
 // Shows remaining monetary value of today's time based on localStorage settings.
@@ -1376,8 +1273,8 @@ function formatTime(isoString) {
 }
 
 // ─── Life Progress Card (P6) ─────────────────────────────────────────────────
-// Replaces enhancements.js buildLifeProgressCard().
-// Shows greeting, SVG life progress ring, countdown, and daily time value.
+// Retirement countdown clock (years / months / days / hours / min / sec)
+// plus daily time value. No life-% meter.
 
 function LifeProgressCard({ profile }) {
   const [now, setNow] = useState(Date.now());
@@ -1389,15 +1286,13 @@ function LifeProgressCard({ profile }) {
 
   if (!profile) return null;
 
-  const percentLived = calcPercentLived(profile);
   const remainingMs = calcRemainingTime(profile);
   const breakdown = msToBreakdown(remainingMs);
+  const months = Math.floor(breakdown.days / 30.4375);
+  const remDays = Math.floor(breakdown.days - months * 30.4375);
   const deathDate = new Date(profile.dob);
   deathDate.setFullYear(deathDate.getFullYear() + (profile.lifespanYears || 80));
   const retirementDateStr = deathDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-
-  const circumference = 2 * Math.PI * 44;
-  const offset = circumference - (percentLived / 100) * circumference;
 
   const h = new Date().getHours();
   const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
@@ -1425,101 +1320,52 @@ function LifeProgressCard({ profile }) {
   return jsxs('div', {
     className: 'mx-4 mt-3 flex flex-col gap-3',
     children: [
-      // Top card: greeting + big clock dial (hero)
-      jsxs('div', {
-        className: 'bg-background border border-border rounded-2xl p-4 flex flex-col items-center',
-        children: [
-          jsxs('div', {
-            className: 'w-full flex items-baseline justify-between gap-3',
-            children: [
-              jsx('p', { className: 'text-sm font-semibold text-foreground/55', children: greeting + ',' }),
-              jsx('p', { className: 'text-[10px] font-extrabold tracking-widest text-foreground/40', children: 'LIFE PROGRESS' })
-            ]
-          }),
-          jsx('h2', { className: 'w-full text-[26px] font-black text-primary truncate max-w-full mt-0.5 mb-1', children: profile.name }),
-          jsxs('div', {
-            className: 'relative w-[150px] h-[150px] flex items-center justify-center my-1',
-            children: [
-              jsx('svg', {
-                width: 150, height: 150, viewBox: '0 0 100 100',
-                className: 'block',
-                children: jsxs(Fragment, {
-                  children: [
-                    jsx('circle', { key: 'track', cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--border))', strokeWidth: 7 }),
-                    jsx('circle', { key: 'arc', cx: 50, cy: 50, r: 44, fill: 'none', stroke: 'hsl(var(--accent))', strokeWidth: 7, strokeLinecap: 'round', strokeDasharray: circumference, strokeDashoffset: offset, transform: 'rotate(-90 50 50)', style: { transition: 'stroke-dashoffset 0.4s ease' } }),
-                    Array.from({ length: 60 }, (_, i) => {
-                      const rad = (i * 6 - 90) * Math.PI / 180;
-                      const major = i % 5 === 0;
-                      const inner = major ? 34.5 : 37;
-                      const outer = 40;
-                      const lit = (i / 60) * 100 <= percentLived;
-                      return jsx('line', {
-                        key: 't' + i,
-                        x1: 50 + inner * Math.cos(rad), y1: 50 + inner * Math.sin(rad),
-                        x2: 50 + outer * Math.cos(rad), y2: 50 + outer * Math.sin(rad),
-                        stroke: lit ? 'hsl(var(--accent))' : 'hsl(var(--border))',
-                        strokeWidth: major ? 1.8 : 1,
-                        strokeLinecap: 'round'
-                      }, 't' + i);
-                    })
-                  ]
-                })
-              }),
-              jsxs('div', {
-                className: 'absolute inset-0 flex flex-col items-center justify-center',
-                children: [
-                  jsx('span', { className: 'text-[32px] font-black text-primary leading-none tabular-nums', children: Math.round(percentLived) + '%' }),
-                  jsx('span', { className: 'text-[8px] font-extrabold tracking-[0.1em] text-foreground/45 mt-1.5', children: 'OF LIFE LIVED' })
-                ]
-              })
-            ]
-          }),
-          jsx('p', { className: 'text-[13px] leading-relaxed text-foreground/60 mt-2 text-center', children: 'Make today count. Your future is built by what you do now.' })
-        ]
-      }),
-      // Compact countdown card
+      // Countdown clock hero (years / months / days / hours / min / sec)
       jsxs('div', {
         className: 'bg-primary rounded-2xl px-4 py-4',
         children: [
           jsxs('div', {
-            className: 'flex flex-wrap items-center gap-x-2 gap-y-1 mb-2',
+            className: 'flex items-start justify-between gap-3 mb-3',
             children: [
-              jsx('p', {
-                className: 'text-[12px] font-bold text-white m-0 uppercase tracking-wide leading-tight',
-                children: [profile.name, "'s Remaining Retirement Time"]
+              jsxs('div', {
+                className: 'flex-1 min-w-0',
+                children: [
+                  jsx('p', { className: 'text-[13px] font-semibold text-white/55', children: greeting + ',' }),
+                  jsx('h2', { className: 'text-[24px] font-black text-white truncate leading-tight', children: profile.name })
+                ]
               }),
-              jsxs('span', {
-                className: 'flex items-center gap-1 bg-[#FDE68A]/15 text-[#FDE68A] text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap',
+              jsx('span', {
+                className: 'flex items-center bg-white/10 text-[#FDE68A] text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap mt-1',
                 children: ['\u2605 ' + planLabel]
               })
             ]
           }),
-          retirementDateStr && jsxs('p', {
-            className: 'text-[11px] font-semibold text-white/60 mb-3',
-            children: ['Retirement date: ', jsx('span', { className: 'text-[#FDE68A]', children: retirementDateStr })]
+          jsx('p', {
+            className: 'text-[10px] font-extrabold tracking-[0.18em] text-white/45 mb-3 text-center',
+            children: 'TIME LEFT UNTIL RETIREMENT'
           }),
           jsxs('div', {
-            className: 'grid grid-cols-5 gap-2',
+            className: 'grid grid-cols-3 gap-2',
             children: [
               jsx(LifeDigit, { value: breakdown.years, label: 'YEARS' }),
-              jsx(LifeDigit, { value: breakdown.days, label: 'DAYS' }),
+              jsx(LifeDigit, { value: months, label: 'MONTHS' }),
+              jsx(LifeDigit, { value: remDays, label: 'DAYS' }),
               jsx(LifeDigit, { value: breakdown.hours, label: 'HOURS' }),
-              jsx(LifeDigit, { value: breakdown.minutes, label: 'MIN' }),
-              jsx(LifeDigit, { value: breakdown.seconds, label: 'SEC', accent: true })
+              jsx(LifeDigit, { value: breakdown.minutes, label: 'MINUTES' }),
+              jsx(LifeDigit, { value: breakdown.seconds, label: 'SECONDS', accent: true })
             ]
           }),
-          jsx('div', {
-            className: 'h-1 w-full bg-white/10 overflow-hidden mt-3',
-            children: jsx('div', {
-              className: 'h-full bg-accent',
-              style: { width: `${percentLived}%` }
-            })
-          }),
           jsxs('div', {
-            className: 'flex justify-between text-[10px] text-white/35 font-medium mt-1.5',
+            className: 'flex items-center justify-between mt-3.5 pt-3 border-t border-white/10',
             children: [
-              jsxs('span', { children: [percentLived.toFixed(1), '% lived'] }),
-              jsxs('span', { children: [breakdown.totalMinutes.toLocaleString(), ' min left'] })
+              jsxs('span', {
+                className: 'text-[11px] font-semibold text-white/60',
+                children: ['Retirement: ', jsx('span', { className: 'text-[#FDE68A]', children: retirementDateStr })]
+              }),
+              jsx('span', {
+                className: 'text-[11px] font-bold text-white/45 tabular-nums',
+                children: breakdown.totalMinutes.toLocaleString() + ' min total'
+              })
             ]
           })
         ]
@@ -1548,14 +1394,14 @@ function LifeProgressCard({ profile }) {
 
 function LifeDigit({ value, label, accent }) {
   return jsxs('div', {
-    className: 'flex flex-col items-center bg-white/10 border border-white/20 rounded-xl py-2.5 px-1',
+    className: 'flex flex-col items-center bg-white/10 border border-white/15 rounded-xl py-2.5 px-1',
     children: [
       jsx('span', {
-        className: cn('text-[17px] font-black text-white tabular-nums leading-none', accent && 'text-accent'),
+        className: cn('text-[24px] font-black text-white tabular-nums leading-none', accent && 'text-accent'),
         children: String(value).padStart(2, '0')
       }),
       jsx('span', {
-        className: 'text-[8px] font-extrabold tracking-widest text-white/50 mt-0.5',
+        className: 'text-[8px] font-extrabold tracking-widest text-white/50 mt-1',
         children: label
       })
     ]

@@ -1,8 +1,8 @@
-import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import { jsx, jsxs } from 'react/jsx-runtime';
 import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getProfile } from './lib/profile.js';
-import { LayoutGrid, ListTodo, Play, Settings, Square, Timer } from 'lucide-react';
+import { LayoutGrid, ListTodo, Settings, Timer } from 'lucide-react';
 import { cn } from './lib/cn.js';
 import { useBlocks } from './hooks/useBlocks.js';
 import { useActivities } from './hooks/useActivities.js';
@@ -117,40 +117,17 @@ const uk = [{
   icon: ListTodo,
   label: "Activity"
 }, {
-  href: "/timeline",
-  icon: LayoutGrid,
-  label: "Life Hub"
-}, {
   href: "/settings",
   icon: Settings,
   label: "Settings"
 }];
 
-/* Floating pill bottom nav — lifted off the screen edge like the reference
-   design, with an elevated centre circle as a quick timer control:
-   idle → jump to Activity (where timers start), running → stop the block. */
+/* Floating pill bottom nav — lifted off the screen edge, two tabs left,
+   Life Hub as the elevated centre button, Settings right. Journal lives
+   inside Life Hub (tool tile), not in the nav. */
 export function ck() {
   const { pathname: e } = useLocation();
-  const navigate = useNavigate();
-  const { data: blocks = [] } = useBlocks();
-  const updateBlock = useUpdateBlock();
-  const queryClient = useQueryClient();
-  const running = blocks.find(b => !b.endTime);
-
-  const onFab = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!running) {
-      navigate('/activity');
-      return;
-    }
-    updateBlock.mutate({
-      id: running.id,
-      data: { endTime: new Date().toISOString() }
-    }, {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: blocksKey() })
-    });
-  };
+  const hubActive = e.startsWith('/timeline');
 
   const renderTab = ({ href: t, icon: n, label: r }) => {
     const o = t === "/" ? e === "/" : e.startsWith(t);
@@ -164,26 +141,20 @@ export function ck() {
   };
 
   const leftTabs = uk.slice(0, 2).map(renderTab);
-  const rightTabs = uk.slice(2).map(renderTab);
+  const rightTab = renderTab(uk[2]);
 
-  const fab = jsx("button", {
-    key: 'fab',
-    type: 'button',
-    onClick: onFab,
-    'aria-label': running ? 'Stop timer' : 'Start timer',
-    className: 'relative shrink-0 -mt-11 w-[54px] h-[54px] rounded-full flex items-center justify-center text-white border-[3px] border-white',
+  const hub = jsx(Link, {
+    key: 'hub',
+    to: '/timeline',
+    'aria-label': 'Life Hub',
+    className: 'shrink-0 -mt-8 w-[54px] h-[54px] rounded-full flex items-center justify-center text-white border-[3px] border-white',
     style: {
-      background: running ? '#DC2626' : 'hsl(var(--primary))',
-      boxShadow: '0 8px 18px rgba(4, 9, 30, 0.35)'
+      background: 'hsl(var(--primary))',
+      boxShadow: '0 8px 18px rgba(4, 9, 30, 0.35)',
+      outline: hubActive ? '2px solid hsl(var(--accent))' : 'none',
+      outlineOffset: '3px'
     },
-    children: running
-      ? jsxs(Fragment, {
-          children: [
-            jsx('span', { className: 'absolute inset-0 rounded-full border-2 border-red-400/70 animate-ping' }),
-            jsx(Square, { className: 'w-5 h-5 relative', fill: 'currentColor' })
-          ]
-        })
-      : jsx(Play, { className: 'w-6 h-6 relative ml-0.5', fill: 'currentColor' })
+    children: jsx(LayoutGrid, { className: 'w-6 h-6' })
   });
 
   return jsx("div", {
@@ -193,9 +164,13 @@ export function ck() {
       pointerEvents: "none"
     },
     children: jsx("nav", {
-      className: "pointer-events-auto mx-auto w-full max-w-[406px] bg-white rounded-full border border-border px-2 py-1.5 flex items-center justify-between",
+      className: "pointer-events-auto mx-auto w-full max-w-[406px] bg-white rounded-full border border-border px-2 py-1.5 flex items-center",
       style: { boxShadow: "0 10px 30px rgba(4, 9, 30, 0.18)" },
-      children: [leftTabs[0], leftTabs[1], fab, rightTabs[0], rightTabs[1]]
+      children: [
+        jsx("div", { key: 'left', className: 'flex-1 flex items-center', children: leftTabs }),
+        hub,
+        jsx("div", { key: 'right', className: 'flex-1 flex items-center', children: rightTab })
+      ]
     })
   });
 }
