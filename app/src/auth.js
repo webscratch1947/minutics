@@ -428,17 +428,12 @@ function injectStyles() {
     .lt-auth-badge-logo { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; display: block; }
     .lt-auth-mascot {
       /* Sits inside the dome, centred above the white logo badge and never
-         touching it (18px gap) — the badge owns the curve. */
+         touching it (18px gap) — the badge owns the curve. Always visible:
+         the canvas is pre-loaded off-screen and moved in once drawn. */
       position: absolute; left: 50%; bottom: 66px; transform: translateX(-50%);
-      width: 180px; height: 214px; pointer-events: none;
+      width: 200px; height: 238px; pointer-events: none;
       filter: drop-shadow(0 22px 30px rgba(20,22,46,.45));
-      /* Hidden until the first real artboard frame lands — while the
-         wasm/artboard is still loading the runtime paints an opaque black
-         "RIVE" placeholder box, which read as a stuck/broken mascot. */
-      opacity: 0;
-      transition: opacity .35s ease;
     }
-    .lt-auth-mascot.lt-auth-mascot-on { opacity: 1; }
     .lt-auth-mascot canvas { width: 100%; height: 100%; display: block; }
     .lt-auth-wtext { text-align: center; padding: 110px 30px 0; }
     .lt-auth-wtitle { font-size: clamp(33px, 9vw, 40px); font-weight: 800; letter-spacing: -.03em; color: #14162E; margin: 0; }
@@ -465,9 +460,15 @@ function injectStyles() {
     .lt-auth-wlogin a { color: #4F46E5; font-weight: 700; cursor: pointer; text-underline-offset: 2px; }
     .lt-auth-wlogin a:hover { text-decoration: underline; }
 
+    @media (max-height: 720px) {
+      /* Dome = clamp(300px, 46vh, 430px): at 681-720px tall it is only
+         313-332px, so the mascot steps down slightly to keep headroom
+         above the curve (17-39px after the 66px offset). */
+      .lt-auth-mascot { width: 194px; height: 230px; }
+    }
     @media (max-height: 680px) {
       .lt-auth-hero { height: 260px; }
-      /* Short dome: shrink just enough that the bigger mascot still clears
+      /* Short dome: shrink just enough that the mascot still clears
          the top of the curve (260 - 66 bottom - 178 = 16px headroom). */
       .lt-auth-mascot { width: 150px; height: 178px; }
       .lt-auth-wtext { padding-top: 100px; }
@@ -653,50 +654,51 @@ function renderGate(mode) {
    navy dome, brand badge sitting on the curve, tagline, gradient pill CTA).
    First thing an unauthenticated visitor sees. ─────────────────────────── */
 /* ── Mascot (Rive) — waves, blinks and wiggles the "Hi!" badge on a loop.
-   The .riv + its wasm are served from ./assets, same as every other asset. ── */
+   The .riv + its wasm are served from ./assets, same as every other asset.
+
+   Loading starts the moment this module executes — long before the startup
+   splash video finishes — on a hidden off-screen canvas, so by the time the
+   welcome screen is first seen the mascot is already drawn: no black "RIVE"
+   placeholder, no fade-in, no appear/disappear. The one canvas is re-parented
+   into the gate when the gate renders and pulled back into the hidden holder
+   when the gate is swapped for login/signup, so it is never reloaded and it
+   shows instantly every time the welcome screen comes back. ────────────── */
 var _mascotRive = null;
+var _mascotCanvas = null;
+var _mascotHolder = null;
 var _mascotObserver = null;
-var _mascotRevealTimer = null;
-function teardownMascot() {
-  if (_mascotRevealTimer) { clearInterval(_mascotRevealTimer); _mascotRevealTimer = null; }
-  if (_mascotRive) { try { _mascotRive.cleanup(); } catch (e) {} _mascotRive = null; }
-  if (_mascotObserver) { try { _mascotObserver.disconnect(); } catch (e) {} _mascotObserver = null; }
+var _mascotPoll = null;
+var _mascotTried = false;
+var _mascotReady = false;
+
+function mascotResize() {
+  if (!_mascotRive || !_mascotCanvas) return;
+  try { _mascotRive.resizeDrawingSurfaceToCanvas(); } catch (e) {}
 }
-/* Rive fires onLoad almost immediately but keeps painting an opaque black
-   "RIVE" placeholder over the canvas for ~2s until the first artboard frame
-   lands. Fade the wrapper in only once real pixels are on the canvas; if that
-   never happens, leave it hidden rather than show the broken-looking box. */
-function revealMascotWhenDrawn(canvas) {
-  if (_mascotRevealTimer) clearInterval(_mascotRevealTimer);
-  var tries = 0;
-  var readyStreak = 0;
-  _mascotRevealTimer = setInterval(function () {
-    var w = canvas.closest(".lt-auth-mascot");
-    if (!w || !document.body.contains(canvas)) {
-      clearInterval(_mascotRevealTimer); _mascotRevealTimer = null;
-      return;
-    }
-    var ready = false;
-    try {
-      var ctx = canvas.getContext("2d");
-      var d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      var total = canvas.width * canvas.height;
-      var painted = 0;
-      for (var i = 3; i < d.length; i += 4) if (d[i] > 8) painted++;
-      ready = total > 0 && painted > 0 && painted < total * 0.9;
-    } catch (e) {}
-    readyStreak = ready ? readyStreak + 1 : 0;
-    if (readyStreak >= 2 || ++tries >= 50) {
-      clearInterval(_mascotRevealTimer); _mascotRevealTimer = null;
-      if (readyStreak >= 2) w.classList.add("lt-auth-mascot-on");
-    }
-  }, 100);
+
+function attachMascot() {
+  if (!_mascotReady || !_mascotCanvas || !document.body) return;
+  var wrap = document.querySelector("#lt-auth-gate .lt-auth-mascot");
+  if (!wrap || _mascotCanvas.parentNode === wrap) return;
+  wrap.appendChild(_mascotCanvas);
+  mascotResize();
 }
-function mountMascot() {
-  teardownMascot();
-  var canvas = document.getElementById("lt-auth-mascot");
-  if (!canvas) return;
-  var wrap = canvas.closest(".lt-auth-mascot");
+
+function startMascot() {
+  if (_mascotTried) return;
+  _mascotTried = true;
+
+  _mascotHolder = document.createElement("div");
+  _mascotHolder.setAttribute("aria-hidden", "true");
+  _mascotHolder.style.cssText =
+    "position:fixed;left:-10000px;top:0;width:200px;height:238px;" +
+    "visibility:hidden;pointer-events:none;overflow:hidden;";
+  _mascotCanvas = document.createElement("canvas");
+  _mascotCanvas.setAttribute("aria-label", "Minutics mascot");
+  _mascotCanvas.style.cssText = "width:100%;height:100%;display:block;";
+  _mascotHolder.appendChild(_mascotCanvas);
+  document.body.appendChild(_mascotHolder);
+
   try {
     RuntimeLoader.setWasmUrl("./assets/rive.wasm");
     _mascotRive = new Rive({
@@ -704,7 +706,7 @@ function mountMascot() {
       artboard: "Mascot",
       stateMachine: "State Machine 1",
       autoplay: true,
-      canvas: canvas,
+      canvas: _mascotCanvas,
       layout: new Layout({ fit: Fit.Contain, alignment: Alignment.BottomCenter }),
       onLoad: function () {
         try {
@@ -714,21 +716,60 @@ function mountMascot() {
         } catch (e) {}
       },
       onLoadError: function () {
-        var w = canvas.closest(".lt-auth-mascot");
-        if (w) w.style.display = "none";
+        if (_mascotPoll) { clearInterval(_mascotPoll); _mascotPoll = null; }
+        _mascotTried = false; /* let a later attempt start over */
       },
     });
-    revealMascotWhenDrawn(canvas);
   } catch (e) {
-    /* Mascot is decoration — never let it break the gate. */
-    if (wrap) wrap.style.display = "none";
+    _mascotRive = null;
+    _mascotTried = false;
+    return;
   }
-  /* Stop rendering the moment the gate is swapped for login/signup. */
+
+  /* The runtime paints an opaque black placeholder for the first ~2s of a
+     cold load. Watch for the first real artboard frames while the canvas is
+     still off-screen, then (and only then) let it into the gate. */
+  var tries = 0;
+  var streak = 0;
+  _mascotPoll = setInterval(function () {
+    var ready = false;
+    try {
+      var c = _mascotCanvas;
+      var d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+      var total = c.width * c.height;
+      var painted = 0;
+      for (var i = 3; i < d.length; i += 4) if (d[i] > 8) painted++;
+      ready = total > 0 && painted > 0 && painted < total * 0.9;
+    } catch (e) {}
+    streak = ready ? streak + 1 : 0;
+    if (streak >= 2) {
+      clearInterval(_mascotPoll); _mascotPoll = null;
+      _mascotReady = true;
+      attachMascot();
+    } else if (++tries > 100) {
+      clearInterval(_mascotPoll); _mascotPoll = null;
+    }
+  }, 100);
+}
+
+function mountMascot() {
+  startMascot();
+  attachMascot();
+  if (_mascotObserver) return;
+  /* Keep the loaded canvas alive across gate swaps: pull it back into the
+     hidden holder the moment its wrapper leaves the document. */
   _mascotObserver = new MutationObserver(function () {
-    if (!document.getElementById("lt-auth-mascot")) teardownMascot();
+    if (_mascotCanvas && !_mascotCanvas.isConnected && _mascotCanvas.parentNode !== _mascotHolder) {
+      _mascotHolder.appendChild(_mascotCanvas);
+      mascotResize();
+    }
   });
   _mascotObserver.observe(document.body, { childList: true, subtree: true });
 }
+
+window.addEventListener("resize", mascotResize);
+if (document.body) startMascot();
+else window.addEventListener("DOMContentLoaded", startMascot);
 
 function renderWelcomeGate() {
   injectStyles();
@@ -760,7 +801,7 @@ function renderWelcomeGate() {
         '<div class="lt-auth-hero">' +
           '<svg class="lt-auth-stars" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + stars + '</svg>' +
         '</div>' +
-        '<div class="lt-auth-mascot"><canvas id="lt-auth-mascot" width="336" height="400" aria-label="Minutics mascot"></canvas></div>' +
+        '<div class="lt-auth-mascot"></div>' +
         '<div class="lt-auth-badge"><img class="lt-auth-badge-logo" src="./assets/icons/logo-512.png" alt="Minutics logo"></div>' +
       '</div>' +
       '<div class="lt-auth-wtext">' +
@@ -1026,3 +1067,4 @@ onAuthStateChanged(auth, function (user) {
     renderGate("welcome");
   }
 });
+
