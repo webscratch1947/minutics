@@ -1299,6 +1299,56 @@ function LifeProgressCard({ profile }) {
 
   const planLabel = (() => { const p = localStorage.getItem('lt_plan_v1'); if (!p) return 'Free'; try { const v = JSON.parse(p); return v === 'basic' ? 'Basic' : v === 'yearly' ? '1 Year' : v === 'lifetime' || v === 'pro' ? 'Lifetime' : 'Free'; } catch { return 'Free'; } })();
 
+  const p2 = (v) => String(v).padStart(2, '0');
+  const DOT_COLORS = ['#00C2A8', '#00C79A', '#12C985', '#22C55E', '#2BC06B', '#0FBFA3', '#00B8AE'];
+  const dotArc = (mirror) => jsx('svg', {
+    viewBox: '0 0 30 80',
+    className: 'w-[30px] h-[80px] shrink-0',
+    children: jsxs('g', { transform: mirror ? 'translate(30,0) scale(-1,1)' : undefined, children: [
+      [0, 1, 2, 3, 4, 5, 6].map((i) => {
+        const a = ((i - 3) / 3) * 1.05;
+        return jsx('circle', {
+          cx: 6 + 15 * (1 - Math.cos(a)),
+          cy: 40 + 25 * Math.sin(a),
+          r: 3.6 - Math.abs(i - 3) * 0.45,
+          fill: DOT_COLORS[i],
+          opacity: 0.95
+        }, 'o' + i);
+      }),
+      [0, 1, 2, 3, 4, 5, 6].map((i) => {
+        const a = ((i - 3) / 3) * 1.15;
+        return jsx('circle', {
+          cx: 13 + 11 * (1 - Math.cos(a)),
+          cy: 40 + 18 * Math.sin(a),
+          r: 2.4 - Math.abs(i - 3) * 0.3,
+          fill: DOT_COLORS[6 - i],
+          opacity: 0.55
+        }, 'i' + i);
+      })
+    ]})
+  });
+  const heroPill = (value, label) => jsxs('span', {
+    className: 'inline-flex items-baseline gap-1 bg-foreground/[0.04] border border-foreground/10 rounded-full px-2.5 py-1',
+    children: [
+      jsx('span', { className: 'text-[13px] font-black text-primary tabular-nums leading-none', children: p2(value) }),
+      jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/50', children: label })
+    ]
+  });
+  const tickTile = (value, label, frac, isSec) => jsxs('div', {
+    className: 'bg-white border border-black/[.06] rounded-2xl px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]',
+    children: [
+      jsxs('div', { className: 'flex items-baseline gap-1', children: [
+        jsx('span', { key: isSec ? value : undefined, className: cn('text-[20px] font-black text-primary tabular-nums leading-none', isSec && 'lt-tick inline-block'), children: p2(value) }),
+        jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/40', children: label })
+      ]}),
+      jsxs('div', { className: 'flex gap-[2px] mt-1.5', children:
+        Array.from({ length: 9 }, (_, k) => jsx('span', {
+          className: cn('h-1.5 flex-1 rounded-full', k < Math.max(1, Math.round(frac * 9)) ? 'bg-accent' : 'bg-foreground/10')
+        }, k))
+      })
+    ]
+  });
+
   // Time value
   let tvData = null;
   try {
@@ -1320,120 +1370,87 @@ function LifeProgressCard({ profile }) {
   return jsxs('div', {
     className: 'mx-4 mt-3 flex flex-col gap-3',
     children: [
-      // Countdown hero — 3D hourglass centerpiece + layered digits
+      // Countdown hero — reference-style light card with dotted-arc hero number
       jsxs('div', {
-        className: 'relative overflow-hidden bg-primary rounded-2xl px-4 pt-4 pb-3.5',
+        className: 'relative bg-white rounded-3xl px-4 pt-4 pb-3.5 border border-black/[.06] shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
         children: [
           jsx('style', {
-            children: '@keyframes ltFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}' +
-              '.lt-float{animation:ltFloat 4.5s ease-in-out infinite}' +
-              '@keyframes ltTick{0%{transform:scale(1);opacity:.6}35%{transform:scale(1.25);opacity:1}100%{transform:scale(1);opacity:1}}' +
+            children: '@keyframes ltTick{0%{transform:scale(1);opacity:.6}35%{transform:scale(1.22);opacity:1}100%{transform:scale(1);opacity:1}}' +
               '.lt-tick{animation:ltTick .4s ease-out}'
           }),
-          jsx('div', { className: 'pointer-events-none absolute -top-14 -right-14 w-48 h-48 rounded-full bg-accent/20 blur-3xl' }),
           jsxs('div', {
-            className: 'relative flex items-start justify-between gap-3 mb-2',
+            className: 'flex items-start justify-between gap-3 mb-1',
             children: [
               jsxs('div', {
                 className: 'flex-1 min-w-0',
                 children: [
-                  jsx('p', { className: 'text-[13px] font-semibold text-white/55', children: greeting + ',' }),
-                  jsx('h2', { className: 'text-[24px] font-black text-white truncate leading-tight', children: profile.name })
+                  jsx('p', { className: 'text-[13px] font-semibold text-foreground/50', children: greeting + ',' }),
+                  jsx('h2', { className: 'text-[24px] font-black text-primary truncate leading-tight', children: profile.name })
                 ]
               }),
               jsx('span', {
-                className: 'flex items-center bg-white/10 text-[#FDE68A] text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap mt-1',
+                className: 'flex items-center bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap mt-1',
                 children: ['\u2605 ' + planLabel]
               })
             ]
           }),
-          jsx('p', {
-            className: 'relative text-[10px] font-extrabold tracking-[0.18em] text-white/45 mb-2.5 text-center',
-            children: 'TIME LEFT UNTIL RETIREMENT'
-          }),
-          jsxs('div', {
-            className: 'relative flex items-center gap-2',
-            children: [
-              jsxs('div', {
-                className: 'relative shrink-0 w-[116px]',
+          jsx('div', {
+            className: 'mt-1 mb-0.5',
+            children: jsx('svg', {
+              viewBox: '0 0 260 30',
+              className: 'w-full h-[30px]',
+              children: jsxs('g', {
                 children: [
-                  jsx('div', { className: 'absolute left-3 right-3 bottom-1.5 h-5 rounded-full bg-accent/40 blur-lg' }),
-                  jsx('img', {
-                    src: 'assets/hero/hourglass.png',
-                    alt: '',
-                    draggable: false,
-                    className: 'relative w-[116px] select-none lt-float drop-shadow-[0_10px_20px_rgba(0,194,168,0.35)]'
-                  })
-                ]
-              }),
-              jsxs('div', {
-                className: 'flex-1 min-w-0 flex flex-col gap-1.5',
-                children: [
-                  jsxs('div', {
-                    className: 'grid grid-cols-2 gap-1.5',
-                    children: [
-                      jsxs('div', {
-                        className: 'flex flex-col items-center bg-white/10 border border-white/15 rounded-xl py-1.5',
-                        children: [
-                          jsx('span', { className: 'text-[20px] font-black text-white tabular-nums leading-none', children: String(breakdown.years).padStart(2, '0') }),
-                          jsx('span', { className: 'text-[9px] font-extrabold tracking-widest text-white/50 mt-1', children: 'YEARS' })
-                        ]
-                      }),
-                      jsxs('div', {
-                        className: 'flex flex-col items-center bg-white/10 border border-white/15 rounded-xl py-1.5',
-                        children: [
-                          jsx('span', { className: 'text-[20px] font-black text-white tabular-nums leading-none', children: String(months).padStart(2, '0') }),
-                          jsx('span', { className: 'text-[9px] font-extrabold tracking-widest text-white/50 mt-1', children: 'MONTHS' })
-                        ]
-                      })
-                    ]
-                  }),
-                  jsxs('div', {
-                    className: 'flex items-baseline justify-center gap-1.5 bg-white/10 border border-white/15 rounded-xl py-1.5 px-2',
-                    children: [
-                      jsx('span', { className: 'text-[34px] font-black text-accent tabular-nums leading-none', children: String(remDays).padStart(2, '0') }),
-                      jsx('span', { className: 'text-[10px] font-extrabold tracking-widest text-white/60', children: 'DAYS' })
-                    ]
+                  jsx('defs', { children: jsx('path', { id: 'ltHeroArc', d: 'M 12 26 Q 130 1 248 26', fill: 'none' }) }),
+                  jsx('text', {
+                    fontSize: 8.5,
+                    letterSpacing: 1.7,
+                    fontWeight: 800,
+                    fill: 'rgba(15,23,42,0.42)',
+                    children: jsx('textPath', { href: '#ltHeroArc', startOffset: '50%', textAnchor: 'middle', children: 'TIME LEFT UNTIL RETIREMENT' })
                   })
                 ]
               })
-            ]
+            })
           }),
           jsxs('div', {
-            className: 'relative grid grid-cols-3 gap-1.5 mt-3',
+            className: 'flex items-center justify-center gap-1',
             children: [
+              dotArc(false),
               jsxs('div', {
-                className: 'flex items-baseline justify-center gap-1.5 bg-white/10 border border-white/15 rounded-xl py-2',
+                className: 'flex flex-col items-center px-1',
                 children: [
-                  jsx('span', { className: 'text-[22px] font-black text-white tabular-nums leading-none', children: String(breakdown.hours).padStart(2, '0') }),
-                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-white/50', children: 'HOURS' })
+                  jsx('span', { className: 'text-[54px] font-black text-primary tabular-nums leading-none', children: p2(remDays) }),
+                  jsx('span', { className: 'text-[10px] font-extrabold tracking-[0.3em] text-foreground/45 mt-1.5', children: 'DAYS' }),
+                  jsxs('div', {
+                    className: 'flex gap-1.5 mt-2.5',
+                    children: [
+                      heroPill(breakdown.years, 'YEARS'),
+                      heroPill(months, 'MONTHS')
+                    ]
+                  })
                 ]
               }),
-              jsxs('div', {
-                className: 'flex items-baseline justify-center gap-1.5 bg-white/10 border border-white/15 rounded-xl py-2',
-                children: [
-                  jsx('span', { className: 'text-[22px] font-black text-white tabular-nums leading-none', children: String(breakdown.minutes).padStart(2, '0') }),
-                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-white/50', children: 'MINUTES' })
-                ]
-              }),
-              jsxs('div', {
-                className: 'flex items-baseline justify-center gap-1.5 bg-white/10 border border-white/15 rounded-xl py-2',
-                children: [
-                  jsx('span', { key: breakdown.seconds, className: 'inline-block text-[22px] font-black text-accent tabular-nums leading-none lt-tick', children: String(breakdown.seconds).padStart(2, '0') }),
-                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-white/50', children: 'SECONDS' })
-                ]
-              })
+              dotArc(true)
             ]
           }),
           jsxs('div', {
-            className: 'flex items-center justify-between mt-3 pt-3 border-t border-white/10',
+            className: 'grid grid-cols-3 gap-2 mt-3.5',
+            children: [
+              tickTile(breakdown.hours, 'HOURS', breakdown.hours / 24),
+              tickTile(breakdown.minutes, 'MINUTES', breakdown.minutes / 60),
+              tickTile(breakdown.seconds, 'SECONDS', breakdown.seconds / 60, true)
+            ]
+          }),
+          jsxs('div', {
+            className: 'flex items-center justify-between mt-3 pt-3 border-t border-foreground/10',
             children: [
               jsxs('span', {
-                className: 'text-[11px] font-semibold text-white/60',
-                children: ['Retirement: ', jsx('span', { className: 'text-[#FDE68A]', children: retirementDateStr })]
+                className: 'text-[11px] font-semibold text-foreground/55',
+                children: ['Retirement: ', jsx('span', { className: 'text-primary font-bold', children: retirementDateStr })]
               }),
               jsx('span', {
-                className: 'text-[11px] font-bold text-white/45 tabular-nums',
+                className: 'text-[11px] font-bold text-foreground/40 tabular-nums',
                 children: breakdown.totalMinutes.toLocaleString() + ' min total'
               })
             ]
