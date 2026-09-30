@@ -1320,12 +1320,19 @@ function LifeProgressCard({ profile }) {
   return jsxs('div', {
     className: 'mx-4 mt-3 flex flex-col gap-3',
     children: [
-      // Countdown clock hero (years / months / days / hours / min / sec)
+      // Countdown hero — 3D hourglass centerpiece + layered digits
       jsxs('div', {
-        className: 'bg-primary rounded-2xl px-4 py-4',
+        className: 'relative overflow-hidden bg-primary rounded-2xl px-4 pt-4 pb-3.5',
         children: [
+          jsx('style', {
+            children: '@keyframes ltFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}' +
+              '.lt-float{animation:ltFloat 4.5s ease-in-out infinite}' +
+              '@keyframes ltTick{0%{transform:scale(1);opacity:.6}35%{transform:scale(1.25);opacity:1}100%{transform:scale(1);opacity:1}}' +
+              '.lt-tick{animation:ltTick .4s ease-out}'
+          }),
+          jsx('div', { className: 'pointer-events-none absolute -top-14 -right-14 w-48 h-48 rounded-full bg-accent/20 blur-3xl' }),
           jsxs('div', {
-            className: 'flex items-start justify-between gap-3 mb-3',
+            className: 'relative flex items-start justify-between gap-3 mb-2',
             children: [
               jsxs('div', {
                 className: 'flex-1 min-w-0',
@@ -1341,22 +1348,85 @@ function LifeProgressCard({ profile }) {
             ]
           }),
           jsx('p', {
-            className: 'text-[10px] font-extrabold tracking-[0.18em] text-white/45 mb-3 text-center',
+            className: 'relative text-[10px] font-extrabold tracking-[0.18em] text-white/45 mb-2.5 text-center',
             children: 'TIME LEFT UNTIL RETIREMENT'
           }),
           jsxs('div', {
-            className: 'grid grid-cols-3 gap-2',
+            className: 'relative flex items-center gap-2',
             children: [
-              jsx(LifeDigit, { value: breakdown.years, label: 'YEARS' }),
-              jsx(LifeDigit, { value: months, label: 'MONTHS' }),
-              jsx(LifeDigit, { value: remDays, label: 'DAYS' }),
-              jsx(LifeDigit, { value: breakdown.hours, label: 'HOURS' }),
-              jsx(LifeDigit, { value: breakdown.minutes, label: 'MINUTES' }),
-              jsx(LifeDigit, { value: breakdown.seconds, label: 'SECONDS', accent: true })
+              jsxs('div', {
+                className: 'relative shrink-0 w-[116px]',
+                children: [
+                  jsx('div', { className: 'absolute left-3 right-3 bottom-1.5 h-5 rounded-full bg-accent/40 blur-lg' }),
+                  jsx('img', {
+                    src: 'assets/hero/hourglass.png',
+                    alt: '',
+                    draggable: false,
+                    className: 'relative w-[116px] select-none lt-float drop-shadow-[0_10px_20px_rgba(0,194,168,0.35)]'
+                  })
+                ]
+              }),
+              jsxs('div', {
+                className: 'flex-1 min-w-0 flex flex-col gap-1.5',
+                children: [
+                  jsxs('div', {
+                    className: 'grid grid-cols-2 gap-1.5',
+                    children: [
+                      jsxs('div', {
+                        className: 'flex flex-col items-center bg-white/10 border border-white/15 rounded-xl py-1.5',
+                        children: [
+                          jsx('span', { className: 'text-[20px] font-black text-white tabular-nums leading-none', children: String(breakdown.years).padStart(2, '0') }),
+                          jsx('span', { className: 'text-[9px] font-extrabold tracking-widest text-white/50 mt-1', children: 'YEARS' })
+                        ]
+                      }),
+                      jsxs('div', {
+                        className: 'flex flex-col items-center bg-white/10 border border-white/15 rounded-xl py-1.5',
+                        children: [
+                          jsx('span', { className: 'text-[20px] font-black text-white tabular-nums leading-none', children: String(months).padStart(2, '0') }),
+                          jsx('span', { className: 'text-[9px] font-extrabold tracking-widest text-white/50 mt-1', children: 'MONTHS' })
+                        ]
+                      })
+                    ]
+                  }),
+                  jsxs('div', {
+                    className: 'flex items-baseline justify-center gap-1.5 bg-white/10 border border-white/15 rounded-xl py-1.5 px-2',
+                    children: [
+                      jsx('span', { className: 'text-[34px] font-black text-accent tabular-nums leading-none', children: String(remDays).padStart(2, '0') }),
+                      jsx('span', { className: 'text-[10px] font-extrabold tracking-widest text-white/60', children: 'DAYS' })
+                    ]
+                  })
+                ]
+              })
             ]
           }),
           jsxs('div', {
-            className: 'flex items-center justify-between mt-3.5 pt-3 border-t border-white/10',
+            className: 'relative grid grid-cols-3 gap-1.5 mt-3',
+            children: [
+              jsxs('div', {
+                className: 'flex items-baseline justify-center gap-1.5 bg-white/10 border border-white/15 rounded-xl py-2',
+                children: [
+                  jsx('span', { className: 'text-[22px] font-black text-white tabular-nums leading-none', children: String(breakdown.hours).padStart(2, '0') }),
+                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-white/50', children: 'HOURS' })
+                ]
+              }),
+              jsxs('div', {
+                className: 'flex items-baseline justify-center gap-1.5 bg-white/10 border border-white/15 rounded-xl py-2',
+                children: [
+                  jsx('span', { className: 'text-[22px] font-black text-white tabular-nums leading-none', children: String(breakdown.minutes).padStart(2, '0') }),
+                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-white/50', children: 'MINUTES' })
+                ]
+              }),
+              jsxs('div', {
+                className: 'flex items-baseline justify-center gap-1.5 bg-white/10 border border-white/15 rounded-xl py-2',
+                children: [
+                  jsx('span', { key: breakdown.seconds, className: 'inline-block text-[22px] font-black text-accent tabular-nums leading-none lt-tick', children: String(breakdown.seconds).padStart(2, '0') }),
+                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-white/50', children: 'SECONDS' })
+                ]
+              })
+            ]
+          }),
+          jsxs('div', {
+            className: 'flex items-center justify-between mt-3 pt-3 border-t border-white/10',
             children: [
               jsxs('span', {
                 className: 'text-[11px] font-semibold text-white/60',
@@ -1387,22 +1457,6 @@ function LifeProgressCard({ profile }) {
             children: 'Rs.' + Number(tvData.rate).toFixed(2) + '/hour'
           })
         ]
-      })
-    ]
-  });
-}
-
-function LifeDigit({ value, label, accent }) {
-  return jsxs('div', {
-    className: 'flex flex-col items-center bg-white/10 border border-white/15 rounded-xl py-2.5 px-1',
-    children: [
-      jsx('span', {
-        className: cn('text-[24px] font-black text-white tabular-nums leading-none', accent && 'text-accent'),
-        children: String(value).padStart(2, '0')
-      }),
-      jsx('span', {
-        className: 'text-[8px] font-extrabold tracking-widest text-white/50 mt-1',
-        children: label
       })
     ]
   });
