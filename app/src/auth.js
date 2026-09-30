@@ -13,7 +13,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { Alignment, Fit, Layout, Rive } from "@rive-app/canvas";
+import { Rive, RuntimeLoader, Layout, Fit, Alignment } from "@rive-app/canvas";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBXruwmDU9SAX4nAe5_Do-x-5qmi_SFh7E",
@@ -416,10 +416,6 @@ function injectStyles() {
       border-bottom-right-radius: 50% 96px;
     }
     .lt-auth-stars { position: absolute; inset: 0; width: 100%; height: 100%; }
-    .lt-auth-rive-mascot {
-      position: absolute; inset: 0; width: 100%; height: 100%;
-      pointer-events: none;
-    }
     .lt-auth-badge {
       position: absolute; left: 50%; bottom: -46px; transform: translateX(-50%);
       width: 94px; height: 94px; border-radius: 50%; background: #fff;
@@ -430,7 +426,21 @@ function injectStyles() {
          snapped into place when the animation ended. Static = correct. */
     }
     .lt-auth-badge-logo { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; display: block; }
-    .lt-auth-wtext { text-align: center; padding: 78px 30px 0; }
+    .lt-auth-mascot {
+      /* Sits inside the dome, centred above the white logo badge and never
+         touching it (18px gap) — the badge owns the curve. */
+      position: absolute; left: 50%; bottom: 66px; transform: translateX(-50%);
+      width: 132px; height: 157px; pointer-events: none;
+      filter: drop-shadow(0 22px 30px rgba(20,22,46,.45));
+      /* Hidden until the first real artboard frame lands — while the
+         wasm/artboard is still loading the runtime paints an opaque black
+         "RIVE" placeholder box, which read as a stuck/broken mascot. */
+      opacity: 0;
+      transition: opacity .35s ease;
+    }
+    .lt-auth-mascot.lt-auth-mascot-on { opacity: 1; }
+    .lt-auth-mascot canvas { width: 100%; height: 100%; display: block; }
+    .lt-auth-wtext { text-align: center; padding: 110px 30px 0; }
     .lt-auth-wtitle { font-size: clamp(33px, 9vw, 40px); font-weight: 800; letter-spacing: -.03em; color: #14162E; margin: 0; }
     .lt-auth-wsub { font-size: 15.5px; line-height: 1.55; color: #6B7280; margin: 13px auto 0; max-width: 320px; }
     .lt-auth-wfoot {
@@ -457,7 +467,7 @@ function injectStyles() {
 
     @media (max-height: 680px) {
       .lt-auth-hero { height: 260px; }
-      .lt-auth-wtext { padding-top: 70px; }
+      .lt-auth-wtext { padding-top: 100px; }
       .lt-auth-scr { padding-top: 34px; }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -470,30 +480,6 @@ function injectStyles() {
 /* Typed email/password survive tab switches and back-navigation (the whole
    gate re-renders on every mode change). Cleared once a user signs in. */
 var _gateDraft = { email: "", pw: "" };
-var _welcomeMascot = null;
-
-function mountWelcomeMascot() {
-  var canvas = document.getElementById("lt-auth-rive-mascot");
-  var stars = document.querySelector("#lt-auth-gate .lt-auth-stars");
-  if (!canvas) return;
-
-  if (stars) stars.style.visibility = "hidden";
-  if (_welcomeMascot) _welcomeMascot.cleanup();
-
-  _welcomeMascot = new Rive({
-    src: "./assets/mascot.riv",
-    canvas: canvas,
-    autoplay: true,
-    layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
-    onLoad: function () {
-      _welcomeMascot.resizeDrawingSurfaceToCanvas();
-    },
-    onLoadError: function () {
-      if (stars) stars.style.visibility = "visible";
-      canvas.remove();
-    }
-  });
-}
 
 function saveDraft() {
   try {
@@ -663,6 +649,84 @@ function renderGate(mode) {
 /* ── Welcome screen — "Get Started for Free": Leafboard-style arch (starry
    navy dome, brand badge sitting on the curve, tagline, gradient pill CTA).
    First thing an unauthenticated visitor sees. ─────────────────────────── */
+/* ── Mascot (Rive) — waves, blinks and wiggles the "Hi!" badge on a loop.
+   The .riv + its wasm are served from ./assets, same as every other asset. ── */
+var _mascotRive = null;
+var _mascotObserver = null;
+var _mascotRevealTimer = null;
+function teardownMascot() {
+  if (_mascotRevealTimer) { clearInterval(_mascotRevealTimer); _mascotRevealTimer = null; }
+  if (_mascotRive) { try { _mascotRive.cleanup(); } catch (e) {} _mascotRive = null; }
+  if (_mascotObserver) { try { _mascotObserver.disconnect(); } catch (e) {} _mascotObserver = null; }
+}
+/* Rive fires onLoad almost immediately but keeps painting an opaque black
+   "RIVE" placeholder over the canvas for ~2s until the first artboard frame
+   lands. Fade the wrapper in only once real pixels are on the canvas; if that
+   never happens, leave it hidden rather than show the broken-looking box. */
+function revealMascotWhenDrawn(canvas) {
+  if (_mascotRevealTimer) clearInterval(_mascotRevealTimer);
+  var tries = 0;
+  var readyStreak = 0;
+  _mascotRevealTimer = setInterval(function () {
+    var w = canvas.closest(".lt-auth-mascot");
+    if (!w || !document.body.contains(canvas)) {
+      clearInterval(_mascotRevealTimer); _mascotRevealTimer = null;
+      return;
+    }
+    var ready = false;
+    try {
+      var ctx = canvas.getContext("2d");
+      var d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      var total = canvas.width * canvas.height;
+      var painted = 0;
+      for (var i = 3; i < d.length; i += 4) if (d[i] > 8) painted++;
+      ready = total > 0 && painted > 0 && painted < total * 0.9;
+    } catch (e) {}
+    readyStreak = ready ? readyStreak + 1 : 0;
+    if (readyStreak >= 2 || ++tries >= 50) {
+      clearInterval(_mascotRevealTimer); _mascotRevealTimer = null;
+      if (readyStreak >= 2) w.classList.add("lt-auth-mascot-on");
+    }
+  }, 100);
+}
+function mountMascot() {
+  teardownMascot();
+  var canvas = document.getElementById("lt-auth-mascot");
+  if (!canvas) return;
+  var wrap = canvas.closest(".lt-auth-mascot");
+  try {
+    RuntimeLoader.setWasmUrl("./assets/rive.wasm");
+    _mascotRive = new Rive({
+      src: "./assets/mascot.riv",
+      artboard: "Mascot",
+      stateMachine: "State Machine 1",
+      autoplay: true,
+      canvas: canvas,
+      layout: new Layout({ fit: Fit.Contain, alignment: Alignment.BottomCenter }),
+      onLoad: function () {
+        try {
+          if (!_mascotRive) return;
+          _mascotRive.resizeDrawingSurfaceToCanvas();
+          _mascotRive.play();
+        } catch (e) {}
+      },
+      onLoadError: function () {
+        var w = canvas.closest(".lt-auth-mascot");
+        if (w) w.style.display = "none";
+      },
+    });
+    revealMascotWhenDrawn(canvas);
+  } catch (e) {
+    /* Mascot is decoration — never let it break the gate. */
+    if (wrap) wrap.style.display = "none";
+  }
+  /* Stop rendering the moment the gate is swapped for login/signup. */
+  _mascotObserver = new MutationObserver(function () {
+    if (!document.getElementById("lt-auth-mascot")) teardownMascot();
+  });
+  _mascotObserver.observe(document.body, { childList: true, subtree: true });
+}
+
 function renderWelcomeGate() {
   injectStyles();
   var existing = document.getElementById("lt-auth-gate");
@@ -692,8 +756,8 @@ function renderWelcomeGate() {
       '<div class="lt-auth-herowrap">' +
         '<div class="lt-auth-hero">' +
           '<svg class="lt-auth-stars" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + stars + '</svg>' +
-          '<canvas class="lt-auth-rive-mascot" id="lt-auth-rive-mascot" aria-label="Animated Minutics mascot"></canvas>' +
         '</div>' +
+        '<div class="lt-auth-mascot"><canvas id="lt-auth-mascot" width="336" height="400" aria-label="Minutics mascot"></canvas></div>' +
         '<div class="lt-auth-badge"><img class="lt-auth-badge-logo" src="./assets/icons/logo-512.png" alt="Minutics logo"></div>' +
       '</div>' +
       '<div class="lt-auth-wtext">' +
@@ -706,7 +770,7 @@ function renderWelcomeGate() {
       '</div>' +
     '</main>';
   document.body.appendChild(gate);
-  mountWelcomeMascot();
+  mountMascot();
 
   document.getElementById("lt-auth-get-started").addEventListener("click", function () {
     renderGate("signup");
