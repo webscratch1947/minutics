@@ -1506,11 +1506,7 @@ function LifeProgressCard({ profile }) {
           jsxs('div', {
             className: 'mt-1.5 relative flex items-baseline gap-1.5 min-w-0',
             children: [
-              jsx('span', {
-                className: 'pointer-events-none absolute right-0 -bottom-2 text-[64px] font-black leading-none text-foreground/[0.05] select-none',
-                children: '\u20B9'
-              }),
-              jsx('span', { className: 'relative text-[17px] font-black text-accent/70 leading-none', children: 'Rs.' }),
+              jsx('span', { className: 'text-[17px] font-black text-accent/70 leading-none', children: 'Rs.' }),
               jsxs('span', {
                 className: 'relative flex items-baseline min-w-0',
                 children: [

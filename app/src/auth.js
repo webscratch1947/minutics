@@ -7,11 +7,15 @@
 
 import { initializeApp } from "firebase/app";
 import {
-  getAuth,
+  initializeAuth,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  inMemoryPersistence,
 } from "firebase/auth";
 
 const firebaseConfig = {
@@ -25,7 +29,19 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+/* Explicit persistence CASCADE: IndexedDB first (where existing sessions
+   live), then localStorage, then session, then memory. When Chrome refuses
+   to open IndexedDB ("Database is closing/hidden" — hidden/bfcached pages),
+   Firebase falls through to the next store instead of failing silently,
+   which was making the login gate randomly reappear on reload. */
+const auth = initializeAuth(app, {
+  persistence: [
+    indexedDBLocalPersistence,
+    browserLocalPersistence,
+    browserSessionPersistence,
+    inMemoryPersistence,
+  ],
+});
 
 /* ── Per-account localStorage namespaces ─────────────────────────────────
    Every Firebase UID owns a private slice of localStorage. On logout /
@@ -826,17 +842,43 @@ function cleanupEnhancementVisuals() {
 }
 
 /* ── Safety: if IndexedDB crashes and onAuthStateChanged never fires,
-   re-render a working login gate after 8s so the user isn't stuck on a
+   re-render a working login gate after 15s so the user isn't stuck on a
    grey screen with no way in. NEVER bypasses auth. Only fires when
-   Firebase never responded. ─────────────────────────────────────────── */
+   Firebase never responded. If the tab is hidden at that moment (bfcached
+   / prerendered pages delay storage reads), wait until it is visible
+   before giving up — Firebase usually resolves right after. ────────── */
 var _authStateChangedFired = false;
+function _authSafetyFire() {
+  if (_authStateChangedFired) return;
+  console.warn("AUTH SAFETY: Firebase never responded — re-rendering login gate (never bypassing auth)");
+  document.body.classList.remove("lt-authed");
+  renderGate("welcome");
+}
 setTimeout(function () {
-  if (!_authStateChangedFired) {
-    console.warn("AUTH SAFETY: Firebase never responded — re-rendering login gate (never bypassing auth)");
-    document.body.classList.remove("lt-authed");
-    renderGate("welcome");
+  if (_authStateChangedFired) return;
+  if (document.visibilityState === "hidden") {
+    var onVis = function () {
+      if (document.visibilityState !== "hidden") {
+        document.removeEventListener("visibilitychange", onVis);
+        setTimeout(_authSafetyFire, 5000); /* give Firebase a beat once visible */
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    setTimeout(_authSafetyFire, 20000); /* absolute cap */
+  } else {
+    _authSafetyFire();
   }
-}, 8000);
+}, 15000);
+
+/* Pages restored from the back-forward cache can come back with a closed
+   IndexedDB connection ("Database is closing/hidden"). If auth never
+   resolved on such a restore, do a clean reload instead of showing a
+   broken gate. */
+window.addEventListener("pageshow", function (e) {
+  if (e.persisted && !_authStateChangedFired) {
+    try { location.reload(); } catch (err) {}
+  }
+});
 
 /* Show a neutral opaque splash immediately so a Firebase/IndexedDB crash
    can never leave a blank grey screen — and so a signed-in user never
