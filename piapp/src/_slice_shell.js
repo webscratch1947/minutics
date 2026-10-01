@@ -84,12 +84,24 @@ function LTTopNav() {
   });
 }
 
+/* Reset the shared scroll container whenever the tab changes so a scrolled
+   Timer tab never leaves the Life Hub (or any other tab) pre-scrolled. */
+function ScrollReset() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const main = document.querySelector('#root main') || document.querySelector('main');
+    if (main) main.scrollTop = 0;
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }, [pathname]);
+  return null;
+}
+
 export function ak({
   children: e
 }) {
   return jsxs("div", {
     className: "relative mx-auto max-w-[430px] w-full h-[100dvh] overflow-hidden bg-background flex flex-col",
-    children: [jsx(LTTopNav, {}), jsx("main", {
+    children: [jsx(ScrollReset, {}), jsx(LTTopNav, {}), jsx("main", {
       className: "flex-1 min-h-0 overflow-y-auto overscroll-contain pb-[88px] no-scrollbar",
       children: e
     }), jsx(ck, {})]

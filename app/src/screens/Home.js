@@ -1371,6 +1371,12 @@ function LifeProgressCard({ profile }) {
       tvData = { value, remHours, remMin, rate: pm * 60, bars: Math.max(1, Math.min(9, Math.ceil((remSecToday / 86400) * 9))), pct: Math.max(0, Math.min(100, Math.ceil((remSecToday / 86400) * 100))) };
     }
   } catch (e) { /* ignore */ }
+  let tvSplit = null;
+  if (tvData) {
+    const s = tvData.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dot = s.indexOf('.');
+    tvSplit = [s.slice(0, dot), s.slice(dot + 1)];
+  }
 
   return jsxs('div', {
     className: 'mx-4 mt-3 flex flex-col gap-3',
@@ -1497,9 +1503,22 @@ function LifeProgressCard({ profile }) {
               })
             ]
           }),
-          jsxs('p', {
-            className: 'mt-1 font-black text-[34px] leading-none tracking-tight tabular-nums text-accent',
-            children: ['Rs.' + tvData.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
+          jsxs('div', {
+            className: 'mt-1.5 relative flex items-baseline gap-1.5 min-w-0',
+            children: [
+              jsx('span', {
+                className: 'pointer-events-none absolute right-0 -bottom-2 text-[64px] font-black leading-none text-foreground/[0.05] select-none',
+                children: '\u20B9'
+              }),
+              jsx('span', { className: 'relative text-[17px] font-black text-accent/70 leading-none', children: 'Rs.' }),
+              jsxs('span', {
+                className: 'relative flex items-baseline min-w-0',
+                children: [
+                  jsx('span', { className: 'text-[42px] font-black leading-none tracking-tight tabular-nums bg-gradient-to-br from-accent to-emerald-600 bg-clip-text text-transparent', children: tvSplit[0] }),
+                  jsx('span', { className: 'text-[21px] font-black leading-none tabular-nums text-accent/70 ml-0.5', children: '.' + tvSplit[1] })
+                ]
+              })
+            ]
           }),
           jsxs('div', {
             className: 'flex gap-[2px] mt-3 pt-3 border-t border-foreground/10',
@@ -1588,48 +1607,63 @@ function TodayGlance({ activities, blocks }) {
   const palette = ['#4F46E5', '#0EA5E9', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444'];
 
   return jsxs('div', {
-    className: 'mx-4 mt-3',
+    className: 'mx-4 mt-3 bg-white border border-black/[.06] rounded-3xl px-3.5 pt-3.5 pb-2.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
     children: [
       jsxs('div', {
-        className: 'flex items-center justify-between mb-2.5',
+        className: 'flex items-center justify-between mb-1.5',
         children: [
           jsx('p', {
-            className: 'text-[18px] font-black text-foreground',
+            className: 'text-[16px] font-black text-foreground',
             children: 'Today at a Glance'
           }),
-          jsx('span', {
-            className: 'text-[11px] font-extrabold text-foreground/45 tabular-nums',
-            children: formatMins(totalMinutes) + ' tracked'
+          jsxs('span', {
+            className: 'inline-flex items-center gap-1 bg-foreground/[0.05] rounded-full px-2.5 py-1 text-[10.5px] font-extrabold text-foreground/55 tabular-nums',
+            children: [
+              jsx(Zb, { className: 'w-3 h-3 text-foreground/40' }),
+              formatMins(totalMinutes) + ' tracked'
+            ]
           })
         ]
       }),
       jsx('div', {
-        className: 'flex flex-col gap-2',
+        className: 'flex flex-col',
         children: display.map((a, i) => {
           const pct = totalMinutes > 0 ? Math.round((a.minutes / totalMinutes) * 100) : 0;
           const color = a.color && /^#|hsl|rgb/i.test(a.color) ? a.color : palette[i % palette.length];
+          const hex = /^#[0-9a-fA-F]{6}$/.test(color) ? color : null;
+          const tint = hex ? hex + '1A' : color;
           const emoji = typeof a.emoji === 'string' && a.emoji.trim() ? a.emoji.trim() : null;
           const letter = (a.name || '?').trim().charAt(0).toUpperCase();
           return jsxs('div', {
-            className: 'flex items-center gap-3 bg-background border border-border rounded-xl px-3 py-2.5',
+            className: 'flex items-center gap-3 rounded-2xl px-1.5 py-1.5',
             children: [
               jsx('div', {
-                className: cn('w-9 h-9 rounded-full flex items-center justify-center shrink-0', emoji ? 'text-[17px]' : 'text-white text-[15px] font-black'),
-                style: { background: color, fontFamily: emoji ? "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif" : undefined },
+                className: cn('w-11 h-11 rounded-2xl flex items-center justify-center shrink-0', emoji ? 'text-[19px]' : 'text-[16px] font-black'),
+                style: {
+                  background: tint,
+                  color: color,
+                  fontFamily: emoji ? "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif" : undefined
+                },
                 children: emoji || letter
               }),
               jsxs('div', {
                 className: 'flex-1 min-w-0',
                 children: [
                   jsxs('div', {
-                    className: 'flex items-baseline justify-between gap-2',
+                    className: 'flex items-center justify-between gap-2',
                     children: [
-                      jsx('span', { className: 'text-[13px] font-bold text-foreground truncate', children: a.name }),
-                      jsx('span', { className: 'text-[13px] font-black text-foreground tabular-nums shrink-0', children: formatMins(a.minutes) })
+                      jsx('span', { className: 'text-[13.5px] font-bold text-foreground truncate', children: a.name }),
+                      jsxs('span', {
+                        className: 'inline-flex items-center gap-1 shrink-0 bg-foreground/[0.05] rounded-full px-2 py-0.5 text-[10.5px] font-extrabold text-foreground/60 tabular-nums',
+                        children: [
+                          jsx(Zb, { className: 'w-3 h-3 text-foreground/40' }),
+                          formatMins(a.minutes)
+                        ]
+                      })
                     ]
                   }),
                   jsx('div', {
-                    className: 'h-1.5 w-full rounded-full bg-border overflow-hidden mt-1.5',
+                    className: 'h-1.5 w-full rounded-full bg-foreground/10 overflow-hidden mt-1.5',
                     children: jsx('div', {
                       className: 'h-full rounded-full',
                       style: { width: (totalMinutes > 0 ? pct : 0) + '%', background: color, transition: 'width .4s ease' }

@@ -91,6 +91,11 @@ function LTTopNav() {
 function RouteWatcher() {
   const { pathname } = useLocation();
   useEffect(() => {
+    /* Reset the shared scroll container so switching tabs never inherits
+       the previous tab's scroll offset (e.g. Timer scrolled → Life Hub). */
+    const main = document.querySelector('#root main') || document.querySelector('main');
+    if (main) main.scrollTop = 0;
+    try { window.scrollTo(0, 0); } catch (e) {}
     try { window.dispatchEvent(new CustomEvent('lt-route-change', { detail: pathname })); } catch (e) {}
   }, [pathname]);
   return null;
