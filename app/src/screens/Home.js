@@ -590,7 +590,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                   }),
                   jsx('p', {
                     className: cn('text-[11px] font-semibold mt-1 mb-0 truncate', isActive ? 'text-accent tabular-nums' : 'text-foreground/40'),
-                    children: isActive ? `${formatElapsed(elapsedSeconds)} · tap for options` : 'Tap to start tracking'
+                    children: isActive ? `${formatElapsed(elapsedSeconds)} tracking` : 'Tap to start'
                   })
                 ]
               }),
@@ -714,9 +714,12 @@ function BottomSheet({ children, onDismiss }) {
         className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
-          // Drag handle
-          jsx('div', {
-            className: 'flex justify-center pt-2.5 pb-1 shrink-0',
+          // Drag handle — tap = back (dismisses the sheet, like a back button)
+          jsx('button', {
+            type: 'button',
+            onClick: onDismiss,
+            'aria-label': 'Back',
+            className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors',
             children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
           }),
           jsx('div', {
@@ -946,9 +949,12 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
         className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
-          // Drag handle
-          jsx('div', {
-            className: 'flex justify-center pt-2.5 pb-1 shrink-0',
+          // Drag handle — tap = back (dismisses the sheet, like a back button)
+          jsx('button', {
+            type: 'button',
+            onClick: onClose,
+            'aria-label': 'Back',
+            className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors',
             children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
           }),
           // Header
@@ -1161,9 +1167,12 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
         className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
-          // Drag handle
-          jsx('div', {
-            className: 'flex justify-center pt-2.5 pb-1 shrink-0',
+          // Drag handle — tap = back (dismisses the sheet, like a back button)
+          jsx('button', {
+            type: 'button',
+            onClick: onClose,
+            'aria-label': 'Back',
+            className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors',
             children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
           }),
           // Header
