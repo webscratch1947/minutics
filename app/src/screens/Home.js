@@ -541,67 +541,82 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
             onTap();
           }
         },
-        className: cn('group flex items-center w-full cursor-pointer select-none transition-colors bg-white hover:bg-secondary'),
-        style: { borderLeft: isActive ? `4px solid ${activity.color}` : '4px solid transparent' },
+        className: cn(
+          'group flex items-center w-full cursor-pointer select-none rounded-2xl bg-white border transition-all',
+          isActive
+            ? 'border-accent/60 shadow-[0_12px_30px_rgba(0,194,168,0.18)]'
+            : 'border-black/[.06] shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_26px_rgba(15,23,42,0.09)]'
+        ),
         children: [
-          // Left section: emoji/dot + name + edit button
+          // Left: emoji tile + name/status + actions
           jsxs('div', {
-            className: 'flex items-center flex-1 min-w-0 px-5 py-5 gap-4',
+            className: 'flex items-center flex-1 min-w-0 gap-3 pl-3 pr-2.5 py-2.5',
             children: [
-              // Emoji or colored dot
+              // Tinted emoji tile (or colored dot fallback)
               activity.emoji
                 ? jsx('span', {
-                    className: 'text-lg leading-none shrink-0 w-5 text-center',
+                    className: 'w-11 h-11 rounded-2xl flex items-center justify-center text-[20px] shrink-0',
+                    style: {
+                      background: (activity.color || '#00C2A8') + '22',
+                      fontFamily: "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"
+                    },
                     children: activity.emoji
                   })
-                : jsx('div', {
-                    className: cn('w-2.5 h-2.5 shrink-0', isActive && 'animate-pulse'),
-                    style: { backgroundColor: activity.color }
+                : jsx('span', {
+                    className: 'w-11 h-11 rounded-2xl flex items-center justify-center shrink-0',
+                    style: { background: (activity.color || '#00C2A8') + '1A' },
+                    children: jsx('span', {
+                      className: cn('w-3 h-3 rounded-full', isActive && 'animate-pulse'),
+                      style: { backgroundColor: activity.color }
+                    })
                   }),
-              // Activity name
-              jsx('span', {
-                className: 'text-base font-semibold flex-1 min-w-0 text-foreground',
-                children: activity.name
+              // Name + status line
+              jsxs('div', {
+                className: 'flex-1 min-w-0',
+                children: [
+                  jsx('p', {
+                    className: 'text-[15px] font-bold text-foreground m-0 truncate leading-tight',
+                    children: activity.name
+                  }),
+                  jsx('p', {
+                    className: cn('text-[11px] font-semibold mt-1 mb-0 truncate', isActive ? 'text-accent' : 'text-foreground/40'),
+                    children: isActive ? 'Tracking now — tap for options' : 'Tap to start tracking'
+                  })
+                ]
               }),
-              // Edit button
-              jsx('button', {
-                onClick: openEdit,
-                className: 'lt-edit-button shrink-0',
-                title: 'Edit',
-                'data-lt-edit-replaced': '1',
-                children: jsx('span', {
-                  className: 'text-sm',
-                  children: 'Edit'
-                })
-              })
-            ]
-          }),
-          // Right section: elapsed time + play/clock + trash
-          jsxs('div', {
-            className: 'flex items-center gap-2 px-4 shrink-0',
-            children: [
-              // Elapsed time display (when active)
-              isActive && jsx('span', {
-                className: 'font-mono text-sm font-bold tabular-nums',
-                style: { color: activity.color },
-                children: formatElapsed(elapsedSeconds)
-              }),
-              // Play/Clock icon button
-              jsx('div', {
-                className: cn(
-                  'w-8 h-8 flex items-center justify-center border transition-colors',
-                  isActive ? 'border-current' : 'border-border group-hover:border-foreground'
-                ),
-                style: isActive ? { borderColor: activity.color, color: activity.color } : {},
-                children: isActive
-                  ? jsx(Zb, { className: 'w-4 h-4' })        // Clock icon when running
-                  : jsx(nk, { className: 'w-4 h-4 text-muted-foreground group-hover:text-foreground' }) // Play icon when stopped
-              }),
-              // Trash button
-              jsx('button', {
-                onClick: handleDelete,
-                className: 'w-8 h-8 flex items-center justify-center border border-transparent hover:border-destructive hover:text-destructive text-muted-foreground transition-all',
-                children: jsx(lk, { className: 'w-4 h-4' })
+              // Right: edit + delete + run button
+              jsxs('div', {
+                className: 'flex items-center gap-1.5 shrink-0',
+                children: [
+                  isActive && jsx('span', {
+                    className: 'font-mono text-[13px] font-black tabular-nums mr-0.5',
+                    style: { color: activity.color },
+                    children: formatElapsed(elapsedSeconds)
+                  }),
+                  jsx('button', {
+                    onClick: openEdit,
+                    title: 'Edit',
+                    'data-lt-edit-replaced': '1',
+                    className: 'w-8 h-8 flex items-center justify-center rounded-full text-foreground/35 hover:text-foreground hover:bg-foreground/5 transition-colors',
+                    children: jsx(tk, { className: 'w-4 h-4' })
+                  }),
+                  jsx('button', {
+                    onClick: handleDelete,
+                    title: 'Remove',
+                    className: 'w-8 h-8 flex items-center justify-center rounded-full text-foreground/35 hover:text-destructive hover:bg-destructive/10 transition-colors',
+                    children: jsx(lk, { className: 'w-4 h-4' })
+                  }),
+                  jsx('span', {
+                    className: cn(
+                      'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all',
+                      isActive ? 'text-white shadow-[0_6px_16px_rgba(0,0,0,0.18)]' : 'bg-accent text-white group-hover:brightness-95 group-hover:scale-105'
+                    ),
+                    style: isActive ? { backgroundColor: activity.color } : {},
+                    children: isActive
+                      ? jsx(Zb, { className: 'w-4 h-4' })
+                      : jsx(nk, { className: 'w-4 h-4 ml-0.5' })
+                  })
+                ]
               })
             ]
           })
@@ -1218,7 +1233,7 @@ function AddActivityBar() {
     children: [
       // Add bar
       jsxs('div', {
-        className: 'border-t border-border bg-white flex items-center',
+        className: 'mx-4 mt-3 mb-1 rounded-2xl bg-white border border-black/[.06] shadow-[0_6px_20px_rgba(15,23,42,0.05)] flex items-center gap-1 pr-2 pl-4',
         children: [
           // Text input
           jsx('input', {
@@ -1230,23 +1245,23 @@ function AddActivityBar() {
               if (e.key === 'Enter') handleAdd();
             },
             placeholder: 'New activity...',
-            className: 'flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none px-2 py-4 text-base font-medium min-w-0'
+            className: 'flex-1 bg-transparent text-foreground placeholder:text-foreground/35 outline-none py-3.5 text-[15px] font-semibold min-w-0'
           }),
           // Emoji picker button (shows selected emoji or 🙂 default)
           jsx('button', {
             type: 'button',
             onClick: () => setShowNewPicker(true),
-            className: 'h-full px-4 py-4 flex items-center justify-center text-xl text-muted-foreground shrink-0',
+            className: 'w-9 h-9 rounded-full bg-foreground/[0.05] hover:bg-foreground/10 flex items-center justify-center text-lg shrink-0 transition-colors',
             title: 'Choose emoji',
             children: newEmoji || '🙂'
           }),
-          // Add button with Plus icon
+          // Add button
           jsxs('button', {
             onClick: handleAdd,
             disabled: !name.trim() || createActivity.isPending,
-            className: 'h-full px-5 py-4 flex items-center gap-2 bg-primary text-white font-semibold text-sm disabled:opacity-40 shrink-0',
+            className: 'h-9 px-4 rounded-full bg-accent text-white font-extrabold text-[13px] flex items-center gap-1.5 disabled:opacity-40 shrink-0 transition-all hover:brightness-95',
             children: [
-              jsx(rk, { className: 'w-4 h-4' }), // Plus icon
+              jsx(rk, { className: 'w-4 h-4' }),
               'Add'
             ]
           })
@@ -1915,17 +1930,17 @@ function calcFocusScore(statsActivities) {
 
 function StatCard({ icon, iconBg, label, value, suffix }) {
   return jsxs('div', {
-    className: 'rounded-2xl border border-black/[0.06] bg-card p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]',
+    className: 'rounded-3xl border border-black/[.06] bg-white p-4 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
     children: [
       jsx('div', {
-        className: 'inline-flex items-center justify-center w-[30px] h-[30px] rounded-full text-sm mb-2',
+        className: 'w-9 h-9 rounded-full flex items-center justify-center text-base mb-2.5',
         style: { background: iconBg },
         children: icon
       }),
-      jsx('p', { className: 'text-xs text-muted-foreground mb-0.5', children: label }),
-      jsxs('p', { className: 'text-xl font-extrabold text-foreground m-0', children: [
+      jsx('p', { className: 'text-[9.5px] font-extrabold uppercase tracking-[0.16em] text-foreground/45 m-0 mb-1', children: label }),
+      jsxs('p', { className: 'text-[21px] font-black text-foreground m-0 leading-none tabular-nums', children: [
         value,
-        suffix && jsx('span', { className: 'text-xs font-semibold text-muted-foreground ml-0.5', children: suffix })
+        suffix && jsx('span', { className: 'text-[11px] font-bold text-foreground/40 ml-0.5', children: suffix })
       ] })
     ]
   });
@@ -2016,16 +2031,22 @@ export function ActivityScreen({ profile }) {
     children: [
       // Title header
       jsxs('div', {
-        className: 'flex items-baseline justify-between gap-2.5 px-4 pt-4 pb-1 flex-wrap',
+        className: 'flex items-center justify-between gap-2.5 px-4 pt-4 pb-1',
         children: [
-          jsx('h1', { className: 'text-[26px] font-black text-foreground m-0', children: "Activity's" }),
-          jsx('span', { className: 'text-xs font-semibold text-muted-foreground whitespace-nowrap', children: dateLabel })
+          jsx('h1', { className: 'text-[26px] font-black text-foreground m-0 leading-none', children: 'Activity' }),
+          jsxs('span', {
+            className: 'inline-flex items-center gap-1.5 text-[11px] font-bold text-foreground/55 bg-white border border-black/[.06] rounded-full px-3 py-1.5 shadow-[0_6px_18px_rgba(15,23,42,0.05)] whitespace-nowrap',
+            children: [
+              jsx('span', { className: 'w-1.5 h-1.5 rounded-full bg-accent' }),
+              dateLabel
+            ]
+          })
         ]
       }),
 
       // 2x2 stats grid
       jsxs('div', {
-        className: 'grid grid-cols-2 gap-2.5 px-4 pt-3 pb-1',
+        className: 'grid grid-cols-2 gap-3 px-4 pt-3.5 pb-1',
         children: [
           jsx(StatCard, { icon: '\u23F1', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
           jsx(StatCard, { icon: '\uD83D\uDCB0', iconBg: '#FEF3C7', label: 'Value Earned', value: valueEarned > 0 ? 'Rs.' + valueEarned.toFixed(2) : '--', suffix: valueEarned > 0 ? undefined : '' }),
@@ -2036,19 +2057,28 @@ export function ActivityScreen({ profile }) {
 
       // Section label
       jsxs('div', {
-        className: 'px-4 pt-3.5 pb-2',
+        className: 'flex items-end justify-between gap-2 px-4 pt-4 pb-2.5',
         children: [
-          jsx('p', { className: 'text-base font-extrabold text-foreground m-0', children: 'Your Activities' }),
-          jsx('p', { className: 'text-[11px] font-semibold text-muted-foreground mt-[-4px] mb-0', children: "Default activities don't count toward achievements" })
+          jsxs('div', {
+            className: 'min-w-0',
+            children: [
+              jsx('p', { className: 'text-[17px] font-black text-foreground m-0 leading-tight', children: 'Your Activities' }),
+              jsx('p', { className: 'text-[11px] font-semibold text-muted-foreground mt-0.5 mb-0', children: "Default activities don't count toward achievements" })
+            ]
+          }),
+          activities.length > 0 && jsx('span', {
+            className: 'shrink-0 text-[10px] font-extrabold uppercase tracking-[0.12em] text-foreground/45 bg-white border border-black/[.06] rounded-full px-2.5 py-1.5',
+            children: activities.length + ' total'
+          })
         ]
       }),
 
       // Activity list
       jsxs('div', {
-        className: 'flex flex-col divide-y divide-border',
+        className: 'flex flex-col gap-2.5 px-4',
         children: [
           activities.length === 0 && jsxs('div', {
-            className: 'flex flex-col items-center justify-center py-20 px-8 text-center bg-background',
+            className: 'flex flex-col items-center justify-center py-12 px-8 text-center bg-white rounded-3xl border border-black/[.06] shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
             children: [
               jsx(rh, { className: 'w-8 h-8 text-muted-foreground mb-4 opacity-30' }),
               jsx('p', { className: 'text-muted-foreground font-medium', children: 'No activities yet.' }),
