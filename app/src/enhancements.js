@@ -4443,7 +4443,19 @@
     /* Only guard the Add-activity button, not other "Add" buttons elsewhere in the app */
     var wrap = input.closest("div");
     if (!wrap || !wrap.contains(addBtn)) return;
-    if (userActivityCount() >= FREE_ACTIVITY_LIMIT) {
+    if (nonArchivedActivityCount() >= FREE_ACTIVITY_LIMIT) {
+      e.preventDefault();
+      e.stopPropagation();
+      showUpgradePrompt("You can't add more than " + FREE_ACTIVITY_LIMIT + " activities on the Free plan. Remove an activity or upgrade for unlimited.");
+    }
+  }, true);
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    if (isPro()) return;
+    var input = document.querySelector('input[placeholder="New activity..."]');
+    if (!input || document.activeElement !== input) return;
+    if (nonArchivedActivityCount() >= FREE_ACTIVITY_LIMIT) {
       e.preventDefault();
       e.stopPropagation();
       showUpgradePrompt("You can't add more than " + FREE_ACTIVITY_LIMIT + " activities on the Free plan. Remove an activity or upgrade for unlimited.");

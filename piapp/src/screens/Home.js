@@ -17,9 +17,12 @@ import { useDeleteActivity } from '../hooks/useDeleteActivity.js';
 import { useTodayStats } from '../hooks/useTodayStats.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '../lib/cn.js';
+import { isPro } from '../lib/settings.js';
 
 // Icons
 import { Timer as Ty, CalendarClock as Jb, Clock as Zb, Play as nk, Trash2 as lk, Square as rh, Plus as rk, Pencil as tk } from 'lucide-react';
+
+const FREE_ACTIVITY_LIMIT = 5;
 
 // ─── LT Timer Panel ─────────────────────────────────────────────────────────
 // Collapsible panel containing the retirement countdown timer.
@@ -645,15 +648,21 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
           }
         },
         className: cn(
-          'group flex items-center w-full cursor-pointer select-none rounded-2xl bg-white border transition-all',
+          'group relative overflow-hidden flex items-center w-full cursor-pointer select-none rounded-2xl bg-white border transition-all',
           isActive
             ? 'border-accent/60 shadow-[0_12px_30px_rgba(0,194,168,0.18)]'
             : 'border-black/[.06] shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_26px_rgba(15,23,42,0.09)]'
         ),
         children: [
+          // Activity color rail
+          jsx('span', {
+            'aria-hidden': true,
+            className: 'absolute left-0 top-0 bottom-0 w-[5px]',
+            style: { background: activity.color || '#00C2A8' }
+          }),
           // Left: emoji tile + name/status + actions
           jsxs('div', {
-            className: 'flex items-center flex-1 min-w-0 gap-3 pl-3 pr-2.5 py-2.5',
+            className: 'flex items-center flex-1 min-w-0 gap-3 pl-4 pr-2.5 py-2.5',
             children: [
               // Tinted emoji tile (or colored dot fallback)
               activity.emoji
@@ -712,7 +721,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                   jsx('span', {
                     className: cn(
                       'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all',
-                      isActive ? 'text-white shadow-[0_6px_16px_rgba(0,0,0,0.18)]' : 'bg-accent text-white group-hover:brightness-95 group-hover:scale-105'
+                      isActive ? 'text-white shadow-[0_6px_16px_rgba(0,0,0,0.18)]' : 'bg-black text-white group-hover:bg-black/85 group-hover:scale-105'
                     ),
                     style: isActive ? { backgroundColor: activity.color } : {},
                     children: isActive
@@ -1312,9 +1321,13 @@ function AddActivityBar() {
   const createActivity = useCreateActivity();
   const queryClient = useQueryClient();
   const inputRef = useRef(null); // zh = React
+  const { data: activities = [] } = useActivities();
+  const freePlan = !isPro();
+  const atLimit = freePlan && activities.length >= FREE_ACTIVITY_LIMIT;
 
   const handleAdd = () => {
     if (!name.trim()) return;
+    if (atLimit) return;
     const randomColor = getRandomColor();
     createActivity.mutate({
       data: {
@@ -1336,37 +1349,59 @@ function AddActivityBar() {
     children: [
       // Add bar
       jsxs('div', {
-        className: 'mx-4 mt-3 mb-1 rounded-2xl bg-white border border-black/[.06] shadow-[0_6px_20px_rgba(15,23,42,0.05)] flex items-center gap-1 pr-2 pl-4',
+        className: cn(
+          'mx-4 mt-3 mb-1 rounded-2xl flex items-center gap-1 pr-2 pl-4 border',
+          atLimit
+            ? 'bg-red-50 border-red-300 shadow-[0_6px_20px_rgba(239,68,68,0.12)]'
+            : 'bg-white border-black/[.06] shadow-[0_6px_20px_rgba(15,23,42,0.05)]'
+        ),
         children: [
           // Text input
           jsx('input', {
             ref: inputRef,
             type: 'text',
             value: name,
+            disabled: atLimit,
             onChange: (e) => setName(e.target.value),
             onKeyDown: (e) => {
               if (e.key === 'Enter') handleAdd();
             },
-            placeholder: 'New activity...',
-            className: 'flex-1 bg-transparent text-foreground placeholder:text-foreground/35 outline-none py-3.5 text-[15px] font-semibold min-w-0'
+            placeholder: atLimit ? 'Free plan limit reached (' + activities.length + '/' + FREE_ACTIVITY_LIMIT + ')' : 'New activity...',
+            className: 'flex-1 bg-transparent text-foreground placeholder:text-foreground/35 disabled:placeholder:text-red-400 outline-none py-3.5 text-[15px] font-semibold min-w-0 disabled:opacity-70'
           }),
           // Emoji picker button (shows selected emoji or 🙂 default)
           jsx('button', {
             type: 'button',
+            disabled: atLimit,
             onClick: () => setShowNewPicker(true),
-            className: 'w-9 h-9 rounded-full bg-foreground/[0.05] hover:bg-foreground/10 flex items-center justify-center text-lg shrink-0 transition-colors',
+            className: 'w-9 h-9 rounded-full bg-foreground/[0.05] hover:bg-foreground/10 flex items-center justify-center text-lg shrink-0 transition-colors disabled:opacity-40',
             title: 'Choose emoji',
             children: newEmoji || '🙂'
           }),
-          // Add button
+          // Add button (black)
           jsxs('button', {
             onClick: handleAdd,
-            disabled: !name.trim() || createActivity.isPending,
-            className: 'h-9 px-4 rounded-full bg-accent text-white font-extrabold text-[13px] flex items-center gap-1.5 disabled:opacity-40 shrink-0 transition-all hover:brightness-95',
+            disabled: atLimit || !name.trim() || createActivity.isPending,
+            className: 'h-9 px-4 rounded-full bg-black text-white font-extrabold text-[13px] flex items-center gap-1.5 disabled:opacity-40 shrink-0 transition-all hover:bg-black/85',
             children: [
               jsx(rk, { className: 'w-4 h-4' }),
               'Add'
             ]
+          })
+        ]
+      }),
+      // Free-plan limit warning
+      atLimit && jsxs('div', {
+        className: 'mx-4 mt-2 mb-3 flex items-center gap-2 rounded-xl bg-red-500/10 border border-red-200 px-3 py-2',
+        children: [
+          jsx('span', {
+            className: 'flex-1 text-[11px] font-bold text-red-600 leading-snug',
+            children: 'Free plan limit reached — you have ' + activities.length + ' of ' + FREE_ACTIVITY_LIMIT + ' activities. Remove an activity to add more.'
+          }),
+          jsx('button', {
+            onClick: () => { if (window.LTPlan && window.LTPlan.showPlansScreen) window.LTPlan.showPlansScreen(); },
+            className: 'shrink-0 h-7 px-3 rounded-full bg-black text-white text-[10px] font-extrabold uppercase tracking-wider hover:bg-black/85',
+            children: 'Upgrade'
           })
         ]
       }),
@@ -1903,19 +1938,19 @@ function calcFocusScore(statsActivities) {
   return Math.min(100, Math.max(0, Math.round(score)));
 }
 
-function StatCard({ icon, iconBg, label, value, suffix }) {
+function StatCard({ icon, iconBg, label, value, suffix, danger }) {
   return jsxs('div', {
-    className: 'rounded-3xl border border-black/[.06] bg-white p-4 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
+    className: 'rounded-2xl bg-white/[0.07] border border-white/10 p-3.5',
     children: [
-      jsx('div', {
-        className: 'w-9 h-9 rounded-full flex items-center justify-center text-base mb-2.5',
+      jsx('span', {
+        className: 'w-7 h-7 rounded-full flex items-center justify-center text-[13px] mb-2',
         style: { background: iconBg },
         children: icon
       }),
-      jsx('p', { className: 'text-[9.5px] font-extrabold uppercase tracking-[0.16em] text-foreground/45 m-0 mb-1', children: label }),
-      jsxs('p', { className: 'text-[21px] font-black text-foreground m-0 leading-none tabular-nums', children: [
+      jsx('p', { className: 'text-[8.5px] font-extrabold uppercase tracking-[0.12em] text-white/40 m-0 mb-1 truncate', children: label }),
+      jsxs('p', { className: cn('text-[20px] font-black m-0 leading-none tabular-nums', danger ? 'text-red-400' : 'text-white'), children: [
         value,
-        suffix && jsx('span', { className: 'text-[11px] font-bold text-foreground/40 ml-0.5', children: suffix })
+        suffix && jsx('span', { className: 'text-[11px] font-bold text-white/40 ml-0.5', children: suffix })
       ] })
     ]
   });
@@ -1949,6 +1984,9 @@ export function ActivityScreen({ profile }) {
   const dateLabel = new Date().toLocaleDateString(undefined, {
     weekday: 'long', month: 'short', day: 'numeric', year: 'numeric'
   });
+
+  const freePlan = !isPro();
+  const limitReached = freePlan && activities.length >= FREE_ACTIVITY_LIMIT;
 
   const handleActivityTap = (activity) => {
     if (runningBlock?.activityId === activity.id) {
@@ -2019,14 +2057,26 @@ export function ActivityScreen({ profile }) {
         ]
       }),
 
-      // 2x2 stats grid
+      // Today summary — black hero card
       jsxs('div', {
-        className: 'grid grid-cols-2 gap-3 px-4 pt-3.5 pb-1',
+        className: 'mx-4 mt-3 rounded-[26px] bg-black p-4 shadow-[0_22px_50px_rgba(0,0,0,0.35)]',
         children: [
-          jsx(StatCard, { icon: '\u23F1', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
-          jsx(StatCard, { icon: '\uD83D\uDCB0', iconBg: '#FEF3C7', label: 'Value Earned', value: valueEarned > 0 ? 'Rs.' + valueEarned.toFixed(2) : '--', suffix: valueEarned > 0 ? undefined : '' }),
-          jsx(StatCard, { icon: '\uD83C\uDFAF', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore, suffix: '/100' }),
-          jsx(StatCard, { icon: '\uD83D\uDD25', iconBg: '#EDE9FE', label: 'Activities', value: activities.length })
+          jsxs('div', {
+            className: 'flex items-center justify-between mb-3',
+            children: [
+              jsx('p', { className: 'text-[9.5px] font-extrabold uppercase tracking-[0.22em] text-white/40 m-0', children: 'Today at a glance' }),
+              jsx('span', { className: 'w-2 h-2 rounded-full bg-accent' })
+            ]
+          }),
+          jsxs('div', {
+            className: 'grid grid-cols-2 gap-2.5',
+            children: [
+              jsx(StatCard, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
+              jsx(StatCard, { icon: '💰', iconBg: '#FEF3C7', label: 'Value Earned', value: valueEarned > 0 ? 'Rs.' + valueEarned.toFixed(2) : '--' }),
+              jsx(StatCard, { icon: '🎯', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore, suffix: '/100' }),
+              jsx(StatCard, { icon: '🔥', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
+            ]
+          })
         ]
       }),
 
@@ -2042,8 +2092,13 @@ export function ActivityScreen({ profile }) {
             ]
           }),
           activities.length > 0 && jsx('span', {
-            className: 'shrink-0 text-[10px] font-extrabold uppercase tracking-[0.12em] text-foreground/45 bg-white border border-black/[.06] rounded-full px-2.5 py-1.5',
-            children: activities.length + ' total'
+            className: cn(
+              'shrink-0 text-[10px] font-extrabold uppercase tracking-[0.12em] rounded-full px-2.5 py-1.5 border',
+              limitReached
+                ? 'bg-red-500 text-white border-red-600 shadow-[0_6px_16px_rgba(239,68,68,0.35)]'
+                : 'text-foreground/45 bg-white border-black/[.06]'
+            ),
+            children: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length + ' total'
           })
         ]
       }),
