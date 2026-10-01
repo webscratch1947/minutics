@@ -1481,30 +1481,25 @@ function LifeProgressCard({ profile }) {
               jsxs('span', {
                 className: 'inline-flex items-baseline gap-1 bg-accent/10 border border-accent/25 rounded-full px-2.5 py-1',
                 children: [
-                  jsx('span', { className: 'text-[13px] font-black text-accent tabular-nums leading-none font-mono', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
+                  jsx('span', { className: 'text-[13px] font-black text-accent tabular-nums leading-none', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
                   jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-accent/60', children: '/H' })
                 ]
               })
             ]
           }),
           jsxs('div', {
-            className: 'mt-2.5 flex items-end justify-between gap-3',
+            className: 'mt-2.5 flex items-center justify-between gap-3',
             children: [
-              jsxs('div', {
-                className: 'min-w-0',
-                children: [
-                  jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining budget' }),
-                  jsxs('p', {
-                    className: 'mt-1 font-mono text-[30px] font-black leading-none tabular-nums text-accent',
-                    children: ['Rs.' + tvData.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
-                  })
-                ]
-              }),
+              jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining budget' }),
               jsxs('span', {
-                className: 'shrink-0 font-mono text-[10.5px] font-bold tracking-wider text-foreground/50 tabular-nums',
+                className: 'shrink-0 text-[11px] font-extrabold tracking-wide text-foreground/50 tabular-nums',
                 children: [tvData.remHours + 'h ' + tvData.remMin + 'm', jsx('span', { className: 'text-foreground/35', children: ' LEFT' })]
               })
             ]
+          }),
+          jsxs('p', {
+            className: 'mt-1 font-black text-[34px] leading-none tracking-tight tabular-nums text-accent',
+            children: ['Rs.' + tvData.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
           }),
           jsxs('div', {
             className: 'flex gap-[2px] mt-3 pt-3 border-t border-foreground/10',
@@ -1559,13 +1554,25 @@ function TodayGlance({ activities, blocks }) {
 
   const totalMinutes = Object.values(activityMinutes).reduce((s, m) => s + m, 0);
 
-  // Top 4 activities by minutes today (stable order for ties), pad rest with 0
+  // All-time minutes per activity (tiebreak so the most-used activities
+  // surface even when today is still 0)
+  const lifetimeMinutes = {};
+  blocks.forEach(b => {
+    if (!b.startTime || !b.activityId) return;
+    const startMs = new Date(b.startTime).getTime();
+    const endMs = b.endTime ? new Date(b.endTime).getTime() : Date.now();
+    if (!(endMs > startMs)) return;
+    lifetimeMinutes[b.activityId] = (lifetimeMinutes[b.activityId] || 0) + Math.round((endMs - startMs) / 60000);
+  });
+
+  // Top 4: most minutes today first, then most all-time usage
   const display = activities
     .map(a => ({
       ...a,
-      minutes: activityMinutes[a.id] || 0
+      minutes: activityMinutes[a.id] || 0,
+      lifetime: lifetimeMinutes[a.id] || 0
     }))
-    .sort((x, y) => y.minutes - x.minutes)
+    .sort((x, y) => (y.minutes - x.minutes) || (y.lifetime - x.lifetime))
     .slice(0, 4);
 
   if (display.length === 0) return null;
@@ -1625,14 +1632,10 @@ function TodayGlance({ activities, blocks }) {
                     className: 'h-1.5 w-full rounded-full bg-border overflow-hidden mt-1.5',
                     children: jsx('div', {
                       className: 'h-full rounded-full',
-                      style: { width: pct + '%', background: color, transition: 'width .4s ease' }
+                      style: { width: (totalMinutes > 0 ? pct : 0) + '%', background: color, transition: 'width .4s ease' }
                     })
                   })
                 ]
-              }),
-              jsx('span', {
-                className: 'text-[11px] font-extrabold text-foreground/45 tabular-nums shrink-0 w-[34px] text-right',
-                children: pct + '%'
               })
             ]
           }, a.id);
@@ -1783,12 +1786,12 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
 
   return jsxs('div', {
     className: cn(
-      'flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition-colors',
+      'flex items-center gap-2.5 rounded-2xl border border-black/20 px-3 py-2.5 transition-colors',
       task?.completed
-        ? 'bg-accent/10 border-accent/30'
+        ? 'bg-accent/10'
         : task
-          ? 'bg-foreground/[0.03] border-black/[.06]'
-          : 'bg-transparent border-dashed border-foreground/15'
+          ? 'bg-foreground/[0.04]'
+          : 'bg-white'
     ),
     children: [
       // Checkbox
@@ -1799,7 +1802,7 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
           'w-[22px] h-[22px] flex-shrink-0 rounded-full border-2 flex items-center justify-center text-[11px] font-black text-white transition-colors',
           task?.completed
             ? 'bg-accent border-accent'
-            : 'border-foreground/25 bg-white hover:border-accent',
+            : 'border-black/30 bg-white hover:border-accent',
           !slotTaskId && 'opacity-35 cursor-default'
         ),
         children: task?.completed ? '\u2713' : null

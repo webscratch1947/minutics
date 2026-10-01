@@ -1583,11 +1583,23 @@ function TodayGlance({ activities, blocks }) {
 
   const totalMinutes = Object.values(activityMinutes).reduce((s, m) => s + m, 0);
 
-  // Always show top 4 activities — sort by minutes desc, pad rest with 0
-  const display = activities.slice(0, 4).map(a => ({
-    ...a,
-    minutes: activityMinutes[a.id] || 0
-  }));
+  // Top 4: most minutes today first, then most all-time usage
+  const lifetimeMinutes = {};
+  blocks.forEach(b => {
+    if (!b.startTime || !b.activityId) return;
+    const startMs = new Date(b.startTime).getTime();
+    const endMs = b.endTime ? new Date(b.endTime).getTime() : Date.now();
+    if (!(endMs > startMs)) return;
+    lifetimeMinutes[b.activityId] = (lifetimeMinutes[b.activityId] || 0) + Math.round((endMs - startMs) / 60000);
+  });
+  const display = activities
+    .map(a => ({
+      ...a,
+      minutes: activityMinutes[a.id] || 0,
+      lifetime: lifetimeMinutes[a.id] || 0
+    }))
+    .sort((x, y) => (y.minutes - x.minutes) || (y.lifetime - x.lifetime))
+    .slice(0, 4);
 
   if (display.length === 0) return null;
 
@@ -1779,12 +1791,12 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
 
   return jsxs('div', {
     className: cn(
-      'flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition-colors',
+      'flex items-center gap-2.5 rounded-2xl border border-black/20 px-3 py-2.5 transition-colors',
       task?.completed
-        ? 'bg-accent/10 border-accent/30'
+        ? 'bg-accent/10'
         : task
-          ? 'bg-foreground/[0.03] border-black/[.06]'
-          : 'bg-transparent border-dashed border-foreground/15'
+          ? 'bg-foreground/[0.04]'
+          : 'bg-white'
     ),
     children: [
       // Checkbox
@@ -1795,7 +1807,7 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
           'w-[22px] h-[22px] flex-shrink-0 rounded-full border-2 flex items-center justify-center text-[11px] font-black text-white transition-colors',
           task?.completed
             ? 'bg-accent border-accent'
-            : 'border-foreground/25 bg-white hover:border-accent',
+            : 'border-black/30 bg-white hover:border-accent',
           !slotTaskId && 'opacity-35 cursor-default'
         ),
         children: task?.completed ? '\u2713' : null
