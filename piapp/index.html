@@ -8,19 +8,7 @@
       .fixed.bottom-0 { padding-bottom: env(safe-area-inset-bottom, 0px) !important; }
       #root { display: none; }
       body.lt-authed #root { display: block; }
-      /* First-paint boot splash: navy screen + pulsing logo, paints before any JS. */
-      #lt-boot-splash { position: fixed; inset: 0; z-index: 2147483646; background: #0b1020; display: flex; align-items: center; justify-content: center; transition: opacity .45s ease; }
-      #lt-boot-splash img { width: 84px; height: 84px; border-radius: 50%; animation: ltBootPulse 1.1s ease-in-out infinite; box-shadow: 0 0 44px rgba(0,194,168,.35); }
-      @keyframes ltBootPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.09); } }
     </style>
-    <script>
-      /* Failsafe: never let the boot splash trap the user. Auth removes it
-         sooner; this just covers a stuck/crashed init. */
-      setTimeout(function () {
-        var b = document.getElementById('lt-boot-splash');
-        if (b) { b.style.opacity = '0'; setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 450); }
-      }, 8000);
-    </script>
     <title>Minutics</title>
     <meta name="description" content="Minutics — Make every minute count." />
     <meta name="robots" content="index, follow" />
@@ -45,7 +33,6 @@
     <link rel="stylesheet" href="./src/styles/main.css">
   </head>
   <body>
-    <div id="lt-boot-splash"><img src="./assets/icons/logo-192.png" alt="Minutics" /></div>
     <div id="root"></div>
   </body>
 </html>

@@ -25,7 +25,6 @@ function demoTimeRemainingMs() {
 }
 function startDemoSession(isNew) {
   if (isNew) localStorage.setItem(DEMO_STORAGE_KEY, String(Date.now()));
-  hideBootSplash();
   var gate = document.getElementById("lt-auth-gate");
   if (gate) gate.remove();
   /* Wait one frame so React (main.js) has time to mount into #root before
@@ -206,18 +205,8 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
-/* Fade the first-paint boot splash (index.html #lt-boot-splash) once a real
-   screen — app or login gate — is ready underneath it. */
-function hideBootSplash() {
-  var b = document.getElementById("lt-boot-splash");
-  if (!b) return;
-  b.style.opacity = "0";
-  setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 450);
-}
-
 /* ── Render the login gate ────────────────────────────────────────────── */
 function renderGate() {
-  hideBootSplash();
   injectStyles();
   var existing = document.getElementById("lt-auth-gate");
   if (existing) {
@@ -289,7 +278,6 @@ function renderGate() {
         /* Store user info locally */
         window.__piUser = r.data.user;
         /* Remove gate and show app */
-        hideBootSplash();
         var g = document.getElementById("lt-auth-gate");
         if (g) g.remove();
         document.body.classList.add("lt-authed");
