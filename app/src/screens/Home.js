@@ -1539,11 +1539,12 @@ function TodayGlance({ activities, blocks }) {
     return () => clearInterval(interval);
   }, []);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const localDay = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const todayStr = localDay(new Date());
   const todayBlocks = blocks.filter(b => {
     if (!b.startTime) return false;
     const start = new Date(b.startTime);
-    const dateStr = start.toISOString().slice(0, 10);
+    const dateStr = localDay(start);
     if (dateStr !== todayStr) return false;
     const end = b.endTime ? new Date(b.endTime) : new Date(now);
     return (end - start) > 0;
@@ -1558,11 +1559,14 @@ function TodayGlance({ activities, blocks }) {
 
   const totalMinutes = Object.values(activityMinutes).reduce((s, m) => s + m, 0);
 
-  // Always show top 4 activities — sort by minutes desc, pad rest with 0
-  const display = activities.slice(0, 4).map(a => ({
-    ...a,
-    minutes: activityMinutes[a.id] || 0
-  }));
+  // Top 4 activities by minutes today (stable order for ties), pad rest with 0
+  const display = activities
+    .map(a => ({
+      ...a,
+      minutes: activityMinutes[a.id] || 0
+    }))
+    .sort((x, y) => y.minutes - x.minutes)
+    .slice(0, 4);
 
   if (display.length === 0) return null;
 
@@ -1597,14 +1601,15 @@ function TodayGlance({ activities, blocks }) {
         children: display.map((a, i) => {
           const pct = totalMinutes > 0 ? Math.round((a.minutes / totalMinutes) * 100) : 0;
           const color = a.color && /^#|hsl|rgb/i.test(a.color) ? a.color : palette[i % palette.length];
+          const emoji = typeof a.emoji === 'string' && a.emoji.trim() ? a.emoji.trim() : null;
           const letter = (a.name || '?').trim().charAt(0).toUpperCase();
           return jsxs('div', {
             className: 'flex items-center gap-3 bg-background border border-border rounded-xl px-3 py-2.5',
             children: [
               jsx('div', {
-                className: 'w-9 h-9 rounded-full flex items-center justify-center text-white text-[15px] font-black shrink-0',
-                style: { background: color },
-                children: letter
+                className: cn('w-9 h-9 rounded-full flex items-center justify-center shrink-0', emoji ? 'text-[17px]' : 'text-white text-[15px] font-black'),
+                style: { background: color, fontFamily: emoji ? "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif" : undefined },
+                children: emoji || letter
               }),
               jsxs('div', {
                 className: 'flex-1 min-w-0',
@@ -1660,11 +1665,15 @@ function EatTheFrog() {
 
   const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-  const starred = tasks.filter(t => t.starred && !t.completed);
+  const starred = tasks.filter(t => t.starred);
   const slots = [];
   for (let i = 0; i < MAX_FROG_TASKS; i++) {
     slots.push(starred[i] || null);
   }
+  const doneCount = starred.filter(t => t.completed).length;
+  const activeCount = starred.length - doneCount;
+  const progMax = Math.max(MAX_FROG_TASKS, starred.length);
+  const progPct = Math.round((doneCount / Math.max(1, progMax)) * 100);
 
   const toggleComplete = (taskId) => {
     const newTasks = tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t);
@@ -1702,23 +1711,52 @@ function EatTheFrog() {
   };
 
   return jsxs('div', {
-    className: 'mx-4 mt-3 p-4 border border-border rounded-2xl bg-background',
+    className: 'mx-4 mt-3 rounded-3xl border border-black/[.06] bg-white shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
+    style: { backgroundImage: 'radial-gradient(130% 100% at 100% 0%, rgba(0,194,168,0.10), rgba(0,194,168,0) 55%),' + 'radial-gradient(90% 80% at 0% 100%, rgba(0,194,168,0.05), rgba(0,194,168,0) 60%)' },
     children: [
-      jsxs('div', { className: 'flex items-center justify-between gap-2', children: [
-        jsx('p', { className: 'text-[15px] font-extrabold text-foreground', children: 'Eat the Frog' }),
-        jsx('img', { src: './assets/eat-the-frog.png', alt: '', className: 'w-12 h-12 object-contain -my-2 shrink-0' })
-      ]}),
-      jsx('p', { className: 'text-xs text-foreground/65 mt-0.5 mb-3', children: starred.length > 0 ? starred.length + ' most important task' + (starred.length !== 1 ? 's' : '') + ' today' : 'Add your most important tasks' }),
-      slots.map((task, i) =>
-        jsx(FrogSlot, {
-          task,
-          index: i,
-          onToggle: toggleComplete,
-          onUnstar: unstarTask,
-          onUpdateTitle: updateTitle,
-          onCreate: createFromSlot
-        }, i)
-      )
+      jsxs('div', {
+        className: 'flex items-start justify-between gap-3 px-4 pt-4',
+        children: [
+          jsxs('div', { className: 'min-w-0', children: [
+            jsxs('p', { className: 'flex items-center gap-1.5 text-[9.5px] font-extrabold uppercase tracking-[0.2em] text-foreground/55', children: [
+              jsx('span', { className: 'inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse' }),
+              'Eat the Frog'
+            ]}),
+            jsx('p', { className: 'text-[19px] font-black text-foreground mt-1 leading-tight', children: activeCount > 0 ? 'Beat your ' + activeCount + ' top task' + (activeCount !== 1 ? 's' : '') : 'Add your top tasks' }),
+            jsx('p', { className: 'text-[11.5px] text-foreground/55 mt-0.5', children: 'Finish what matters before anything else' })
+          ]}),
+          jsx('img', { src: './assets/eat-the-frog.png', alt: '', className: 'w-[74px] h-[74px] object-contain -mt-1 -mr-1 shrink-0' })
+        ]
+      }),
+      jsxs('div', {
+        className: 'flex items-center gap-2.5 px-4 mt-3',
+        children: [
+          jsx('div', {
+            className: 'flex-1 h-2 rounded-full bg-foreground/10 overflow-hidden',
+            children: jsx('div', {
+              className: 'h-full rounded-full bg-accent transition-[width] duration-500',
+              style: { width: progPct + '%' }
+            })
+          }),
+          jsx('span', {
+            className: 'text-[10px] font-extrabold text-foreground/50 tabular-nums shrink-0',
+            children: doneCount + '/' + progMax + ' done'
+          })
+        ]
+      }),
+      jsx('div', {
+        className: 'flex flex-col gap-2 px-4 pt-3 pb-4',
+        children: slots.map((task, i) =>
+          jsx(FrogSlot, {
+            task,
+            index: i,
+            onToggle: toggleComplete,
+            onUnstar: unstarTask,
+            onUpdateTitle: updateTitle,
+            onCreate: createFromSlot
+          }, i)
+        )
+      })
     ]
   });
 }
@@ -1744,17 +1782,24 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
   };
 
   return jsxs('div', {
-    className: 'flex items-center gap-2.5 py-2 border-t border-border first:border-t-0',
+    className: cn(
+      'flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition-colors',
+      task?.completed
+        ? 'bg-accent/10 border-accent/30'
+        : task
+          ? 'bg-foreground/[0.03] border-black/[.06]'
+          : 'bg-transparent border-dashed border-foreground/15'
+    ),
     children: [
       // Checkbox
       jsx('button', {
         type: 'button',
         onClick: () => slotTaskId && onToggle(slotTaskId),
         className: cn(
-          'w-[22px] h-[22px] flex-shrink-0 rounded-full border-2 flex items-center justify-center text-xs text-white',
+          'w-[22px] h-[22px] flex-shrink-0 rounded-full border-2 flex items-center justify-center text-[11px] font-black text-white transition-colors',
           task?.completed
-            ? 'bg-green-500 border-green-500'
-            : 'border-foreground/40 bg-foreground/10',
+            ? 'bg-accent border-accent'
+            : 'border-foreground/25 bg-white hover:border-accent',
           !slotTaskId && 'opacity-35 cursor-default'
         ),
         children: task?.completed ? '\u2713' : null
@@ -1764,18 +1809,19 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
         type: 'text',
         value: localTitle,
         onChange: handleInput,
-        placeholder: 'Add an important task\u2026',
+        placeholder: index === 0 ? 'Add your most important task\u2026' : 'Add another task\u2026',
         className: cn(
-          'flex-1 border border-border focus:border-foreground/40 bg-secondary/30 text-sm text-foreground outline-none rounded-lg px-2.5 py-1.5 min-w-0',
-          task?.completed && 'line-through opacity-60'
+          'flex-1 bg-transparent border-none text-sm text-foreground outline-none min-w-0 py-0.5 placeholder:text-foreground/35',
+          task?.completed && 'line-through opacity-55'
         )
       }),
       // Unstar
       jsx('button', {
         type: 'button',
         onClick: () => slotTaskId && onUnstar(slotTaskId),
+        title: 'Remove from Eat the Frog',
         className: cn(
-          'flex-shrink-0 p-1 text-[#f5a623]',
+          'flex-shrink-0 p-1 text-[#f5a623] hover:scale-110 transition-transform',
           !slotTaskId && 'invisible'
         ),
         children: jsx('svg', {
