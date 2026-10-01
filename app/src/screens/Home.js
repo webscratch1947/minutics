@@ -712,20 +712,25 @@ function BottomSheet({ children, onDismiss }) {
     children: [
       // Backdrop
       jsx('div', {
-        className: 'absolute inset-0 bg-black/50'
+        className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px]'
       }),
       // Panel
       jsxs('div', {
-        className: 'relative w-full max-w-[430px] mx-auto bg-white border-t border-border flex flex-col max-h-[80dvh]',
+        className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
+          // Drag handle
+          jsx('div', {
+            className: 'flex justify-center pt-2.5 pb-1 shrink-0',
+            children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
+          }),
           jsx('div', {
             className: 'overflow-y-auto flex-1',
             children: children
           }),
           // Bottom spacer for safe area
           jsx('div', {
-            className: 'h-20 bg-white shrink-0'
+            className: 'h-16 bg-white shrink-0'
           })
         ]
       })
@@ -738,27 +743,36 @@ function BottomSheet({ children, onDismiss }) {
 
 function ModalHeader({ activity, subtitle }) {
   return jsxs('div', {
-    className: 'px-5 pt-5 pb-3 border-b border-border flex items-center gap-3',
+    className: 'px-5 pt-3 pb-4 flex items-center gap-3.5',
     children: [
-      // Emoji or colored dot
+      // Tinted emoji tile (or color tile fallback)
       activity.emoji
         ? jsx('span', {
-            className: 'text-lg leading-none shrink-0 w-5 text-center',
+            className: 'w-12 h-12 rounded-2xl flex items-center justify-center text-[22px] shrink-0',
+            style: {
+              background: (activity.color || '#00C2A8') + '22',
+              fontFamily: "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"
+            },
             children: activity.emoji
           })
-        : jsx('div', {
-            className: 'w-3 h-3 shrink-0',
-            style: { backgroundColor: activity.color }
+        : jsx('span', {
+            className: 'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
+            style: { background: (activity.color || '#00C2A8') + '1A' },
+            children: jsx('span', {
+              className: 'w-3.5 h-3.5 rounded-full',
+              style: { backgroundColor: activity.color }
+            })
           }),
       // Name + subtitle
       jsxs('div', {
+        className: 'min-w-0',
         children: [
           jsx('p', {
-            className: 'font-bold text-foreground leading-tight',
+            className: 'font-bold text-foreground leading-tight text-[17px] font-black truncate m-0',
             children: activity.name
           }),
           jsx('p', {
-            className: 'text-xs text-muted-foreground mt-0.5',
+            className: 'text-[13px] text-muted-foreground mt-1 mb-0 font-medium',
             children: subtitle
           })
         ]
@@ -768,28 +782,45 @@ function ModalHeader({ activity, subtitle }) {
 }
 
 // ─── Modal Option (Js) ──────────────────────────────────────────────────────
-// Clickable option row for modals (icon + label + description).
+// Clickable option row for modals (icon + label + description + chevron).
 
-function ModalOption({ icon, label, description, onClick, labelClass = '' }) {
+function ModalOption({ icon, label, description, onClick, labelClass = '', primary = false }) {
   return jsxs('button', {
     onClick,
-    className: 'w-full flex items-center gap-4 px-5 py-4 border-b border-border hover:bg-secondary transition-colors text-left',
+    className: cn(
+      'flex items-center gap-3.5 px-4 py-3.5 mb-2.5 mx-4 w-[calc(100%-2rem)] rounded-2xl border text-left transition-all active:scale-[0.985]',
+      primary
+        ? 'bg-black border-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.30)] hover:bg-black/90'
+        : 'bg-white border-black/[.07] shadow-[0_6px_18px_rgba(15,23,42,0.06)] hover:bg-secondary'
+    ),
     children: [
       jsx('div', {
-        className: 'shrink-0 text-foreground',
+        className: cn(
+          'shrink-0 w-11 h-11 rounded-xl flex items-center justify-center',
+          primary ? 'bg-white/15 text-white' : 'bg-secondary text-foreground'
+        ),
         children: icon
       }),
       jsxs('div', {
+        className: 'flex-1 min-w-0',
         children: [
           jsx('p', {
-            className: cn('font-semibold text-sm', labelClass || 'text-foreground'),
+            className: cn('font-bold text-[15px]', labelClass || (primary ? 'text-white' : 'text-foreground')),
             children: label
           }),
           jsx('p', {
-            className: 'text-xs text-muted-foreground mt-0.5',
+            className: cn('text-xs mt-1 font-medium', primary ? 'text-white/60' : 'text-muted-foreground'),
             children: description
           })
         ]
+      }),
+      jsx('svg', {
+        className: cn('w-4 h-4 shrink-0', primary ? 'text-white/50' : 'text-foreground/25'),
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 2.5,
+        children: jsx('path', { d: 'M9 6l6 6-6 6', strokeLinecap: 'round', strokeLinejoin: 'round' })
       })
     ]
   });
@@ -800,17 +831,17 @@ function ModalOption({ icon, label, description, onClick, labelClass = '' }) {
 
 function TimePicker({ label, value, onChange }) {
   const time = value ?? { h: 12, m: 0, ampm: 'AM' };
-  const inputClass = 'border border-border bg-secondary text-foreground font-bold text-lg px-2 py-2.5 outline-none focus:border-primary appearance-none text-center';
+  const inputClass = 'border border-black/[.08] bg-white text-foreground font-black text-lg px-2 py-3 outline-none focus:border-black/40 appearance-none text-center rounded-xl';
 
   return jsxs('div', {
     className: 'flex-1',
     children: [
       jsx('label', {
-        className: 'block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2',
+        className: 'block text-[10px] font-black text-foreground/45 uppercase tracking-[0.14em] mb-2',
         children: label
       }),
       jsxs('div', {
-        className: 'flex items-center gap-1',
+        className: 'flex items-center gap-1.5',
         children: [
           // Hour select (1-12)
           jsx('select', {
@@ -822,7 +853,7 @@ function TimePicker({ label, value, onChange }) {
             )
           }),
           jsx('span', {
-            className: 'font-bold text-foreground text-lg',
+            className: 'font-black text-foreground text-lg',
             children: ':'
           }),
           // Minute select (0-59)
@@ -838,7 +869,7 @@ function TimePicker({ label, value, onChange }) {
           jsx('button', {
             type: 'button',
             onClick: () => onChange({ ...time, ampm: time.ampm === 'AM' ? 'PM' : 'AM' }),
-            className: 'border border-border bg-secondary text-foreground font-bold text-sm px-2 py-2.5 w-12 hover:bg-primary hover:text-white transition-colors',
+            className: 'bg-black text-white font-black text-sm px-2 py-3 w-14 rounded-xl hover:bg-black/85 transition-colors',
             children: time.ampm
           })
         ]
@@ -902,7 +933,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
   const isValid = durationMinutes !== null && durationMinutes > 0;
   const spansDays = fromDate !== toDate || wrapsNextDay;
 
-  const dateInputClass = 'border border-border bg-secondary text-foreground font-medium text-sm px-3 py-2 outline-none focus:border-primary w-full';
+  const dateInputClass = 'border border-black/[.08] bg-black/[.035] text-foreground font-semibold text-sm px-3.5 py-3 rounded-xl outline-none focus:border-black/40 w-full';
 
   // When "From" date changes, ensure "To" date doesn't go before it
   const handleFromDateChange = (e) => {
@@ -915,30 +946,49 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
     className: 'fixed inset-0 z-[60] flex items-end',
     onClick: onClose,
     children: [
-      jsx('div', { className: 'absolute inset-0 bg-black/50' }),
+      jsx('div', { className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px]' }),
       jsxs('div', {
-        className: 'relative w-full max-w-[430px] mx-auto bg-white border-t border-border flex flex-col max-h-[85dvh]',
+        className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
+          // Drag handle
+          jsx('div', {
+            className: 'flex justify-center pt-2.5 pb-1 shrink-0',
+            children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
+          }),
           // Header
           jsxs('div', {
-            className: 'px-5 pt-5 pb-3 border-b border-border flex items-center justify-between shrink-0',
+            className: 'px-5 pt-2 pb-4 flex items-center justify-between shrink-0',
             children: [
               jsxs('div', {
-                className: 'flex items-center gap-3',
+                className: 'flex items-center gap-3.5',
                 children: [
-                  jsx('div', {
-                    className: 'w-3 h-3',
-                    style: { backgroundColor: activity.color }
-                  }),
+                  activity.emoji
+                    ? jsx('span', {
+                        className: 'w-12 h-12 rounded-2xl flex items-center justify-center text-[22px] shrink-0',
+                        style: {
+                          background: (activity.color || '#00C2A8') + '22',
+                          fontFamily: "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"
+                        },
+                        children: activity.emoji
+                      })
+                    : jsx('span', {
+                        className: 'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
+                        style: { background: (activity.color || '#00C2A8') + '1A' },
+                        children: jsx('span', {
+                          className: 'w-3.5 h-3.5 rounded-full',
+                          style: { backgroundColor: activity.color }
+                        })
+                      }),
                   jsxs('div', {
+                    className: 'min-w-0',
                     children: [
                       jsx('p', {
-                        className: 'font-bold text-foreground',
+                        className: 'font-bold text-foreground leading-tight text-[17px] font-black truncate m-0',
                         children: activity.name
                       }),
                       jsx('p', {
-                        className: 'text-xs text-muted-foreground',
+                        className: 'text-[13px] text-muted-foreground mt-1 mb-0 font-medium',
                         children: 'Log a time block'
                       })
                     ]
@@ -947,20 +997,28 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               jsx('button', {
                 onClick: onClose,
-                className: 'text-muted-foreground px-2 py-1 text-sm',
-                children: 'x'
+                className: 'w-9 h-9 flex items-center justify-center rounded-full bg-black/[.05] text-foreground/50 hover:text-foreground hover:bg-black/10 transition-colors shrink-0',
+                children: jsx('svg', {
+                  className: 'w-4 h-4',
+                  viewBox: '0 0 24 24',
+                  fill: 'none',
+                  stroke: 'currentColor',
+                  strokeWidth: 2.5,
+                  children: jsx('path', { d: 'M6 6l12 12M18 6L6 18', strokeLinecap: 'round' })
+                })
               })
             ]
           }),
           // Form content
           jsxs('div', {
-            className: 'overflow-y-auto flex-1 px-5 py-5 flex flex-col gap-4',
+            className: 'overflow-y-auto flex-1 px-5 pb-5 flex flex-col gap-3',
             children: [
               // From date
               jsxs('div', {
+                className: 'rounded-2xl border border-black/[.07] bg-[#Fdfbf7] p-3.5',
                 children: [
                   jsx('label', {
-                    className: 'block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5',
+                    className: 'block text-[10px] font-black text-foreground/45 uppercase tracking-[0.14em] mb-2',
                     children: 'Date'
                   }),
                   jsx('input', {
@@ -972,32 +1030,38 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 ]
               }),
               // From time
-              jsx(TimePicker, {
-                label: 'From',
-                value: fromTime,
-                onChange: setFromTime
+              jsxs('div', {
+                className: 'rounded-2xl border border-black/[.07] bg-[#Fdfbf7] p-3.5',
+                children: [
+                  jsx(TimePicker, {
+                    label: 'From',
+                    value: fromTime,
+                    onChange: setFromTime
+                  })
+                ]
               }),
               // Divider
               jsxs('div', {
-                className: 'flex items-center gap-3',
+                className: 'flex items-center gap-3 py-0.5',
                 children: [
-                  jsx('div', { className: 'flex-1 h-px bg-border' }),
+                  jsx('div', { className: 'flex-1 h-px bg-black/10' }),
                   jsx('span', {
-                    className: 'text-muted-foreground text-sm font-semibold',
-                    children: 'TO'
+                    className: 'text-foreground/35 text-[11px] font-black uppercase tracking-[0.18em]',
+                    children: 'to'
                   }),
-                  jsx('div', { className: 'flex-1 h-px bg-border' })
+                  jsx('div', { className: 'flex-1 h-px bg-black/10' })
                 ]
               }),
               // To date with "Ends next day" badge
               jsxs('div', {
+                className: 'rounded-2xl border border-black/[.07] bg-[#Fdfbf7] p-3.5',
                 children: [
                   jsxs('label', {
-                    className: 'flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5',
+                    className: 'flex items-center justify-between text-[10px] font-black text-foreground/45 uppercase tracking-[0.14em] mb-2',
                     children: [
                       jsx('span', { children: 'End date' }),
                       spansDays && jsx('span', {
-                        className: 'text-primary normal-case font-bold',
+                        className: 'text-black normal-case font-black tracking-normal',
                         children: 'Ends next day'
                       })
                     ]
@@ -1012,22 +1076,27 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 ]
               }),
               // To time
-              jsx(TimePicker, {
-                label: 'To',
-                value: toTime,
-                onChange: setToTime
+              jsxs('div', {
+                className: 'rounded-2xl border border-black/[.07] bg-[#Fdfbf7] p-3.5',
+                children: [
+                  jsx(TimePicker, {
+                    label: 'To',
+                    value: toTime,
+                    onChange: setToTime
+                  })
+                ]
               })
             ]
           }),
           // Sticky footer: duration + actions (compact so it never crowds the form)
           jsxs('div', {
-            className: 'shrink-0 bg-white border-t border-border pb-[env(safe-area-inset-bottom)]',
+            className: 'shrink-0 bg-white border-t border-black/[.07] pb-[env(safe-area-inset-bottom)] rounded-b-[28px]',
             children: [
               // Duration preview
               durationMinutes !== null && durationMinutes > 0 && jsx('div', {
-                className: 'px-5 pt-2 pb-1.5 text-center',
+                className: 'px-5 pt-3 pb-1 text-center',
                 children: jsx('p', {
-                  className: 'text-sm font-bold text-primary',
+                  className: 'inline-block text-sm font-black text-white bg-black rounded-full px-4 py-1.5',
                   children: durationMinutes >= 60
                     ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60}m`
                     : `${durationMinutes}m`
@@ -1035,16 +1104,16 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // Validation error
               toTime && durationMinutes !== null && durationMinutes <= 0 && jsx('p', {
-                className: 'px-5 pt-2 pb-1.5 text-sm text-destructive font-medium text-center',
+                className: 'px-5 pt-3 pb-1 text-sm text-red-500 font-bold text-center',
                 children: 'End must be after start.'
               }),
               // Cancel / Log block buttons
               jsxs('div', {
-                className: 'flex border-t border-border',
+                className: 'flex gap-2.5 px-4 py-3.5',
                 children: [
                   jsx('button', {
                     onClick: onClose,
-                    className: 'flex-1 py-3 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
+                    className: 'flex-1 py-3.5 text-foreground/60 font-bold border border-black/[.08] bg-black/[.035] hover:bg-black/[.07] rounded-xl text-sm transition-colors',
                     children: 'Cancel'
                   }),
                   jsx('button', {
@@ -1057,7 +1126,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                       }
                     },
                     disabled: !isValid,
-                    className: 'flex-1 py-3 text-primary font-bold hover:bg-secondary text-sm disabled:opacity-40',
+                    className: 'flex-1 py-3.5 text-white font-black bg-black hover:bg-black/85 rounded-xl text-sm disabled:opacity-30 transition-colors',
                     children: 'Log block'
                   })
                 ]
@@ -1092,30 +1161,49 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
     className: 'fixed inset-0 z-[60] flex items-end',
     onClick: onClose,
     children: [
-      jsx('div', { className: 'absolute inset-0 bg-black/50' }),
+      jsx('div', { className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px]' }),
       jsxs('div', {
-        className: 'relative w-full max-w-[430px] mx-auto bg-white border-t border-border flex flex-col max-h-[85dvh]',
+        className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
+          // Drag handle
+          jsx('div', {
+            className: 'flex justify-center pt-2.5 pb-1 shrink-0',
+            children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
+          }),
           // Header
           jsxs('div', {
-            className: 'px-5 pt-5 pb-3 border-b border-border flex items-center justify-between shrink-0',
+            className: 'px-5 pt-2 pb-4 flex items-center justify-between shrink-0',
             children: [
               jsxs('div', {
-                className: 'flex items-center gap-3',
+                className: 'flex items-center gap-3.5',
                 children: [
-                  jsx('div', {
-                    className: 'w-3 h-3',
-                    style: { backgroundColor: activity.color }
-                  }),
+                  activity.emoji
+                    ? jsx('span', {
+                        className: 'w-12 h-12 rounded-2xl flex items-center justify-center text-[22px] shrink-0',
+                        style: {
+                          background: (activity.color || '#00C2A8') + '22',
+                          fontFamily: "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"
+                        },
+                        children: activity.emoji
+                      })
+                    : jsx('span', {
+                        className: 'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
+                        style: { background: (activity.color || '#00C2A8') + '1A' },
+                        children: jsx('span', {
+                          className: 'w-3.5 h-3.5 rounded-full',
+                          style: { backgroundColor: activity.color }
+                        })
+                      }),
                   jsxs('div', {
+                    className: 'min-w-0',
                     children: [
                       jsx('p', {
-                        className: 'font-bold text-foreground',
+                        className: 'font-bold text-foreground leading-tight text-[17px] font-black truncate m-0',
                         children: 'Edit time block'
                       }),
                       jsx('p', {
-                        className: 'text-xs text-muted-foreground',
+                        className: 'text-[13px] text-muted-foreground mt-1 mb-0 font-medium',
                         children: activity.name
                       })
                     ]
@@ -1124,8 +1212,15 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
               }),
               jsx('button', {
                 onClick: onClose,
-                className: 'text-muted-foreground px-2 py-1 text-sm',
-                children: 'x'
+                className: 'w-9 h-9 flex items-center justify-center rounded-full bg-black/[.05] text-foreground/50 hover:text-foreground hover:bg-black/10 transition-colors shrink-0',
+                children: jsx('svg', {
+                  className: 'w-4 h-4',
+                  viewBox: '0 0 24 24',
+                  fill: 'none',
+                  stroke: 'currentColor',
+                  strokeWidth: 2.5,
+                  children: jsx('path', { d: 'M6 6l12 12M18 6L6 18', strokeLinecap: 'round' })
+                })
               })
             ]
           }),
@@ -1137,29 +1232,29 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
               jsxs('div', {
                 children: [
                   jsx('label', {
-                    className: 'block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5',
+                    className: 'block text-[10px] font-black text-foreground/45 uppercase tracking-[0.14em] mb-2',
                     children: 'Start time'
                   }),
                   jsx('input', {
                     type: 'datetime-local',
                     value: startValue,
                     onChange: (e) => setStartValue(e.target.value),
-                    className: 'w-full border border-border bg-secondary px-3 py-2.5 text-sm font-medium outline-none focus:border-primary text-foreground'
+                    className: 'w-full border border-black/[.08] bg-black/[.035] px-3.5 py-3 rounded-xl text-sm font-semibold outline-none focus:border-black/40 text-foreground'
                   })
                 ]
               }),
               // "Keep timer running" checkbox
               jsxs('label', {
-                className: 'flex items-center gap-3 cursor-pointer select-none',
+                className: 'flex items-center gap-3 cursor-pointer select-none rounded-xl border border-black/[.07] bg-[#Fdfbf7] px-3.5 py-3',
                 children: [
                   jsx('input', {
                     type: 'checkbox',
                     checked: keepRunning,
                     onChange: (e) => setKeepRunning(e.target.checked),
-                    className: 'w-4 h-4 accent-primary'
+                    className: 'w-4 h-4 accent-black'
                   }),
                   jsx('span', {
-                    className: 'text-sm font-medium text-foreground',
+                    className: 'text-sm font-bold text-foreground',
                     children: 'Keep timer running'
                   })
                 ]
@@ -1168,14 +1263,14 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
               !keepRunning && jsxs('div', {
                 children: [
                   jsx('label', {
-                    className: 'block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5',
+                    className: 'block text-[10px] font-black text-foreground/45 uppercase tracking-[0.14em] mb-2',
                     children: 'End time'
                   }),
                   jsx('input', {
                     type: 'datetime-local',
                     value: endValue,
                     onChange: (e) => setEndValue(e.target.value),
-                    className: 'w-full border border-border bg-secondary px-3 py-2.5 text-sm font-medium outline-none focus:border-primary text-foreground'
+                    className: 'w-full border border-black/[.08] bg-black/[.035] px-3.5 py-3 rounded-xl text-sm font-semibold outline-none focus:border-black/40 text-foreground'
                   })
                 ]
               })
@@ -1183,11 +1278,11 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
           }),
           // Cancel / Save buttons
           jsxs('div', {
-            className: 'flex border-t border-border shrink-0',
+            className: 'flex gap-2.5 px-4 py-3.5 border-t border-black/[.07] shrink-0 rounded-b-[28px]',
             children: [
               jsx('button', {
                 onClick: onClose,
-                className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
+                className: 'flex-1 py-3.5 text-foreground/60 font-bold border border-black/[.08] bg-black/[.035] hover:bg-black/[.07] rounded-xl text-sm transition-colors',
                 children: 'Cancel'
               }),
               jsx('button', {
@@ -1196,13 +1291,13 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
                   const endTime = keepRunning ? null : new Date(endValue).toISOString();
                   onSave(startTime, endTime);
                 },
-                className: 'flex-1 py-4 text-primary font-bold hover:bg-secondary text-sm',
+                className: 'flex-1 py-3.5 text-white font-black bg-black hover:bg-black/85 rounded-xl text-sm transition-colors',
                 children: 'Save'
               })
             ]
           }),
           // Bottom spacer
-          jsx('div', { className: 'h-20 bg-white shrink-0' })
+          jsx('div', { className: 'h-8 bg-white shrink-0' })
         ]
       })
     ]
@@ -2157,6 +2252,7 @@ export function ActivityScreen({ profile }) {
             icon: jsx(Ty, { className: 'w-5 h-5' }),
             label: 'Start timer now',
             description: 'Live timer from right now',
+            primary: true,
             onClick: (e) => {
               e.nativeEvent.stopImmediatePropagation();
               startTimer(selectedActivity);
