@@ -457,7 +457,7 @@ function LTEmojiPicker({ value, onSelect, onClose }) {
 // Individual activity row in the list. Shows emoji/icon, name, edit button,
 // elapsed time (when active), play/clock button, and trash button.
 
-function ActivityCard({ activity, isActive, activeBlock, onTap }) {
+function ActivityCard({ activity, isActive, activeBlock, onTap, todaySeconds }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const deleteActivity = useDeleteActivity();
   const queryClient = useQueryClient();
@@ -558,14 +558,14 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
             className: 'absolute left-0 top-0 bottom-0 w-[5px]',
             style: { background: activity.color || '#00C2A8' }
           }),
-          // Left: emoji tile + name/status + actions
+          // Left: emoji tile + name + today time
           jsxs('div', {
-            className: 'flex items-center flex-1 min-w-0 gap-3 pl-4 pr-2.5 py-2.5',
+            className: 'flex items-center flex-1 min-w-0 gap-3 pl-4 pr-2.5 py-3',
             children: [
               // Tinted emoji tile (or colored dot fallback)
               activity.emoji
                 ? jsx('span', {
-                    className: 'w-11 h-11 rounded-2xl flex items-center justify-center text-[20px] shrink-0',
+                    className: 'w-12 h-12 rounded-2xl flex items-center justify-center text-[22px] shrink-0',
                     style: {
                       background: (activity.color || '#00C2A8') + '22',
                       fontFamily: "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"
@@ -573,24 +573,24 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                     children: activity.emoji
                   })
                 : jsx('span', {
-                    className: 'w-11 h-11 rounded-2xl flex items-center justify-center shrink-0',
+                    className: 'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
                     style: { background: (activity.color || '#00C2A8') + '1A' },
                     children: jsx('span', {
-                      className: cn('w-3 h-3 rounded-full', isActive && 'animate-pulse'),
+                      className: cn('w-3.5 h-3.5 rounded-full', isActive && 'animate-pulse'),
                       style: { backgroundColor: activity.color }
                     })
                   }),
-              // Name + status line
+              // Name + today's tracked time
               jsxs('div', {
                 className: 'flex-1 min-w-0',
                 children: [
                   jsx('p', {
-                    className: 'text-[15px] font-bold text-foreground m-0 truncate leading-tight',
+                    className: 'text-[15px] font-extrabold text-foreground m-0 truncate leading-tight',
                     children: activity.name
                   }),
                   jsx('p', {
                     className: cn('text-[11px] font-semibold mt-1 mb-0 truncate', isActive ? 'text-accent' : 'text-foreground/40'),
-                    children: isActive ? 'Tracking now — tap for options' : 'Tap to start tracking'
+                    children: isActive ? 'Tracking now' : fmtMins(todaySeconds || 0) + ' today'
                   })
                 ]
               }),
@@ -613,7 +613,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                   jsx('button', {
                     onClick: handleDelete,
                     title: 'Remove',
-                    className: 'w-8 h-8 flex items-center justify-center rounded-full text-foreground/35 hover:text-destructive hover:bg-destructive/10 transition-colors',
+                    className: 'w-8 h-8 flex items-center justify-center rounded-full text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors',
                     children: jsx(lk, { className: 'w-4 h-4' })
                   }),
                   jsx('span', {
@@ -1972,20 +1972,17 @@ function calcFocusScore(statsActivities) {
   return Math.min(100, Math.max(0, Math.round(score)));
 }
 
-function StatCard({ icon, iconBg, label, value, suffix, danger }) {
+function StatRow({ icon, iconBg, label, value, danger }) {
   return jsxs('div', {
-    className: 'rounded-3xl border border-black/[.06] bg-white p-4 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
+    className: 'flex items-center gap-3 px-4 py-2.5',
     children: [
-      jsx('div', {
-        className: 'w-9 h-9 rounded-full flex items-center justify-center text-base mb-2.5',
+      jsx('span', {
+        className: 'w-7 h-7 rounded-full flex items-center justify-center text-[13px] shrink-0',
         style: { background: iconBg },
         children: icon
       }),
-      jsx('p', { className: 'text-[9.5px] font-extrabold uppercase tracking-[0.16em] text-foreground/45 m-0 mb-1', children: label }),
-      jsxs('p', { className: cn('text-[21px] font-black m-0 leading-none tabular-nums', danger ? 'text-red-500' : 'text-foreground'), children: [
-        value,
-        suffix && jsx('span', { className: 'text-[11px] font-bold text-foreground/40 ml-0.5', children: suffix })
-      ] })
+      jsx('p', { className: 'flex-1 text-[9.5px] font-extrabold uppercase tracking-[0.16em] text-foreground/45 m-0', children: label }),
+      jsx('p', { className: cn('text-[16px] font-black m-0 tabular-nums leading-none', danger ? 'text-red-500' : 'text-foreground'), children: value })
     ]
   });
 }
@@ -2006,6 +2003,7 @@ export function ActivityScreen({ profile }) {
   const [logBlockActivity, setLogBlockActivity] = useState(null);
 
   const todayEntries = todayStats?.activities || [];
+  const todayById = new Map(todayEntries.map(e => [e.activityId, e.totalSeconds]));
   const totalMinutesTracked = Math.round((todayStats?.totalSeconds || 0) / 60);
 
   let valueEarned = 0;
@@ -2091,14 +2089,14 @@ export function ActivityScreen({ profile }) {
         ]
       }),
 
-      // 2x2 stats grid
+      // Today summary — compact stat list
       jsxs('div', {
-        className: 'grid grid-cols-2 gap-3 px-4 pt-3.5 pb-1',
+        className: 'mx-4 mt-3 rounded-3xl bg-white border border-black/[.06] shadow-[0_10px_34px_rgba(15,23,42,0.07)] divide-y divide-black/[0.05]',
         children: [
-          jsx(StatCard, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
-          jsx(StatCard, { icon: '💰', iconBg: '#FEF3C7', label: 'Value Earned', value: valueEarned > 0 ? 'Rs.' + valueEarned.toFixed(2) : '--' }),
-          jsx(StatCard, { icon: '🎯', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore, suffix: '/100' }),
-          jsx(StatCard, { icon: '🔥', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
+          jsx(StatRow, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
+          jsx(StatRow, { icon: '💰', iconBg: '#FEF3C7', label: 'Value Earned', value: valueEarned > 0 ? 'Rs.' + valueEarned.toFixed(2) : '--' }),
+          jsx(StatRow, { icon: '🎯', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore + '/100' }),
+          jsx(StatRow, { icon: '🔥', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
         ]
       }),
 
@@ -2142,6 +2140,7 @@ export function ActivityScreen({ profile }) {
               activity,
               isActive: runningBlock?.activityId === activity.id,
               activeBlock: runningBlock?.activityId === activity.id ? runningBlock : null,
+              todaySeconds: todayById.get(activity.id) || 0,
               onTap: () => handleActivityTap(activity)
             }, activity.id)
           )
