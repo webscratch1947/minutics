@@ -589,8 +589,8 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                     children: activity.name
                   }),
                   jsx('p', {
-                    className: cn('text-[11px] font-semibold mt-1 mb-0 truncate', isActive ? 'text-accent' : 'text-foreground/40'),
-                    children: isActive ? 'Tracking now — tap for options' : 'Tap to start tracking'
+                    className: cn('text-[11px] font-semibold mt-1 mb-0 truncate', isActive ? 'text-accent tabular-nums' : 'text-foreground/40'),
+                    children: isActive ? `${formatElapsed(elapsedSeconds)} · tap for options` : 'Tap to start tracking'
                   })
                 ]
               }),
@@ -598,11 +598,6 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
               jsxs('div', {
                 className: 'flex items-center gap-1.5 shrink-0',
                 children: [
-                  isActive && jsx('span', {
-                    className: 'font-mono text-[13px] font-black tabular-nums mr-0.5',
-                    style: { color: activity.color },
-                    children: formatElapsed(elapsedSeconds)
-                  }),
                   jsx('button', {
                     onClick: openEdit,
                     title: 'Edit',
