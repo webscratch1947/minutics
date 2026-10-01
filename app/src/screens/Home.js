@@ -741,7 +741,7 @@ function BottomSheet({ children, onDismiss }) {
 
 function ModalHeader({ activity, subtitle }) {
   return jsxs('div', {
-    className: 'px-5 pt-3 pb-4 flex items-center gap-3.5',
+    className: 'px-5 pt-3 pb-4 flex items-center gap-3.5 border-b border-black/[.07]',
     children: [
       // Tinted emoji tile (or color tile fallback)
       activity.emoji
@@ -786,34 +786,29 @@ function ModalOption({ icon, label, description, onClick, labelClass = '', prima
   return jsxs('button', {
     onClick,
     className: cn(
-      'flex items-center gap-3.5 px-4 py-3.5 mb-2.5 mx-4 w-[calc(100%-2rem)] rounded-2xl border text-left transition-all active:scale-[0.985]',
-      primary
-        ? 'bg-black border-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.30)] hover:bg-black/90'
-        : 'bg-white border-black/[.07] shadow-[0_6px_18px_rgba(15,23,42,0.06)] hover:bg-secondary'
+      'flex items-center gap-3.5 px-4 py-3.5 mb-3 mx-4 w-[calc(100%-2rem)] rounded-2xl border text-left transition-all active:scale-[0.985]',
+      'bg-black border-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.30)] hover:bg-black/90'
     ),
     children: [
       jsx('div', {
-        className: cn(
-          'shrink-0 w-11 h-11 rounded-xl flex items-center justify-center',
-          primary ? 'bg-white/15 text-white' : 'bg-secondary text-foreground'
-        ),
+        className: 'shrink-0 w-11 h-11 rounded-xl flex items-center justify-center bg-white/15 text-white',
         children: icon
       }),
       jsxs('div', {
         className: 'flex-1 min-w-0',
         children: [
           jsx('p', {
-            className: cn('font-bold text-[15px]', labelClass || (primary ? 'text-white' : 'text-foreground')),
+            className: cn('font-bold text-[15px]', labelClass || 'text-white'),
             children: label
           }),
           jsx('p', {
-            className: cn('text-xs mt-1 font-medium', primary ? 'text-white/60' : 'text-muted-foreground'),
+            className: 'text-xs mt-1 font-medium text-white/60',
             children: description
           })
         ]
       }),
       jsx('svg', {
-        className: cn('w-4 h-4 shrink-0', primary ? 'text-white/50' : 'text-foreground/25'),
+        className: 'w-4 h-4 shrink-0 text-white/50',
         viewBox: '0 0 24 24',
         fill: 'none',
         stroke: 'currentColor',
