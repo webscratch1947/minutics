@@ -133,7 +133,7 @@ export function mk({
         var hasAuth = document.body.classList.contains("lt-authed");
         var hasProgress = !!document.getElementById("lt-life-progress");
         var hasGlance = !!document.querySelector("[data-lt-enhancement]");
-        if ((hasAuth && (hasProgress || hasGlance)) || checks > 50) {
+        if ((hasAuth && (hasProgress || hasGlance)) || checks > 60) {
           clearInterval(readyTimer);
           var ks = document.getElementById("lt-root-killswitch");
           if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
@@ -144,8 +144,8 @@ export function mk({
             }, 500);
           });
         }
-      }, 80);
-    }, 3000);
+      }, 50);
+    }, 100);
   }
 
   /* ── shared chrome: back button + progress dots ── */

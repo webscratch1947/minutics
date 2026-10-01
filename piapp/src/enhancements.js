@@ -1,59 +1,6 @@
 ﻿(function () {
   "use strict";
 
-  /* ── Startup loading screen ────────────────────────────────────────────
-     Plays the branded splash video once (no loop) and dismisses right
-     after it ends — if the video is still going once we'd normally cut
-     it, we let it finish and freeze on the last frame instead of jumping. */
-  var _ltSplashDone = false;
-  (function showStartupSplash() {
-    var MAX_MS = 4500;
-    var splash  = document.createElement("div");
-    splash.id   = "lt-startup-splash";
-    splash.style.cssText =
-      "position:fixed;inset:0;z-index:2147483647;background:hsl(230 40% 16%);" +
-      "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
-      "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
-
-    var video = document.createElement("video");
-    video.id = "lt-startup-splash-video";
-    video.src = "assets/lt/minutics_splash.mp4";
-    video.autoplay = true;
-    video.muted = true;
-    video.setAttribute("playsinline", "");
-    video.setAttribute("webkit-playsinline", "");
-    video.preload = "auto";
-    video.loop = false;
-    video.style.cssText = "width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s ease;";
-    splash.appendChild(video);
-    (document.body || document.documentElement).appendChild(splash);
-
-    var dismissed = false;
-    function dismiss() {
-      if (dismissed) return;
-      dismissed = true;
-      _ltSplashDone = true;
-      splash.style.opacity = "0";
-      setTimeout(function () {
-        if (splash.parentNode) splash.parentNode.removeChild(splash);
-      }, 550);
-    }
-
-    video.addEventListener("playing", function () { video.style.opacity = "1"; });
-    video.addEventListener("ended", function () {
-      setTimeout(dismiss, 200);
-    });
-    video.addEventListener("error", dismiss);
-
-    video.muted = false;
-    video.play().catch(function () {
-      video.muted = true;
-      video.play().catch(function () {});
-    });
-
-    setTimeout(dismiss, MAX_MS);
-  })();
-
   /* ── Storage keys ──────────────────────────────────────────────────────── */
   var BUDGET_KEY    = "lt_budget_tracker_v1";
   var EMI_KEY       = "lt_emi_history_v1";

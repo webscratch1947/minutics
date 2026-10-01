@@ -30,24 +30,6 @@ Object.keys(IMGS).forEach((step) => {
 /* Warm the setup-loader background NOW (app open), not when the loader
    appears â€" the "Setting up your appâ€¦" screen must never pop in bare. */
 try { const _sr = new Image(); _sr.src = "./assets/onboarding/setup-robot.png"; } catch {}
-/* The idle animation is created + fetched AT APP OPEN (not when the loader
-   shows). showSetupLoader() MOVES this same element into the loader, so its
-   bytes and first frame are already warm — the animation starts instantly
-   instead of showing the static poster for seconds first. */
-const SETUP_ANIM = (() => {
-  try {
-    const v = document.createElement("video");
-    v.preload = "auto";
-    v.muted = true;
-    v.defaultMuted = true;
-    v.setAttribute("playsinline", "");
-    v.setAttribute("webkit-playsinline", "");
-    v.poster = "./assets/onboarding/setup-robot.png";
-    v.src = "./assets/onboarding/setup-anim.mp4";
-    v.load();
-    return v;
-  } catch { return null; }
-})();
 function whenImageReady(step, cb) {
   const p = IMG_LOAD[step];
   if (!p || IMG_READY[step]) { cb(); return; }
@@ -142,28 +124,9 @@ export function mk({
       '.lt-setup-bar{width:min(240px,64vw);height:7px;border-radius:99px;background:rgba(17,24,39,.12);overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.07)}' +
       '.lt-setup-bar-fill{position:absolute;left:0;top:0;width:0%;height:100%;border-radius:99px;background:linear-gradient(90deg,#4F46E5,#7C3AED);transition:width .15s linear;box-shadow:0 0 8px rgba(79,70,229,.45)}' +
       '</style>';
-    /* Move the module-warmed video INTO the loader as the FIRST child (so
-       the text/bar paint above it). It was created + fetched at app open,
-       so its bytes and first frame are already warm here — the animation
-       starts immediately instead of showing the static poster for seconds.
-       Single playthrough (loop=false): "ended" finishes the setup. */
-    var vid = SETUP_ANIM, videoDone = false;
-    if (vid) {
-      loader.insertBefore(vid, loader.firstChild);
-      vid.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:0";
-      vid.loop = false;
-      vid.muted = true;
-      vid.defaultMuted = true;
-      vid.addEventListener("ended", function () { videoDone = true; tryFinish(); });
-      vid.addEventListener("error", function () {
-        vid.style.display = "none";
-        videoDone = true;
-        tryFinish();
-      });
-      try { var pl = vid.play(); if (pl && pl.catch) pl.catch(function () {}); } catch {}
-    } else {
-      videoDone = true;
-    }
+    /* No intro animation: static art + bar only, and the loader leaves as
+       soon as the app underneath is ready. */
+    var vid = null, videoDone = true;
     (document.body || document.documentElement).appendChild(loader);
 
     /* Progress bar — mirrors the REAL animation playhead (0→98% across the
@@ -181,9 +144,7 @@ export function mk({
         p = (vid.currentTime / vid.duration) * 98;
       } else {
         var el = (now || 0) - barT0;
-        p = el < 3000
-          ? (el / 3000) * 55
-          : 55 + 40 * (1 - Math.exp(-(el - 3000) / 4500));
+        p = Math.min(95, (el / 1200) * 95);
       }
       if (p > 98) p = 98;
       fill.style.width = p.toFixed(2) + "%";
@@ -213,24 +174,12 @@ export function mk({
         });
       }, 420);
     }
-    /* Safety: broken/unsupported media must never hang the loader — after
-       15s fall back to boot-time alone. Re-armed with the REAL duration on
-       metadata so a longer animation is never cut off early. */
-    var mediaSafety = setTimeout(function () { videoDone = true; tryFinish(); }, 15000);
-    function armMediaSafety() {
-      clearTimeout(mediaSafety);
-      mediaSafety = setTimeout(function () { videoDone = true; tryFinish(); },
-        Math.max(15000, ((vid && vid.duration) || 0) * 1000 + 2500));
-    }
-    if (vid) {
-      vid.addEventListener("loadedmetadata", armMediaSafety);
-      if (vid.readyState >= 1) armMediaSafety(); /* metadata fetched at app open */
-    }
+    /* Safety net: if the app never signals ready, still reveal it. */
+    var appGuard = setTimeout(function () { appReady = true; tryFinish(); }, 6000);
 
-    /* Phase 2: render the main app first, but keep this opaque loader over
-       it until React and the enhancement pass have settled. The loader only
-       leaves when BOTH conditions hold — boot ready AND the animation
-       finished its single playthrough. */
+    /* Phase 2: render the main app immediately under the loader, then
+       reveal the app underneath as soon as React and the enhancement pass
+       have settled — the loader never waits on anything else. */
     setTimeout(function () {
       e(profileData);
       /* Poll: wait for enhancements to apply (life-progress card or
@@ -242,15 +191,16 @@ export function mk({
         var hasAuth = document.body.classList.contains("lt-authed");
         var hasProgress = !!document.getElementById("lt-life-progress");
         var hasGlance = !!document.querySelector("[data-lt-enhancement]");
-        if ((hasAuth && (hasProgress || hasGlance)) || checks > 150) {
+        if ((hasAuth && (hasProgress || hasGlance)) || checks > 60) {
           clearInterval(readyTimer);
           var ks = document.getElementById("lt-root-killswitch");
           if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
+          clearTimeout(appGuard);
           appReady = true;
           tryFinish();
         }
-      }, 80);
-    }, 3000);
+      }, 50);
+    }, 100);
   }
 
   /* â”€â”€ shared chrome: back button + progress dots â”€â”€ */
