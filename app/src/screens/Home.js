@@ -1368,7 +1368,7 @@ function LifeProgressCard({ profile }) {
       const value = Math.max(0, dailyBudget * (remSecToday / 86400));
       const remHours = Math.floor(remSecToday / 3600);
       const remMin = Math.floor((remSecToday % 3600) / 60);
-      tvData = { value, earned: Math.max(0, dailyBudget - value), budget: dailyBudget, remHours, remMin, rate: pm * 60, bars: Math.max(1, Math.min(9, Math.ceil((remSecToday / 86400) * 9))), pct: Math.max(0, Math.min(100, Math.ceil((remSecToday / 86400) * 100))) };
+      tvData = { value, remHours, remMin, rate: pm * 60, bars: Math.max(1, Math.min(9, Math.ceil((remSecToday / 86400) * 9))), pct: Math.max(0, Math.min(100, Math.ceil((remSecToday / 86400) * 100))) };
     }
   } catch (e) { /* ignore */ }
   let tvSplit = null;
@@ -1468,12 +1468,11 @@ function LifeProgressCard({ profile }) {
           })
         ]
       }),
-      // Time value card — violet/indigo money theme: two-column hero
-      // (amount + time-left stat), smooth day-progress bar with marker dot,
-      // earned/budget footer.
+      // Time value card — classic tech readout: same light/white style as
+      // the countdown tiles (white card, mono digits, segmented bar).
       tvData && jsxs('div', {
-        className: 'relative bg-white border border-violet-200/70 rounded-3xl px-4 py-4 shadow-[0_10px_34px_rgba(124,58,237,0.10)] overflow-hidden',
-        style: { backgroundImage: 'radial-gradient(120% 95% at 100% 0%, rgba(124,58,237,0.10), rgba(124,58,237,0) 58%)' },
+        className: 'relative bg-white border border-black/[.06] rounded-2xl px-4 py-3.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
+        style: { backgroundImage: 'radial-gradient(120% 90% at 100% 0%, rgba(0,194,168,0.08), rgba(0,194,168,0) 55%)' },
         children: [
           jsxs('div', {
             className: 'flex items-center justify-between',
@@ -1481,88 +1480,55 @@ function LifeProgressCard({ profile }) {
               jsxs('span', {
                 className: 'flex items-center gap-1.5 text-[9.5px] font-extrabold uppercase tracking-[0.2em] text-foreground/55',
                 children: [
-                  jsx('span', { className: 'inline-block h-1.5 w-1.5 rounded-full bg-violet-500 animate-pulse' }),
+                  jsx('span', { className: 'inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse' }),
                   'Today\u2019s Time Value'
                 ]
               }),
               jsxs('span', {
-                className: 'inline-flex items-baseline gap-1 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-1',
+                className: 'inline-flex items-baseline gap-1 bg-accent/10 border border-accent/25 rounded-full px-2.5 py-1',
                 children: [
-                  jsx('span', { className: 'text-[13px] font-black text-violet-700 tabular-nums leading-none', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
-                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-violet-400', children: '/H' })
+                  jsx('span', { className: 'text-[13px] font-black text-accent tabular-nums leading-none', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
+                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-accent/60', children: '/H' })
                 ]
               })
             ]
           }),
           jsxs('div', {
-            className: 'mt-3 flex items-center justify-between gap-3',
+            className: 'mt-2.5 flex items-center justify-between gap-3',
             children: [
-              jsxs('div', {
-                className: 'flex items-baseline gap-1.5 min-w-0',
-                children: [
-                  jsx('span', { className: 'text-[11px] font-black text-violet-600 bg-violet-50 border border-violet-200 rounded-md px-1.5 py-0.5 leading-none', children: 'Rs.' }),
-                  jsxs('span', {
-                    className: 'relative flex items-baseline min-w-0',
-                    children: [
-                      jsx('span', { className: cn('font-black leading-none tracking-tight tabular-nums bg-gradient-to-br from-violet-600 via-violet-600 to-indigo-500 bg-clip-text text-transparent', tvSplit[0].length > 6 ? 'text-[30px]' : 'text-[40px]'), children: tvSplit[0] }),
-                      jsx('span', { className: 'text-[20px] font-black leading-none tabular-nums text-violet-500 ml-0.5', children: '.' + tvSplit[1] })
-                    ]
-                  })
-                ]
-              }),
-              jsxs('div', {
-                className: 'shrink-0 flex items-center gap-2.5 pl-3 border-l border-violet-200',
-                children: [
-                  jsxs('div', {
-                    className: 'text-right',
-                    children: [
-                      jsx('p', { className: 'text-[15px] font-black text-violet-700 tabular-nums leading-none', children: tvData.remHours + 'h ' + tvData.remMin + 'm' }),
-                      jsx('p', { className: 'text-[8px] font-extrabold uppercase tracking-[0.16em] text-foreground/40 mt-1', children: 'Time left' })
-                    ]
-                  })
-                ]
+              jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining budget' }),
+              jsxs('span', {
+                className: 'shrink-0 text-[11px] font-extrabold tracking-wide text-foreground/50 tabular-nums',
+                children: [tvData.remHours + 'h ' + tvData.remMin + 'm', jsx('span', { className: 'text-foreground/35', children: ' LEFT' })]
               })
             ]
           }),
-          jsx('p', { className: 'mt-3.5 text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining budget' }),
           jsxs('div', {
-            className: 'relative mt-2 h-2 rounded-full bg-violet-100',
+            className: 'mt-1.5 relative flex items-baseline gap-1.5 min-w-0',
             children: [
-              jsx('div', {
-                className: 'absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-violet-500 to-indigo-500',
-                style: { width: tvData.pct + '%' }
-              }),
-              jsx('span', {
-                className: 'absolute top-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full bg-white border-[3px] border-violet-500 shadow-[0_0_0_3px_rgba(139,92,246,0.18)]',
-                style: { left: 'calc(' + tvData.pct + '% - 7px)' }
+              jsx('span', { className: 'text-[17px] font-black text-accent/70 leading-none', children: 'Rs.' }),
+              jsxs('span', {
+                className: 'relative flex items-baseline min-w-0',
+                children: [
+                  jsx('span', { className: 'text-[42px] font-black leading-none tracking-tight tabular-nums bg-gradient-to-br from-accent to-emerald-600 bg-clip-text text-transparent', children: tvSplit[0] }),
+                  jsx('span', { className: 'text-[21px] font-black leading-none tabular-nums text-accent/70 ml-0.5', children: '.' + tvSplit[1] })
+                ]
               })
             ]
           }),
           jsxs('div', {
-            className: 'flex items-center justify-between mt-2',
+            className: 'flex gap-[2px] mt-3 pt-3 border-t border-foreground/10',
+            children:
+              Array.from({ length: 9 }, (_, k) => jsx('span', {
+                className: cn('h-2 flex-1 rounded-full', k < tvData.bars ? 'bg-accent' : 'bg-foreground/10')
+              }, k))
+          }),
+          jsxs('div', {
+            className: 'flex items-center justify-between mt-1.5',
             children: [
               jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' }),
               jsx('span', { className: 'text-[9.5px] font-bold text-foreground/50 tabular-nums', children: tvData.pct + '% of today\u2019s value left' }),
               jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' })
-            ]
-          }),
-          jsxs('div', {
-            className: 'mt-3 pt-3 border-t border-violet-100 flex items-center justify-between',
-            children: [
-              jsxs('span', {
-                className: 'flex items-baseline gap-1.5',
-                children: [
-                  jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.16em] text-foreground/40', children: 'Earned today' }),
-                  jsx('span', { className: 'text-[11px] font-black text-violet-600 tabular-nums', children: 'Rs.' + Number(tvData.earned).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })
-                ]
-              }),
-              jsxs('span', {
-                className: 'flex items-baseline gap-1.5',
-                children: [
-                  jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.16em] text-foreground/40', children: 'Day budget' }),
-                  jsx('span', { className: 'text-[11px] font-black text-foreground/55 tabular-nums', children: 'Rs.' + Number(tvData.budget).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })
-                ]
-              })
             ]
           })
         ]

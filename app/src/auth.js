@@ -269,7 +269,7 @@ function injectStyles() {
   style.textContent = `
     #lt-auth-gate {
       position: fixed; inset: 0; z-index: 999999;
-      background: #Fdfbf7; color: #111827;
+      background: #FFE0CC; color: #111827;
       display: flex; align-items: flex-start; justify-content: center;
       overflow-y: auto; overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
@@ -684,7 +684,7 @@ function renderWelcomeGate() {
 
   var gate = document.createElement("div");
   gate.id = "lt-auth-gate";
-  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#Fdfbf7;color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
+  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#FFE0CC;color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
   gate.innerHTML =
     '<main class="lt-auth-welcome">' +
       '<div class="lt-auth-herowrap">' +
@@ -900,7 +900,7 @@ window.addEventListener("pageshow", function (e) {
   if (existing) existing.remove();
   var gate = document.createElement("div");
   gate.id = "lt-auth-gate";
-  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#Fdfbf7;";
+  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#FFE0CC;";
   document.body.appendChild(gate);
 })();
 

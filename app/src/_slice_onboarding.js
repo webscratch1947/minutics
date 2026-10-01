@@ -490,7 +490,7 @@ export function mk({
   }
 
   return jsxs("div", {
-    className: "min-h-[100dvh] bg-[#FDFBF7] flex flex-col",
+    className: "min-h-[100dvh] bg-[#FFE0CC] flex flex-col",
     children: [
       jsxs("div", {
         className: "flex items-center gap-2 px-4 pt-10 pb-3",
@@ -501,7 +501,7 @@ export function mk({
         children: body
       }),
       jsx("div", {
-        className: "px-6 pt-3 pb-8 bg-[#FDFBF7]",
+        className: "px-6 pt-3 pb-8 bg-[#FFE0CC]",
         children: footer
       })
     ]
