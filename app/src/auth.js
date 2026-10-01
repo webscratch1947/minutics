@@ -500,7 +500,17 @@ function applyDraft() {
 }
 
 /* ── Render login/signup form ──────────────────────────────────────────── */
+/* Fade the first-paint boot splash (index.html #lt-boot-splash) once a real
+   screen — app or login gate — is ready underneath it. */
+function hideBootSplash() {
+  var b = document.getElementById("lt-boot-splash");
+  if (!b) return;
+  b.style.opacity = "0";
+  setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 450);
+}
+
 function renderGate(mode) {
+  hideBootSplash();
   injectStyles();
   var existing = document.getElementById("lt-auth-gate");
   if (existing) {
@@ -936,6 +946,7 @@ onAuthStateChanged(auth, function (user) {
        confirms the remount (lt-user-changed-applied) so stale UI never
        flashes between gate removal and the remount commit. */
     var dropGate = function () {
+      hideBootSplash();
       var g = document.getElementById("lt-auth-gate");
       if (!g) return;
       requestAnimationFrame(function () {
