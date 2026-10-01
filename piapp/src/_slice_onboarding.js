@@ -388,7 +388,8 @@ export function mk({
         jsx("button", {
           type: "button",
           onClick: () => finish(false),
-          className: "w-full py-3 text-sm font-semibold text-gray-400 active:text-gray-600",
+          className: "w-full py-3 text-sm font-bold text-white rounded-xl active:opacity-80",
+          style: { background: "#DC2626" },
           children: "Skip for now"
         })
       ]

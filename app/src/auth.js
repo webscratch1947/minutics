@@ -13,7 +13,6 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { Rive, RuntimeLoader, Layout, Fit, Alignment } from "@rive-app/canvas";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBXruwmDU9SAX4nAe5_Do-x-5qmi_SFh7E",
@@ -426,15 +425,6 @@ function injectStyles() {
          snapped into place when the animation ended. Static = correct. */
     }
     .lt-auth-badge-logo { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; display: block; }
-    .lt-auth-mascot {
-      /* Sits inside the dome, centred above the white logo badge and never
-         touching it (18px gap) — the badge owns the curve. Always visible:
-         the canvas is pre-loaded off-screen and moved in once drawn. */
-      position: absolute; left: 50%; bottom: 66px; transform: translateX(-50%);
-      width: 200px; height: 238px; pointer-events: none;
-      filter: drop-shadow(0 22px 30px rgba(20,22,46,.45));
-    }
-    .lt-auth-mascot canvas { width: 100%; height: 100%; display: block; }
     .lt-auth-wtext { text-align: center; padding: 110px 30px 0; }
     .lt-auth-wtitle { font-size: clamp(33px, 9vw, 40px); font-weight: 800; letter-spacing: -.03em; color: #14162E; margin: 0; }
     .lt-auth-wsub { font-size: 15.5px; line-height: 1.55; color: #6B7280; margin: 13px auto 0; max-width: 320px; }
@@ -460,17 +450,8 @@ function injectStyles() {
     .lt-auth-wlogin a { color: #4F46E5; font-weight: 700; cursor: pointer; text-underline-offset: 2px; }
     .lt-auth-wlogin a:hover { text-decoration: underline; }
 
-    @media (max-height: 720px) {
-      /* Dome = clamp(300px, 46vh, 430px): at 681-720px tall it is only
-         313-332px, so the mascot steps down slightly to keep headroom
-         above the curve (17-39px after the 66px offset). */
-      .lt-auth-mascot { width: 194px; height: 230px; }
-    }
     @media (max-height: 680px) {
       .lt-auth-hero { height: 260px; }
-      /* Short dome: shrink just enough that the mascot still clears
-         the top of the curve (260 - 66 bottom - 178 = 16px headroom). */
-      .lt-auth-mascot { width: 150px; height: 178px; }
       .lt-auth-wtext { padding-top: 100px; }
       .lt-auth-scr { padding-top: 34px; }
     }
@@ -653,185 +634,6 @@ function renderGate(mode) {
 /* ── Welcome screen — "Get Started for Free": Leafboard-style arch (starry
    navy dome, brand badge sitting on the curve, tagline, gradient pill CTA).
    First thing an unauthenticated visitor sees. ─────────────────────────── */
-/* ── Mascot (Rive) — waves, blinks and wiggles the "Hi!" badge on a loop.
-   The .riv + its wasm are served from ./assets, same as every other asset.
-
-   Loading starts the moment this module executes — long before the startup
-   splash video finishes — on a hidden off-screen canvas, so by the time the
-   welcome screen is first seen the mascot is already drawn: no black "RIVE"
-   placeholder, no fade-in, no appear/disappear. The one canvas is re-parented
-   into the gate when the gate renders and pulled back into the hidden holder
-   when the gate is swapped for login/signup, so it is never reloaded and it
-   shows instantly every time the welcome screen comes back. ────────────── */
-var _mascotRive = null;
-var _mascotCanvas = null;
-var _mascotHolder = null;
-var _mascotObserver = null;
-var _mascotPoll = null;
-var _mascotTried = false;
-var _mascotReady = false;
-var _mascotLoaded = false;
-var _mascotReviving = false;
-
-function mascotResize() {
-  if (!_mascotRive || !_mascotCanvas) return;
-  try { _mascotRive.resizeDrawingSurfaceToCanvas(); } catch (e) {}
-}
-
-function mascotFramePainted() {
-  try {
-    var c = _mascotCanvas;
-    if (!c || !c.width || !c.height) return false;
-    var d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-    var total = c.width * c.height;
-    var painted = 0;
-    for (var i = 3; i < d.length; i += 4) if (d[i] > 8) painted++;
-    return painted > 0 && painted < total * 0.9;
-  } catch (e) { return false; }
-}
-
-/* The mascot must never be missing: attach as soon as a real frame is on
-   the canvas, and force-attach on tab return (a backgrounded tab stops
-   rAF, so the pixel check can stall) instead of leaving it hidden. */
-function mascotTryAttach(force) {
-  if (_mascotReady || !_mascotCanvas) return;
-  if (!force && !mascotFramePainted()) return;
-  _mascotReady = true;
-  if (_mascotPoll) { clearInterval(_mascotPoll); _mascotPoll = null; }
-  attachMascot();
-}
-
-function attachMascot() {
-  if (!_mascotReady || !_mascotCanvas || !document.body) return;
-  var wrap = document.querySelector("#lt-auth-gate .lt-auth-mascot");
-  if (!wrap || _mascotCanvas.parentNode === wrap) return;
-  wrap.appendChild(_mascotCanvas);
-  mascotResize();
-}
-
-function mascotEnsureCanvas() {
-  if (_mascotCanvas) return;
-  _mascotHolder = document.createElement("div");
-  _mascotHolder.setAttribute("aria-hidden", "true");
-  _mascotHolder.style.cssText =
-    "position:fixed;left:-10000px;top:0;width:200px;height:238px;" +
-    "visibility:hidden;pointer-events:none;overflow:hidden;";
-  _mascotCanvas = document.createElement("canvas");
-  _mascotCanvas.setAttribute("aria-label", "Minutics mascot");
-  _mascotCanvas.style.cssText = "width:100%;height:100%;display:block;";
-  _mascotHolder.appendChild(_mascotCanvas);
-  document.body.appendChild(_mascotHolder);
-}
-
-function mascotCreateInstance() {
-  try {
-    RuntimeLoader.setWasmUrl("./assets/rive.wasm");
-    _mascotRive = new Rive({
-      src: "./assets/mascot.riv",
-      artboard: "Mascot",
-      stateMachine: "State Machine 1",
-      autoplay: true,
-      canvas: _mascotCanvas,
-      layout: new Layout({ fit: Fit.Contain, alignment: Alignment.BottomCenter }),
-      onLoad: function () {
-        try {
-          if (!_mascotRive) return;
-          _mascotLoaded = true;
-          _mascotRive.resizeDrawingSurfaceToCanvas();
-          _mascotRive.play();
-        } catch (e) {}
-      },
-      onLoadError: function () {
-        if (_mascotPoll) { clearInterval(_mascotPoll); _mascotPoll = null; }
-        _mascotRive = null;
-        _mascotTried = false; /* let a later attempt start over */
-      },
-    });
-    _mascotTried = true;
-  } catch (e) {
-    _mascotRive = null;
-    _mascotTried = false;
-    return;
-  }
-
-  /* The runtime paints an opaque black placeholder for the first ~2s of a
-     cold load. Watch for the first real artboard frames while the canvas is
-     still off-screen, then (and only then) let it into the gate. */
-  if (_mascotPoll) clearInterval(_mascotPoll);
-  _mascotPoll = setInterval(function () { mascotTryAttach(false); }, 100);
-}
-
-function startMascot() {
-  if (_mascotRive) return;
-  mascotEnsureCanvas();
-  mascotCreateInstance();
-}
-
-/* Chrome freezes a tab that gets backgrounded right after a refresh and
-   discards the pending requestAnimationFrame callback — which silently
-   kills Rive's render loop, so the mascot would stay blank forever. On
-   return: nudge play(), and if nothing is painted within ~700ms rebuild
-   the instance on the same canvas so it always starts drawing again. */
-function mascotRevive() {
-  if (!_mascotCanvas) return;
-  if (mascotFramePainted()) { mascotTryAttach(false); return; }
-  if (!_mascotRive) { startMascot(); return; }
-  try { _mascotRive.play(); } catch (e) {}
-  mascotResize();
-  if (_mascotReviving) return;
-  _mascotReviving = true;
-  var t0 = Date.now();
-  var t = setInterval(function () {
-    if (mascotFramePainted()) {
-      clearInterval(t); _mascotReviving = false;
-      mascotTryAttach(false);
-      return;
-    }
-    if (Date.now() - t0 > 400) {
-      clearInterval(t); _mascotReviving = false;
-      try { if (_mascotRive) _mascotRive.destroy(); } catch (e) {}
-      _mascotRive = null;
-      _mascotLoaded = false;
-      startMascot();
-    }
-  }, 150);
-}
-
-function mountMascot() {
-  startMascot();
-  attachMascot();
-  if (_mascotObserver) return;
-  /* Keep the loaded canvas alive across gate swaps: pull it back into the
-     hidden holder the moment its wrapper leaves the document. */
-  _mascotObserver = new MutationObserver(function () {
-    if (_mascotCanvas && !_mascotCanvas.isConnected && _mascotCanvas.parentNode !== _mascotHolder) {
-      _mascotHolder.appendChild(_mascotCanvas);
-      mascotResize();
-    }
-  });
-  _mascotObserver.observe(document.body, { childList: true, subtree: true });
-}
-
-window.addEventListener("resize", mascotResize);
-/* Returning to the tab (or a frozen page resuming): resume the loop,
-   revive a render loop the freeze killed, and never leave the mascot
-   missing — worst case it is force-attached within 1.5s. */
-function mascotOnVisible() {
-  if (document.visibilityState !== "visible") return;
-  mascotResize();
-  mascotTryAttach(false);   /* a frame is already there: show it instantly */
-  mascotRevive();           /* restart a loop the freeze discarded */
-  setTimeout(function () { mascotTryAttach(false); }, 600);
-  /* Last resort only: attach even if unpainted, so the mascot is never
-     missing. The black placeholder stays in the hidden holder until a real
-     frame exists (revive rebuilds the instance if the loop was killed). */
-  setTimeout(function () { mascotTryAttach(true); }, 4000);
-}
-window.addEventListener("focus", mascotOnVisible);
-document.addEventListener("visibilitychange", mascotOnVisible);
-document.addEventListener("resume", mascotOnVisible); /* Page Lifecycle */
-if (document.body) startMascot();
-else window.addEventListener("DOMContentLoaded", startMascot);
 
 function renderWelcomeGate() {
   injectStyles();
@@ -863,7 +665,6 @@ function renderWelcomeGate() {
         '<div class="lt-auth-hero">' +
           '<svg class="lt-auth-stars" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + stars + '</svg>' +
         '</div>' +
-        '<div class="lt-auth-mascot"></div>' +
         '<div class="lt-auth-badge"><img class="lt-auth-badge-logo" src="./assets/icons/logo-512.png" alt="Minutics logo"></div>' +
       '</div>' +
       '<div class="lt-auth-wtext">' +
@@ -876,7 +677,6 @@ function renderWelcomeGate() {
       '</div>' +
     '</main>';
   document.body.appendChild(gate);
-  mountMascot();
 
   document.getElementById("lt-auth-get-started").addEventListener("click", function () {
     renderGate("signup");

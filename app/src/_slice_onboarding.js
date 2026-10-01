@@ -30,6 +30,24 @@ Object.keys(IMGS).forEach((step) => {
 /* Warm the setup-loader background NOW (app open), not when the loader
    appears â€" the "Setting up your appâ€¦" screen must never pop in bare. */
 try { const _sr = new Image(); _sr.src = "./assets/onboarding/setup-robot.png"; } catch {}
+/* The idle animation is created + fetched AT APP OPEN (not when the loader
+   shows). showSetupLoader() MOVES this same element into the loader, so its
+   bytes and first frame are already warm — the animation starts instantly
+   instead of showing the static poster for seconds first. */
+const SETUP_ANIM = (() => {
+  try {
+    const v = document.createElement("video");
+    v.preload = "auto";
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    v.poster = "./assets/onboarding/setup-robot.png";
+    v.src = "./assets/onboarding/setup-anim.mp4";
+    v.load();
+    return v;
+  } catch { return null; }
+})();
 function whenImageReady(step, cb) {
   const p = IMG_LOAD[step];
   if (!p || IMG_READY[step]) { cb(); return; }
@@ -124,9 +142,26 @@ export function mk({
       '.lt-setup-bar{width:min(240px,64vw);height:7px;border-radius:99px;background:rgba(17,24,39,.12);overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,.07)}' +
       '.lt-setup-bar-fill{position:absolute;left:0;top:0;width:0%;height:100%;border-radius:99px;background:linear-gradient(90deg,#4F46E5,#7C3AED);transition:width .15s linear;box-shadow:0 0 8px rgba(79,70,229,.45)}' +
       '</style>';
-    /* No intro animation: static art + bar only, and the loader leaves as
-       soon as the app underneath is ready. */
-    var vid = null, videoDone = true;
+    /* Move the module-warmed video INTO the loader as the FIRST child (so
+       the text/bar paint above it). Single playthrough (loop=false): when
+       "ended" fires the setup ends. */
+    var vid = SETUP_ANIM, videoDone = false;
+    if (vid) {
+      loader.insertBefore(vid, loader.firstChild);
+      vid.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:0";
+      vid.loop = false;
+      vid.muted = true;
+      vid.defaultMuted = true;
+      vid.addEventListener("ended", function () { videoDone = true; tryFinish(); });
+      vid.addEventListener("error", function () {
+        vid.style.display = "none";
+        videoDone = true;
+        tryFinish();
+      });
+      try { var pl = vid.play(); if (pl && pl.catch) pl.catch(function () {}); } catch {}
+    } else {
+      videoDone = true;
+    }
     (document.body || document.documentElement).appendChild(loader);
 
     /* Progress bar — mirrors the REAL animation playhead (0→98% across the
@@ -144,7 +179,9 @@ export function mk({
         p = (vid.currentTime / vid.duration) * 98;
       } else {
         var el = (now || 0) - barT0;
-        p = Math.min(95, (el / 1200) * 95);
+        p = el < 3000
+          ? (el / 3000) * 55
+          : 55 + 40 * (1 - Math.exp(-(el - 3000) / 4500));
       }
       if (p > 98) p = 98;
       fill.style.width = p.toFixed(2) + "%";
@@ -174,12 +211,13 @@ export function mk({
         });
       }, 420);
     }
-    /* Safety net: if the app never signals ready, still reveal it. */
-    var appGuard = setTimeout(function () { appReady = true; tryFinish(); }, 6000);
+    /* Safety: broken/unsupported media must never hang the loader — after
+       15s fall back to boot-time alone. */
+    var mediaSafety = setTimeout(function () { videoDone = true; tryFinish(); }, 15000);
 
     /* Phase 2: render the main app immediately under the loader, then
-       reveal the app underneath as soon as React and the enhancement pass
-       have settled — the loader never waits on anything else. */
+       reveal the app as soon as React and the enhancement pass have
+       settled — so once the animation ends the screen closes right away. */
     setTimeout(function () {
       e(profileData);
       /* Poll: wait for enhancements to apply (life-progress card or
@@ -191,11 +229,11 @@ export function mk({
         var hasAuth = document.body.classList.contains("lt-authed");
         var hasProgress = !!document.getElementById("lt-life-progress");
         var hasGlance = !!document.querySelector("[data-lt-enhancement]");
-        if ((hasAuth && (hasProgress || hasGlance)) || checks > 60) {
+        if ((hasAuth && (hasProgress || hasGlance)) || checks > 100) {
           clearInterval(readyTimer);
           var ks = document.getElementById("lt-root-killswitch");
           if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
-          clearTimeout(appGuard);
+          clearTimeout(mediaSafety);
           appReady = true;
           tryFinish();
         }
@@ -443,7 +481,8 @@ export function mk({
         jsx("button", {
           type: "button",
           onClick: () => finish(false),
-          className: "w-full py-3 text-sm font-semibold text-gray-400 rounded-xl transition-colors active:text-gray-700 active:bg-gray-100",
+          className: "w-full py-3 text-sm font-bold text-white rounded-xl transition-colors active:opacity-80",
+          style: { background: "#DC2626" },
           children: "Skip for now"
         })
       ]
