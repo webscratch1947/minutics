@@ -1704,9 +1704,9 @@ function EatTheFrog() {
   return jsxs('div', {
     className: 'mx-4 mt-3 p-4 border border-border rounded-2xl bg-background',
     children: [
-      jsxs('div', { className: 'flex items-center gap-2', children: [
-        jsx('img', { src: './assets/eat-the-frog.png', alt: '', className: 'w-10 h-10 object-contain -my-1.5 shrink-0' }),
-        jsx('p', { className: 'text-[15px] font-extrabold text-foreground', children: 'Eat the Frog' })
+      jsxs('div', { className: 'flex items-center justify-between gap-2', children: [
+        jsx('p', { className: 'text-[15px] font-extrabold text-foreground', children: 'Eat the Frog' }),
+        jsx('img', { src: './assets/eat-the-frog.png', alt: '', className: 'w-12 h-12 object-contain -my-2 shrink-0' })
       ]}),
       jsx('p', { className: 'text-xs text-foreground/65 mt-0.5 mb-3', children: starred.length > 0 ? starred.length + ' most important task' + (starred.length !== 1 ? 's' : '') + ' today' : 'Add your most important tasks' }),
       slots.map((task, i) =>
