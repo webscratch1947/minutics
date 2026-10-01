@@ -1368,7 +1368,7 @@ function LifeProgressCard({ profile }) {
       const value = Math.max(0, dailyBudget * (remSecToday / 86400));
       const remHours = Math.floor(remSecToday / 3600);
       const remMin = Math.floor((remSecToday % 3600) / 60);
-      tvData = { value, remHours, remMin, rate: pm * 60, bars: Math.max(1, Math.min(9, Math.ceil((remSecToday / 86400) * 9))) };
+      tvData = { value, remHours, remMin, rate: pm * 60, bars: Math.max(1, Math.min(9, Math.ceil((remSecToday / 86400) * 9))), pct: Math.max(0, Math.min(100, Math.ceil((remSecToday / 86400) * 100))) };
     }
   } catch (e) { /* ignore */ }
 
@@ -1465,7 +1465,8 @@ function LifeProgressCard({ profile }) {
       // Time value card — classic tech readout: same light/white style as
       // the countdown tiles (white card, mono digits, segmented bar).
       tvData && jsxs('div', {
-        className: 'bg-white border border-black/[.06] rounded-2xl px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] overflow-hidden',
+        className: 'relative bg-white border border-black/[.06] rounded-2xl px-4 py-3.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
+        style: { backgroundImage: 'radial-gradient(120% 90% at 100% 0%, rgba(0,194,168,0.08), rgba(0,194,168,0) 55%)' },
         children: [
           jsxs('div', {
             className: 'flex items-center justify-between',
@@ -1478,10 +1479,10 @@ function LifeProgressCard({ profile }) {
                 ]
               }),
               jsxs('span', {
-                className: 'inline-flex items-baseline gap-1 bg-foreground/[0.04] border border-foreground/10 rounded-full px-2.5 py-1',
+                className: 'inline-flex items-baseline gap-1 bg-accent/10 border border-accent/25 rounded-full px-2.5 py-1',
                 children: [
-                  jsx('span', { className: 'text-[13px] font-black text-accent tabular-nums leading-none font-mono', children: 'Rs.' + Number(tvData.rate).toFixed(2) }),
-                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/50', children: '/H' })
+                  jsx('span', { className: 'text-[13px] font-black text-accent tabular-nums leading-none font-mono', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
+                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-accent/60', children: '/H' })
                 ]
               })
             ]
@@ -1494,8 +1495,8 @@ function LifeProgressCard({ profile }) {
                 children: [
                   jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining budget' }),
                   jsxs('p', {
-                    className: 'mt-1 font-mono text-[27px] font-black leading-none tabular-nums text-accent',
-                    children: ['Rs.' + tvData.value.toFixed(2)]
+                    className: 'mt-1 font-mono text-[30px] font-black leading-none tabular-nums text-accent',
+                    children: ['Rs.' + tvData.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
                   })
                 ]
               }),
@@ -1509,8 +1510,16 @@ function LifeProgressCard({ profile }) {
             className: 'flex gap-[2px] mt-3 pt-3 border-t border-foreground/10',
             children:
               Array.from({ length: 9 }, (_, k) => jsx('span', {
-                className: cn('h-1.5 flex-1 rounded-full', k < tvData.bars ? 'bg-accent' : 'bg-foreground/10')
+                className: cn('h-2 flex-1 rounded-full', k < tvData.bars ? 'bg-accent' : 'bg-foreground/10')
               }, k))
+          }),
+          jsxs('div', {
+            className: 'flex items-center justify-between mt-1.5',
+            children: [
+              jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' }),
+              jsx('span', { className: 'text-[9.5px] font-bold text-foreground/50 tabular-nums', children: tvData.pct + '% of today\u2019s value left' }),
+              jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' })
+            ]
           })
         ]
       })
@@ -1695,7 +1704,10 @@ function EatTheFrog() {
   return jsxs('div', {
     className: 'mx-4 mt-3 p-4 border border-border rounded-2xl bg-background',
     children: [
-      jsx('p', { className: 'text-[15px] font-extrabold text-foreground flex items-center gap-1.5', children: 'Eat the Frog' }),
+      jsxs('div', { className: 'flex items-center gap-2', children: [
+        jsx('img', { src: './assets/eat-the-frog.png', alt: '', className: 'w-10 h-10 object-contain -my-1.5 shrink-0' }),
+        jsx('p', { className: 'text-[15px] font-extrabold text-foreground', children: 'Eat the Frog' })
+      ]}),
       jsx('p', { className: 'text-xs text-foreground/65 mt-0.5 mb-3', children: starred.length > 0 ? starred.length + ' most important task' + (starred.length !== 1 ? 's' : '') + ' today' : 'Add your most important tasks' }),
       slots.map((task, i) =>
         jsx(FrogSlot, {
