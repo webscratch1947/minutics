@@ -4411,8 +4411,19 @@
       return;
     }
     var downgradeAt = readJson(DOWNGRADE_AT_KEY, null);
-    if (!downgradeAt) return;
-    if (nonArchivedActivityCount() <= FREE_ACTIVITY_LIMIT) {
+    var count = nonArchivedActivityCount();
+    if (!downgradeAt) {
+      /* Free account holding MORE than the limit without a downgrade event
+         (limit enforcement arrived after they already went over): arm the
+         same 3-day grace so the warning can count down and extras trim. */
+      if (count > FREE_ACTIVITY_LIMIT) {
+        downgradeAt = Date.now();
+        writeJson(DOWNGRADE_AT_KEY, downgradeAt);
+      } else {
+        return;
+      }
+    }
+    if (count <= FREE_ACTIVITY_LIMIT) {
       writeJson(DOWNGRADE_AT_KEY, null);
       return;
     }

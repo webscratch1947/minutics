@@ -23,6 +23,7 @@ import { isPro } from '../lib/settings.js';
 import { Timer as Ty, CalendarClock as Jb, Clock as Zb, Play as nk, Trash2 as lk, Square as rh, Plus as rk, Pencil as tk } from 'lucide-react';
 
 const FREE_ACTIVITY_LIMIT = 5;
+const FREE_TRIM_DAYS = 3;
 
 // ─── LT Daily Value Bar ─────────────────────────────────────────────────────
 // Shows remaining monetary value of today's time based on localStorage settings.
@@ -1221,6 +1222,12 @@ function AddActivityBar() {
   const { data: activities = [] } = useActivities();
   const freePlan = !isPro();
   const atLimit = freePlan && activities.length >= FREE_ACTIVITY_LIMIT;
+  const overLimit = freePlan && activities.length > FREE_ACTIVITY_LIMIT;
+  let trimDaysLeft = FREE_TRIM_DAYS;
+  try {
+    const armedAt = JSON.parse(localStorage.getItem('lt_downgrade_at_v1') || 'null');
+    if (armedAt) trimDaysLeft = Math.max(1, Math.ceil((Number(armedAt) + FREE_TRIM_DAYS * 86400000 - Date.now()) / 86400000));
+  } catch (e) { /* ignore */ }
 
   const handleAdd = () => {
     if (!name.trim()) return;
@@ -1293,7 +1300,9 @@ function AddActivityBar() {
         children: [
           jsx('span', {
             className: 'flex-1 text-[11px] font-bold text-red-600 leading-snug',
-            children: 'Free plan limit reached — you have ' + activities.length + ' of ' + FREE_ACTIVITY_LIMIT + ' activities. Remove an activity to add more.'
+            children: overLimit
+              ? 'You have ' + activities.length + ' of ' + FREE_ACTIVITY_LIMIT + ' activities. Remove an activity — or in ' + trimDaysLeft + ' day' + (trimDaysLeft === 1 ? '' : 's') + ' a random extra activity is removed automatically.'
+              : 'Free plan limit reached — you have ' + activities.length + ' of ' + FREE_ACTIVITY_LIMIT + ' activities. Remove an activity to add more.'
           }),
           jsx('button', {
             onClick: () => { if (window.LTPlan && window.LTPlan.showPlansScreen) window.LTPlan.showPlansScreen(); },
@@ -1965,17 +1974,17 @@ function calcFocusScore(statsActivities) {
 
 function StatCard({ icon, iconBg, label, value, suffix, danger }) {
   return jsxs('div', {
-    className: 'rounded-2xl bg-white/[0.07] border border-white/10 p-3.5',
+    className: 'rounded-3xl border border-black/[.06] bg-white p-4 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
     children: [
-      jsx('span', {
-        className: 'w-7 h-7 rounded-full flex items-center justify-center text-[13px] mb-2',
+      jsx('div', {
+        className: 'w-9 h-9 rounded-full flex items-center justify-center text-base mb-2.5',
         style: { background: iconBg },
         children: icon
       }),
-      jsx('p', { className: 'text-[8.5px] font-extrabold uppercase tracking-[0.12em] text-white/40 m-0 mb-1 truncate', children: label }),
-      jsxs('p', { className: cn('text-[20px] font-black m-0 leading-none tabular-nums', danger ? 'text-red-400' : 'text-white'), children: [
+      jsx('p', { className: 'text-[9.5px] font-extrabold uppercase tracking-[0.16em] text-foreground/45 m-0 mb-1', children: label }),
+      jsxs('p', { className: cn('text-[21px] font-black m-0 leading-none tabular-nums', danger ? 'text-red-500' : 'text-foreground'), children: [
         value,
-        suffix && jsx('span', { className: 'text-[11px] font-bold text-white/40 ml-0.5', children: suffix })
+        suffix && jsx('span', { className: 'text-[11px] font-bold text-foreground/40 ml-0.5', children: suffix })
       ] })
     ]
   });
@@ -2082,26 +2091,14 @@ export function ActivityScreen({ profile }) {
         ]
       }),
 
-      // Today summary — black hero card
+      // 2x2 stats grid
       jsxs('div', {
-        className: 'mx-4 mt-3 rounded-[26px] bg-black p-4 shadow-[0_22px_50px_rgba(0,0,0,0.35)]',
+        className: 'grid grid-cols-2 gap-3 px-4 pt-3.5 pb-1',
         children: [
-          jsxs('div', {
-            className: 'flex items-center justify-between mb-3',
-            children: [
-              jsx('p', { className: 'text-[9.5px] font-extrabold uppercase tracking-[0.22em] text-white/40 m-0', children: 'Today at a glance' }),
-              jsx('span', { className: 'w-2 h-2 rounded-full bg-accent' })
-            ]
-          }),
-          jsxs('div', {
-            className: 'grid grid-cols-2 gap-2.5',
-            children: [
-              jsx(StatCard, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
-              jsx(StatCard, { icon: '💰', iconBg: '#FEF3C7', label: 'Value Earned', value: valueEarned > 0 ? 'Rs.' + valueEarned.toFixed(2) : '--' }),
-              jsx(StatCard, { icon: '🎯', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore, suffix: '/100' }),
-              jsx(StatCard, { icon: '🔥', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
-            ]
-          })
+          jsx(StatCard, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
+          jsx(StatCard, { icon: '💰', iconBg: '#FEF3C7', label: 'Value Earned', value: valueEarned > 0 ? 'Rs.' + valueEarned.toFixed(2) : '--' }),
+          jsx(StatCard, { icon: '🎯', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore, suffix: '/100' }),
+          jsx(StatCard, { icon: '🔥', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
         ]
       }),
 
