@@ -20,7 +20,7 @@ import { cn } from '../lib/cn.js';
 import { isPro } from '../lib/settings.js';
 
 // Icons
-import { Timer as Ty, CalendarClock as Jb, Clock as Zb, Play as nk, Trash2 as lk, Square as rh, Plus as rk, Pencil as tk } from 'lucide-react';
+import { Timer as Ty, CalendarClock as Jb, Clock as Zb, Play as nk, Trash2 as lk, Square as rh, Plus as rk, Pencil as tk, IndianRupee as Ri, ChartColumn as Cc } from 'lucide-react';
 
 const FREE_ACTIVITY_LIMIT = 5;
 const FREE_TRIM_DAYS = 3;
@@ -944,7 +944,7 @@ function TimePicker({ label, value, onChange }) {
             value: time.h,
             onChange: (e) => onChange({ ...time, h: Number(e.target.value) }),
             className: cn(inputClass, 'w-14'),
-            children: Array.from({ length: 12 }, (_, i) => i + 1).map(h =>
+            children: Array.from({ length: 13 }, (_, i) => i).map(h =>
               jsx('option', { value: h, children: String(h).padStart(2, '0') }, h)
             )
           }),
@@ -981,19 +981,9 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
   const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
-  const [fromTime, setFromTime] = useState(() => getDefaultTime());
-  const [toTime, setToTime] = useState(null);
-
-  // Get current time in { h, m, ampm } format
-  function getDefaultTime() {
-    const now = new Date();
-    const hours = now.getHours();
-    return {
-      h: hours % 12 === 0 ? 12 : hours % 12,
-      m: now.getMinutes(),
-      ampm: hours < 12 ? 'AM' : 'PM'
-    };
-  }
+  // Clean defaults: start and end both 00:00 — nothing pre-filled.
+  const [fromTime, setFromTime] = useState({ h: 0, m: 0, ampm: 'AM' });
+  const [toTime, setToTime] = useState({ h: 0, m: 0, ampm: 'AM' });
 
   // Convert time object to ISO string
   const toISOString = (dateStr, timeObj) => {
@@ -1010,15 +1000,16 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
   const fromTimestamp = fromTime ? toISOString(fromDate, fromTime) : null;
   const toTimestamp = toTime ? toISOString(toDate, toTime) : null;
 
-  // Duration; if To is before From on the same day, treat as overnight (+24h)
-  // so Log block doesn't stay locked for blocks like 9:47 AM → 12:00 AM.
+  // Duration; if To is before or exactly at From on the same day, treat as
+  // overnight (+24h) so 00:00 → 00:00 logs a full day and Log block never
+  // stays locked (e.g. blocks like 9:47 AM → 12:00 AM).
   let durationMinutes = null;
   let endTimestamp = toTimestamp;
   let wrapsNextDay = false;
   if (fromTimestamp && toTimestamp) {
     const fromMs = new Date(fromTimestamp).getTime();
     let endMs = new Date(toTimestamp).getTime();
-    if (endMs < fromMs) {
+    if (endMs <= fromMs) {
       endMs += 24 * 60 * 60 * 1000;
       wrapsNextDay = true;
       endTimestamp = new Date(endMs).toISOString();
@@ -1200,11 +1191,6 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                     ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60}m`
                     : `${durationMinutes}m`
                 })
-              }),
-              // Validation error
-              toTime && durationMinutes !== null && durationMinutes <= 0 && jsx('p', {
-                className: 'px-5 pt-3 pb-1 text-sm text-red-500 font-bold text-center',
-                children: 'End must be after start.'
               }),
               // Cancel / Log block buttons
               jsxs('div', {
@@ -1571,9 +1557,63 @@ function LifeProgressCard({ profile }) {
       const value = Math.max(0, dailyBudget * (remSecToday / 86400));
       const remHours = Math.floor(remSecToday / 3600);
       const remMin = Math.floor((remSecToday % 3600) / 60);
-      tvData = { value, remHours, remMin, rate: pm * 60 };
+      tvData = {
+        value, remHours, remMin, rate: pm * 60,
+        spent: Math.max(0, dailyBudget - value),
+        elapsedFrac: secOfDay / 86400,
+        pct: Math.max(0, Math.min(100, Math.ceil((remSecToday / 86400) * 100)))
+      };
     }
   } catch (e) { /* ignore */ }
+
+  let tvSplit = null;
+  if (tvData) {
+    const s = tvData.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dot = s.indexOf('.');
+    tvSplit = [s.slice(0, dot), s.slice(dot + 1)];
+  }
+
+  // Area chart for the money timer — deterministic day-decline curve with a
+  // marker dot at the current position and a "% left" tooltip bubble.
+  let tvChart = null;
+  if (tvData) {
+    const CW = 280, CH = 56;
+    const yAt = (f) => 8 + f * 36 + 3 * Math.sin(f * Math.PI * 2.6);
+    const N = 48;
+    let d = '';
+    for (let i = 0; i <= N; i++) {
+      const f = i / N;
+      d += (i === 0 ? 'M' : 'L') + (f * CW).toFixed(1) + ' ' + yAt(f).toFixed(1) + ' ';
+    }
+    d = d.trim();
+    const ef = Math.max(0, Math.min(0.975, tvData.elapsedFrac || 0));
+    tvChart = {
+      line: d,
+      area: d + ' L' + CW + ' ' + CH + ' L0 ' + CH + ' Z',
+      dx: ef * CW,
+      dy: yAt(ef),
+      tipX: Math.max(27, Math.min(CW - 27, ef * CW)),
+      tipY: Math.max(1, yAt(ef) - 23)
+    };
+  }
+  const tvMoney = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const tvTile = (o) => jsxs('div', {
+    className: cn('rounded-2xl px-2 py-2 flex flex-col gap-1 min-w-0 overflow-hidden', o.bg),
+    children: [
+      jsx('span', {
+        className: cn('w-5 h-5 rounded-full flex items-center justify-center shrink-0', o.chip),
+        children: jsx(o.icon, { className: 'w-3 h-3 ' + o.iconCls })
+      }),
+      jsxs('span', {
+        className: 'flex items-baseline gap-0.5 min-w-0',
+        children: [
+          o.sym && jsx('span', { className: cn('text-[8px] font-black shrink-0', o.valCls), children: o.sym }),
+          jsx('span', { className: cn('text-[10.5px] font-black tabular-nums leading-none truncate', o.valCls), children: o.amount })
+        ]
+      }),
+      jsx('span', { className: 'text-[8.5px] font-bold text-foreground/45 leading-none truncate', children: o.label })
+    ]
+  });
 
   return jsxs('div', {
     className: 'mx-4 mt-3 flex flex-col gap-3',
@@ -1666,21 +1706,113 @@ function LifeProgressCard({ profile }) {
           })
         ]
       }),
-      // Time value card
+      // Money timer — reference-style card: header, remaining row, big
+      // number, area chart, segmented bar + three stat tiles.
       tvData && jsxs('div', {
-        className: 'border border-accent/30 bg-accent/10 rounded-2xl p-4 flex items-center justify-between gap-2.5',
+        className: 'relative bg-white border border-black/[.06] rounded-2xl px-4 py-3.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
+        style: { backgroundImage: 'radial-gradient(120% 90% at 100% 0%, rgba(0,194,168,0.08), rgba(0,194,168,0) 55%)' },
         children: [
           jsxs('div', {
+            className: 'flex items-center justify-between',
             children: [
-              jsx('p', { className: 'text-[13px] font-extrabold text-primary', children: 'Today\u2019s Time Value' }),
-              jsx('p', { className: 'text-[11px] text-foreground/50 mt-px', children: 'Your remaining time' }),
-              jsx('p', { className: 'text-[22px] font-black text-accent mt-1.5', children: 'Rs.' + tvData.value.toFixed(2) }),
-              jsx('p', { className: 'text-[11px] text-foreground/50 mt-0.5', children: tvData.remHours + 'h ' + tvData.remMin + 'm left' })
+              jsxs('span', {
+                className: 'flex items-center gap-1.5 text-[9.5px] font-extrabold uppercase tracking-[0.14em] text-foreground/55 whitespace-nowrap',
+                children: [
+                  jsx('span', { className: 'inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse shrink-0' }),
+                  'Today\u2019s Money Timer'
+                ]
+              }),
+              jsxs('span', {
+                className: 'inline-flex items-baseline gap-1 bg-accent/10 border border-accent/25 rounded-full px-2.5 py-1 shrink-0',
+                children: [
+                  jsx('span', { className: 'text-[12px] font-black text-accent tabular-nums leading-none', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
+                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-accent/60', children: '/h' })
+                ]
+              })
             ]
           }),
-          jsx('span', {
-            className: 'flex-shrink-0 bg-accent/15 text-accent rounded-full px-2.5 py-1.5 text-[10px] font-extrabold text-center leading-tight max-w-[96px]',
-            children: 'Rs.' + Number(tvData.rate).toFixed(2) + '/hour'
+          jsxs('div', {
+            className: 'mt-2.5 flex items-center justify-between gap-3',
+            children: [
+              jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining budget' }),
+              jsxs('span', {
+                className: 'shrink-0 inline-flex items-center gap-1 text-[11px] font-extrabold tracking-wide text-foreground/50 tabular-nums',
+                children: [
+                  jsx(Zb, { className: 'w-3 h-3 text-foreground/35' }),
+                  tvData.remHours + 'h ' + tvData.remMin + 'min',
+                  jsx('span', { className: 'text-foreground/35', children: ' LEFT' })
+                ]
+              })
+            ]
+          }),
+          jsxs('div', {
+            className: 'mt-1.5 relative flex items-baseline gap-1.5 min-w-0',
+            children: [
+              jsx('span', { className: 'text-[17px] font-black text-accent/70 leading-none', children: 'Rs.' }),
+              jsxs('span', {
+                className: 'relative flex items-baseline min-w-0',
+                children: [
+                  jsx('span', { className: 'text-[42px] font-black leading-none tracking-tight tabular-nums bg-gradient-to-br from-accent to-emerald-600 bg-clip-text text-transparent', children: tvSplit[0] }),
+                  jsx('span', { className: 'text-[21px] font-black leading-none tabular-nums text-accent/70 ml-0.5', children: '.' + tvSplit[1] })
+                ]
+              })
+            ]
+          }),
+          // Area chart — day-decline curve, marker dot + "% left" bubble
+          tvChart && jsx('div', {
+            className: 'mt-2',
+            children: jsxs('svg', {
+              viewBox: '0 0 280 56',
+              className: 'w-full h-auto block',
+              children: [
+                jsx('defs', {
+                  children: jsxs('linearGradient', {
+                    id: 'ltTvChartFill', x1: '0', y1: '0', x2: '0', y2: '1',
+                    children: [
+                      jsx('stop', { offset: '0%', stopColor: '#00C2A8', stopOpacity: 0.32 }),
+                      jsx('stop', { offset: '100%', stopColor: '#00C2A8', stopOpacity: 0.02 })
+                    ]
+                  })
+                }),
+                jsx('path', { d: tvChart.area, fill: 'url(#ltTvChartFill)', stroke: 'none' }),
+                jsx('path', { d: tvChart.line, fill: 'none', stroke: '#00C2A8', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+                jsx('rect', { x: tvChart.tipX - 25, y: tvChart.tipY, width: 50, height: 15, rx: 7.5, fill: '#E6FAF6', stroke: '#00C2A8', strokeOpacity: 0.35 }),
+                jsx('text', { x: tvChart.tipX, y: tvChart.tipY + 10.5, textAnchor: 'middle', fontSize: 8.5, fontWeight: 800, fill: '#00A98F', children: tvData.pct + '% left' }),
+                jsx('circle', { cx: tvChart.dx, cy: tvChart.dy, r: 4, fill: '#00C2A8', stroke: '#fff', strokeWidth: 2 })
+              ]
+            })
+          }),
+          // Segmented bar — partial fill from the left = remaining today
+          jsxs('div', {
+            className: 'flex gap-[2px] mt-3 pt-3 border-t border-foreground/10',
+            children:
+              Array.from({ length: 9 }, (_, k) => {
+                const fill = Math.max(0, Math.min(1, (tvData.pct / 100) * 9 - k));
+                return jsx('span', {
+                  className: 'relative h-2 flex-1 rounded-full bg-foreground/[0.08] overflow-hidden',
+                  children: fill > 0 && jsx('span', {
+                    className: 'absolute inset-y-0 left-0 bg-accent rounded-full',
+                    style: { width: (fill * 100).toFixed(1) + '%' }
+                  })
+                }, k);
+              })
+          }),
+          jsxs('div', {
+            className: 'flex items-center justify-between mt-1.5',
+            children: [
+              jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' }),
+              jsx('span', { className: 'text-[9.5px] font-bold text-foreground/50 tabular-nums', children: tvData.pct + '% of today\u2019s value left' }),
+              jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' })
+            ]
+          }),
+          // Three stat tiles: spent today / per hour / remaining
+          jsxs('div', {
+            className: 'grid grid-cols-3 gap-2 mt-3',
+            children: [
+              tvTile({ bg: 'bg-accent/10', chip: 'bg-accent/20', icon: Ri, iconCls: 'text-accent', sym: 'Rs.', amount: tvMoney(tvData.spent), valCls: 'text-accent', label: 'Spent Today' }),
+              tvTile({ bg: 'bg-violet-500/10', chip: 'bg-violet-500/15', icon: Cc, iconCls: 'text-violet-600', sym: 'Rs.', amount: tvMoney(tvData.rate), valCls: 'text-foreground', label: 'Per Hour' }),
+              tvTile({ bg: 'bg-amber-500/10', chip: 'bg-amber-500/15', icon: Zb, iconCls: 'text-amber-600', sym: '', amount: tvData.remHours + 'h ' + tvData.remMin + 'min', valCls: 'text-foreground', label: 'Remaining' })
+            ]
           })
         ]
       })
