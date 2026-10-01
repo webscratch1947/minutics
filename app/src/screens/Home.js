@@ -1334,20 +1334,25 @@ function LifeProgressCard({ profile }) {
       jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/50', children: label })
     ]
   });
-  const tickTile = (value, label, frac, isSec) => jsxs('div', {
-    className: 'bg-white border border-black/[.06] rounded-2xl px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]',
-    children: [
-      jsxs('div', { className: 'flex items-baseline gap-1', children: [
-        jsx('span', { key: isSec ? value : undefined, className: cn('text-[20px] font-black text-primary tabular-nums leading-none', isSec && 'lt-tick inline-block'), children: p2(value) }),
-        jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/40', children: label })
-      ]}),
-      jsxs('div', { className: 'flex gap-[2px] mt-1.5', children:
-        Array.from({ length: 9 }, (_, k) => jsx('span', {
-          className: cn('h-1.5 flex-1 rounded-full', k < Math.max(1, Math.round(frac * 9)) ? 'bg-accent' : 'bg-foreground/10')
-        }, k))
-      })
-    ]
-  });
+  const tickTile = (value, label, frac, opts) => {
+    const isSec = !!(opts && opts.isSec);
+    const bars = (opts && opts.bars) || 9;
+    const filled = Math.max(1, Math.min(bars, Math.round(frac * bars)));
+    return jsxs('div', {
+      className: 'bg-white border border-black/[.06] rounded-2xl px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)] overflow-hidden',
+      children: [
+        jsxs('div', { className: 'flex items-baseline justify-center gap-1 min-w-0', children: [
+          jsx('span', { key: isSec ? value : undefined, className: cn('text-[18px] font-black text-primary tabular-nums leading-none', isSec && 'lt-tick inline-block'), children: p2(value) }),
+          jsx('span', { className: 'text-[7px] font-extrabold tracking-[0.05em] text-foreground/40 whitespace-nowrap', children: label })
+        ]}),
+        jsxs('div', { className: 'flex gap-[2px] mt-1.5', children:
+          Array.from({ length: bars }, (_, k) => jsx('span', {
+            className: cn('h-1.5 flex-1 rounded-full', k < filled ? 'bg-accent' : 'bg-foreground/10')
+          }, k))
+        })
+      ]
+    });
+  };
 
   // Time value
   let tvData = null;
@@ -1439,7 +1444,7 @@ function LifeProgressCard({ profile }) {
             children: [
               tickTile(breakdown.hours, 'HOURS', breakdown.hours / 24),
               tickTile(breakdown.minutes, 'MINUTES', breakdown.minutes / 60),
-              tickTile(breakdown.seconds, 'SECONDS', breakdown.seconds / 60, true)
+              tickTile(breakdown.seconds, 'SECONDS', breakdown.seconds / 60, { isSec: true, bars: 6 })
             ]
           }),
           jsxs('div', {
