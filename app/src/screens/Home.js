@@ -1368,7 +1368,7 @@ function LifeProgressCard({ profile }) {
       const value = Math.max(0, dailyBudget * (remSecToday / 86400));
       const remHours = Math.floor(remSecToday / 3600);
       const remMin = Math.floor((remSecToday % 3600) / 60);
-      tvData = { value, remHours, remMin, rate: pm * 60, bars: Math.max(1, Math.min(9, Math.ceil((remSecToday / 86400) * 9))), pct: Math.max(0, Math.min(100, Math.ceil((remSecToday / 86400) * 100))) };
+      tvData = { value, earned: Math.max(0, dailyBudget - value), budget: dailyBudget, remHours, remMin, rate: pm * 60, bars: Math.max(1, Math.min(9, Math.ceil((remSecToday / 86400) * 9))), pct: Math.max(0, Math.min(100, Math.ceil((remSecToday / 86400) * 100))) };
     }
   } catch (e) { /* ignore */ }
   let tvSplit = null;
@@ -1468,11 +1468,11 @@ function LifeProgressCard({ profile }) {
           })
         ]
       }),
-      // Time value card — classic tech readout: same light/white style as
-      // the countdown tiles (white card, mono digits, segmented bar).
+      // Time value card — money theme: white card with amber/gold wash,
+      // gold gradient number, LEFT pill, day-scale bar + earned/budget footer.
       tvData && jsxs('div', {
-        className: 'relative bg-white border border-black/[.06] rounded-2xl px-4 py-3.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
-        style: { backgroundImage: 'radial-gradient(120% 90% at 100% 0%, rgba(0,194,168,0.08), rgba(0,194,168,0) 55%)' },
+        className: 'relative bg-white border border-amber-300/70 rounded-2xl px-4 py-3.5 shadow-[0_10px_34px_rgba(245,158,11,0.14)] overflow-hidden',
+        style: { backgroundImage: 'radial-gradient(120% 95% at 100% 0%, rgba(245,158,11,0.16), rgba(245,158,11,0) 58%)' },
         children: [
           jsxs('div', {
             className: 'flex items-center justify-between',
@@ -1480,15 +1480,15 @@ function LifeProgressCard({ profile }) {
               jsxs('span', {
                 className: 'flex items-center gap-1.5 text-[9.5px] font-extrabold uppercase tracking-[0.2em] text-foreground/55',
                 children: [
-                  jsx('span', { className: 'inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse' }),
+                  jsx('span', { className: 'inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse' }),
                   'Today\u2019s Time Value'
                 ]
               }),
               jsxs('span', {
-                className: 'inline-flex items-baseline gap-1 bg-accent/10 border border-accent/25 rounded-full px-2.5 py-1',
+                className: 'inline-flex items-baseline gap-1 bg-amber-100 border border-amber-200 rounded-full px-2.5 py-1',
                 children: [
-                  jsx('span', { className: 'text-[13px] font-black text-accent tabular-nums leading-none', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
-                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-accent/60', children: '/H' })
+                  jsx('span', { className: 'text-[13px] font-black text-amber-700 tabular-nums leading-none', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
+                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-amber-500', children: '/H' })
                 ]
               })
             ]
@@ -1498,29 +1498,29 @@ function LifeProgressCard({ profile }) {
             children: [
               jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining budget' }),
               jsxs('span', {
-                className: 'shrink-0 text-[11px] font-extrabold tracking-wide text-foreground/50 tabular-nums',
-                children: [tvData.remHours + 'h ' + tvData.remMin + 'm', jsx('span', { className: 'text-foreground/35', children: ' LEFT' })]
+                className: 'shrink-0 inline-flex items-center gap-1 bg-amber-500 text-white rounded-full px-2 py-[3px] text-[10px] font-black tabular-nums leading-none',
+                children: [tvData.remHours + 'h ' + tvData.remMin + 'm', jsx('span', { className: 'text-amber-100 font-extrabold tracking-wider', children: 'LEFT' })]
               })
             ]
           }),
           jsxs('div', {
-            className: 'mt-1.5 relative flex items-baseline gap-1.5 min-w-0',
+            className: 'mt-2 flex items-baseline gap-1.5 min-w-0',
             children: [
-              jsx('span', { className: 'text-[17px] font-black text-accent/70 leading-none', children: 'Rs.' }),
+              jsx('span', { className: 'text-[11px] font-black text-amber-600 bg-amber-100 border border-amber-200 rounded-md px-1.5 py-0.5 leading-none', children: 'Rs.' }),
               jsxs('span', {
                 className: 'relative flex items-baseline min-w-0',
                 children: [
-                  jsx('span', { className: 'text-[42px] font-black leading-none tracking-tight tabular-nums bg-gradient-to-br from-accent to-emerald-600 bg-clip-text text-transparent', children: tvSplit[0] }),
-                  jsx('span', { className: 'text-[21px] font-black leading-none tabular-nums text-accent/70 ml-0.5', children: '.' + tvSplit[1] })
+                  jsx('span', { className: 'text-[42px] font-black leading-none tracking-tight tabular-nums bg-gradient-to-br from-amber-500 via-orange-500 to-orange-600 bg-clip-text text-transparent', children: tvSplit[0] }),
+                  jsx('span', { className: 'text-[21px] font-black leading-none tabular-nums text-amber-600 ml-0.5', children: '.' + tvSplit[1] })
                 ]
               })
             ]
           }),
           jsxs('div', {
-            className: 'flex gap-[2px] mt-3 pt-3 border-t border-foreground/10',
+            className: 'flex gap-[2px] mt-3 pt-3 border-t border-amber-900/10',
             children:
               Array.from({ length: 9 }, (_, k) => jsx('span', {
-                className: cn('h-2 flex-1 rounded-full', k < tvData.bars ? 'bg-accent' : 'bg-foreground/10')
+                className: cn('h-2 flex-1 rounded-full', k < tvData.bars ? 'bg-amber-500' : 'bg-amber-900/[.08]')
               }, k))
           }),
           jsxs('div', {
@@ -1529,6 +1529,25 @@ function LifeProgressCard({ profile }) {
               jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' }),
               jsx('span', { className: 'text-[9.5px] font-bold text-foreground/50 tabular-nums', children: tvData.pct + '% of today\u2019s value left' }),
               jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' })
+            ]
+          }),
+          jsxs('div', {
+            className: 'mt-2.5 pt-2.5 border-t border-amber-900/[.08] flex items-center justify-between',
+            children: [
+              jsxs('span', {
+                className: 'flex items-baseline gap-1.5',
+                children: [
+                  jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.16em] text-foreground/40', children: 'Earned today' }),
+                  jsx('span', { className: 'text-[11px] font-black text-amber-600 tabular-nums', children: 'Rs.' + Number(tvData.earned).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })
+                ]
+              }),
+              jsxs('span', {
+                className: 'flex items-baseline gap-1.5',
+                children: [
+                  jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.16em] text-foreground/40', children: 'Day budget' }),
+                  jsx('span', { className: 'text-[11px] font-black text-foreground/55 tabular-nums', children: 'Rs.' + Number(tvData.budget).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })
+                ]
+              })
             ]
           })
         ]
