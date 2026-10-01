@@ -670,10 +670,35 @@ var _mascotObserver = null;
 var _mascotPoll = null;
 var _mascotTried = false;
 var _mascotReady = false;
+var _mascotLoaded = false;
+var _mascotReviving = false;
 
 function mascotResize() {
   if (!_mascotRive || !_mascotCanvas) return;
   try { _mascotRive.resizeDrawingSurfaceToCanvas(); } catch (e) {}
+}
+
+function mascotFramePainted() {
+  try {
+    var c = _mascotCanvas;
+    if (!c || !c.width || !c.height) return false;
+    var d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    var total = c.width * c.height;
+    var painted = 0;
+    for (var i = 3; i < d.length; i += 4) if (d[i] > 8) painted++;
+    return painted > 0 && painted < total * 0.9;
+  } catch (e) { return false; }
+}
+
+/* The mascot must never be missing: attach as soon as a real frame is on
+   the canvas, and force-attach on tab return (a backgrounded tab stops
+   rAF, so the pixel check can stall) instead of leaving it hidden. */
+function mascotTryAttach(force) {
+  if (_mascotReady || !_mascotCanvas) return;
+  if (!force && !mascotFramePainted()) return;
+  _mascotReady = true;
+  if (_mascotPoll) { clearInterval(_mascotPoll); _mascotPoll = null; }
+  attachMascot();
 }
 
 function attachMascot() {
@@ -684,10 +709,8 @@ function attachMascot() {
   mascotResize();
 }
 
-function startMascot() {
-  if (_mascotTried) return;
-  _mascotTried = true;
-
+function mascotEnsureCanvas() {
+  if (_mascotCanvas) return;
   _mascotHolder = document.createElement("div");
   _mascotHolder.setAttribute("aria-hidden", "true");
   _mascotHolder.style.cssText =
@@ -698,7 +721,9 @@ function startMascot() {
   _mascotCanvas.style.cssText = "width:100%;height:100%;display:block;";
   _mascotHolder.appendChild(_mascotCanvas);
   document.body.appendChild(_mascotHolder);
+}
 
+function mascotCreateInstance() {
   try {
     RuntimeLoader.setWasmUrl("./assets/rive.wasm");
     _mascotRive = new Rive({
@@ -711,15 +736,18 @@ function startMascot() {
       onLoad: function () {
         try {
           if (!_mascotRive) return;
+          _mascotLoaded = true;
           _mascotRive.resizeDrawingSurfaceToCanvas();
           _mascotRive.play();
         } catch (e) {}
       },
       onLoadError: function () {
         if (_mascotPoll) { clearInterval(_mascotPoll); _mascotPoll = null; }
+        _mascotRive = null;
         _mascotTried = false; /* let a later attempt start over */
       },
     });
+    _mascotTried = true;
   } catch (e) {
     _mascotRive = null;
     _mascotTried = false;
@@ -729,27 +757,44 @@ function startMascot() {
   /* The runtime paints an opaque black placeholder for the first ~2s of a
      cold load. Watch for the first real artboard frames while the canvas is
      still off-screen, then (and only then) let it into the gate. */
-  var tries = 0;
-  var streak = 0;
-  _mascotPoll = setInterval(function () {
-    var ready = false;
-    try {
-      var c = _mascotCanvas;
-      var d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
-      var total = c.width * c.height;
-      var painted = 0;
-      for (var i = 3; i < d.length; i += 4) if (d[i] > 8) painted++;
-      ready = total > 0 && painted > 0 && painted < total * 0.9;
-    } catch (e) {}
-    streak = ready ? streak + 1 : 0;
-    if (streak >= 2) {
-      clearInterval(_mascotPoll); _mascotPoll = null;
-      _mascotReady = true;
-      attachMascot();
-    } else if (++tries > 100) {
-      clearInterval(_mascotPoll); _mascotPoll = null;
+  if (_mascotPoll) clearInterval(_mascotPoll);
+  _mascotPoll = setInterval(function () { mascotTryAttach(false); }, 100);
+}
+
+function startMascot() {
+  if (_mascotRive) return;
+  mascotEnsureCanvas();
+  mascotCreateInstance();
+}
+
+/* Chrome freezes a tab that gets backgrounded right after a refresh and
+   discards the pending requestAnimationFrame callback — which silently
+   kills Rive's render loop, so the mascot would stay blank forever. On
+   return: nudge play(), and if nothing is painted within ~700ms rebuild
+   the instance on the same canvas so it always starts drawing again. */
+function mascotRevive() {
+  if (!_mascotCanvas) return;
+  if (mascotFramePainted()) { mascotTryAttach(false); return; }
+  if (!_mascotRive) { startMascot(); return; }
+  try { _mascotRive.play(); } catch (e) {}
+  mascotResize();
+  if (_mascotReviving) return;
+  _mascotReviving = true;
+  var t0 = Date.now();
+  var t = setInterval(function () {
+    if (mascotFramePainted()) {
+      clearInterval(t); _mascotReviving = false;
+      mascotTryAttach(false);
+      return;
     }
-  }, 100);
+    if (Date.now() - t0 > 400) {
+      clearInterval(t); _mascotReviving = false;
+      try { if (_mascotRive) _mascotRive.destroy(); } catch (e) {}
+      _mascotRive = null;
+      _mascotLoaded = false;
+      startMascot();
+    }
+  }, 150);
 }
 
 function mountMascot() {
@@ -768,6 +813,23 @@ function mountMascot() {
 }
 
 window.addEventListener("resize", mascotResize);
+/* Returning to the tab (or a frozen page resuming): resume the loop,
+   revive a render loop the freeze killed, and never leave the mascot
+   missing — worst case it is force-attached within 1.5s. */
+function mascotOnVisible() {
+  if (document.visibilityState !== "visible") return;
+  mascotResize();
+  mascotTryAttach(false);   /* a frame is already there: show it instantly */
+  mascotRevive();           /* restart a loop the freeze discarded */
+  setTimeout(function () { mascotTryAttach(false); }, 600);
+  /* Last resort only: attach even if unpainted, so the mascot is never
+     missing. The black placeholder stays in the hidden holder until a real
+     frame exists (revive rebuilds the instance if the loop was killed). */
+  setTimeout(function () { mascotTryAttach(true); }, 4000);
+}
+window.addEventListener("focus", mascotOnVisible);
+document.addEventListener("visibilitychange", mascotOnVisible);
+document.addEventListener("resume", mascotOnVisible); /* Page Lifecycle */
 if (document.body) startMascot();
 else window.addEventListener("DOMContentLoaded", startMascot);
 

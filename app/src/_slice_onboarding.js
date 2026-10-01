@@ -5,10 +5,10 @@ import { getCurrency, getCurrencySymbol } from './lib/currency.js';
 
 const STEPS = ["welcome", "name", "dob", "salary"];
 const IMGS = {
-  welcome: "./assets/onboarding/welcome.webp",
-  name: "./assets/onboarding/name.webp",
-  dob: "./assets/onboarding/dob.webp",
-  salary: "./assets/onboarding/salary.webp"
+  welcome: "./assets/onboarding/welcome.png",
+  name: "./assets/onboarding/name.png",
+  dob: "./assets/onboarding/dob.png",
+  salary: "./assets/onboarding/salary.png"
 };
 const GREEN = "#157347";
 
