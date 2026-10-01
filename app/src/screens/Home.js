@@ -1443,7 +1443,7 @@ function LifeProgressCard({ profile }) {
             className: 'grid grid-cols-3 gap-2 mt-3.5',
             children: [
               tickTile(breakdown.hours, 'HOURS', breakdown.hours / 24),
-              tickTile(breakdown.minutes, 'MINUTES', breakdown.minutes / 60),
+              tickTile(breakdown.minutes, 'MINUTES', breakdown.minutes / 60, { bars: 6 }),
               tickTile(breakdown.seconds, 'SECONDS', breakdown.seconds / 60, { isSec: true, bars: 6 })
             ]
           }),
