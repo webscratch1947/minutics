@@ -113,6 +113,14 @@ window.LTAuth = {
     }).catch(function () {}).then(function () {
       renderGate();
     });
+    /* FAILSAFE: a hung logout request must never leave a white screen
+       (#root hidden above with no gate rendered). Force the gate after 5s
+       — no-op when root was already revealed or a gate is on screen. */
+    setTimeout(function () {
+      if (document.getElementById("lt-auth-gate")) return;
+      var r = document.getElementById("root");
+      if (r && r.style.display === "none") renderGate();
+    }, 5000);
   },
   getPiUser: function () { return window.__piUser || null; },
 };

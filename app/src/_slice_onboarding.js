@@ -215,11 +215,24 @@ export function mk({
        15s fall back to boot-time alone. */
     var mediaSafety = setTimeout(function () { videoDone = true; tryFinish(); }, 15000);
 
+    /* ABSOLUTE FAILSAFE: onComplete crashing (or enhancements never
+       applying) must NEVER leave #root hidden forever behind the kill
+       switch or the loader stuck on screen. Force the reveal after 12s. */
+    setTimeout(function () {
+      var ks = document.getElementById("lt-root-killswitch");
+      if (ks && ks.parentNode) ks.parentNode.removeChild(ks);
+      var ld = document.getElementById("lt-signin-loader");
+      if (ld && ld.parentNode) {
+        ld.style.opacity = "0";
+        setTimeout(function () { if (ld.parentNode) ld.parentNode.removeChild(ld); }, 500);
+      }
+    }, 12000);
+
     /* Phase 2: render the main app immediately under the loader, then
        reveal the app as soon as React and the enhancement pass have
        settled — so once the animation ends the screen closes right away. */
     setTimeout(function () {
-      e(profileData);
+      try { e(profileData); } catch (err) { console.error("onboarding onComplete failed:", err); }
       /* Poll: wait for enhancements to apply (life-progress card or
          enhancement markers exist + body has lt-authed), then reveal the
          app underneath the still-opaque loader. */

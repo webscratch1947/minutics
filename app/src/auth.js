@@ -236,8 +236,19 @@ window.LTAuth = {
     // nav bar disappears on re-login.
     var root = document.getElementById("root");
     if (root) root.style.cssText = "display:none!important";
-    
-    signOut(auth).catch(function () {});
+
+    try { signOut(auth).catch(function () {}); } catch (err) { console.error("signOut failed:", err); }
+    /* FAILSAFE: if signOut never settles (IndexedDB/network hang), the null
+       branch of onAuthStateChanged never runs — #root stays hidden above and
+       no gate is ever rendered → permanent white screen with the app DOM
+       sitting invisibly underneath. Force the login gate after 5s. Guard:
+       only when root is still hidden AND no gate exists (i.e. a quick
+       re-login or a completed logout both leave this a no-op). */
+    setTimeout(function () {
+      if (document.getElementById("lt-auth-gate")) return;
+      var r = document.getElementById("root");
+      if (r && r.style.display === "none") renderGate("welcome");
+    }, 5000);
   },
   currentUser: function () {
     return auth.currentUser;
