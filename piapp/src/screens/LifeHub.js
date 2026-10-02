@@ -224,7 +224,21 @@ export function LifeHubScreen({ profile }) {
   if (view === "list") {
     var isDefaultView = !search && activeCat === "all";
     var catLabel = { time: "Time", finance: "Finance", productivity: "Productivity" };
+    var CAT_STYLE = {
+      time: { background: "#E7F1FF", color: "#1D4ED8" },
+      finance: { background: "#E7F9F0", color: "#047857" },
+      productivity: { background: "#F5EDFF", color: "#7C3AED" }
+    };
     var colorsOf = function (t) { return TOOL_COLORS[t.id] || { bg: "#F3F4F6", fg: "#374151" }; };
+    var catChipCls = "mt-auto pt-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider";
+
+    var statPM = perMinute;
+    if (!(statPM > 0)) {
+      try {
+        var _sv = JSON.parse(localStorage.getItem("lt_time_value_v1") || "null");
+        if (_sv && _sv.perMinute > 0) statPM = _sv.perMinute;
+      } catch (e) {}
+    }
 
     var iconTile = function (t, cls, white) {
       var c = colorsOf(t);
@@ -277,13 +291,14 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": t.id,
         "data-lt-category": t.category,
         "data-lt-tile-injected": "1",
-        className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 transition hover:border-black/15 hover:shadow-[0_6px_18px_rgba(0,0,0,.08)] active:scale-[.98]",
+        className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 transition hover:-translate-y-0.5 hover:border-black/15 hover:shadow-[0_8px_20px_rgba(0,0,0,.09)] active:scale-[.98]",
         children: [
-          iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0"),
+          iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 shadow-[0_2px_8px_rgba(0,0,0,.07)] ring-1 ring-black/[.04]"),
           jsx("span", { className: "font-bold text-sm text-foreground leading-snug", children: t.label }),
-          jsx("span", { className: "text-xs text-muted-foreground leading-[1.35]", children: t.desc }),
+          jsx("span", { className: "text-xs text-muted-foreground leading-[1.35] line-clamp-2", children: t.desc }),
           jsx("span", {
-            className: "mt-auto pt-1 px-1.5 py-0.5 rounded-md bg-secondary text-[9px] font-black uppercase tracking-wider text-muted-foreground",
+            className: catChipCls + " bg-secondary text-muted-foreground",
+            style: CAT_STYLE[t.category] || undefined,
             children: catLabel[t.category] || t.category
           })
         ]
@@ -295,13 +310,13 @@ export function LifeHubScreen({ profile }) {
       "data-lifetime-tool": featured.id,
       "data-lt-category": featured.category,
       "data-lt-tile-injected": "1",
-      className: "col-span-2 w-full relative overflow-hidden rounded-3xl p-4 text-left bg-foreground text-background transition active:scale-[.99]",
+      className: "group col-span-2 w-full relative overflow-hidden rounded-3xl p-4 text-left bg-foreground text-background ring-1 ring-white/10 shadow-[0_14px_34px_rgba(0,0,0,.28)] transition active:scale-[.99]",
       children: [
         jsx("div", { className: "absolute -right-10 -top-12 w-40 h-40 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.07)" } }),
         jsx("div", { className: "absolute -right-4 top-16 w-24 h-24 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.05)" } }),
-        jsx("div", { className: "absolute -left-10 -bottom-14 w-32 h-32 rounded-full pointer-events-none", style: { background: "rgba(255,59,48,.18)" } }),
+        jsx("div", { className: "absolute -left-10 -bottom-14 w-32 h-32 rounded-full pointer-events-none", style: { background: "rgba(255,59,48,.24)" } }),
         jsxs("div", { className: "relative flex items-center gap-3.5", children: [
-          iconTile(featured, "w-12 h-12 rounded-2xl flex items-center justify-center text-[23px] shrink-0", true),
+          iconTile(featured, "w-12 h-12 rounded-2xl flex items-center justify-center text-[23px] shrink-0 shadow-[0_6px_16px_rgba(0,0,0,.3)]", true),
           jsxs("div", { className: "flex-1 min-w-0", children: [
             jsxs("div", { className: "flex items-center gap-2 flex-wrap", children: [
               jsx("span", { className: "font-black text-[17px] leading-tight", children: featured.label }),
@@ -315,9 +330,21 @@ export function LifeHubScreen({ profile }) {
               className: "block text-xs mt-1 leading-[1.45]",
               style: { color: "rgba(253,251,247,.65)" },
               children: featured.desc
-            })
+            }),
+            statPM > 0 && jsxs("div", { className: "flex flex-wrap gap-1.5 mt-2", children: [
+              jsxs("span", {
+                className: "px-2 py-[3px] rounded-full text-[10px] font-bold",
+                style: { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.18)", color: "rgba(253,251,247,.92)" },
+                children: ["1 min \u2248 ", currSymbol, statPM.toFixed(2)]
+              }),
+              hoursNum > 0 && jsx("span", {
+                className: "px-2 py-[3px] rounded-full text-[10px] font-bold",
+                style: { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.18)", color: "rgba(253,251,247,.92)" },
+                children: hoursNum + "h workday"
+              })
+            ]})
           ]}),
-          jsx("div", { className: "w-9 h-9 rounded-full bg-white text-foreground flex items-center justify-center shrink-0", children: chevron(15) })
+          jsx("div", { className: "w-9 h-9 rounded-full bg-white text-foreground flex items-center justify-center shrink-0 transition-transform group-hover:translate-x-1", children: chevron(15) })
         ]})
       ]
     }, "featured");
@@ -329,10 +356,13 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": spotlight.id,
         "data-lt-category": spotlight.category,
         "data-lt-tile-injected": "1",
-        className: "col-span-2 flex items-center gap-3 p-3.5 rounded-2xl text-left transition active:scale-[.99]",
-        style: { background: c.bg, border: "1px solid " + c.fg + "2e" },
+        className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl text-left shadow-[0_4px_14px_rgba(0,0,0,.07)] transition active:scale-[.99]",
+        style: {
+          background: "linear-gradient(115deg, " + c.bg + " 0%, rgba(255,255,255,.92) 160%)",
+          border: "1px solid " + c.fg + "2e"
+        },
         children: [
-          iconTile(spotlight, "w-12 h-12 rounded-xl flex items-center justify-center text-[23px] shrink-0", true),
+          iconTile(spotlight, "w-12 h-12 rounded-xl flex items-center justify-center text-[23px] shrink-0 shadow-[0_4px_12px_rgba(0,0,0,.12)]", true),
           jsxs("div", { className: "flex-1 min-w-0", children: [
             jsx("span", { className: "block font-black text-[15px] leading-tight", style: { color: c.fg }, children: spotlight.label }),
             jsx("span", {
@@ -341,9 +371,9 @@ export function LifeHubScreen({ profile }) {
               children: spotlight.desc
             })
           ]}),
-          jsx("div", { className: "w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0", style: { color: c.fg }, children: chevron(14) })
+          jsx("div", { className: "w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 transition-transform group-hover:translate-x-1", style: { color: c.fg, boxShadow: "0 2px 8px rgba(0,0,0,.12)" }, children: chevron(14) })
         ]
-      }, "spotlight");
+      }, spotlight.id);
     })();
 
     var tailCard = tail && (function () {
@@ -353,20 +383,21 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": tail.id,
         "data-lt-category": tail.category,
         "data-lt-tile-injected": "1",
-        className: "col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] text-left transition hover:border-black/15 hover:shadow-[0_6px_18px_rgba(0,0,0,.08)] active:scale-[.99]",
+        className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] text-left transition hover:-translate-y-0.5 hover:border-black/15 hover:shadow-[0_8px_20px_rgba(0,0,0,.09)] active:scale-[.99]",
         children: [
-          iconTile(tail, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0"),
+          iconTile(tail, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 shadow-[0_2px_8px_rgba(0,0,0,.07)] ring-1 ring-black/[.04]"),
           jsxs("div", { className: "flex-1 min-w-0", children: [
             jsx("span", { className: "block font-bold text-sm text-foreground leading-snug", children: tail.label }),
-            jsx("span", { className: "block text-xs text-muted-foreground leading-[1.35] mt-0.5", children: tail.desc })
+            jsx("span", { className: "block text-xs text-muted-foreground leading-[1.35] mt-0.5 line-clamp-2", children: tail.desc })
           ]}),
           jsx("span", {
-            className: "shrink-0 px-1.5 py-0.5 rounded-md bg-secondary text-[9px] font-black uppercase tracking-wider text-muted-foreground",
+            className: "shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider",
+            style: CAT_STYLE[tail.category] || undefined,
             children: catLabel[tail.category] || tail.category
           }),
-          jsx("div", { className: "w-8 h-8 rounded-full bg-secondary text-muted-foreground flex items-center justify-center shrink-0", children: chevron(14) })
+          jsx("div", { className: "w-8 h-8 rounded-full bg-secondary text-muted-foreground flex items-center justify-center shrink-0 transition-transform group-hover:translate-x-1", children: chevron(14) })
         ]
-      }, "tail");
+      }, tail.id);
     })();
 
     return jsxs("div", {
@@ -377,7 +408,7 @@ export function LifeHubScreen({ profile }) {
           jsxs("div", { className: "flex items-center justify-between gap-3", children: [
             jsx("h1", { className: "text-[27px] font-black leading-none tracking-tight", children: "Life Hub" }),
             jsxs("span", {
-              className: "shrink-0 px-2.5 py-1 rounded-full bg-white border border-black/[.07] text-[10px] font-black uppercase tracking-wider text-muted-foreground",
+              className: "shrink-0 px-2.5 py-1 rounded-full bg-foreground text-background text-[10px] font-black uppercase tracking-wider",
               children: [tools.length, " tools"]
             })
           ]}),
@@ -464,10 +495,11 @@ export function LifeHubScreen({ profile }) {
               className: "flex items-center gap-2 mb-2.5",
               children: [
                 jsx("p", {
-                  className: "text-[10px] font-black text-muted-foreground uppercase tracking-[.14em]",
+                  className: "text-[10px] font-black uppercase tracking-[.14em]",
+                  style: { color: "#B45309" },
                   children: "Premium"
                 }),
-                jsx("div", { className: "h-px flex-1 bg-black/[.07]" })
+                jsx("div", { className: "h-px flex-1", style: { background: "linear-gradient(90deg, rgba(245,158,11,.55), rgba(0,0,0,0))" } })
               ]
             }),
             jsx("div", {
@@ -482,16 +514,17 @@ export function LifeHubScreen({ profile }) {
                   onClick: function () {
                     alert("This is a Premium Feature. Upgrade to access it.");
                   },
-                  className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-foreground text-background border border-white/10 gap-2 transition hover:opacity-90 active:scale-[.98]",
+                  className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-foreground text-background border border-white/10 gap-2 transition hover:-translate-y-0.5 hover:opacity-90 active:scale-[.98]",
                   children: [
                     jsx("span", {
-                      className: "absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-white text-foreground text-[9px] font-black uppercase tracking-wider",
+                      className: "absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider",
+                      style: { background: "linear-gradient(135deg,#FCD34D,#F59E0B)", color: "#78350F" },
                       children: "PRO"
                     }),
-                    iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0"),
+                    iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 shadow-[0_2px_8px_rgba(0,0,0,.2)]"),
                     jsx("span", { className: "font-bold text-sm text-background leading-snug", children: t.label }),
                     jsx("span", {
-                      className: "text-xs leading-[1.35]",
+                      className: "text-xs leading-[1.35] line-clamp-2",
                       style: { color: "rgba(253,251,247,.6)" },
                       children: t.desc
                     })
