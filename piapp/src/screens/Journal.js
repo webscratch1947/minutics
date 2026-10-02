@@ -229,148 +229,103 @@ export function JournalScreen() {
     className: "flex flex-col",
     children: [
 
-      // Inject keyframe animation for today's glowing circle
-      jsx("style", { children: "@keyframes journalPulse { 0%, 100% { box-shadow: 0 0 8px 2px rgba(22,163,74,0.6); } 50% { box-shadow: 0 0 16px 4px rgba(22,163,74,0.9); } }" }),
+      // Keyframes: green pulse ring for today markers
+      jsx("style", { children: "@keyframes journalPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,.55); } 50% { box-shadow: 0 0 0 7px rgba(22,163,74,0); } }" }, "kf"),
+
+      /* ── 1. Hero + stats + week strip ────────────────────────────────────── */
       jsxs("div", {
-        className: "px-5 pt-5",
+        className: "px-4 pt-4",
         children: [
 
-          // Two cards side by side
+          /* HERO — today's total on a black card with a gold hard shadow */
           jsxs("div", {
-            className: "grid grid-cols-2 gap-3 w-full mb-4",
+            className: "relative overflow-hidden mb-3",
+            style: { background: "#111114", borderRadius: "26px", padding: "20px 18px 18px", boxShadow: "7px 7px 0 #F59E0B" },
             children: [
-
-              // Consistency Streak card
-              jsxs("div", {
-                className: "rounded-2xl p-4",
-                style: { backgroundColor: "#FEF3E2", border: "1px solid #FBD38D" },
-                children: [
-                  jsx("p", {
-                    className: "text-xs font-bold uppercase tracking-widest mb-1",
-                    style: { color: "#B45309" },
-                    children: "Consistency Streak"
-                  }),
-                  jsxs("p", {
-                    className: "text-2xl font-black text-foreground",
-                    children: [streak, " ", streak === 1 ? "day" : "days"]
-                  }),
-                  jsx("p", {
-                    className: "text-xs font-semibold mt-1",
-                    style: { color: "#B45309" },
-                    children: streak > 0 ? "Keep showing up!" : "Start today!"
-                  })
-                ]
-              }),
-
-              // This Week card
-              jsxs("div", {
-                className: "rounded-2xl p-4 bg-white border border-border",
-                children: [
-                  jsx("p", {
-                    className: "text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1",
-                    children: "This Week"
-                  }),
-                  jsxs("p", {
-                    className: "text-2xl font-black text-foreground",
-                    children: [weekLogged, " ", weekLogged === 1 ? "day" : "days", " logged"]
-                  }),
-                  jsx("p", {
-                    className: "text-xs text-primary font-semibold mt-1",
-                    children: "Stay on track"
-                  })
-                ]
-              })
+              jsx("div", { style: { position: "absolute", top: "-54px", right: "-42px", width: "170px", height: "170px", borderRadius: "50%", background: "radial-gradient(circle, rgba(245,158,11,.45), rgba(245,158,11,0) 70%)", pointerEvents: "none" } }, "glow"),
+              jsxs("div", { className: "flex items-center justify-between mb-3", children: [
+                jsx("span", { style: { background: "#FCD34D", color: "#111114", fontSize: "9px", fontWeight: "900", letterSpacing: ".16em", textTransform: "uppercase", padding: "5px 11px", borderRadius: "999px" }, children: "Today" }, "pill"),
+                jsx("span", { style: { color: "rgba(255,255,255,.5)", fontSize: "11px", fontWeight: "700", letterSpacing: ".04em" }, children: formatDateLong(now) }, "date")
+              ]}, "row"),
+              jsx("p", { style: { color: "#fff", fontSize: "50px", lineHeight: "1", fontWeight: "900", letterSpacing: "-.03em", margin: "0" }, children: todayTotalSeconds === 0 ? "0m" : formatDuration(todayTotalSeconds) }, "big"),
+              jsx("p", { style: { color: "rgba(255,255,255,.55)", fontSize: "11px", fontWeight: "800", letterSpacing: ".16em", textTransform: "uppercase", margin: "8px 0 0" }, children: "tracked today" }, "sub"),
+              todayStats.activities.length > 0 && jsx("div", {
+                className: "mt-4 flex h-2.5 w-full overflow-hidden",
+                style: { background: "rgba(255,255,255,.12)", borderRadius: "999px" },
+                children: todayStats.activities.map(function(a) {
+                  return jsx("div", {
+                    style: {
+                      width: (a.totalSeconds / Math.max(1, todayTotalSeconds) * 100) + "%",
+                      backgroundColor: a.activityColor
+                    },
+                    className: "h-full"
+                  }, a.activityId);
+                })
+              }, "bar")
             ]
-          }),
+          }, "hero"),
 
-          // Week calendar grid (Mon–Sun)
+          /* Two hard-shadow stat cards */
+          jsxs("div", { className: "grid grid-cols-2 gap-3 mb-3", children: [
+            jsxs("div", {
+              style: { background: "#FCD34D", border: "2px solid #111114", borderRadius: "20px", padding: "14px", boxShadow: "5px 5px 0 #111114" },
+              children: [
+                jsx("p", { style: { fontSize: "9px", fontWeight: "900", letterSpacing: ".14em", textTransform: "uppercase", color: "#78350F", margin: "0 0 6px" }, children: "🔥 Consistency" }, "l"),
+                jsx("p", { style: { fontSize: "26px", fontWeight: "900", color: "#111114", margin: "0", letterSpacing: "-.02em", lineHeight: "1.1" }, children: streak + (streak === 1 ? " day" : " days") }, "n"),
+                jsx("p", { style: { fontSize: "11px", fontWeight: "800", color: "#92400E", margin: "5px 0 0" }, children: streak > 0 ? "Keep showing up!" : "Start today!" }, "s")
+              ]
+            }, "streak"),
+            jsxs("div", {
+              style: { background: "#fff", border: "2px solid #111114", borderRadius: "20px", padding: "14px", boxShadow: "5px 5px 0 #111114" },
+              children: [
+                jsx("p", { style: { fontSize: "9px", fontWeight: "900", letterSpacing: ".14em", textTransform: "uppercase", color: "#57534E", margin: "0 0 6px" }, children: "This week" }, "l"),
+                jsx("p", { style: { fontSize: "26px", fontWeight: "900", color: "#111114", margin: "0", letterSpacing: "-.02em", lineHeight: "1.1" }, children: weekLogged + (weekLogged === 1 ? " day" : " days") }, "n"),
+                jsx("p", { style: { fontSize: "11px", fontWeight: "800", color: "#16A34A", margin: "5px 0 0" }, children: "Stay on track" }, "s")
+              ]
+            }, "week")
+          ]}, "stats"),
+
+          /* Week strip — bordered card with chunky day squares */
           jsx("div", {
-            className: "grid grid-cols-7 gap-1 w-full mb-2",
-            children: weekDates.map(function(d, i) {
+            style: { background: "#fff", border: "2px solid #111114", borderRadius: "20px", padding: "12px 10px", boxShadow: "5px 5px 0 #111114" },
+            children: jsxs("div", { className: "grid grid-cols-7 gap-1", children: weekDates.map(function(d, i) {
               var isToday = isSameDay(d, now);
-              // Check if this day has tracked time
               var tracked = false;
               for (var ti = 0; ti < dayGroups.length; ti++) {
-                if (isSameDay(days[ti], d) && dayGroups[ti].totalSeconds > 0) {
-                  tracked = true;
-                  break;
-                }
+                if (isSameDay(days[ti], d) && dayGroups[ti].totalSeconds > 0) { tracked = true; break; }
               }
-              return jsxs("div", {
-                className: "flex flex-col items-center gap-1",
-                children: [
-                  // Day name label (Mon, Tue, etc.)
-                  jsx("span", {
-                    className: "text-xs font-bold text-muted-foreground",
-                    children: getDayName(d)
-                  }),
-                   // Day number circle
-                   jsx("div", {
-                     className: "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
-                     style: isToday
-                       ? { backgroundColor: "#16a34a", color: "#ffffff" }
-                       : { color: "#1f2937" },
-                     children: getDayNum(d)
-                   }),
-                  // Tracking dot (green if tracked, transparent if not)
-                  jsx("span", {
-                    className: "w-1 h-1 rounded-full",
-                    style: { backgroundColor: tracked ? "#16a34a" : "transparent" }
-                  })
-                ]
-              }, i);
-            })
-          })
+              return jsxs("div", { className: "flex flex-col items-center gap-1.5", children: [
+                jsx("span", { style: { fontSize: "9px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".06em", color: "#78716C" }, children: getDayName(d) }, "d"),
+                jsx("div", {
+                  className: "flex items-center justify-center",
+                  style: {
+                    width: "34px", height: "34px", borderRadius: "12px", fontSize: "13px", fontWeight: "900",
+                    border: "2px solid #111114",
+                    background: isToday ? "#111114" : (tracked ? "#16A34A" : "#fff"),
+                    color: isToday ? "#FCD34D" : (tracked ? "#fff" : "#111114"),
+                    boxShadow: isToday ? "3px 3px 0 #F59E0B" : "none"
+                  },
+                  children: getDayNum(d)
+                }, "n"),
+                jsx("span", { style: { width: "5px", height: "5px", borderRadius: "50%", background: tracked ? "#16a34a" : "rgba(17,17,20,.15)" } }, "t")
+              ]}, i);
+            })})
+          }, "strip")
         ]
-      }),
+      }, "sec1"),
 
-      /* ── 2. Today's Time Summary (primary banner) ──────────────────────────── */
-      jsxs("div", {
-        className: "bg-primary text-white px-5 pt-10 pb-6",
-        children: [
-          // Full date: "Wednesday, September 9"
-          jsx("p", {
-            className: "text-xs font-semibold text-white/50 uppercase tracking-widest mb-1",
-            children: formatDateLong(now)
-          }),
-          // Large time display
-          jsx("p", {
-            className: "text-4xl font-black",
-            children: todayTotalSeconds === 0 ? "0 min" : formatDuration(todayTotalSeconds)
-          }),
-          // Subtitle
-          jsx("p", {
-            className: "text-white/50 text-sm mt-1",
-            children: "tracked today"
-          }),
-          // Activity bar (horizontal segments proportional to time)
-          todayStats.activities.length > 0 && jsx("div", {
-            className: "mt-4 flex h-1.5 w-full bg-white/10 overflow-hidden",
-            children: todayStats.activities.map(function(a) {
-              return jsx("div", {
-                style: {
-                  width: (a.totalSeconds / Math.max(1, todayTotalSeconds) * 100) + "%",
-                  backgroundColor: a.activityColor
-                },
-                className: "h-full"
-              }, a.activityId);
-            })
-          })
-        ]
-      }),
-
-      /* ── 3. "THIS MONTH" Day List ───────────────────────────────────────────── */
-      jsxs("div", {
-        className: "px-5 pt-5 pb-2",
-        children: [
-          jsx("h2", {
-            className: "text-xs font-semibold text-muted-foreground uppercase tracking-widest",
-            children: "This month"
-          })
-        ]
-      }),
+      /* ── 2. "THIS MONTH" label ────────────────────────────────────────────── */
       jsx("div", {
-        className: "flex flex-col divide-y divide-border border-t border-b border-border",
+        className: "px-4 pt-6 pb-3",
+        children: jsx("h2", {
+          style: { display: "inline-block", fontSize: "12px", fontWeight: "900", letterSpacing: ".18em", textTransform: "uppercase", color: "#111114", borderBottom: "4px solid #F59E0B", paddingBottom: "4px", margin: "0" },
+          children: "This month"
+        })
+      }, "sec2"),
+
+      /* ── 3. Day cards ─────────────────────────────────────────────────────── */
+      jsx("div", {
+        className: "px-4 flex flex-col gap-3",
         children: dayGroups.map(function(dg, idx) {
           var dayDate = days[idx];
           var isToday = isSameDay(dayDate, now);
@@ -378,130 +333,100 @@ export function JournalScreen() {
           var activities = dg.activities;
 
           return jsxs("div", {
+            style: { background: "#fff", border: "2px solid #111114", borderRadius: "20px", boxShadow: isToday ? "5px 5px 0 #F59E0B" : "5px 5px 0 #111114", overflow: "hidden" },
             children: [
               // Day row button (tap to expand)
               jsxs("button", {
                 type: "button",
                 onClick: function() { setExpandedDay(isOpen ? -1 : idx); },
-                className: "w-full flex items-center justify-between px-5 py-4 bg-white",
+                className: "w-full flex items-center justify-between",
+                style: { padding: "12px 14px", background: "transparent", cursor: "pointer", WebkitTapHighlightColor: "transparent" },
                 children: [
-                  jsxs("div", {
-                    className: "flex items-center gap-2.5",
-                    children: [
-                       // Circle indicator: solid green+pulse for today, solid black for other days
-                       jsx("span", {
-                         className: "w-3 h-3 shrink-0 rounded-full",
-                         style: isToday
-                           ? { backgroundColor: "#16a34a", animation: "journalPulse 1.5s ease-in-out infinite" }
-                           : { backgroundColor: "#111827" }
-                       }),
-                       // Date label
-                      jsx("span", {
-                        className: "font-bold text-sm text-foreground",
-                        children: formatDate(dayDate)
-                      })
-                    ]
-                  }),
-                  jsxs("div", {
-                    className: "flex items-center gap-3",
-                    children: [
-                      // Total time for the day
-                      jsx("span", {
-                        className: "font-mono text-sm font-bold text-muted-foreground",
-                        children: dg.totalSeconds > 0 ? formatDuration(dg.totalSeconds) : "\u2014"
-                      }),
-                      // Expand arrow (rotates when open)
-                      jsx("span", {
-                        className: "text-muted-foreground text-xs transition-transform " + (isOpen ? "rotate-90" : ""),
-                        children: "\u25B6"
-                      })
-                    ]
-                  })
+                  jsxs("div", { className: "flex items-center gap-3", children: [
+                    jsx("div", {
+                      className: "flex items-center justify-center shrink-0",
+                      style: {
+                        width: "44px", height: "44px", borderRadius: "14px",
+                        background: isToday ? "#16A34A" : "#111114", color: "#fff",
+                        fontSize: "18px", fontWeight: "900",
+                        animation: isToday ? "journalPulse 1.6s ease-in-out infinite" : "none"
+                      },
+                      children: getDayNum(dayDate)
+                    }, "sq"),
+                    jsxs("div", { style: { textAlign: "left" }, children: [
+                      jsx("p", { style: { fontSize: "14px", fontWeight: "900", color: "#111114", margin: 0, letterSpacing: "-.01em" }, children: formatDate(dayDate) }, "dt"),
+                      jsx("p", { style: { fontSize: "10px", fontWeight: "800", color: "#A8A29E", margin: "2px 0 0", letterSpacing: ".08em", textTransform: "uppercase" }, children: getDayName(dayDate) }, "wd")
+                    ]}, "col")
+                  ]}, "left"),
+                  jsxs("div", { className: "flex items-center gap-2", children: [
+                    isToday && jsx("span", { style: { background: "#FCD34D", border: "1.5px solid #111114", color: "#111114", fontSize: "8px", fontWeight: "900", letterSpacing: ".12em", padding: "3px 8px", borderRadius: "999px" }, children: "TODAY" }, "tp"),
+                    dg.totalSeconds > 0
+                      ? jsx("span", { style: { background: "#111114", color: "#FCD34D", fontSize: "12px", fontWeight: "900", fontFamily: "ui-monospace, monospace", padding: "7px 12px", borderRadius: "999px" }, children: formatDuration(dg.totalSeconds) }, "dur")
+                      : jsx("span", { style: { fontSize: "13px", fontWeight: "800", color: "#D6D3D1" }, children: "\u2014" }, "dur"),
+                    jsx("span", { style: { fontSize: "10px", color: "#111114", fontWeight: "900", transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }, children: "\u25B6" }, "ar")
+                  ]}, "right")
                 ]
-              }),
+              }, "btn"),
 
               // Expanded content: activity groups with individual blocks
               isOpen && (activities.length === 0
                 ? jsx("div", {
-                    className: "px-5 py-4 text-sm text-muted-foreground bg-secondary",
+                    style: { padding: "12px 16px", background: "#FAF8F3", borderTop: "2px solid #111114", fontSize: "12px", fontWeight: "700", color: "#78716C" },
                     children: "No time logged."
-                  })
+                  }, "empty")
                 : jsx("div", {
-                    className: "bg-secondary",
+                    style: { background: "#FAF8F3", borderTop: "2px solid #111114", padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: "8px" },
                     children: activities.map(function(a, ai) {
                       var activityTotal = a.blocks.reduce(function(sum, b) {
                         return sum + (b.durationSeconds || 0);
                       }, 0);
-                      return jsxs("div", {
-                        children: [
-                          // Activity header row (colored bar + name + total)
-                          jsxs("div", {
-                            className: "flex items-center justify-between px-5 py-2.5",
-                            style: { borderLeft: "4px solid " + a.activityColor },
+                      return jsxs("div", { children: [
+                        // Activity header row (color bar + name + total)
+                        jsxs("div", {
+                          className: "flex items-center justify-between",
+                          style: { background: "#fff", border: "1.5px solid rgba(17,17,20,.1)", borderLeft: "6px solid " + a.activityColor, borderRadius: "12px", padding: "9px 12px" },
+                          children: [
+                            jsx("span", { style: { fontSize: "13px", fontWeight: "900", color: a.activityColor }, children: a.activityName }, "an"),
+                            jsx("span", { style: { background: "#111114", color: "#fff", fontSize: "11px", fontWeight: "900", fontFamily: "ui-monospace, monospace", padding: "5px 10px", borderRadius: "999px" }, children: formatDuration(activityTotal) }, "at")
+                          ]
+                        }, "ahdr"),
+                        // Individual block rows
+                        a.blocks.map(function(b) {
+                          return jsxs("div", {
+                            className: "flex items-center justify-between",
+                            style: { background: "#fff", border: "1.5px solid rgba(17,17,20,.08)", borderLeft: "4px solid " + a.activityColor + "66", borderRadius: "10px", padding: "7px 12px" },
                             children: [
-                              jsx("span", {
-                                className: "font-bold text-sm",
-                                style: { color: a.activityColor },
-                                children: a.activityName
-                              }),
-                              jsx("span", {
-                                className: "font-mono text-sm font-bold text-muted-foreground",
-                                children: formatDuration(activityTotal)
-                              })
+                              jsxs("span", { style: { fontSize: "12px", color: "#57534E", fontFamily: "ui-monospace, monospace" }, children: [
+                                formatTime12(b.startTime),
+                                // If block started before this day
+                                b.startedBefore && jsx("span", { style: { fontSize: "10px", fontStyle: "italic" }, children: " (from prev. day)" }, "sb"),
+                                // End time or running indicator
+                                b.continuesAfter
+                                  ? jsxs(Fragment, {
+                                      children: [
+                                        " \u2192 " + formatTime12(b.endTime),
+                                        jsx("span", { style: { fontSize: "10px", fontStyle: "italic" }, children: " (continues next day)" }, "ca")
+                                      ]
+                                    })
+                                  : (b.endTime
+                                      ? " \u2192 " + formatTime12(b.endTime)
+                                      : " \u00B7 running")
+                              ] }, "times"),
+                              jsx("span", { style: { fontSize: "12px", fontWeight: "900", color: "#111114", fontFamily: "ui-monospace, monospace" }, children: b.durationSeconds ? formatDuration(b.durationSeconds) : "\u2014" }, "bd")
                             ]
-                          }),
-                          // Individual block rows
-                          a.blocks.map(function(b) {
-                            return jsxs("div", {
-                              className: "flex items-center justify-between px-5 py-2 pl-8",
-                              style: { borderLeft: "4px solid " + a.activityColor + "40" },
-                              children: [
-                                jsxs("span", {
-                                  className: "text-sm text-muted-foreground",
-                                  children: [
-                                    formatTime12(b.startTime),
-                                    // If block started before this day
-                                    b.startedBefore && jsx("span", {
-                                      className: "text-xs italic",
-                                      children: " (from prev. day)"
-                                    }),
-                                    // End time or running indicator
-                                    b.continuesAfter
-                                      ? jsxs(Fragment, {
-                                          children: [
-                                            " \u2192 " + formatTime12(b.endTime),
-                                            jsx("span", {
-                                              className: "text-xs italic",
-                                              children: " (continues next day)"
-                                            })
-                                          ]
-                                        })
-                                      : (b.endTime
-                                          ? " \u2192 " + formatTime12(b.endTime)
-                                          : " \u00B7 running")
-                                  ]
-                                }),
-                                jsx("span", {
-                                  className: "font-mono text-sm font-semibold",
-                                  children: b.durationSeconds
-                                    ? formatDuration(b.durationSeconds)
-                                    : "\u2014"
-                                })
-                              ]
-                            }, b.id);
-                          })
-                        ]
-                      }, ai);
+                          }, b.id);
+                        })
+                      ] }, ai);
                     })
-                  })
+                  }, "exp")
               )
             ]
           }, idx);
         })
-      }),
+      }, "sec3"),
 
       // Bottom spacer
-      jsx("div", { className: "h-6" })
+      jsx("div", { className: "h-6" }, "sp")
     ]
   });
 }
