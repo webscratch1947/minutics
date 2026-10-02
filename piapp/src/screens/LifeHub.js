@@ -222,6 +222,153 @@ export function LifeHubScreen({ profile }) {
   // VIEW: "list" — Tool Grid
   // ═══════════════════════════════════════════════════════════════════════════
   if (view === "list") {
+    var isDefaultView = !search && activeCat === "all";
+    var catLabel = { time: "Time", finance: "Finance", productivity: "Productivity" };
+    var colorsOf = function (t) { return TOOL_COLORS[t.id] || { bg: "#F3F4F6", fg: "#374151" }; };
+
+    var iconTile = function (t, cls, white) {
+      var c = colorsOf(t);
+      return jsx("div", {
+        className: cls,
+        style: white ? { background: "#fff" } : { background: c.bg, color: c.fg },
+        children: t.id === "sixjars"
+          ? jsx("img", {
+              src: "assets/icons/jar-savings.png",
+              alt: "",
+              style: { width: "70%", height: "70%", objectFit: "contain", display: "block" }
+            })
+          : t.symbol
+      });
+    };
+
+    var chevron = function (size) {
+      return jsx("svg", {
+        width: size, height: size, viewBox: "0 0 24 24", fill: "none",
+        stroke: "currentColor", strokeWidth: 2.6, strokeLinecap: "round", strokeLinejoin: "round",
+        children: jsx("path", { d: "m9 18 6-6-6-6" })
+      });
+    };
+
+    // ── Featured Time Value card — default view only ──
+    var featured = null;
+    if (isDefaultView) featured = filtered.filter(function (t) { return t.id === "timevalue"; })[0] || null;
+    var rest = featured ? filtered.filter(function (t) { return t.id !== "timevalue"; }) : filtered;
+
+    // ── Wide spotlight card (Routine Trackers) — default view only ──
+    var spotlight = null;
+    if (isDefaultView) {
+      spotlight = rest.filter(function (t) { return t.id === "routine"; })[0] || null;
+      if (spotlight) rest = rest.filter(function (t) { return t.id !== "routine"; });
+    }
+
+    // ── An odd trailing tile becomes full-width so no column dangles ──
+    var tail = null;
+    if (!spotlight && rest.length % 2 === 1) {
+      tail = rest[rest.length - 1];
+      rest = rest.slice(0, -1);
+    }
+    var head = rest.slice(0, 4);
+    var body = rest.slice(4);
+
+    var smallCard = function (t) {
+      var c = colorsOf(t);
+      return jsxs("button", {
+        type: "button",
+        "data-lifetime-tool": t.id,
+        "data-lt-category": t.category,
+        "data-lt-tile-injected": "1",
+        className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 transition hover:border-black/15 hover:shadow-[0_6px_18px_rgba(0,0,0,.08)] active:scale-[.98]",
+        children: [
+          iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0"),
+          jsx("span", { className: "font-bold text-sm text-foreground leading-snug", children: t.label }),
+          jsx("span", { className: "text-xs text-muted-foreground leading-[1.35]", children: t.desc }),
+          jsx("span", {
+            className: "mt-auto pt-1 px-1.5 py-0.5 rounded-md bg-secondary text-[9px] font-black uppercase tracking-wider text-muted-foreground",
+            children: catLabel[t.category] || t.category
+          })
+        ]
+      }, t.id);
+    };
+
+    var featuredCard = featured && jsxs("button", {
+      type: "button",
+      "data-lifetime-tool": featured.id,
+      "data-lt-category": featured.category,
+      "data-lt-tile-injected": "1",
+      className: "col-span-2 w-full relative overflow-hidden rounded-3xl p-4 text-left bg-foreground text-background transition active:scale-[.99]",
+      children: [
+        jsx("div", { className: "absolute -right-10 -top-12 w-40 h-40 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.07)" } }),
+        jsx("div", { className: "absolute -right-4 top-16 w-24 h-24 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.05)" } }),
+        jsx("div", { className: "absolute -left-10 -bottom-14 w-32 h-32 rounded-full pointer-events-none", style: { background: "rgba(255,59,48,.18)" } }),
+        jsxs("div", { className: "relative flex items-center gap-3.5", children: [
+          iconTile(featured, "w-12 h-12 rounded-2xl flex items-center justify-center text-[23px] shrink-0", true),
+          jsxs("div", { className: "flex-1 min-w-0", children: [
+            jsxs("div", { className: "flex items-center gap-2 flex-wrap", children: [
+              jsx("span", { className: "font-black text-[17px] leading-tight", children: featured.label }),
+              jsx("span", {
+                className: "px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0",
+                style: { background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)" },
+                children: "Featured"
+              })
+            ]}),
+            jsx("span", {
+              className: "block text-xs mt-1 leading-[1.45]",
+              style: { color: "rgba(253,251,247,.65)" },
+              children: featured.desc
+            })
+          ]}),
+          jsx("div", { className: "w-9 h-9 rounded-full bg-white text-foreground flex items-center justify-center shrink-0", children: chevron(15) })
+        ]})
+      ]
+    }, "featured");
+
+    var spotlightCard = spotlight && (function () {
+      var c = colorsOf(spotlight);
+      return jsxs("button", {
+        type: "button",
+        "data-lifetime-tool": spotlight.id,
+        "data-lt-category": spotlight.category,
+        "data-lt-tile-injected": "1",
+        className: "col-span-2 flex items-center gap-3 p-3.5 rounded-2xl text-left transition active:scale-[.99]",
+        style: { background: c.bg, border: "1px solid " + c.fg + "2e" },
+        children: [
+          iconTile(spotlight, "w-12 h-12 rounded-xl flex items-center justify-center text-[23px] shrink-0", true),
+          jsxs("div", { className: "flex-1 min-w-0", children: [
+            jsx("span", { className: "block font-black text-[15px] leading-tight", style: { color: c.fg }, children: spotlight.label }),
+            jsx("span", {
+              className: "block text-xs mt-0.5 leading-[1.4]",
+              style: { color: "rgba(17,17,17,.6)" },
+              children: spotlight.desc
+            })
+          ]}),
+          jsx("div", { className: "w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0", style: { color: c.fg }, children: chevron(14) })
+        ]
+      }, "spotlight");
+    })();
+
+    var tailCard = tail && (function () {
+      var c = colorsOf(tail);
+      return jsxs("button", {
+        type: "button",
+        "data-lifetime-tool": tail.id,
+        "data-lt-category": tail.category,
+        "data-lt-tile-injected": "1",
+        className: "col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] text-left transition hover:border-black/15 hover:shadow-[0_6px_18px_rgba(0,0,0,.08)] active:scale-[.99]",
+        children: [
+          iconTile(tail, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0"),
+          jsxs("div", { className: "flex-1 min-w-0", children: [
+            jsx("span", { className: "block font-bold text-sm text-foreground leading-snug", children: tail.label }),
+            jsx("span", { className: "block text-xs text-muted-foreground leading-[1.35] mt-0.5", children: tail.desc })
+          ]}),
+          jsx("span", {
+            className: "shrink-0 px-1.5 py-0.5 rounded-md bg-secondary text-[9px] font-black uppercase tracking-wider text-muted-foreground",
+            children: catLabel[tail.category] || tail.category
+          }),
+          jsx("div", { className: "w-8 h-8 rounded-full bg-secondary text-muted-foreground flex items-center justify-center shrink-0", children: chevron(14) })
+        ]
+      }, "tail");
+    })();
+
     return jsxs("div", {
       className: "flex flex-col bg-background p-4 pb-6",
       children: [
@@ -240,7 +387,7 @@ export function LifeHubScreen({ profile }) {
           })
         ]}),
 
-        // ── Search bar: white pill with icon + clear ──
+        // ── Search bar ──
         jsxs("div", {
           className: "relative mb-3",
           children: [
@@ -266,7 +413,7 @@ export function LifeHubScreen({ profile }) {
           ]
         }),
 
-        // ── Category filter pills: rounded, active = black ──
+        // ── Category filter pills ──
         jsx("div", {
           className: "flex gap-2 mb-4 overflow-x-auto no-scrollbar",
           children: LT_FILTERS.map(function (f) {
@@ -282,43 +429,16 @@ export function LifeHubScreen({ profile }) {
           })
         }),
 
-        // ── Tool grid (2 columns) ──
+        // ── Bento tool grid ──
         jsx("div", {
           className: "grid grid-cols-2 gap-3",
-          children: filtered.map(function (t) {
-            var colors = TOOL_COLORS[t.id] || { bg: "#F3F4F6", fg: "#374151" };
-            return jsxs("button", {
-              type: "button",
-              "data-lifetime-tool": t.id,
-              "data-lt-category": t.category,
-              "data-lt-tile-injected": "1",
-              className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 transition-transform active:scale-[.98]",
-              children: [
-                // Colored icon tile
-                jsx("div", {
-                  className: "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0",
-                  style: { background: colors.bg, color: colors.fg },
-                  children: t.id === "sixjars"
-                    ? jsx("img", {
-                        src: "assets/icons/jar-savings.png",
-                        alt: "",
-                        style: { width: "70%", height: "70%", objectFit: "contain", display: "block" }
-                      })
-                    : t.symbol
-                }),
-                // Label
-                jsx("span", {
-                  className: "font-bold text-sm text-foreground leading-snug",
-                  children: t.label
-                }),
-                // Description
-                jsx("span", {
-                  className: "text-xs text-muted-foreground leading-[1.35]",
-                  children: t.desc
-                })
-              ]
-            }, t.id);
-          })
+          children: [
+            featuredCard,
+            head.map(smallCard),
+            spotlightCard,
+            body.map(smallCard),
+            tailCard
+          ]
         }),
 
         // ── Empty search state ──
@@ -353,7 +473,7 @@ export function LifeHubScreen({ profile }) {
             jsx("div", {
               className: "grid grid-cols-2 gap-3",
               children: filteredLocked.map(function (t) {
-                var colors = TOOL_COLORS[t.id] || { bg: "#F3F4F6", fg: "#374151" };
+                var c = colorsOf(t);
                 return jsxs("button", {
                   type: "button",
                   "data-lifetime-tool": t.id,
@@ -362,27 +482,17 @@ export function LifeHubScreen({ profile }) {
                   onClick: function () {
                     alert("This is a Premium Feature. Upgrade to access it.");
                   },
-                  className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 opacity-60 transition-transform active:scale-[.98]",
+                  className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-foreground text-background border border-white/10 gap-2 transition hover:opacity-90 active:scale-[.98]",
                   children: [
-                    // Black PRO badge
                     jsx("span", {
-                      className: "absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-foreground text-background text-[9px] font-black uppercase tracking-wider",
+                      className: "absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-white text-foreground text-[9px] font-black uppercase tracking-wider",
                       children: "PRO"
                     }),
-                    // Colored icon tile
-                    jsx("div", {
-                      className: "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0",
-                      style: { background: colors.bg, color: colors.fg },
-                      children: t.symbol
-                    }),
-                    // Label
+                    iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0"),
+                    jsx("span", { className: "font-bold text-sm text-background leading-snug", children: t.label }),
                     jsx("span", {
-                      className: "font-bold text-sm text-foreground leading-snug",
-                      children: t.label
-                    }),
-                    // Description
-                    jsx("span", {
-                      className: "text-xs text-muted-foreground leading-[1.35]",
+                      className: "text-xs leading-[1.35]",
+                      style: { color: "rgba(253,251,247,.6)" },
                       children: t.desc
                     })
                   ]
