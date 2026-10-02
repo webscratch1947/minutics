@@ -242,20 +242,22 @@ export function JournalScreen() {
 
               // Consistency Streak card
               jsxs("div", {
-                className: "rounded-2xl p-4",
-                style: { backgroundColor: "#FEF3E2", border: "1px solid #FBD38D" },
+                className: "rounded-2xl p-4 bg-white border border-black/10 shadow-[0_2px_10px_rgba(0,0,0,.05)]",
                 children: [
-                  jsx("p", {
-                    className: "text-xs font-bold uppercase tracking-widest mb-1",
-                    style: { color: "#B45309" },
-                    children: "Consistency Streak"
+                  jsxs("p", {
+                    className: "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[.14em] mb-1",
+                    style: { color: "#92400E" },
+                    children: [
+                      jsx("span", { className: "w-2.5 h-2.5 rounded-[3px] bg-[#F59E0B] border border-black shrink-0" }),
+                      "Consistency Streak"
+                    ]
                   }),
                   jsxs("p", {
-                    className: "text-2xl font-black text-foreground",
+                    className: "text-[26px] font-black text-foreground leading-none tracking-tight",
                     children: [streak, " ", streak === 1 ? "day" : "days"]
                   }),
                   jsx("p", {
-                    className: "text-xs font-semibold mt-1",
+                    className: "text-xs font-semibold mt-1.5",
                     style: { color: "#B45309" },
                     children: streak > 0 ? "Keep showing up!" : "Start today!"
                   })
@@ -264,18 +266,21 @@ export function JournalScreen() {
 
               // This Week card
               jsxs("div", {
-                className: "rounded-2xl p-4 bg-white border border-border",
+                className: "rounded-2xl p-4 bg-white border border-black/10 shadow-[0_2px_10px_rgba(0,0,0,.05)]",
                 children: [
-                  jsx("p", {
-                    className: "text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1",
-                    children: "This Week"
+                  jsxs("p", {
+                    className: "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[.14em] text-muted-foreground mb-1",
+                    children: [
+                      jsx("span", { className: "w-2.5 h-2.5 rounded-[3px] bg-[#F59E0B] border border-black shrink-0" }),
+                      "This Week"
+                    ]
                   }),
                   jsxs("p", {
-                    className: "text-2xl font-black text-foreground",
+                    className: "text-[26px] font-black text-foreground leading-none tracking-tight",
                     children: [weekLogged, " ", weekLogged === 1 ? "day" : "days", " logged"]
                   }),
                   jsx("p", {
-                    className: "text-xs text-primary font-semibold mt-1",
+                    className: "text-xs text-primary font-semibold mt-1.5",
                     children: "Stay on track"
                   })
                 ]
@@ -301,21 +306,21 @@ export function JournalScreen() {
                 children: [
                   // Day name label (Mon, Tue, etc.)
                   jsx("span", {
-                    className: "text-xs font-bold text-muted-foreground",
+                    className: "text-[10px] font-black uppercase tracking-wider text-muted-foreground",
                     children: getDayName(d)
                   }),
-                   // Day number circle
+                   // Day number circle — today gets the black + gold-shadow signature
                    jsx("div", {
-                     className: "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
-                     style: isToday
-                       ? { backgroundColor: "#16a34a", color: "#ffffff" }
-                       : { color: "#1f2937" },
+                     className: "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold " +
+                       (isToday
+                         ? "bg-foreground text-background border-2 border-black shadow-[2px_2px_0_#F59E0B]"
+                         : "bg-white border border-black/10 text-[#1f2937]"),
                      children: getDayNum(d)
                    }),
-                  // Tracking dot (green if tracked, transparent if not)
+                  // Tracking dot (green if tracked, faint if not)
                   jsx("span", {
-                    className: "w-1 h-1 rounded-full",
-                    style: { backgroundColor: tracked ? "#16a34a" : "transparent" }
+                    className: "w-1.5 h-1.5 rounded-full",
+                    style: { backgroundColor: tracked ? "#16a34a" : "rgba(0,0,0,.12)" }
                   })
                 ]
               }, i);
@@ -324,28 +329,32 @@ export function JournalScreen() {
         ]
       }),
 
-      /* ── 2. Today's Time Summary (primary banner) ──────────────────────────── */
+      /* ── 2. Today's Time Summary (black hero card with gold offset) ────────── */
       jsxs("div", {
-        className: "bg-primary text-white px-5 pt-10 pb-6",
+        className: "mx-5 mt-4 mb-1 rounded-3xl bg-[#111114] text-white px-5 py-6 border-2 border-black shadow-[6px_6px_0_#F59E0B]",
         children: [
-          // Full date: "Wednesday, September 9"
-          jsx("p", {
-            className: "text-xs font-semibold text-white/50 uppercase tracking-widest mb-1",
-            children: formatDateLong(now)
+          // Kicker: gold dot + full date ("Wednesday, September 9")
+          jsxs("p", {
+            className: "flex items-center gap-2 text-[10px] font-black uppercase tracking-[.18em] mb-1.5",
+            style: { color: "#FCD34D" },
+            children: [
+              jsx("span", { className: "w-2 h-2 rounded-full bg-[#F59E0B] shrink-0" }),
+              formatDateLong(now)
+            ]
           }),
           // Large time display
           jsx("p", {
-            className: "text-4xl font-black",
+            className: "text-4xl font-black tracking-tight leading-none",
             children: todayTotalSeconds === 0 ? "0 min" : formatDuration(todayTotalSeconds)
           }),
           // Subtitle
           jsx("p", {
-            className: "text-white/50 text-sm mt-1",
+            className: "text-white/50 text-[12px] mt-1.5 font-semibold",
             children: "tracked today"
           }),
           // Activity bar (horizontal segments proportional to time)
           todayStats.activities.length > 0 && jsx("div", {
-            className: "mt-4 flex h-1.5 w-full bg-white/10 overflow-hidden",
+            className: "mt-4 flex h-2 w-full bg-white/10 rounded-full overflow-hidden",
             children: todayStats.activities.map(function(a) {
               return jsx("div", {
                 style: {
@@ -361,16 +370,26 @@ export function JournalScreen() {
 
       /* ── 3. "THIS MONTH" Day List ───────────────────────────────────────────── */
       jsxs("div", {
-        className: "px-5 pt-5 pb-2",
+        className: "px-5 pt-6 pb-1",
         children: [
-          jsx("h2", {
-            className: "text-xs font-semibold text-muted-foreground uppercase tracking-widest",
-            children: "This month"
+          jsxs("div", {
+            className: "flex items-center gap-2.5",
+            children: [
+              jsx("span", { className: "w-2.5 h-2.5 rounded-[3px] bg-[#F59E0B] border border-black shrink-0" }),
+              jsx("h2", {
+                className: "text-[11px] font-black uppercase tracking-[.16em] text-foreground",
+                children: "This month"
+              }),
+              jsx("span", {
+                className: "flex-1 h-px",
+                style: { background: "linear-gradient(90deg, rgba(245,158,11,.6), rgba(0,0,0,0))" }
+              })
+            ]
           })
         ]
       }),
       jsx("div", {
-        className: "flex flex-col divide-y divide-border border-t border-b border-border",
+        className: "flex flex-col gap-2.5 px-5 pt-3",
         children: dayGroups.map(function(dg, idx) {
           var dayDate = days[idx];
           var isToday = isSameDay(dayDate, now);
@@ -379,11 +398,13 @@ export function JournalScreen() {
 
           return jsxs("div", {
             children: [
-              // Day row button (tap to expand)
+              // Day row button (tap to expand) — styled as a white journal card
               jsxs("button", {
                 type: "button",
                 onClick: function() { setExpandedDay(isOpen ? -1 : idx); },
-                className: "w-full flex items-center justify-between px-5 py-4 bg-white",
+                className: "w-full flex items-center justify-between px-4 py-3.5 bg-white border border-black/10 rounded-2xl shadow-[0_1px_4px_rgba(0,0,0,.05)] transition " +
+                  (isOpen ? "rounded-b-none border-b-0 shadow-none " : "") +
+                  (isToday ? "border-l-[3px] border-l-[#F59E0B]" : ""),
                 children: [
                   jsxs("div", {
                     className: "flex items-center gap-2.5",
@@ -395,9 +416,14 @@ export function JournalScreen() {
                            ? { backgroundColor: "#16a34a", animation: "journalPulse 1.5s ease-in-out infinite" }
                            : { backgroundColor: "#111827" }
                        }),
+                       // Day-of-week label (Full view injects right after the date span)
+                      jsx("span", {
+                        className: "text-[10px] font-black uppercase tracking-wider text-muted-foreground",
+                        children: getDayName(dayDate)
+                      }),
                        // Date label
                       jsx("span", {
-                        className: "font-bold text-sm text-foreground",
+                        className: "font-black text-sm text-foreground tracking-tight",
                         children: formatDate(dayDate)
                       })
                     ]
@@ -423,11 +449,13 @@ export function JournalScreen() {
               // Expanded content: activity groups with individual blocks
               isOpen && (activities.length === 0
                 ? jsx("div", {
-                    className: "px-5 py-4 text-sm text-muted-foreground bg-secondary",
+                    className: "px-4 py-4 text-sm text-muted-foreground bg-secondary border border-t-0 border-black/10 rounded-2xl" +
+                      (isToday ? " border-l-[3px] border-l-[#F59E0B]" : ""),
                     children: "No time logged."
                   })
                 : jsx("div", {
-                    className: "bg-secondary",
+                    className: "bg-secondary border border-t-0 border-black/10 rounded-2xl overflow-hidden" +
+                      (isToday ? " border-l-[3px] border-l-[#F59E0B]" : ""),
                     children: activities.map(function(a, ai) {
                       var activityTotal = a.blocks.reduce(function(sum, b) {
                         return sum + (b.durationSeconds || 0);
@@ -436,7 +464,7 @@ export function JournalScreen() {
                         children: [
                           // Activity header row (colored bar + name + total)
                           jsxs("div", {
-                            className: "flex items-center justify-between px-5 py-2.5",
+                            className: "flex items-center justify-between px-4 py-2.5",
                             style: { borderLeft: "4px solid " + a.activityColor },
                             children: [
                               jsx("span", {
@@ -453,7 +481,7 @@ export function JournalScreen() {
                           // Individual block rows
                           a.blocks.map(function(b) {
                             return jsxs("div", {
-                              className: "flex items-center justify-between px-5 py-2 pl-8",
+                              className: "flex items-center justify-between px-4 py-2 pl-7",
                               style: { borderLeft: "4px solid " + a.activityColor + "40" },
                               children: [
                                 jsxs("span", {

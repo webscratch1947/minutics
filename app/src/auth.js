@@ -52,6 +52,9 @@ var ACTIVE_UID_KEY = "lt_active_uid";
 var _lastSeenUid = null;
 var _justSignedUp = false;
 var _prevAuthState; /* undefined | null | user — genuine-login detection */
+var _logoutInProgress = false; /* a real signOut() is in flight (set by
+   LTAuth.logout / forceLogoutSingleSession) — distinguishes a genuine
+   sign-out from a transient IndexedDB read failure that reports null */
 
 function nsKey(uid) { return "lt_ns_" + uid; }
 function isReservedKey(k) {
@@ -120,6 +123,7 @@ function claimSessionNow() {
 
 function forceLogoutSingleSession() {
   stopSessionWatch();
+  _logoutInProgress = true;
   signOut(auth).then(function () {
     setTimeout(function () {
       alert("This account is only allowed on one device. You were signed out here — log in again on this device to take over.");
@@ -227,6 +231,7 @@ function announceUserChanged() {
 window.LTAuth = {
   logout: function () {
     /* IMPORTANT: do NOT clear localStorage here. */
+    _logoutInProgress = true;
     
     // Clean up any enhancement visuals before logout to prevent flash
     cleanupEnhancementVisuals();
@@ -862,15 +867,46 @@ function cleanupEnhancementVisuals() {
   }
 }
 
+/* Transient IndexedDB failures on a refresh ("Data base is closing/hidden")
+   surface as unhandled rejections out of Firebase's internal storage
+   retries. They recover on the next read — log them as warnings instead of
+   letting them hit the console as red errors. */
+window.addEventListener("unhandledrejection", function (e) {
+  var msg = "";
+  try { msg = String((e && e.reason && (e.reason.message || e.reason)) || ""); } catch (err) {}
+  if (/(base|database) is closing|closing\/hidden|database is blocked|aborterror/i.test(msg)) {
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
+    console.warn("AUTH STORAGE (transient):", msg);
+  }
+});
+
+/* First response to a broken storage read: reload the page exactly once per
+   tab. The session lives in IndexedDB; when that read bounces ("Data base
+   is closing/hidden") Firebase either falls through to an empty store (null
+   user) or never calls back at all — and a plain second refresh always
+   fixed it. Automate that second refresh; only after it also fails do we
+   show the login gate (still never bypassing auth). */
+function _authTryRecover(reason) {
+  if (_logoutInProgress) return false;   /* a real sign-out is ending here */
+  if (!getMarker()) return false;        /* nobody was signed in on this device */
+  try { if (sessionStorage.getItem("lt_auth_recovered")) return false; } catch (e) {}
+  try { sessionStorage.setItem("lt_auth_recovered", "1"); } catch (e) {}
+  console.warn("AUTH SAFETY: " + reason + " — reloading once to recover storage (marker " + getMarker() + ")");
+  setTimeout(function () { try { location.reload(); } catch (e) {} }, 250);
+  return true;
+}
+
 /* ── Safety: if IndexedDB crashes and onAuthStateChanged never fires,
-   re-render a working login gate after 15s so the user isn't stuck on a
-   grey screen with no way in. NEVER bypasses auth. Only fires when
-   Firebase never responded. If the tab is hidden at that moment (bfcached
-   / prerendered pages delay storage reads), wait until it is visible
-   before giving up — Firebase usually resolves right after. ────────── */
+   first try the one-shot storage-reload above; otherwise re-render a
+   working login gate after 10s so the user isn't stuck on a grey screen
+   with no way in. NEVER bypasses auth. Only fires when Firebase never
+   responded. If the tab is hidden at that moment (bfcached / prerendered
+   pages delay storage reads), wait until it is visible before giving up —
+   Firebase usually resolves right after. ────────────────────────────────── */
 var _authStateChangedFired = false;
 function _authSafetyFire() {
   if (_authStateChangedFired) return;
+  if (_authTryRecover("Firebase never responded")) return;
   console.warn("AUTH SAFETY: Firebase never responded — re-rendering login gate (never bypassing auth)");
   document.body.classList.remove("lt-authed");
   renderGate("welcome");
@@ -881,15 +917,15 @@ setTimeout(function () {
     var onVis = function () {
       if (document.visibilityState !== "hidden") {
         document.removeEventListener("visibilitychange", onVis);
-        setTimeout(_authSafetyFire, 5000); /* give Firebase a beat once visible */
+        setTimeout(_authSafetyFire, 4000); /* give Firebase a beat once visible */
       }
     };
     document.addEventListener("visibilitychange", onVis);
-    setTimeout(_authSafetyFire, 20000); /* absolute cap */
+    setTimeout(_authSafetyFire, 16000); /* absolute cap */
   } else {
     _authSafetyFire();
   }
-}, 15000);
+}, 10000);
 
 /* Pages restored from the back-forward cache can come back with a closed
    IndexedDB connection ("Database is closing/hidden"). If auth never
@@ -923,6 +959,7 @@ onAuthStateChanged(auth, function (user) {
   var storageChanged = false;
   if (user) {
     console.log("Removing auth gate and adding lt-authed class");
+    _logoutInProgress = false;
     /* Swap per-account storage BEFORE any UI reads it. */
     storageChanged = reconcileStorage(user);
     _lastSeenUid = user.uid;
@@ -979,6 +1016,14 @@ onAuthStateChanged(auth, function (user) {
     }
   } else {
     console.log("Removing lt-authed class and rendering login gate");
+    /* A null user while our active-account marker is still set — and no
+       real sign-out is in flight — is the transient IndexedDB failure
+       mode, not a genuine sign-out (genuine sign-outs flag
+       _logoutInProgress; completed ones already cleared the marker).
+       Reload once instead of dumping a signed-in user on the login
+       screen. MUST run before reconcileStorage(null), which clears the
+       marker. */
+    if (_authTryRecover("got a null user while still signed in")) return;
     /* Park the outgoing account's data under its uid and wipe the live
        keys so the next account (or a fresh signup) starts clean. */
     storageChanged = reconcileStorage(null);
