@@ -4700,15 +4700,29 @@
     if (existing) existing.remove();
     var modal = document.createElement("div");
     modal.id = "lt-upgrade-modal";
-    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.55);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(16,18,35,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
     var isActivityLimit = /activities/i.test(message || "");
     modal.innerHTML =
-      '<div style="width:100%;max-width:320px;background:#fff;border:1px solid hsl(220 13% 88%);padding:26px;text-align:center">' +
-        '<div style="font-size:30px;margin-bottom:10px;color:' + (isActivityLimit ? "#d94264" : "hsl(230 40% 16%)") + '">' + (isActivityLimit ? "\u00D7" : "\u2B50") + '</div>' +
-        '<p style="color:hsl(230 40% 16%);font-size:16px;font-weight:800;margin:0 0 6px">' + (isActivityLimit ? "Limit reached" : "Premium feature") + '</p>' +
-        '<p style="color:hsl(220 10% 45%);font-size:13px;margin:0 0 20px;line-height:1.4">' + escapeHtml(message || "This is a premium feature.") + '</p>' +
-        '<button id="lt-upgrade-cta" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;font-family:inherit">View Plans</button>' +
-        '<button id="lt-upgrade-close" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:hsl(220 10% 40%);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>' +
+      '<style>' +
+        '@keyframes ltUpIn{from{opacity:0;transform:translateY(16px) scale(.95)}to{opacity:1;transform:none}}' +
+        '#lt-upgrade-card{animation:ltUpIn .24s cubic-bezier(.2,.9,.3,1.15)}' +
+        '@media (prefers-reduced-motion:reduce){#lt-upgrade-card{animation:none}}' +
+      '</style>' +
+      '<div id="lt-upgrade-card" style="width:100%;max-width:330px;background:#fff;border-radius:26px;padding:26px 22px 18px;text-align:center;box-shadow:0 24px 60px rgba(8,10,25,.4);position:relative;overflow:hidden">' +
+        '<div style="position:absolute;inset:0 0 auto;height:130px;background:linear-gradient(180deg,' + (isActivityLimit ? 'rgba(254,226,226,.75)' : 'rgba(252,211,77,.22)') + ',rgba(255,255,255,0));pointer-events:none"></div>' +
+        '<div style="position:relative;width:58px;height:58px;margin:0 auto 13px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:' + (isActivityLimit ? '#FEE2E2' : 'linear-gradient(135deg,#FCD34D,#F59E0B)') + ';box-shadow:' + (isActivityLimit ? '0 8px 18px rgba(220,38,38,.22)' : '0 10px 22px rgba(245,158,11,.4)') + '">' +
+          (isActivityLimit
+            ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+            : '<svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"/></svg>') +
+        '</div>' +
+        (isActivityLimit ? '' :
+          '<div style="position:relative;display:inline-block;padding:4px 11px;border-radius:999px;background:linear-gradient(135deg,#FCD34D,#F59E0B);color:#78350F;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px">Minutics Pro</div>') +
+        '<p style="position:relative;color:#111;font-size:17px;font-weight:900;margin:0 0 7px;letter-spacing:-.01em">' + (isActivityLimit ? "Limit reached" : "Premium feature") + '</p>' +
+        '<p style="position:relative;color:#6E6A5E;font-size:13.5px;line-height:1.5;margin:0 auto 18px;max-width:252px">' + escapeHtml(message || "This is a premium feature.") + '</p>' +
+        '<button id="lt-upgrade-cta" style="position:relative;width:100%;background:#111114;color:#fff;border:none;border-radius:999px;padding:14px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 10px 24px rgba(0,0,0,.25)">' +
+          (isActivityLimit ? '' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="#FCD34D"><path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"/></svg>') +
+          'View Plans</button>' +
+        '<button id="lt-upgrade-close" style="position:relative;width:100%;background:transparent;color:#8A8578;border:none;padding:13px 0 2px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>' +
       '</div>';
     /* When an overlay is active (e.g. Tasks), append inside the overlay root
        so the modal is guaranteed to paint above the overlay content —

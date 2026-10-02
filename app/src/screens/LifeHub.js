@@ -315,36 +315,36 @@ export function LifeHubScreen({ profile }) {
         jsx("div", { className: "absolute -right-10 -top-12 w-40 h-40 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.07)" } }),
         jsx("div", { className: "absolute -right-4 top-16 w-24 h-24 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.05)" } }),
         jsx("div", { className: "absolute -left-10 -bottom-14 w-32 h-32 rounded-full pointer-events-none", style: { background: "rgba(255,59,48,.24)" } }),
-        jsxs("div", { className: "relative flex items-center gap-3.5", children: [
-          iconTile(featured, "w-12 h-12 rounded-2xl flex items-center justify-center text-[23px] shrink-0 shadow-[0_6px_16px_rgba(0,0,0,.3)]", true),
-          jsxs("div", { className: "flex-1 min-w-0", children: [
-            jsxs("div", { className: "flex items-center gap-2 flex-wrap", children: [
-              jsx("span", { className: "font-black text-[17px] leading-tight", children: featured.label }),
-              jsx("span", {
-                className: "px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0",
-                style: { background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)" },
-                children: "Featured"
-              })
-            ]}),
+        jsxs("div", { className: "relative flex flex-col gap-2.5", children: [
+          jsxs("div", { className: "flex items-center gap-2", children: [
+            jsx("span", { className: "flex-1 min-w-0 font-black text-[15px] leading-tight", children: featured.label }),
             jsx("span", {
-              className: "block text-xs mt-1 leading-[1.45]",
+              className: "shrink-0 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider",
+              style: { background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)" },
+              children: "Featured"
+            })
+          ]}),
+          jsxs("div", { className: "flex items-center gap-2.5", children: [
+            iconTile(featured, "w-10 h-10 rounded-xl flex items-center justify-center text-[19px] shrink-0 shadow-[0_6px_16px_rgba(0,0,0,.3)]", true),
+            jsx("span", {
+              className: "flex-1 min-w-0 text-[11.5px] leading-snug",
               style: { color: "rgba(253,251,247,.65)" },
               children: featured.desc
             }),
-            statPM > 0 && jsxs("div", { className: "flex flex-wrap gap-1.5 mt-2", children: [
-              jsxs("span", {
-                className: "px-2 py-[3px] rounded-full text-[10px] font-bold",
-                style: { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.18)", color: "rgba(253,251,247,.92)" },
-                children: ["1 min \u2248 ", currSymbol, statPM.toFixed(2)]
-              }),
-              hoursNum > 0 && jsx("span", {
-                className: "px-2 py-[3px] rounded-full text-[10px] font-bold",
-                style: { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.18)", color: "rgba(253,251,247,.92)" },
-                children: hoursNum + "h workday"
-              })
-            ]})
+            jsx("div", { className: "w-8 h-8 rounded-full bg-white text-foreground flex items-center justify-center shrink-0 transition-transform group-hover:translate-x-1", children: chevron(14) })
           ]}),
-          jsx("div", { className: "w-9 h-9 rounded-full bg-white text-foreground flex items-center justify-center shrink-0 transition-transform group-hover:translate-x-1", children: chevron(15) })
+          statPM > 0 && jsxs("div", { className: "flex items-center gap-1.5", children: [
+            jsxs("span", {
+              className: "px-2 py-[3px] rounded-full text-[10px] font-bold",
+              style: { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.18)", color: "rgba(253,251,247,.92)" },
+              children: ["1 min \u2248 ", currSymbol, statPM.toFixed(2)]
+            }),
+            hoursNum > 0 && jsx("span", {
+              className: "px-2 py-[3px] rounded-full text-[10px] font-bold",
+              style: { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.18)", color: "rgba(253,251,247,.92)" },
+              children: hoursNum + "h workday"
+            })
+          ]})
         ]})
       ]
     }, "featured");
