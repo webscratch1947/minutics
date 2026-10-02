@@ -903,15 +903,23 @@ export function SettingsScreen() {
           jsx(SectionHeader, { children: "Telegram Daily Reports" }),
           jsx(Card, {
             children: jsxs("div", {
-              className: "flex items-center gap-3 px-4 py-4",
+              className: "flex items-center gap-3 px-4 py-4 cursor-pointer active:bg-red-50/50 transition-colors",
+              role: "button",
+              onClick: function () {
+                window.dispatchEvent(new CustomEvent("lt:upgrade", {
+                  detail: "Telegram daily reports are a premium feature. Upgrade to unlock."
+                }));
+              },
               children: [
                 jsx("span", { className: "text-2xl", children: "\uD83D\uDD12" }),
                 jsxs("div", {
+                  className: "flex-1",
                   children: [
                     jsx("p", { className: "text-sm font-bold text-foreground", children: "Premium feature" }),
                     jsx("p", { className: "text-xs text-muted-foreground mt-0.5", children: "Upgrade to unlock Telegram daily reports." })
                   ]
-                })
+                }),
+                jsx("span", { className: "text-muted-foreground text-sm font-bold", children: "\u203A" })
               ]
             })
           })
