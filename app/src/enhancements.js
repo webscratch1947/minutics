@@ -734,7 +734,11 @@
     while ((node = walker.nextNode())) {
       if (node.parentElement && node.parentElement.closest("[data-lt-enhancement]")) continue;
       var t = node.nodeValue;
-      if (t.indexOf("years left") !== -1) node.nodeValue = t.replace(/years left/g, "years to " + goal.word.toLowerCase());
+      if (t.indexOf("years left") !== -1 || t.indexOf("year left") !== -1) {
+        node.nodeValue = t.replace(/(\d+) years? left/g, function (m, n) {
+          return n + (Number(n) === 1 ? " year" : " years") + " to " + goal.word.toLowerCase();
+        });
+      }
       if (t.indexOf("Retire date") !== -1) node.nodeValue = t.replace(/Retire date/g, goal.dateLabel);
       if (t.indexOf("Remaining Retirement Time") !== -1) node.nodeValue = t.replace(/Remaining Retirement Time/g, "Remaining " + goal.word + " Time");
       if (t.indexOf("date of birth and retire date") !== -1) node.nodeValue = t.replace(/date of birth and retire date/g, "date of birth and " + goal.dateLabel.toLowerCase());

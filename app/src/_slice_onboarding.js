@@ -54,6 +54,14 @@ function whenImageReady(step, cb) {
   p.then(cb);
 }
 
+/* Singular-aware year labels ("1 year", never "1 years"). */
+function yrs(n) {
+  return n === 1 ? "1 year" : n + " years";
+}
+function yrsShort(n) {
+  return n === 1 ? "1 yr" : n + " yrs";
+}
+
 export function mk({
   onComplete: e
 }) {
@@ -69,13 +77,13 @@ export function mk({
       lived: Math.max(0, k)
     }
   })(), d = (() => {
-    if (u) return `${Math.floor(u.left)} years left`;
+    if (u) return `${yrs(Math.floor(u.left))} left`;
     if (s) {
       const Hb = new Date(s);
       const Ib = Math.floor((Date.now() - Hb.getTime()) / (365.25 * 24 * 3600 * 1e3));
-      return `${Math.max(0,l-Ib)} years left`
+      return `${yrs(Math.max(0,l-Ib))} left`
     }
-    return `${l} years`
+    return yrs(l)
   })(), idx = STEPS.indexOf(t), sym = (() => {
     try { return getCurrencySymbol(getCurrency().code); } catch { return "Rs."; }
   })();
@@ -353,10 +361,13 @@ export function mk({
   }
 
   if (t === "dob") {
-    const _maxYear = new Date().getFullYear() - 1;
+    const _maxYear = new Date().getFullYear();
     const _minYear = 1920;
     const _months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const _daysInMonth = (dY && dM) ? new Date(Number(dY), Number(dM), 0).getDate() : 31;
+    const _ageYears = s
+      ? Math.min(100, Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / (365.25 * 24 * 3600 * 1000))))
+      : 0;
     const _updateDob = (y, m, dd) => {
       setDY(y);
       setDM(m);
@@ -365,6 +376,10 @@ export function mk({
         const dayStr = String(dd).padStart(2, "0"),
           monStr = String(m).padStart(2, "0");
         i(y + "-" + monStr + "-" + dayStr);
+        /* Keep retire age inside the slider range: never below the user's
+           current age and never above 100 (min must stay <= max). */
+        const age = Math.min(100, Math.max(0, Math.floor((Date.now() - new Date(y + "-" + monStr + "-" + dayStr).getTime()) / (365.25 * 24 * 3600 * 1000))));
+        a(prev => Math.min(100, Math.max(prev, age)));
       } else {
         i("");
       }
@@ -384,7 +399,7 @@ export function mk({
                 className: _selStyle,
                 children: [
                   jsx("option", { value: "", children: "Day" }, "d0"),
-                  Array.from({ length: _daysInMonth }, (_, ii) => ii + 1).map(dd => jsx("option", { value: String(dd).padStart(2, "0"), children: String(dd).padStart(2, "0") }, dd))
+                  Array.from({ length: _daysInMonth }, (_, ii) => ii + 1).map(dd => jsx("option", { value: String(dd).padStart(2, "0"), children: String(dd) }, dd))
                 ]
               }),
               jsxs("select", {
@@ -415,16 +430,17 @@ export function mk({
           }),
           jsx("input", {
             type: "range",
-            min: s ? Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / (365.25 * 24 * 3600 * 1000))) : 0,
+            min: _ageYears,
             max: 100,
-            value: l,
+            step: 1,
+            value: Math.min(100, Math.max(l, _ageYears)),
             onChange: g => a(Number(g.target.value)),
             className: "w-full accent-[#157347]"
           }),
           jsxs("div", {
             className: "flex justify-between text-xs text-gray-400 mt-1",
             children: [
-              jsx("span", { children: s ? `${Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / (365.25 * 24 * 3600 * 1000)))} yrs` : "0 yrs" }),
+              jsx("span", { children: yrsShort(_ageYears) }),
               jsx("span", { children: "100 yrs" })
             ]
           })
@@ -434,15 +450,15 @@ export function mk({
           jsxs("div", {
             className: "flex h-4 w-full border border-[#E5DFCF] overflow-hidden rounded-full",
             children: [
-              jsx("div", { className: "h-full", style: { width: `${u.lived / l * 100}%`, background: GREEN } }),
-              jsx("div", { className: "h-full", style: { width: `${u.left / l * 100}%`, background: GREEN, opacity: .25 } })
+              jsx("div", { className: "h-full", style: { width: `${Math.min(100, u.lived / Math.max(1, l) * 100)}%`, background: GREEN } }),
+              jsx("div", { className: "h-full", style: { width: `${Math.min(100, u.left / Math.max(1, l) * 100)}%`, background: GREEN, opacity: .25 } })
             ]
           }),
           jsxs("div", {
             className: "flex justify-between text-xs text-gray-400 mt-2",
             children: [
-              jsxs("span", { children: [Math.floor(u.lived), " yrs lived"] }),
-              jsxs("span", { children: [Math.floor(u.left), " yrs remaining"] })
+              jsx("span", { children: [yrsShort(Math.floor(u.lived)), " lived"] }),
+              jsx("span", { children: [yrsShort(Math.floor(u.left)), " remaining"] })
             ]
           }),
           u.left > 0 && jsxs("p", {

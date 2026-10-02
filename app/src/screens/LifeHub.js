@@ -35,9 +35,9 @@ var LT_TOOLS = [
 /** Category filter options */
 var LT_FILTERS = [
   { key: "all",          label: "All" },
-  { key: "time",         label: "\uD83D\uDD52 Time" },
-  { key: "finance",      label: "\uD83D\uDCB3 Finance" },
-  { key: "productivity", label: "\u26A1 Productivity" }
+  { key: "time",         label: "Time" },
+  { key: "finance",      label: "Finance" },
+  { key: "productivity", label: "Productivity" }
 ];
 
 // ─── Color Palettes for Tool Tiles ───────────────────────────────────────────
@@ -173,8 +173,14 @@ export function LifeHubScreen({ profile }) {
     return matchesSearch && matchesCat;
   });
 
-  // ── Separate locked tools for Premium section
+  // ── Separate locked tools for Premium section (respects search + category)
   var lockedTools = tools.filter(function (t) { return t.locked; });
+  var filteredLocked = lockedTools.filter(function (t) {
+    var matchesSearch = !search ||
+      (t.label + " " + t.desc).toLowerCase().indexOf(search.toLowerCase()) !== -1;
+    var matchesCat = activeCat === "all" || t.category === activeCat;
+    return matchesSearch && matchesCat;
+  });
 
   // ── Shared header component for sub-views (time, life)
   var Header = function (title, desc) {
@@ -217,49 +223,60 @@ export function LifeHubScreen({ profile }) {
   // ═══════════════════════════════════════════════════════════════════════════
   if (view === "list") {
     return jsxs("div", {
-      className: "flex flex-col bg-background p-4 pb-4",
+      className: "flex flex-col bg-background p-4 pb-6",
       children: [
-        // ── Title ──
-        jsx("h1", {
-          className: "text-2xl font-bold mb-4",
-          children: "Life Hub"
-        }),
+        // ── Title block ──
+        jsxs("div", { className: "mb-4", children: [
+          jsxs("div", { className: "flex items-center justify-between gap-3", children: [
+            jsx("h1", { className: "text-[27px] font-black leading-none tracking-tight", children: "Life Hub" }),
+            jsxs("span", {
+              className: "shrink-0 px-2.5 py-1 rounded-full bg-white border border-black/[.07] text-[10px] font-black uppercase tracking-wider text-muted-foreground",
+              children: [tools.length, " tools"]
+            })
+          ]}),
+          jsx("p", {
+            className: "text-[13px] text-muted-foreground mt-1.5 font-medium",
+            children: "Every Minutics tool — search, filter and open."
+          })
+        ]}),
 
-        // ── Search bar with magnifying glass and clear button ──
+        // ── Search bar: white pill with icon + clear ──
         jsxs("div", {
           className: "relative mb-3",
           children: [
-            jsx("span", {
-              className: "absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm",
-              children: "\uD83D\uDD0D"
+            jsx("svg", {
+              className: "absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none",
+              width: 15, height: 15, viewBox: "0 0 24 24", fill: "none",
+              stroke: "currentColor", strokeWidth: 2.4, strokeLinecap: "round", strokeLinejoin: "round",
+              children: jsxs("g", { children: [jsx("circle", { cx: 11, cy: 11, r: 8 }), jsx("path", { d: "m21 21-4.3-4.3" })] })
             }),
             jsx("input", {
               type: "text",
               value: search,
               onChange: function (ev) { setSearch(ev.target.value); },
               placeholder: "Search tools...",
-              className: "w-full bg-secondary border border-border rounded-xl pl-9 pr-9 py-2.5 text-sm font-medium outline-none focus:border-primary"
+              className: "w-full bg-white border border-black/[.07] rounded-full pl-10 pr-11 py-2.5 text-sm font-medium outline-none focus:border-foreground/40 shadow-[0_1px_2px_rgba(0,0,0,.04)] placeholder:text-muted-foreground placeholder:font-normal"
             }),
             search && jsx("button", {
               type: "button",
               onClick: function () { setSearch(""); },
-              className: "absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm",
+              className: "absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-secondary text-muted-foreground text-xs font-bold flex items-center justify-center",
               children: "\u2715"
             })
           ]
         }),
 
-        // ── Category filter pills ──
+        // ── Category filter pills: rounded, active = black ──
         jsx("div", {
           className: "flex gap-2 mb-4 overflow-x-auto no-scrollbar",
           children: LT_FILTERS.map(function (f) {
             return jsx("button", {
               type: "button",
               onClick: function () { setActiveCat(f.key); },
-              className: "shrink-0 px-3.5 py-1.5 text-xs font-bold border " +
+              className: "shrink-0 px-4 py-1.5 text-xs font-bold rounded-full border transition-colors " +
                 (activeCat === f.key
-                  ? "bg-primary text-white border-primary"
-                  : "bg-white text-foreground border-border"),
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-white text-foreground border-black/[.07]"),
               children: f.label
             }, f.key);
           })
@@ -275,11 +292,11 @@ export function LifeHubScreen({ profile }) {
               "data-lifetime-tool": t.id,
               "data-lt-category": t.category,
               "data-lt-tile-injected": "1",
-              className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_2px_rgba(0,0,0,.04)] gap-2",
+              className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 transition-transform active:scale-[.98]",
               children: [
-                // Colored icon box
+                // Colored icon tile
                 jsx("div", {
-                  className: "w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0",
+                  className: "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0",
                   style: { background: colors.bg, color: colors.fg },
                   children: t.id === "sixjars"
                     ? jsx("img", {
@@ -291,12 +308,12 @@ export function LifeHubScreen({ profile }) {
                 }),
                 // Label
                 jsx("span", {
-                  className: "font-bold text-sm text-foreground",
+                  className: "font-bold text-sm text-foreground leading-snug",
                   children: t.label
                 }),
                 // Description
                 jsx("span", {
-                  className: "text-xs text-muted-foreground leading-[1.3]",
+                  className: "text-xs text-muted-foreground leading-[1.35]",
                   children: t.desc
                 })
               ]
@@ -305,49 +322,67 @@ export function LifeHubScreen({ profile }) {
         }),
 
         // ── Empty search state ──
-        filtered.length === 0 && lockedTools.length === 0 && jsx("div", {
-          className: "text-center py-10 text-sm text-muted-foreground",
-          children: "No tools match your search."
+        filtered.length === 0 && jsxs("div", {
+          className: "text-center py-10",
+          children: [
+            jsx("div", { className: "text-2xl mb-2", children: "\uD83D\uDD0D" }),
+            jsx("p", { className: "text-sm font-bold text-foreground", children: "No tools match your search." }),
+            search && jsx("button", {
+              type: "button",
+              onClick: function () { setSearch(""); },
+              className: "mt-3 px-4 py-1.5 rounded-full bg-foreground text-background text-xs font-bold",
+              children: "Clear search"
+            })
+          ]
         }),
 
         // ── Premium section (locked tools) ──
-        lockedTools.length > 0 && jsxs("div", {
-          className: "mt-4 pb-4",
+        filteredLocked.length > 0 && jsxs("div", {
+          className: "mt-5 pb-4",
           children: [
-            jsx("p", {
-              className: "text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2",
-              children: "Premium"
+            jsxs("div", {
+              className: "flex items-center gap-2 mb-2.5",
+              children: [
+                jsx("p", {
+                  className: "text-[10px] font-black text-muted-foreground uppercase tracking-[.14em]",
+                  children: "Premium"
+                }),
+                jsx("div", { className: "h-px flex-1 bg-black/[.07]" })
+              ]
             }),
             jsx("div", {
               className: "grid grid-cols-2 gap-3",
-              children: lockedTools.map(function (t) {
+              children: filteredLocked.map(function (t) {
                 var colors = TOOL_COLORS[t.id] || { bg: "#F3F4F6", fg: "#374151" };
                 return jsxs("button", {
                   type: "button",
+                  "data-lifetime-tool": t.id,
+                  "data-lt-category": t.category,
+                  "data-lt-tile-injected": "1",
                   onClick: function () {
                     alert("This is a Premium Feature. Upgrade to access it.");
                   },
-                  className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_2px_rgba(0,0,0,.04)] gap-2 opacity-55",
+                  className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 opacity-60 transition-transform active:scale-[.98]",
                   children: [
-                    // Lock icon
+                    // Black PRO badge
                     jsx("span", {
-                      className: "absolute top-2.5 right-2.5 text-xs",
-                      children: "\uD83D\uDD12"
+                      className: "absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-foreground text-background text-[9px] font-black uppercase tracking-wider",
+                      children: "PRO"
                     }),
-                    // Colored icon box
+                    // Colored icon tile
                     jsx("div", {
-                      className: "w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0",
+                      className: "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0",
                       style: { background: colors.bg, color: colors.fg },
                       children: t.symbol
                     }),
                     // Label
                     jsx("span", {
-                      className: "font-bold text-sm text-foreground",
+                      className: "font-bold text-sm text-foreground leading-snug",
                       children: t.label
                     }),
                     // Description
                     jsx("span", {
-                      className: "text-xs text-muted-foreground leading-[1.3]",
+                      className: "text-xs text-muted-foreground leading-[1.35]",
                       children: t.desc
                     })
                   ]
