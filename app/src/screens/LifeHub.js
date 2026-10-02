@@ -209,7 +209,7 @@ export function LifeHubScreen({ profile }) {
             jsx("button", {
               type: "button",
               onClick: function () { setView("list"); },
-              className: "shrink-0 border-2 border-black bg-white px-3 py-2 text-[13px] font-bold shadow-[3px_3px_0_#111114] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none hover:bg-secondary",
+              className: "shrink-0 border border-border bg-white px-3 py-2 text-[13px] font-bold hover:bg-secondary",
               children: "\u2190 Back"
             })
           ]
@@ -230,7 +230,7 @@ export function LifeHubScreen({ profile }) {
       productivity: { background: "#F5EDFF", color: "#7C3AED" }
     };
     var colorsOf = function (t) { return TOOL_COLORS[t.id] || { bg: "#F3F4F6", fg: "#374151" }; };
-    var catChipCls = "mt-auto pt-1 px-1.5 py-0.5 rounded-md border-[1.5px] border-black text-[9px] font-black uppercase tracking-wider";
+    var catChipCls = "mt-auto pt-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider";
 
     var statPM = perMinute;
     if (!(statPM > 0)) {
@@ -291,9 +291,9 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": t.id,
         "data-lt-category": t.category,
         "data-lt-tile-injected": "1",
-        className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border-2 border-black shadow-[5px_5px_0_#111114] gap-2 transition hover:-translate-y-0.5 hover:shadow-[7px_7px_0_#111114] active:translate-x-[3px] active:translate-y-[3px] active:shadow-[1px_1px_0_#111114]",
+        className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 transition hover:-translate-y-0.5 hover:border-black/15 hover:shadow-[0_8px_20px_rgba(0,0,0,.09)] active:scale-[.98]",
         children: [
-          iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,.3)]"),
+          iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 shadow-[0_2px_8px_rgba(0,0,0,.07)] ring-1 ring-black/[.04]"),
           jsx("span", { className: "font-bold text-sm text-foreground leading-snug", children: t.label }),
           jsx("span", { className: "text-xs text-muted-foreground leading-[1.35] line-clamp-2", children: t.desc }),
           jsx("span", {
@@ -310,7 +310,7 @@ export function LifeHubScreen({ profile }) {
       "data-lifetime-tool": featured.id,
       "data-lt-category": featured.category,
       "data-lt-tile-injected": "1",
-      className: "group col-span-2 w-full relative overflow-hidden rounded-3xl p-4 text-left bg-foreground text-background border-2 border-black shadow-[7px_7px_0_#F59E0B] transition hover:-translate-y-0.5 hover:shadow-[9px_9px_0_#F59E0B] active:translate-x-[3px] active:translate-y-[3px] active:shadow-[3px_3px_0_#F59E0B]",
+      className: "group col-span-2 w-full relative overflow-hidden rounded-3xl p-4 text-left bg-foreground text-background ring-1 ring-white/10 shadow-[0_14px_34px_rgba(0,0,0,.28)] transition active:scale-[.99]",
       children: [
         jsx("div", { className: "absolute -right-10 -top-12 w-40 h-40 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.07)" } }),
         jsx("div", { className: "absolute -right-4 top-16 w-24 h-24 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.05)" } }),
@@ -325,7 +325,7 @@ export function LifeHubScreen({ profile }) {
             })
           ]}),
           jsxs("div", { className: "flex items-center gap-2.5", children: [
-            iconTile(featured, "w-10 h-10 rounded-xl flex items-center justify-center text-[19px] shrink-0 border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,.35)]", true),
+            iconTile(featured, "w-10 h-10 rounded-xl flex items-center justify-center text-[19px] shrink-0 shadow-[0_6px_16px_rgba(0,0,0,.3)]", true),
             jsx("span", {
               className: "flex-1 min-w-0 text-[11.5px] leading-snug",
               style: { color: "rgba(253,251,247,.65)" },
@@ -356,12 +356,13 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": spotlight.id,
         "data-lt-category": spotlight.category,
         "data-lt-tile-injected": "1",
-        className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl text-left border-2 border-black shadow-[5px_5px_0_#111114] transition hover:-translate-y-0.5 hover:shadow-[7px_7px_0_#111114] active:translate-x-[3px] active:translate-y-[3px] active:shadow-[1px_1px_0_#111114]",
+        className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl text-left shadow-[0_4px_14px_rgba(0,0,0,.07)] transition active:scale-[.99]",
         style: {
-          background: "linear-gradient(115deg, " + c.bg + " 0%, rgba(255,255,255,.92) 160%)"
+          background: "linear-gradient(115deg, " + c.bg + " 0%, rgba(255,255,255,.92) 160%)",
+          border: "1px solid " + c.fg + "2e"
         },
         children: [
-          iconTile(spotlight, "w-12 h-12 rounded-xl flex items-center justify-center text-[23px] shrink-0 border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,.25)]", true),
+          iconTile(spotlight, "w-12 h-12 rounded-xl flex items-center justify-center text-[23px] shrink-0 shadow-[0_4px_12px_rgba(0,0,0,.12)]", true),
           jsxs("div", { className: "flex-1 min-w-0", children: [
             jsx("span", { className: "block font-black text-[15px] leading-tight", style: { color: c.fg }, children: spotlight.label }),
             jsx("span", {
@@ -382,9 +383,9 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": tail.id,
         "data-lt-category": tail.category,
         "data-lt-tile-injected": "1",
-        className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-white border-2 border-black shadow-[5px_5px_0_#111114] text-left transition hover:-translate-y-0.5 hover:shadow-[7px_7px_0_#111114] active:translate-x-[3px] active:translate-y-[3px] active:shadow-[1px_1px_0_#111114]",
+        className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-black/[.06] shadow-[0_1px_3px_rgba(0,0,0,.05)] text-left transition hover:-translate-y-0.5 hover:border-black/15 hover:shadow-[0_8px_20px_rgba(0,0,0,.09)] active:scale-[.99]",
         children: [
-          iconTile(tail, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,.3)]"),
+          iconTile(tail, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 shadow-[0_2px_8px_rgba(0,0,0,.07)] ring-1 ring-black/[.04]"),
           jsxs("div", { className: "flex-1 min-w-0", children: [
             jsx("span", { className: "block font-bold text-sm text-foreground leading-snug", children: tail.label }),
             jsx("span", { className: "block text-xs text-muted-foreground leading-[1.35] mt-0.5 line-clamp-2", children: tail.desc })
@@ -407,7 +408,7 @@ export function LifeHubScreen({ profile }) {
           jsxs("div", { className: "flex items-center justify-between gap-3", children: [
             jsx("h1", { className: "text-[27px] font-black leading-none tracking-tight", children: "Life Hub" }),
             jsxs("span", {
-              className: "shrink-0 px-2.5 py-1 rounded-full bg-foreground text-background border-2 border-black shadow-[3px_3px_0_#F59E0B] text-[10px] font-black uppercase tracking-wider",
+              className: "shrink-0 px-2.5 py-1 rounded-full bg-foreground text-background text-[10px] font-black uppercase tracking-wider",
               children: [tools.length, " tools"]
             })
           ]}),
@@ -432,12 +433,12 @@ export function LifeHubScreen({ profile }) {
               value: search,
               onChange: function (ev) { setSearch(ev.target.value); },
               placeholder: "Search tools...",
-              className: "w-full bg-white border-2 border-black rounded-full pl-10 pr-11 py-2.5 text-sm font-medium outline-none shadow-[3px_3px_0_#111114] focus:shadow-[4px_4px_0_#F59E0B] placeholder:text-muted-foreground placeholder:font-normal"
+              className: "w-full bg-white border border-black/[.07] rounded-full pl-10 pr-11 py-2.5 text-sm font-medium outline-none focus:border-foreground/40 shadow-[0_1px_2px_rgba(0,0,0,.04)] placeholder:text-muted-foreground placeholder:font-normal"
             }),
             search && jsx("button", {
               type: "button",
               onClick: function () { setSearch(""); },
-              className: "absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-secondary border-2 border-black text-muted-foreground text-xs font-bold flex items-center justify-center",
+              className: "absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-secondary text-muted-foreground text-xs font-bold flex items-center justify-center",
               children: "\u2715"
             })
           ]
@@ -450,10 +451,10 @@ export function LifeHubScreen({ profile }) {
             return jsx("button", {
               type: "button",
               onClick: function () { setActiveCat(f.key); },
-              className: "shrink-0 px-4 py-1.5 text-xs font-bold rounded-full border-2 transition-colors " +
+              className: "shrink-0 px-4 py-1.5 text-xs font-bold rounded-full border transition-colors " +
                 (activeCat === f.key
-                  ? "bg-foreground text-background border-black shadow-[3px_3px_0_#F59E0B]"
-                  : "bg-white text-foreground border-black shadow-[3px_3px_0_#111114] hover:-translate-y-0.5"),
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-white text-foreground border-black/[.07]"),
               children: f.label
             }, f.key);
           })
@@ -480,7 +481,7 @@ export function LifeHubScreen({ profile }) {
             search && jsx("button", {
               type: "button",
               onClick: function () { setSearch(""); },
-              className: "mt-3 px-4 py-1.5 rounded-full bg-foreground text-background border-2 border-black shadow-[3px_3px_0_#F59E0B] text-xs font-bold",
+              className: "mt-3 px-4 py-1.5 rounded-full bg-foreground text-background text-xs font-bold",
               children: "Clear search"
             })
           ]
@@ -513,14 +514,14 @@ export function LifeHubScreen({ profile }) {
                   onClick: function () {
                     alert("This is a Premium Feature. Upgrade to access it.");
                   },
-                  className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-foreground text-background border-2 border-black shadow-[5px_5px_0_#F59E0B] gap-2 transition hover:-translate-y-0.5 hover:shadow-[7px_7px_0_#F59E0B] active:translate-x-[3px] active:translate-y-[3px] active:shadow-[1px_1px_0_#F59E0B]",
+                  className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-foreground text-background border border-white/10 gap-2 transition hover:-translate-y-0.5 hover:opacity-90 active:scale-[.98]",
                   children: [
                     jsx("span", {
                       className: "absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider",
                       style: { background: "linear-gradient(135deg,#FCD34D,#F59E0B)", color: "#78350F" },
                       children: "PRO"
                     }),
-                    iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 border-2 border-black shadow-[2px_2px_0_rgba(0,0,0,.3)]"),
+                    iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 shadow-[0_2px_8px_rgba(0,0,0,.2)]"),
                     jsx("span", { className: "font-bold text-sm text-background leading-snug", children: t.label }),
                     jsx("span", {
                       className: "text-xs leading-[1.35] line-clamp-2",
@@ -552,7 +553,7 @@ export function LifeHubScreen({ profile }) {
           children: [
             // ── Metadata row ──
             jsxs("div", {
-              className: "flex justify-between border-t-2 border-b-2 border-black py-3 mb-4",
+              className: "flex justify-between border-t border-b py-3 mb-4",
               children: [
                 jsxs("div", {
                   className: "flex-1 text-center",
@@ -599,7 +600,7 @@ export function LifeHubScreen({ profile }) {
                       type: "number",
                       value: salary,
                       onChange: function (ev) { setSalary(ev.target.value); },
-                      className: "w-full border-2 border-black rounded-xl p-2 focus:outline-none focus:shadow-[3px_3px_0_#F59E0B]",
+                      className: "w-full border rounded-xl p-2",
                       placeholder: "e.g. 50000"
                     })
                   ]
@@ -615,7 +616,7 @@ export function LifeHubScreen({ profile }) {
                       type: "number",
                       value: hours,
                       onChange: function (ev) { setHours(ev.target.value); },
-                      className: "w-full border-2 border-black rounded-xl p-2 focus:outline-none focus:shadow-[3px_3px_0_#F59E0B]",
+                      className: "w-full border rounded-xl p-2",
                       placeholder: "e.g. 8"
                     })
                   ]
@@ -631,7 +632,7 @@ export function LifeHubScreen({ profile }) {
                       type: "number",
                       value: days,
                       onChange: function (ev) { setDays(ev.target.value); },
-                      className: "w-full border-2 border-black rounded-xl p-2 focus:outline-none focus:shadow-[3px_3px_0_#F59E0B]",
+                      className: "w-full border rounded-xl p-2",
                       placeholder: "e.g. 22"
                     })
                   ]
@@ -641,7 +642,7 @@ export function LifeHubScreen({ profile }) {
 
             // ── Display card ──
             jsxs("div", {
-              className: "border-2 border-black rounded-xl p-4 bg-secondary shadow-[5px_5px_0_#111114] mb-4",
+              className: "border rounded-xl p-4 bg-secondary mb-4",
               children: [
                 jsx("div", {
                   className: "text-sm text-muted-foreground mb-1",
@@ -666,7 +667,7 @@ export function LifeHubScreen({ profile }) {
               type: "button",
               onClick: saveTimeValue,
               disabled: perMinute <= 0,
-              className: "w-full py-3 bg-primary text-white font-semibold rounded-xl border-2 border-black shadow-[4px_4px_0_#111114] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none disabled:opacity-40",
+              className: "w-full py-3 bg-primary text-white font-semibold rounded-xl disabled:opacity-40",
               children: saved ? "Saved \u2713" : "Save"
             })
           ]
@@ -689,7 +690,7 @@ export function LifeHubScreen({ profile }) {
         children: [
           // ── Metadata row ──
           jsxs("div", {
-            className: "flex justify-between border-t-2 border-b-2 border-black py-3 mb-4",
+            className: "flex justify-between border-t border-b py-3 mb-4",
             children: [
               jsxs("div", {
                 className: "flex-1 text-center",
@@ -734,7 +735,7 @@ export function LifeHubScreen({ profile }) {
                   type: "number",
                   value: screenHours,
                   onChange: function (ev) { setScreenHours(ev.target.value); },
-                  className: "w-full border-2 border-black rounded-xl p-2 focus:outline-none focus:shadow-[3px_3px_0_#F59E0B]",
+                  className: "w-full border rounded-xl p-2",
                   placeholder: "e.g. 4"
                 })
               ]
@@ -743,7 +744,7 @@ export function LifeHubScreen({ profile }) {
 
           // ── Display card ──
           jsxs("div", {
-            className: "border-2 border-black rounded-xl p-4 bg-secondary shadow-[5px_5px_0_#111114]",
+            className: "border rounded-xl p-4 bg-secondary",
             children: [
               jsx("div", {
                 className: "text-sm text-muted-foreground mb-1",
