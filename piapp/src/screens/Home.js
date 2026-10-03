@@ -5,7 +5,7 @@ import { jsx, jsxs } from 'react/jsx-runtime';
 // App logic
 import { getStore, setStore, nextId, enrichBlocksForRange } from '../lib/storage.js';
 import { calcRemainingTime, calcPercentLived, msToBreakdown } from '../lib/lifeCalc.js';
-import { getRandomColor } from '../lib/constants.js';
+import { getDistinctColor } from '../lib/constants.js';
 import { blocksKey, activitiesKey, todayStatsKey } from '../lib/queryKeys.js';
 import { useActivities } from '../hooks/useActivities.js';
 import { useBlocks } from '../hooks/useBlocks.js';
@@ -711,7 +711,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                   jsx('button', {
                     onClick: handleDelete,
                     title: 'Remove',
-                    className: 'w-8 h-8 flex items-center justify-center rounded-full text-foreground/35 hover:text-destructive hover:bg-destructive/10 transition-colors',
+                    className: 'w-8 h-8 flex items-center justify-center rounded-full text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors',
                     children: jsx(lk, { className: 'w-4 h-4' })
                   }),
                   jsx('span', {
@@ -776,7 +776,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
               children: [
                 jsx('button', {
                   onClick: () => setShowEdit(false),
-                  className: 'flex-1 py-4 text-white font-bold bg-red-500 hover:bg-red-600 text-sm',
+                  className: 'flex-1 py-4 text-red-500 font-bold hover:bg-red-50 text-sm',
                   children: 'Cancel'
                 }),
                 jsx('button', {
@@ -937,7 +937,7 @@ function clockFaceSvgIcon() {
   });
 }
 
-function TimePicker({ label, value, onChange }) {
+function TimePicker({ label, value, onChange, labelClass }) {
   const [open, setOpen] = useState(false);
   const time = value ?? { h: 12, m: 0, ampm: 'AM' };
   const display = `${String(time.h).padStart(2, '0')}:${String(time.m).padStart(2, '0')} ${time.ampm}`;
@@ -946,7 +946,7 @@ function TimePicker({ label, value, onChange }) {
     className: 'flex-1',
     children: [
       jsx('label', {
-        className: 'block text-[10px] font-black text-foreground/45 uppercase tracking-[0.14em] mb-2',
+        className: 'block text-[10px] font-black uppercase tracking-[0.14em] mb-2 ' + (labelClass || 'text-foreground/45'),
         children: label
       }),
       jsxs('button', {
@@ -973,22 +973,43 @@ function ClockFace({ initial, onCancel, onConfirm }) {
   const [m, setM] = useState(base.m);
   const [ampm, setAmpm] = useState(base.ampm);
   const [mode, setMode] = useState('h');
-  const dialStart = useRef(null);
+  const modeRef = useRef(null);
+  modeRef.current = mode;
 
   const pickFromDial = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - r.left - r.width / 2;
     const y = e.clientY - r.top - r.height / 2;
-    if (Math.sqrt(x * x + y * y) < 24) return; // ignore dead center
+    if (Math.sqrt(x * x + y * y) < 24) return false; // ignore dead center
     let ang = Math.atan2(x, -y) * 180 / Math.PI;
     if (ang < 0) ang += 360;
     if (mode === 'h') {
       let hh = Math.round(ang / 30) % 12;
       setH(hh === 0 ? 12 : hh);
-      setMode('m');
     } else {
       setM(Math.round(ang / 6) % 60);
     }
+    return true;
+  };
+
+  // Press-and-drag: picking starts immediately on pointerdown and keeps
+  // tracking while held (pointer captured to the dial so re-renders don't
+  // interrupt it); hour→minute hand-off happens on release.
+  const dialDrag = useRef(null);
+  const onDialDown = (e) => {
+    if (dialDrag.current) return;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    dialDrag.current = { picked: pickFromDial(e) };
+  };
+  const onDialMove = (e) => {
+    if (!dialDrag.current) return;
+    if (pickFromDial(e)) dialDrag.current.picked = true;
+  };
+  const onDialUp = () => {
+    if (!dialDrag.current) return;
+    const picked = dialDrag.current.picked;
+    dialDrag.current = null;
+    if (picked && modeRef.current === 'h') setMode('m');
   };
 
   const handAng = mode === 'h' ? ((h % 12) * 30) : (m * 6);
@@ -1041,22 +1062,20 @@ function ClockFace({ initial, onCancel, onConfirm }) {
               jsx('span', { className: 'text-[14px] font-black text-foreground/45 ml-1.5 self-start mt-3.5', children: ampm })
             ]
           }),
-          // Clock dial — tap only: the pin is clicked into place, never dragged
+          // Clock dial — press and hold to pick, drag around to sweep, release to continue
           jsxs('div', {
             className: 'relative w-[240px] h-[240px] rounded-full border border-black/10 bg-[#Fdfbf7] mx-auto cursor-pointer select-none touch-none',
-            onPointerDown: (e) => { dialStart.current = { x: e.clientX, y: e.clientY }; },
-            onPointerUp: (e) => {
-              const s = dialStart.current;
-              dialStart.current = null;
-              if (!s) return;
-              if (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10) return;
-              pickFromDial(e);
-            },
-            onPointerCancel: () => { dialStart.current = null; },
+            onPointerDown: onDialDown,
+            onPointerMove: onDialMove,
+            onPointerUp: onDialUp,
+            onPointerCancel: onDialUp,
             children: [
               jsx('div', {
-                className: 'absolute left-1/2 top-1/2 w-[2.5px] -ml-[1.25px] bg-black/80 rounded-full',
-                style: { height: '37%', transformOrigin: '50% 0%', transform: 'rotate(' + (handAng + 180) + 'deg)' }
+                className: 'absolute left-1/2 top-1/2 w-[3px] -ml-[1.5px] bg-black/80 rounded-full pointer-events-none',
+                style: { height: '37%', transformOrigin: '50% 0%', transform: 'rotate(' + (handAng + 180) + 'deg)' },
+                children: jsx('div', {
+                  className: 'absolute left-1/2 -ml-2 -bottom-[7px] w-4 h-4 rounded-full bg-black'
+                })
               }),
               jsx('div', { className: 'absolute left-1/2 top-1/2 w-2.5 h-2.5 -ml-[5px] -mt-[5px] rounded-full bg-black pointer-events-none' }),
               nums
@@ -1075,14 +1094,14 @@ function ClockFace({ initial, onCancel, onConfirm }) {
               }, p)
             )
           }),
-          // Cancel / OK
+          // Cancel / OK (Cancel on the left, OK right next to it)
           jsxs('div', {
-            className: 'flex justify-end gap-4 mt-4',
+            className: 'flex justify-start gap-4 mt-4',
             children: [
               jsx('button', {
                 type: 'button',
                 onClick: onCancel,
-                className: 'py-2.5 px-5 text-[13.5px] font-black text-white bg-red-500 hover:bg-red-600 rounded-full cursor-pointer transition-colors',
+                className: 'py-2.5 px-5 text-[13.5px] font-black text-red-500 bg-white border border-red-200 hover:bg-red-50 rounded-full cursor-pointer transition-colors',
                 children: 'Cancel'
               }),
               jsx('button', {
@@ -1145,7 +1164,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
   const isValid = durationMinutes !== null && durationMinutes > 0;
   const spansDays = fromDate !== toDate || wrapsNextDay;
 
-  const dateInputClass = 'border border-black/[.08] bg-black/[.035] text-foreground font-semibold text-sm px-3.5 py-3 rounded-xl outline-none focus:border-black/40 w-full';
+  const dateInputClass = 'border border-black/[.08] bg-white text-foreground font-semibold text-sm px-3.5 py-3 rounded-xl outline-none focus:border-black/40 w-full';
 
   // When "From" date changes, ensure "To" date doesn't go before it
   const handleFromDateChange = (e) => {
@@ -1228,12 +1247,12 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
           jsxs('div', {
             className: 'overflow-y-auto flex-1 px-5 pb-5 flex flex-col gap-3',
             children: [
-              // From date
+              // From date — blue-tinted "start" group
               jsxs('div', {
-                className: 'rounded-2xl border border-black/[.07] bg-[#Fdfbf7] p-3.5',
+                className: 'rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-3.5',
                 children: [
                   jsx('label', {
-                    className: 'block text-[10px] font-black text-foreground/45 uppercase tracking-[0.14em] mb-2',
+                    className: 'block text-[10px] font-black text-[#2563EB] uppercase tracking-[0.14em] mb-2',
                     children: 'Date'
                   }),
                   jsx('input', {
@@ -1246,12 +1265,13 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // From time
               jsxs('div', {
-                className: 'rounded-2xl border border-black/[.07] bg-[#Fdfbf7] p-3.5',
+                className: 'rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-3.5',
                 children: [
                   jsx(TimePicker, {
                     label: 'From',
                     value: fromTime,
-                    onChange: setFromTime
+                    onChange: setFromTime,
+                    labelClass: 'text-[#2563EB]'
                   })
                 ]
               }),
@@ -1267,16 +1287,16 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                   jsx('div', { className: 'flex-1 h-px bg-black/10' })
                 ]
               }),
-              // To date with "Ends next day" badge
+              // To date with "Ends next day" badge — amber-tinted "end" group
               jsxs('div', {
-                className: 'rounded-2xl border border-black/[.07] bg-[#Fdfbf7] p-3.5',
+                className: 'rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-3.5',
                 children: [
                   jsxs('label', {
-                    className: 'flex items-center justify-between text-[10px] font-black text-foreground/45 uppercase tracking-[0.14em] mb-2',
+                    className: 'flex items-center justify-between text-[10px] font-black text-[#D97706] uppercase tracking-[0.14em] mb-2',
                     children: [
                       jsx('span', { children: 'End date' }),
                       spansDays && jsx('span', {
-                        className: 'text-black normal-case font-black tracking-normal',
+                        className: 'text-[#B45309] normal-case font-black tracking-normal',
                         children: 'Ends next day'
                       })
                     ]
@@ -1292,12 +1312,13 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // To time
               jsxs('div', {
-                className: 'rounded-2xl border border-black/[.07] bg-[#Fdfbf7] p-3.5',
+                className: 'rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-3.5',
                 children: [
                   jsx(TimePicker, {
                     label: 'To',
                     value: toTime,
-                    onChange: setToTime
+                    onChange: setToTime,
+                    labelClass: 'text-[#D97706]'
                   })
                 ]
               })
@@ -1311,7 +1332,8 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               durationMinutes !== null && durationMinutes > 0 && jsx('div', {
                 className: 'px-5 pt-3 pb-1 text-center',
                 children: jsx('p', {
-                  className: 'inline-block text-sm font-black text-white bg-black rounded-full px-4 py-1.5',
+                  className: 'inline-block text-sm font-black text-white rounded-full px-4 py-1.5',
+                  style: { backgroundColor: activity.color || '#00C2A8' },
                   children: durationMinutes >= 60
                     ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60}m`
                     : `${durationMinutes}m`
@@ -1323,7 +1345,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                   children: [
                     jsx('button', {
                       onClick: onClose,
-                      className: 'flex-1 py-3.5 text-white font-black bg-red-500 hover:bg-red-600 rounded-xl text-sm transition-colors',
+                      className: 'flex-1 py-3.5 text-red-500 font-black bg-white border border-red-200 hover:bg-red-50 rounded-xl text-sm transition-colors',
                       children: 'Cancel'
                     }),
                   jsx('button', {
@@ -1495,7 +1517,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
             children: [
               jsx('button', {
                 onClick: onClose,
-                className: 'flex-1 py-3.5 text-white font-black bg-red-500 hover:bg-red-600 rounded-xl text-sm transition-colors',
+                className: 'flex-1 py-3.5 text-red-500 font-black bg-white border border-red-200 hover:bg-red-50 rounded-xl text-sm transition-colors',
                 children: 'Cancel'
               }),
               jsx('button', {
@@ -1540,7 +1562,7 @@ function AddActivityBar() {
   const handleAdd = () => {
     if (!name.trim()) return;
     if (atLimit) return;
-    const randomColor = getRandomColor();
+    const randomColor = getDistinctColor(activities.map((a) => a.color));
     createActivity.mutate({
       data: {
         name: name.trim(),

@@ -6,7 +6,7 @@ import { getStore, setStore } from './lib/storage.js';
 (function seedDefaultActivitiesEarly() {
   var SEEDED_KEY = "lt_default_activities_seeded_v2";
   var DB_KEY = "lifetime_local_db_v1";
-  var COLORS = ["#1B1F3B","#00897B","#D97706","#7C3AED","#1D4ED8","#BE185D","#15803D","#B91C1C"];
+  var COLORS = ["#1B1F3B","#00897B","#D97706","#7C3AED","#E11D48","#BE185D","#15803D","#B91C1C"];
   try {
     if (localStorage.getItem(SEEDED_KEY) === "true") return;
     var db;

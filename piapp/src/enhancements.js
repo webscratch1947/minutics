@@ -1029,7 +1029,7 @@
       ".lt-tool-primary{background:#111114;color:#fff;border-color:#111114;box-shadow:0 2px 6px rgba(17,17,20,.22)}",
       ".lt-tool-secondary{background:#fff;box-shadow:0 1px 2px rgba(17,17,20,.07)}",
       ".lt-tool-danger{color:#DC2626;border-color:rgba(220,38,38,.35);background:#FEF2F2;box-shadow:0 1px 2px rgba(220,38,38,.1)}",
-      ".lt-cancel-btn{background:#DC2626!important;border-color:#DC2626!important;color:#fff!important;box-shadow:0 2px 6px rgba(220,38,38,.3)!important}",
+      ".lt-cancel-btn{background:#fff!important;border-color:#F1C7C7!important;color:#DC2626!important;box-shadow:none!important}",
       ".lt-tool-close:active,.lt-tool-primary:active,.lt-tool-secondary:active,.lt-tool-danger:active{transform:translateY(1px);box-shadow:none}",
       ".lt-tool-card{border:1px solid rgba(17,17,20,.08);background:#fff;padding:18px;border-radius:18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(17,17,20,.05);word-break:break-word}",
       ".lt-card-title{font-weight:800;font-size:16px;margin:0 0 12px;letter-spacing:-.01em;color:#111114;display:flex;align-items:center;gap:9px}",
@@ -1278,15 +1278,16 @@
       ".lt-clockpicker-amp{font-size:13px;font-weight:900;color:hsl(var(--muted-foreground));align-self:flex-start;margin-top:4px;margin-left:3px}",
       ".lt-clockpicker-face{position:relative;width:240px;height:240px;border-radius:50%;background:hsl(var(--muted));border:1px solid hsl(var(--border));margin:0 auto;cursor:pointer;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}",
       ".lt-clockpicker-hand{position:absolute;left:50%;top:50%;width:2.5px;margin-left:-1.25px;background:#111114;border-radius:2px;transform-origin:50% 0%;pointer-events:none}",
+      ".lt-clockpicker-hand::after{content:'';position:absolute;left:50%;bottom:-7px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:#111114}",
       ".lt-clockpicker-center{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#111114;pointer-events:none}",
       ".lt-clockpicker-num{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:700;color:hsl(var(--foreground));pointer-events:none;user-select:none}",
       ".lt-clockpicker-num.on{background:#111114;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.25)}",
       ".lt-clockpicker-ampm{display:flex;justify-content:center;gap:8px;margin-top:14px}",
       ".lt-clockpicker-ampm button{min-width:66px;padding:8px 14px;border-radius:999px;border:1px solid hsl(var(--border));background:hsl(var(--card));color:hsl(var(--muted-foreground));font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}",
       ".lt-clockpicker-ampm button.on{background:#111114;color:#fff;border-color:#111114}",
-      ".lt-clockpicker-actions{display:flex;justify-content:flex-end;gap:14px}",
+      ".lt-clockpicker-actions{display:flex;justify-content:flex-start;gap:14px}",
       ".lt-clockpicker-actions button{background:none;border:none;color:#111114;font-size:13.5px;font-weight:800;cursor:pointer;padding:8px 6px;font-family:inherit;-webkit-tap-highlight-color:transparent}",
-      ".lt-clockpicker-actions button.lt-cancel{color:hsl(var(--muted-foreground))}",
+      ".lt-clockpicker-actions button.lt-cancel{color:#DC2626}",
     ].join("");
     document.head.appendChild(s);
   }
@@ -1701,6 +1702,26 @@
      reads that trio next to a given label and returns minutes-since-
      midnight, converting 12-hour + AM/PM to 24-hour the same way the app
      itself does (hour % 12, +12 for PM). */
+  /* React Log-block modal: TimePicker renders <label>From/To</label> with a
+     sibling button showing "HH:MM AM" — no <select>s at all, so the native
+     sheet reader below never matches it. Read that button text instead. */
+  function readReactTimeLabelMinutes(labelText) {
+    var labels = Array.prototype.slice.call(document.querySelectorAll("label"));
+    for (var i = 0; i < labels.length; i++) {
+      if ((labels[i].textContent || "").trim() !== labelText) continue;
+      var scope = labels[i].parentElement;
+      if (!scope) continue;
+      var btn = scope.querySelector("button");
+      if (!btn) continue;
+      var m = (btn.textContent || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (!m) continue;
+      var h = parseInt(m[1], 10) % 12;
+      if (m[3].toUpperCase() === "PM") h += 12;
+      return h * 60 + parseInt(m[2], 10);
+    }
+    return null;
+  }
+
   function readFromToSelectMinutes(labelText) {
     var labels = Array.prototype.slice.call(document.querySelectorAll("label"));
     for (var i = 0; i < labels.length; i++) {
@@ -1735,6 +1756,24 @@
   }
 
   function getTimeBlockMinutesFromDom() {
+    /* 0) The React "Log a time block" modal: From/To TimePicker buttons
+        ("HH:MM AM") plus two date inputs. Read times + day difference. */
+    var rFrom = readReactTimeLabelMinutes("From");
+    var rTo = readReactTimeLabelMinutes("To");
+    if (rFrom != null && rTo != null) {
+      var rDiff = rTo - rFrom;
+      if (rDiff < 0) rDiff += 24 * 60; /* crossed midnight */
+      var dts = document.querySelectorAll('input[type="date"]');
+      if (dts.length >= 2 && dts[0].value && dts[1].value) {
+        var d0 = new Date(dts[0].value + "T00:00:00");
+        var d1 = new Date(dts[1].value + "T00:00:00");
+        if (!isNaN(d0.getTime()) && !isNaN(d1.getTime())) {
+          rDiff += Math.round((d1 - d0) / 86400000) * 24 * 60;
+        }
+      }
+      if (rDiff > 0) return rDiff;
+    }
+
     /* 1) The real quick-add "Log a time block" sheet: From/To hour+minute
        selects with an AM/PM button. */
     var fromMin = readFromToSelectMinutes("From");
@@ -3603,6 +3642,65 @@
 
   var _clockPickerState = null;
 
+  /* Hold-and-drag dial tracking. The picker re-renders (and replaces its
+     overlay element) whenever it renders, so during an active gesture we
+     mutate the existing hand/number/readout nodes in place instead — that
+     keeps touch pointer capture intact while the finger is down. The
+     document-level listeners live here once, outside renderClockPicker(). */
+  var clkDrag = null;
+  function clkFacePick(ev) {
+    var s = _clockPickerState;
+    if (!s) return false;
+    var overlay = document.getElementById("lt-clockpicker-overlay");
+    if (!overlay) return false;
+    var face = overlay.querySelector("[data-clockface]");
+    if (!face) return false;
+    var r = face.getBoundingClientRect();
+    var x = ev.clientX - r.left - r.width / 2;
+    var y = ev.clientY - r.top - r.height / 2;
+    if (Math.sqrt(x * x + y * y) < 24) return false; /* ignore dead center */
+    var ang = Math.atan2(x, -y) * 180 / Math.PI;
+    if (ang < 0) ang += 360;
+    if (s.mode === "h") {
+      var hh = Math.round(ang / 30) % 12;
+      s.hour12 = hh === 0 ? 12 : hh;
+    } else {
+      s.minute = Math.round(ang / 6) % 60;
+    }
+    /* In-place update: hand angle + selected number + digital readout. */
+    var hand = face.querySelector(".lt-clockpicker-hand");
+    if (hand) {
+      var handAng = s.mode === "h" ? ((s.hour12 % 12) * 30) : (s.minute * 6);
+      hand.style.transform = "rotate(" + (handAng + 180) + "deg)";
+    }
+    var nums = face.querySelectorAll(".lt-clockpicker-num");
+    for (var i = 0; i < nums.length; i++) {
+      var v = parseInt(nums[i].textContent, 10);
+      var on = s.mode === "h" ? (v === s.hour12) : (v === s.minute);
+      nums[i].classList.toggle("on", on);
+    }
+    var hbtn = overlay.querySelector('[data-clockmode="h"]');
+    var mbtn = overlay.querySelector('[data-clockmode="m"]');
+    if (hbtn) hbtn.textContent = pad2(s.hour12);
+    if (mbtn) mbtn.textContent = pad2(s.minute);
+    return true;
+  }
+  document.addEventListener("pointermove", function (e) {
+    if (!clkDrag) return;
+    if (clkFacePick(e)) clkDrag.picked = true;
+  });
+  function endClockDrag() {
+    if (!clkDrag) return;
+    var picked = clkDrag.picked;
+    clkDrag = null;
+    var s = _clockPickerState;
+    /* Hand off from hour to minute once the gesture ends — matching the
+       tap behaviour without interrupting a drag mid-gesture. */
+    if (picked && s && s.mode === "h") { s.mode = "m"; renderClockPicker(); }
+  }
+  document.addEventListener("pointerup", endClockDrag);
+  document.addEventListener("pointercancel", endClockDrag);
+
   function pad2(n) { n = String(n); return n.length < 2 ? "0" + n : n; }
 
   function openClockPicker(initialHHMM, onDone) {
@@ -3690,11 +3788,16 @@
     document.documentElement.appendChild(wrap.firstChild);
 
     var overlay = document.getElementById("lt-clockpicker-overlay");
-    /* Tap-only dial: record where the pointer went down and ignore the
-       resulting click when the finger/mouse travelled — the pin must be
-       clicked into place, never dragged around the face. */
-    var clkDown = null;
-    overlay.addEventListener("pointerdown", function (e) { clkDown = { x: e.clientX, y: e.clientY }; });
+    /* Press-and-drag dial: picking starts on pointerdown and keeps
+       tracking the finger while held (document-level move/up listeners
+       above survive the re-render that each pick triggers). */
+    overlay.addEventListener("pointerdown", function (e) {
+      if (e.target === overlay) return;
+      var face = e.target.closest("[data-clockface]");
+      if (!face) return;
+      e.preventDefault();
+      clkDrag = { picked: clkFacePick(e) };
+    });
     overlay.addEventListener("click", function (e) {
       if (e.target === overlay) { closeClockPicker(); return; }
       var actionEl = e.target.closest("[data-clockaction]");
@@ -3715,24 +3818,6 @@
       if (modeEl) { s.mode = modeEl.getAttribute("data-clockmode"); renderClockPicker(); return; }
       var ampmEl = e.target.closest("[data-clockampm]");
       if (ampmEl) { s.pm = ampmEl.getAttribute("data-clockampm") === "pm"; renderClockPicker(); return; }
-      var face = e.target.closest("[data-clockface]");
-      if (face) {
-        if (clkDown && (Math.abs(e.clientX - clkDown.x) > 10 || Math.abs(e.clientY - clkDown.y) > 10)) return; /* drag ≠ tap */
-        var r = face.getBoundingClientRect();
-        var x = e.clientX - r.left - r.width / 2;
-        var y = e.clientY - r.top - r.height / 2;
-        if (Math.sqrt(x * x + y * y) < 24) return; /* ignore dead center */
-        var ang = Math.atan2(x, -y) * 180 / Math.PI;
-        if (ang < 0) ang += 360;
-        if (s.mode === "h") {
-          var hh = Math.round(ang / 30) % 12;
-          s.hour12 = hh === 0 ? 12 : hh;
-          s.mode = "m";
-        } else {
-          s.minute = Math.round(ang / 6) % 60;
-        }
-        renderClockPicker();
-      }
     });
   }
 
@@ -4358,7 +4443,7 @@
   /* ── Free-plan activity cap ────────────────────────────────────────────── */
   var LOCAL_DB_KEY = "lifetime_local_db_v1";
   var DEFAULT_ACTIVITIES_SEEDED_KEY = "lt_default_activities_seeded_v2";
-  var ACTIVITY_COLORS = ["#3B82F6","#00897B","#D97706","#7C3AED","#1D4ED8","#BE185D","#15803D","#B91C1C"];
+  var ACTIVITY_COLORS = ["#3B82F6","#00897B","#D97706","#7C3AED","#E11D48","#BE185D","#15803D","#B91C1C"];
 
   /* Seed the app's common default activities on first run. Defaults remain
      available, but the Free-plan allowance applies to activities the user
@@ -4439,7 +4524,7 @@
     if (readJson(COLOR_FIX_KEY, false)) return;
     var db = readJson(LOCAL_DB_KEY, { activities: [] });
     if (!Array.isArray(db.activities)) { writeJson(COLOR_FIX_KEY, true); return; }
-    var bright = ["#3B82F6","#00897B","#D97706","#7C3AED","#1D4ED8","#BE185D","#15803D","#B91C1C"];
+    var bright = ["#3B82F6","#00897B","#D97706","#7C3AED","#E11D48","#BE185D","#15803D","#B91C1C"];
     var changed = false;
     var nextIdx = 0;
     db.activities.forEach(function (a) {
@@ -4456,6 +4541,47 @@
     });
     if (changed) writeJson(LOCAL_DB_KEY, db);
     writeJson(COLOR_FIX_KEY, true);
+  }
+
+  /* Migration: every activity must have its OWN distinct color — two
+     activities sitting on near-identical hues (the old seeds shipped two
+     blues) made the Activity list, Journal and Full view disagree with
+     each other once the report re-assigned one of them. Uses the same
+     perceptual-distance threshold as the Full view so both agree. */
+  var DISTINCT_COLORS_KEY = "lt_activity_colors_distinct_v2";
+  var DISTINCT_COLORS_PAL = ["#F59E0B","#EF4444","#16A34A","#2563EB","#A855F7","#EC4899","#14B8A6","#EAB308","#F97316","#8B5CF6","#06B6D4","#84CC16","#F43F5E","#0EA5E9","#D946EF","#22C55E"];
+  function fixDuplicateActivityColors() {
+    if (readJson(DISTINCT_COLORS_KEY, false)) return;
+    var db = readJson(LOCAL_DB_KEY, { activities: [] });
+    if (!Array.isArray(db.activities)) { writeJson(DISTINCT_COLORS_KEY, true); return; }
+    var used = [];
+    var changed = false;
+    db.activities.forEach(function (a) {
+      if (!a) return;
+      var rgb = fvHexToRgb(a.color);
+      var ok = !!rgb;
+      if (ok) {
+        for (var i = 0; i < used.length; i++) {
+          if (fvColorDist(rgb, used[i]) < 90) { ok = false; break; }
+        }
+      }
+      if (!ok) {
+        var orig = a.color;
+        for (var j = 0; j < DISTINCT_COLORS_PAL.length; j++) {
+          var prgb = fvHexToRgb(DISTINCT_COLORS_PAL[j]);
+          var good = true;
+          for (var k = 0; k < used.length; k++) {
+            if (fvColorDist(prgb, used[k]) < 90) { good = false; break; }
+          }
+          if (good) { a.color = DISTINCT_COLORS_PAL[j]; rgb = prgb; break; }
+        }
+        if (a.color !== orig) changed = true;
+        if (!rgb) rgb = fvHexToRgb(a.color) || [124, 140, 255];
+      }
+      used.push(rgb);
+    });
+    if (changed) writeJson(LOCAL_DB_KEY, db);
+    writeJson(DISTINCT_COLORS_KEY, true);
   }
 
   function currentActivityCount() {
@@ -5206,23 +5332,25 @@
     var out = acts.map(function (a) {
       return { name: a.name, minutes: a.minutes, color: String(a.color || "").trim() || "#7c8cff" };
     });
+    /* Every activity keeps its OWN color here — the Activity list and the
+       Journal both show activity.color, so re-assigning a palette color in
+       the report only ever made the three views disagree (Work read blue
+       everywhere except Full view). A boot-time migration keeps the stored
+       colors mutually distinct, so no substitution is needed; only an
+       unreadable color falls back to the palette. */
     var used = [];
     out.forEach(function (a) {
       var rgb = fvHexToRgb(a.color);
-      var ok = !!rgb;
-      if (ok) {
-        for (var i = 0; i < used.length; i++) { if (fvColorDist(rgb, used[i]) < 90) { ok = false; break; } }
-      }
-      if (!ok) {
+      if (!rgb) {
         for (var j = 0; j < FV_PALETTE.length; j++) {
           var prgb = fvHexToRgb(FV_PALETTE[j]);
           var good = true;
           for (var k = 0; k < used.length; k++) { if (fvColorDist(prgb, used[k]) < 90) { good = false; break; } }
           if (good) { a.color = FV_PALETTE[j]; rgb = prgb; break; }
         }
-        if (!rgb) rgb = fvHexToRgb(a.color);
+        if (!rgb) rgb = [124, 140, 255];
       }
-      used.push(rgb || [0, 0, 0]);
+      used.push(rgb);
     });
     return out;
   }
@@ -7671,6 +7799,7 @@
     safeRun(addStyle3);
     safeRun(seedDefaultActivities);
     safeRun(fixDarkActivityColors);
+    safeRun(fixDuplicateActivityColors);
     safeRun(enforceActivityGraceIfNeeded);
     safeRun(normalizeMinuteUnits);
     /* Remove any stray compiled account card (React now owns Settings) */

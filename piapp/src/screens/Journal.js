@@ -388,7 +388,7 @@ export function JournalScreen() {
               jsxs("button", {
                 type: "button",
                 onClick: function() { setExpandedDay(isOpen ? -1 : idx); },
-                className: "w-full flex items-center justify-between px-4 py-4 bg-white transition-colors active:bg-secondary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-black/30 [-webkit-tap-highlight-color:transparent]",
+                className: "w-full flex items-center justify-between px-4 py-4 bg-white transition-colors active:bg-black/[.04] [-webkit-tap-highlight-color:transparent]",
                 children: [
                   jsxs("div", {
                     className: "flex items-center gap-2.5",
@@ -413,11 +413,11 @@ export function JournalScreen() {
                       // Total time for the day
                       jsx("span", {
                         className: "font-mono text-sm font-bold text-muted-foreground",
-                        children: dg.totalSeconds > 0 ? formatDuration(dg.totalSeconds) : "\u2014"
+                        children: dg.totalSeconds > 0 ? formatDuration(dg.totalSeconds) : "00:00"
                       }),
                       // Expand indicator (static, flips instantly)
                       jsx("span", {
-                        className: "text-muted-foreground text-xs",
+                        className: "text-muted-foreground text-[17px] font-black leading-none",
                         children: isOpen ? "\u25BE" : "\u25B8"
                       })
                     ]
@@ -428,11 +428,11 @@ export function JournalScreen() {
               // Expanded content: activity groups with individual blocks
               isOpen && (activities.length === 0
                 ? jsx("div", {
-                    className: "px-5 py-4 text-sm text-muted-foreground bg-secondary",
+                    className: "px-5 py-4 text-sm text-muted-foreground bg-white border-t border-black/[.06]",
                     children: "No time logged."
                   })
                 : jsx("div", {
-                    className: "bg-secondary",
+                    className: "bg-white border-t border-black/[.06]",
                     children: activities.map(function(a, ai) {
                       var activityTotal = a.blocks.reduce(function(sum, b) {
                         return sum + (b.durationSeconds || 0);
@@ -490,7 +490,7 @@ export function JournalScreen() {
                                   className: "font-mono text-sm font-semibold",
                                   children: b.durationSeconds
                                     ? formatDuration(b.durationSeconds)
-                                    : "\u2014"
+                                    : "00:00"
                                 })
                               ]
                             }, b.id);
