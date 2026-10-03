@@ -6,7 +6,7 @@ import { calcRemainingTime } from '../lib/lifeCalc.js';
 import { getCurrency, getCurrencySymbol } from '../lib/currency.js';
 import { isPro } from '../lib/settings.js';
 import { cn } from '../lib/cn.js';
-import { Play as nk, Pencil as tk } from 'lucide-react';
+import { Play as nk, Pencil as tk, Clock, Wallet, Calculator, TrendingUp, BookOpen, ListChecks, CalendarClock, Heart, Scale, ShoppingCart, BarChart3, Headphones, Hourglass, Trophy, Star, PiggyBank } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -14,22 +14,22 @@ import { Play as nk, Pencil as tk } from 'lucide-react';
 
 /** All available tools in the Life Hub */
 var LT_TOOLS = [
-  { id: "timevalue",   symbol: "timevalue",  label: "Time Value Calculator",     desc: "Know the value of every minute",          category: "time",         locked: false },
-  { id: "budget",      symbol: "\uD83D\uDCB3", label: "Budget Tracker",          desc: "Manage income, expenses and balance",     category: "finance",      locked: true  },
-  { id: "emi",         symbol: "\uD83E\uDDEE", label: "EMI Calculator",          desc: "Plan loans and calculate EMI",           category: "finance",      locked: false },
-  { id: "compound",    symbol: "\uD83D\uDCC8", label: "Compound Interest",       desc: "See money growth with compounding",      category: "finance",      locked: false },
-  { id: "gram",        symbol: "\uD83D\uDCD6", label: "Knowledge Gram",          desc: "Track what you learn daily",             category: "productivity", locked: false },
-  { id: "tasks",       symbol: "\u2705",       label: "My Tasks",                desc: "Organize tasks and things to do",        category: "productivity", locked: false },
-  { id: "routine",     symbol: "\uD83D\uDD52", label: "Routine Trackers",        desc: "Build daily timetable, tick off slots",  category: "time",         locked: false },
-  { id: "lifevalue",   symbol: "\u2764\uFE0F", label: "Life Value",              desc: "Calculate and improve overall life value",category: "time",         locked: true  },
-  { id: "opp",         symbol: "\u25C6",       label: "Opportunity Cost",        desc: "See what time/money could do instead",   category: "finance",      locked: false },
-  { id: "itemcost",    symbol: "\uD83D\uDED2", label: "Item Time Cost Calculator",desc: "Hours of work an item really costs",    category: "finance",      locked: false },
-  { id: "prodscore",   symbol: "\uD83D\uDCCA", label: "Productivity Score",      desc: "0-100 score for today from logged time", category: "productivity", locked: false },
-  { id: "focus",       symbol: "\uD83C\uDFA7", label: "Focus Mode",              desc: "25-min focus timer with ambient sounds", category: "time",         locked: false },
-  { id: "wastebudget", symbol: "\u26A0\uFE0F", label: "Time Waste Budget",       desc: "Daily waste limit with red alert",       category: "time",         locked: false },
-  { id: "achievements",symbol: "\uD83C\uDFC1", label: "Achievements",            desc: "Milestones and badges unlocked",         category: "productivity", locked: false },
-  { id: "bucketlist",  symbol: "\uD83C\uDF1F", label: "Bucket List",             desc: "Dreams/goals \u2014 check off for life", category: "productivity", locked: false },
-  { id: "sixjars",     symbol: "\uD83E\uDED4", label: "6 Jars",                  desc: "Split salary into 6 money jars",         category: "finance",      locked: false }
+  { id: "timevalue",   symbol: Clock,       label: "Time Value Calculator",     desc: "Know the value of every minute",          category: "time",         locked: false },
+  { id: "budget",      symbol: Wallet,      label: "Budget Tracker",            desc: "Manage income, expenses and balance",     category: "finance",      locked: true  },
+  { id: "emi",         symbol: Calculator,  label: "EMI Calculator",            desc: "Plan loans and calculate EMI",            category: "finance",      locked: false },
+  { id: "compound",    symbol: TrendingUp,  label: "Compound Interest",         desc: "See money growth with compounding",       category: "finance",      locked: false },
+  { id: "gram",        symbol: BookOpen,    label: "Knowledge Gram",            desc: "Track what you learn daily",              category: "productivity", locked: false },
+  { id: "tasks",       symbol: ListChecks,  label: "My Tasks",                  desc: "Organize tasks and things to do",         category: "productivity", locked: false },
+  { id: "routine",     symbol: CalendarClock, label: "Routine Trackers",        desc: "Build daily timetable, tick off slots",   category: "time",         locked: false },
+  { id: "lifevalue",   symbol: Heart,       label: "Life Value",                desc: "Calculate and improve overall life value",category: "time",         locked: true  },
+  { id: "opp",         symbol: Scale,       label: "Opportunity Cost",          desc: "See what time/money could do instead",    category: "finance",      locked: false },
+  { id: "itemcost",    symbol: ShoppingCart,label: "Item Time Cost Calculator", desc: "Hours of work an item really costs",      category: "finance",      locked: false },
+  { id: "prodscore",   symbol: BarChart3,   label: "Productivity Score",        desc: "0-100 score for today from logged time",  category: "productivity", locked: false },
+  { id: "focus",       symbol: Headphones,  label: "Focus Mode",                desc: "25-min focus timer with ambient sounds",  category: "time",         locked: false },
+  { id: "wastebudget", symbol: Hourglass,   label: "Time Waste Budget",         desc: "Daily waste limit with red alert",        category: "time",         locked: false },
+  { id: "achievements",symbol: Trophy,      label: "Achievements",              desc: "Milestones and badges unlocked",          category: "productivity", locked: false },
+  { id: "bucketlist",  symbol: Star,        label: "Bucket List",               desc: "Dreams/goals \u2014 check off for life",  category: "productivity", locked: false },
+  { id: "sixjars",     symbol: PiggyBank,   label: "6 Jars",                    desc: "Split salary into 6 money jars",          category: "finance",      locked: false }
 ];
 
 /** Category filter options */
@@ -157,8 +157,6 @@ export function LifeHubScreen({ profile }) {
   // ── Apply dynamic colors to tools
   var tools = LT_TOOLS.map(function (t) {
     var tool = Object.assign({}, t);
-    // Time Value Calculator uses the user's currency symbol
-    if (tool.id === "timevalue") tool.symbol = "\u23F1\uFE0F";
     // Budget and Life Value are PRO-only
     if (tool.id === "budget" || tool.id === "lifevalue") tool.locked = !isPro();
     return tool;
@@ -251,7 +249,9 @@ export function LifeHubScreen({ profile }) {
               alt: "",
               style: { width: "70%", height: "70%", objectFit: "contain", display: "block" }
             })
-          : t.symbol
+          : (typeof t.symbol === "string"
+              ? t.symbol
+              : jsx(t.symbol, { size: 21, strokeWidth: 2.3, "aria-hidden": true }))
       });
     };
 

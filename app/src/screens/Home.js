@@ -820,11 +820,24 @@ function ModalOption({ icon, label, description, onClick, labelClass = '', prima
 }
 
 // ─── Time Picker (mh) ──────────────────────────────────────────────────────
-// Hour (1-12) + Minute (0-59) + AM/PM toggle
+// Classic analog clock face — tap the dial to set the hour (then the
+// minute), switch mode via the digital readout, pick AM/PM, confirm.
+
+function clockFaceSvgIcon() {
+  return jsx('svg', {
+    width: 17, height: 17, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round',
+    children: jsxs('g', { children: [
+      jsx('circle', { cx: 12, cy: 12, r: 9 }),
+      jsx('path', { d: 'M12 7.5V12l3 2' })
+    ] })
+  });
+}
 
 function TimePicker({ label, value, onChange }) {
+  const [open, setOpen] = useState(false);
   const time = value ?? { h: 12, m: 0, ampm: 'AM' };
-  const inputClass = 'border border-black/[.08] bg-white text-foreground font-black text-lg px-2 py-3 outline-none focus:border-black/40 appearance-none text-center rounded-xl';
+  const display = `${String(time.h).padStart(2, '0')}:${String(time.m).padStart(2, '0')} ${time.ampm}`;
 
   return jsxs('div', {
     className: 'flex-1',
@@ -833,37 +846,140 @@ function TimePicker({ label, value, onChange }) {
         className: 'block text-[10px] font-black text-foreground/45 uppercase tracking-[0.14em] mb-2',
         children: label
       }),
-      jsxs('div', {
-        className: 'flex items-center gap-1.5',
+      jsxs('button', {
+        type: 'button',
+        onClick: () => setOpen(true),
+        className: 'w-full flex items-center justify-center gap-2.5 border border-black/[.08] bg-white text-foreground font-bold text-lg px-2 py-3 rounded-xl outline-none focus:border-black/40 cursor-pointer transition-colors active:bg-black/[.04]',
         children: [
-          // Hour select (1-12)
-          jsx('select', {
-            value: time.h,
-            onChange: (e) => onChange({ ...time, h: Number(e.target.value) }),
-            className: cn(inputClass, 'w-14'),
-            children: Array.from({ length: 13 }, (_, i) => i).map(h =>
-              jsx('option', { value: h, children: String(h).padStart(2, '0') }, h)
+          clockFaceSvgIcon(),
+          jsx('span', { children: display })
+        ]
+      }),
+      open && jsx(ClockFace, {
+        initial: value,
+        onCancel: () => setOpen(false),
+        onConfirm: (v) => { onChange(v); setOpen(false); }
+      })
+    ]
+  });
+}
+
+function ClockFace({ initial, onCancel, onConfirm }) {
+  const base = initial ?? { h: 12, m: 0, ampm: 'AM' };
+  const [h, setH] = useState(base.h);
+  const [m, setM] = useState(base.m);
+  const [ampm, setAmpm] = useState(base.ampm);
+  const [mode, setMode] = useState('h');
+
+  const pickFromDial = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - r.left - r.width / 2;
+    const y = e.clientY - r.top - r.height / 2;
+    if (Math.sqrt(x * x + y * y) < 24) return; // ignore dead center
+    let ang = Math.atan2(x, -y) * 180 / Math.PI;
+    if (ang < 0) ang += 360;
+    if (mode === 'h') {
+      let hh = Math.round(ang / 30) % 12;
+      setH(hh === 0 ? 12 : hh);
+      setMode('m');
+    } else {
+      setM(Math.round(ang / 6) % 60);
+    }
+  };
+
+  const handAng = mode === 'h' ? ((h % 12) * 30) : (m * 6);
+  const nums = [];
+  for (let i = 0; i < 12; i++) {
+    const val = mode === 'h' ? (i === 0 ? 12 : i) : (i * 5);
+    const angDeg = mode === 'h' ? (val * 30) : (val * 6);
+    const a = angDeg * Math.PI / 180;
+    const rx = 50 + 38.5 * Math.sin(a);
+    const ry = 50 - 38.5 * Math.cos(a);
+    const sel = mode === 'h' ? (val === h) : (val === m);
+    nums.push(
+      jsx('span', {
+        key: val,
+        className: 'absolute w-8 h-8 -ml-4 -mt-4 rounded-full flex items-center justify-center text-[13.5px] font-bold pointer-events-none select-none ' +
+          (sel ? 'bg-black text-white shadow-[0_4px_10px_rgba(0,0,0,.25)]' : 'text-foreground/75'),
+        style: { left: rx + '%', top: ry + '%' },
+        children: String(val).padStart(2, '0')
+      }, val)
+    );
+  }
+
+  return jsxs('div', {
+    className: 'fixed inset-0 z-[80] flex items-center justify-center bg-black/55 backdrop-blur-[2px] p-5',
+    onClick: (e) => e.stopPropagation(),
+    children: [
+      jsxs('div', {
+        className: 'w-full max-w-[330px] bg-white rounded-3xl p-5 shadow-[0_24px_60px_rgba(0,0,0,.35)]',
+        onClick: (e) => e.stopPropagation(),
+        children: [
+          // Digital readout — tap hour or minute to switch dial mode
+          jsxs('div', {
+            className: 'flex items-center justify-center gap-1 mb-4',
+            children: [
+              jsx('button', {
+                type: 'button',
+                onClick: () => setMode('h'),
+                className: 'text-[34px] font-black leading-none px-2 py-1 rounded-xl transition-colors ' +
+                  (mode === 'h' ? 'bg-black text-white' : 'text-foreground/40'),
+                children: String(h).padStart(2, '0')
+              }),
+              jsx('span', { className: 'text-[30px] font-black text-foreground/60 leading-none', children: ':' }),
+              jsx('button', {
+                type: 'button',
+                onClick: () => setMode('m'),
+                className: 'text-[34px] font-black leading-none px-2 py-1 rounded-xl transition-colors ' +
+                  (mode === 'm' ? 'bg-black text-white' : 'text-foreground/40'),
+                children: String(m).padStart(2, '0')
+              }),
+              jsx('span', { className: 'text-[14px] font-black text-foreground/45 ml-1.5 self-start mt-1.5', children: ampm })
+            ]
+          }),
+          // Clock dial
+          jsxs('div', {
+            onClick: pickFromDial,
+            className: 'relative w-[240px] h-[240px] rounded-full border border-black/10 bg-[#Fdfbf7] mx-auto cursor-pointer select-none touch-none',
+            children: [
+              jsx('div', {
+                className: 'absolute left-1/2 top-1/2 w-[2.5px] -ml-[1.25px] bg-black/80 rounded-full',
+                style: { height: '37%', transformOrigin: '50% 0%', transform: 'rotate(' + (handAng + 180) + 'deg)' }
+              }),
+              jsx('div', { className: 'absolute left-1/2 top-1/2 w-2.5 h-2.5 -ml-[5px] -mt-[5px] rounded-full bg-black pointer-events-none' }),
+              nums
+            ]
+          }),
+          // AM / PM
+          jsxs('div', {
+            className: 'flex justify-center gap-2 mt-4',
+            children: ['AM', 'PM'].map((p) =>
+              jsx('button', {
+                type: 'button',
+                onClick: () => setAmpm(p),
+                className: 'px-6 py-2 rounded-full text-[13px] font-black border transition-colors ' +
+                  (ampm === p ? 'bg-black text-white border-black' : 'bg-white text-foreground/50 border-black/10'),
+                children: p
+              }, p)
             )
           }),
-          jsx('span', {
-            className: 'font-black text-foreground text-lg',
-            children: ':'
-          }),
-          // Minute select (0-59)
-          jsx('select', {
-            value: time.m,
-            onChange: (e) => onChange({ ...time, m: Number(e.target.value) }),
-            className: cn(inputClass, 'w-14'),
-            children: Array.from({ length: 60 }, (_, i) => i).map(m =>
-              jsx('option', { value: m, children: String(m).padStart(2, '0') }, m)
-            )
-          }),
-          // AM/PM toggle
-          jsx('button', {
-            type: 'button',
-            onClick: () => onChange({ ...time, ampm: time.ampm === 'AM' ? 'PM' : 'AM' }),
-            className: 'bg-black text-white font-black text-sm px-2 py-3 w-14 rounded-xl hover:bg-black/85 transition-colors',
-            children: time.ampm
+          // Cancel / OK
+          jsxs('div', {
+            className: 'flex justify-end gap-4 mt-4',
+            children: [
+              jsx('button', {
+                type: 'button',
+                onClick: onCancel,
+                className: 'py-2 px-1 text-[13.5px] font-black text-foreground/45 cursor-pointer',
+                children: 'Cancel'
+              }),
+              jsx('button', {
+                type: 'button',
+                onClick: () => onConfirm({ h, m, ampm }),
+                className: 'py-2 px-1 text-[13.5px] font-black text-black cursor-pointer',
+                children: 'OK'
+              })
+            ]
           })
         ]
       })
@@ -897,16 +1013,16 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
   const fromTimestamp = fromTime ? toISOString(fromDate, fromTime) : null;
   const toTimestamp = toTime ? toISOString(toDate, toTime) : null;
 
-  // Duration; if To is before or exactly at From on the same day, treat as
-  // overnight (+24h) so 00:00 → 00:00 logs a full day and Log block never
-  // stays locked (e.g. blocks like 9:47 AM → 12:00 AM).
+  // Duration; if To is strictly before From on the same day, treat as
+  // overnight (+24h) so blocks like 9:47 AM → 12:00 AM work. Equal times
+  // mean no duration at all: the pill stays hidden and Log block is locked.
   let durationMinutes = null;
   let endTimestamp = toTimestamp;
   let wrapsNextDay = false;
   if (fromTimestamp && toTimestamp) {
     const fromMs = new Date(fromTimestamp).getTime();
     let endMs = new Date(toTimestamp).getTime();
-    if (endMs <= fromMs) {
+    if (endMs < fromMs) {
       endMs += 24 * 60 * 60 * 1000;
       wrapsNextDay = true;
       endTimestamp = new Date(endMs).toISOString();
@@ -1108,7 +1224,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                       }
                     },
                     disabled: !isValid,
-                    className: 'flex-1 py-3.5 text-white font-black bg-black hover:bg-black/85 rounded-xl text-sm disabled:opacity-30 transition-colors',
+                    className: 'flex-1 py-3.5 text-white font-black bg-black hover:bg-black/85 rounded-xl text-sm disabled:opacity-30 disabled:cursor-not-allowed transition-colors',
                     children: 'Log block'
                   })
                 ]
@@ -2180,11 +2296,11 @@ export function ActivityScreen({ profile }) {
   const todayEntries = todayStats?.activities || [];
   const totalMinutesTracked = Math.round((todayStats?.totalSeconds || 0) / 60);
 
-  let valueEarned = 0;
-  try {
-    const tv = JSON.parse(localStorage.getItem('lt_time_value_v1') || 'null');
-    if (tv && tv.perMinute) valueEarned = tv.perMinute * totalMinutesTracked;
-  } catch { /* ignore */ }
+  const todayBlockCount = blocks.filter((b) => {
+    const d = new Date(b.startTime);
+    const n = new Date();
+    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+  }).length;
 
   const focusScore = calcFocusScore(todayEntries);
   const dateLabel = new Date().toLocaleDateString(undefined, {
@@ -2268,7 +2384,7 @@ export function ActivityScreen({ profile }) {
         className: 'grid grid-cols-2 gap-3 px-4 pt-3.5 pb-1',
         children: [
           jsx(StatCard, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
-          jsx(StatCard, { icon: '💰', iconBg: '#FEF3C7', label: 'Value Earned', value: valueEarned > 0 ? 'Rs.' + valueEarned.toFixed(2) : '--' }),
+          jsx(StatCard, { icon: '📋', iconBg: '#E0F2FE', label: 'Blocks Today', value: todayBlockCount }),
           jsx(StatCard, { icon: '🎯', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore, suffix: '/100' }),
           jsx(StatCard, { icon: '🔥', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
         ]

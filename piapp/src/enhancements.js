@@ -1016,18 +1016,16 @@
       ".lt-tile-icon-wrap{width:56px!important;height:56px!important;border-radius:14px!important;background:hsl(var(--secondary))!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:24px!important;color:hsl(var(--primary))!important;margin-bottom:2px!important}",
       ".lt-tile-label{font-size:11px!important;font-weight:600!important;color:hsl(var(--foreground))!important;line-height:1.3!important;max-width:68px!important}",
       /* overlay root */
-      "#lt-overlay-root{position:fixed;inset:0;z-index:2147483647;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;background:hsl(var(--background));color:hsl(var(--foreground));box-sizing:border-box}",
+      "#lt-overlay-root{position:fixed;inset:0;z-index:2147483647;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;background:hsl(var(--background));color:hsl(var(--foreground));box-sizing:border-box;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}",
       ".lt-tool-shell{max-width:700px;margin:0 auto;padding:18px 16px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%}",
-      /* Light, clean header — kicker chip, title, description and Back all live inside .lt-tool-top */
-      ".lt-tool-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin:0 0 20px;padding:20px 18px;background:#fff;border:1px solid rgba(17,17,20,.08);border-radius:24px;color:#111114;box-shadow:0 6px 22px rgba(17,17,20,.07);position:relative;overflow:hidden}",
-      ".lt-tool-top::after{content:'';position:absolute;top:-60px;right:-40px;width:190px;height:190px;border-radius:50%;background:radial-gradient(circle,rgba(17,17,20,.05),rgba(17,17,20,0) 70%);pointer-events:none}",
-      ".lt-tool-top>*{position:relative;z-index:1}",
-      ".lt-tool-kicker{display:inline-flex;align-items:center;gap:6px;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--muted-foreground));font-weight:800;margin:0 0 8px;padding:4px 9px;border:1px solid rgba(17,17,20,.1);border-radius:999px;background:hsl(var(--secondary))}",
+      /* Classic borderless header — Back link on top, plain kicker, title, description */
+      ".lt-tool-top{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin:0 0 18px;color:#111114}",
+      ".lt-tool-kicker{display:inline-flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 7px}",
       ".lt-tool-kicker::before{content:'';width:5px;height:5px;border-radius:50%;background:#111114;flex-shrink:0}",
-      ".lt-tool-heading{font-size:25px;line-height:1.15;font-weight:800;margin:0;letter-spacing:-.02em;color:#111114}",
-      ".lt-tool-description{font-size:13px;line-height:1.55;color:hsl(var(--muted-foreground));margin:8px 0 0;max-width:460px}",
-      ".lt-tool-close,.lt-tool-primary,.lt-tool-secondary,.lt-tool-danger{border:1px solid rgba(17,17,20,.14);padding:10px 16px;font-weight:800;font-size:13px;cursor:pointer;border-radius:999px;background:#fff;color:#111114;white-space:nowrap;transition:transform .1s,box-shadow .15s;-webkit-tap-highlight-color:transparent}",
-      ".lt-tool-close{flex-shrink:0;box-shadow:0 1px 2px rgba(17,17,20,.07)}",
+      ".lt-tool-heading{font-size:26px;line-height:1.18;font-weight:700;margin:0;letter-spacing:-.015em;color:#111114}",
+      ".lt-tool-description{font-size:13.5px;line-height:1.55;color:hsl(var(--muted-foreground));margin:7px 0 0;max-width:460px}",
+      ".lt-tool-close,.lt-tool-primary,.lt-tool-secondary,.lt-tool-danger{border:1px solid rgba(17,17,20,.14);padding:10px 16px;font-weight:700;font-size:13px;cursor:pointer;border-radius:999px;background:#fff;color:#111114;white-space:nowrap;transition:transform .1s,box-shadow .15s;-webkit-tap-highlight-color:transparent}",
+      ".lt-tool-close{flex-shrink:0;align-self:flex-start;border:none;background:transparent;padding:2px 0;color:hsl(var(--muted-foreground));box-shadow:none;letter-spacing:.01em}",
       ".lt-tool-primary{background:#111114;color:#fff;border-color:#111114;box-shadow:0 2px 6px rgba(17,17,20,.22)}",
       ".lt-tool-secondary{background:#fff;box-shadow:0 1px 2px rgba(17,17,20,.07)}",
       ".lt-tool-danger{color:#DC2626;border-color:rgba(220,38,38,.35);background:#FEF2F2;box-shadow:0 1px 2px rgba(220,38,38,.1)}",
@@ -1254,10 +1252,10 @@
       ".lt-routine-addanother{width:100%;display:flex;align-items:center;justify-content:center;gap:6px;background:hsl(var(--muted));border:1.5px dashed hsl(var(--border));color:#0369A1;border-radius:14px;padding:12px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;margin:4px 0 14px;-webkit-tap-highlight-color:transparent;transition:opacity .15s}",
       ".lt-routine-addanother:active{opacity:.65}",
       ".lt-routine-sheet-done{width:100%;background:transparent;color:hsl(var(--muted-foreground));border:none;padding:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}",
-      ".lt-clock-field{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;border:1.5px solid #bfe3fa;background:#eaf7ff;color:#0369A1;font:inherit;font-size:14px;font-weight:800;padding:11px 10px;border-radius:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:center;box-sizing:border-box;transition:opacity .15s}",
+      ".lt-clock-field{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;border:1px solid rgba(17,17,20,.14);background:#fff;color:#111114;font:inherit;font-size:15px;font-weight:700;padding:11px 10px;border-radius:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:center;box-sizing:border-box;transition:opacity .15s}",
       ".lt-clock-field:active{opacity:.7}",
-      ".lt-clock-field .lt-clock-icon{font-size:12px}",
-      ".lt-clock-field .lt-clock-caret{font-size:9px;color:#0369A1;margin-left:2px}",
+      ".lt-clock-field .lt-clock-icon{display:flex;align-items:center;color:#111114}",
+      ".lt-clock-field .lt-clock-caret{font-size:9px;color:hsl(var(--muted-foreground));margin-left:2px}",
       ".lt-clock-field.lt-clock-empty{background:hsl(var(--muted));border-color:hsl(var(--border));color:hsl(var(--muted-foreground))}",
       ".lt-clock-field.lt-clock-empty .lt-clock-caret{color:hsl(var(--muted-foreground))}",
       ".lt-tasks-sheet-row:has(.lt-clock-field){border-top:none;padding:0;gap:8px}",
@@ -1272,13 +1270,21 @@
       "#lt-clockpicker-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px}",
       ".lt-clockpicker{width:100%;max-width:320px;background:hsl(var(--card));color:hsl(var(--foreground));border-radius:22px;padding:22px 20px 16px;box-sizing:border-box;box-shadow:0 20px 50px rgba(0,0,0,.35)}",
       ".lt-clockpicker-title{font-size:14px;font-weight:800;text-align:center;margin-bottom:18px;color:hsl(var(--muted-foreground))}",
-      ".lt-clockpicker-row{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:20px}",
-      ".lt-clockpicker-select{-webkit-appearance:none;-moz-appearance:none;appearance:none;background:hsl(var(--muted));color:hsl(var(--foreground));border:1px solid hsl(var(--border));border-radius:12px;padding:12px 14px;font-size:17px;font-weight:800;font-family:inherit;text-align:center;text-align-last:center;cursor:pointer;-webkit-tap-highlight-color:transparent}",
-      ".lt-clockpicker-select:focus{outline:2px solid #0369A1}",
-      ".lt-clockpicker-select.lt-clockpicker-ampm{min-width:64px}",
-      ".lt-clockpicker-colon{font-size:20px;font-weight:800;padding:0 2px}",
+      ".lt-clockpicker-digital{display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:14px}",
+      ".lt-clockpicker-digital button{font-size:34px;font-weight:900;line-height:1;padding:5px 8px;border:none;border-radius:12px;background:transparent;color:hsl(var(--muted-foreground));cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:background .12s,color .12s}",
+      ".lt-clockpicker-digital button.on{background:#111114;color:#fff}",
+      ".lt-clockpicker-sep{font-size:30px;font-weight:900;padding:0 1px;color:hsl(var(--foreground))}",
+      ".lt-clockpicker-amp{font-size:13px;font-weight:900;color:hsl(var(--muted-foreground));align-self:flex-start;margin-top:4px;margin-left:3px}",
+      ".lt-clockpicker-face{position:relative;width:240px;height:240px;border-radius:50%;background:hsl(var(--muted));border:1px solid hsl(var(--border));margin:0 auto;cursor:pointer;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}",
+      ".lt-clockpicker-hand{position:absolute;left:50%;top:50%;width:2.5px;margin-left:-1.25px;background:#111114;border-radius:2px;transform-origin:50% 0%;pointer-events:none}",
+      ".lt-clockpicker-center{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#111114;pointer-events:none}",
+      ".lt-clockpicker-num{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:700;color:hsl(var(--foreground));pointer-events:none;user-select:none}",
+      ".lt-clockpicker-num.on{background:#111114;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.25)}",
+      ".lt-clockpicker-ampm{display:flex;justify-content:center;gap:8px;margin-top:14px}",
+      ".lt-clockpicker-ampm button{min-width:66px;padding:8px 14px;border-radius:999px;border:1px solid hsl(var(--border));background:hsl(var(--card));color:hsl(var(--muted-foreground));font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}",
+      ".lt-clockpicker-ampm button.on{background:#111114;color:#fff;border-color:#111114}",
       ".lt-clockpicker-actions{display:flex;justify-content:flex-end;gap:14px}",
-      ".lt-clockpicker-actions button{background:none;border:none;color:#0369A1;font-size:13.5px;font-weight:800;cursor:pointer;padding:8px 6px;font-family:inherit;-webkit-tap-highlight-color:transparent}",
+      ".lt-clockpicker-actions button{background:none;border:none;color:#111114;font-size:13.5px;font-weight:800;cursor:pointer;padding:8px 6px;font-family:inherit;-webkit-tap-highlight-color:transparent}",
       ".lt-clockpicker-actions button.lt-cancel{color:hsl(var(--muted-foreground))}",
     ].join("");
     document.head.appendChild(s);
@@ -2442,12 +2448,12 @@
   function toolHeader(title, description) {
     return (
       '<div class="lt-tool-top">' +
+        '<button class="lt-tool-close" data-lt-action="close">\u2190 Back</button>' +
         '<div>' +
           '<p class="lt-tool-kicker">Life Hub</p>' +
           '<h1 class="lt-tool-heading">' + escapeHtml(title) + '</h1>' +
           '<p class="lt-tool-description">' + escapeHtml(description) + '</p>' +
         '</div>' +
-        '<button class="lt-tool-close" data-lt-action="close">\u2190 Back</button>' +
       '</div>'
     );
   }
@@ -3607,12 +3613,13 @@
       h24 = parseInt(p[0], 10) || 0;
       mn = parseInt(p[1], 10) || 0;
     } else {
-      h24 = now.getHours(); mn = Math.round(now.getMinutes() / 5) * 5 % 60;
+      h24 = now.getHours(); mn = now.getMinutes();
     }
     _clockPickerState = {
       pm: h24 >= 12,
       hour12: (h24 % 12) === 0 ? 12 : (h24 % 12),
-      minute: mn - (mn % 5),
+      minute: mn,
+      mode: "h",
       onDone: onDone
     };
     renderClockPicker();
@@ -3637,28 +3644,38 @@
     var old = document.getElementById("lt-clockpicker-overlay");
     if (old) old.remove();
 
-    var i;
-    var hourOptions = "";
-    for (i = 1; i <= 12; i++) {
-      hourOptions += '<option value="' + i + '"' + (i === s.hour12 ? " selected" : "") + '>' + i + '</option>';
+    /* Analog face: 12 positions around the dial. Hour mode picks 1-12,
+       minute mode picks the exact minute from the tapped angle. */
+    var i, nums = "";
+    for (i = 0; i < 12; i++) {
+      var val = s.mode === "h" ? (i === 0 ? 12 : i) : (i * 5);
+      var angDeg = s.mode === "h" ? (val * 30) : (val * 6);
+      var a = angDeg * Math.PI / 180;
+      var rx = 50 + 38.5 * Math.sin(a);
+      var ry = 50 - 38.5 * Math.cos(a);
+      var sel = s.mode === "h" ? (val === s.hour12) : (val === s.minute);
+      nums += '<span class="lt-clockpicker-num' + (sel ? ' on' : '') + '" style="left:' + rx.toFixed(2) + '%;top:' + ry.toFixed(2) + '%">' + pad2(val) + '</span>';
     }
-    var minuteOptions = "";
-    for (i = 0; i < 60; i += 5) {
-      minuteOptions += '<option value="' + i + '"' + (i === s.minute ? " selected" : "") + '>' + pad2(i) + '</option>';
-    }
-    var ampmOptions =
-      '<option value="am"' + (!s.pm ? " selected" : "") + '>AM</option>' +
-      '<option value="pm"' + (s.pm ? " selected" : "") + '>PM</option>';
+    var handAng = s.mode === "h" ? ((s.hour12 % 12) * 30) : (s.minute * 6);
 
     var html = (
       '<div id="lt-clockpicker-overlay">' +
         '<div class="lt-clockpicker" role="dialog" aria-label="Select time">' +
           '<div class="lt-clockpicker-title">Select time</div>' +
-          '<div class="lt-clockpicker-row">' +
-            '<select class="lt-clockpicker-select" data-clocksel="hour" aria-label="Hour">' + hourOptions + '</select>' +
-            '<span class="lt-clockpicker-colon">:</span>' +
-            '<select class="lt-clockpicker-select" data-clocksel="minute" aria-label="Minute">' + minuteOptions + '</select>' +
-            '<select class="lt-clockpicker-select lt-clockpicker-ampm" data-clocksel="ampm" aria-label="AM or PM">' + ampmOptions + '</select>' +
+          '<div class="lt-clockpicker-digital">' +
+            '<button type="button" data-clockmode="h" class="' + (s.mode === "h" ? "on" : "") + '">' + pad2(s.hour12) + '</button>' +
+            '<span class="lt-clockpicker-sep">:</span>' +
+            '<button type="button" data-clockmode="m" class="' + (s.mode === "m" ? "on" : "") + '">' + pad2(s.minute) + '</button>' +
+            '<span class="lt-clockpicker-amp">' + (s.pm ? "PM" : "AM") + '</span>' +
+          '</div>' +
+          '<div class="lt-clockpicker-face" data-clockface="1">' +
+            '<div class="lt-clockpicker-hand" style="height:37%;transform:rotate(' + (handAng + 180) + 'deg)"></div>' +
+            '<div class="lt-clockpicker-center"></div>' +
+            nums +
+          '</div>' +
+          '<div class="lt-clockpicker-ampm">' +
+            '<button type="button" data-clockampm="am" class="' + (!s.pm ? "on" : "") + '">AM</button>' +
+            '<button type="button" data-clockampm="pm" class="' + (s.pm ? "on" : "") + '">PM</button>' +
           '</div>' +
           '<div class="lt-clockpicker-actions">' +
             '<button type="button" class="lt-cancel" data-clockaction="cancel">Cancel</button>' +
@@ -3686,15 +3703,29 @@
         } else {
           closeClockPicker();
         }
+        return;
       }
-    });
-    overlay.addEventListener("change", function (e) {
-      var sel = e.target.closest("[data-clocksel]");
-      if (!sel) return;
-      var kind = sel.getAttribute("data-clocksel");
-      if (kind === "hour") _clockPickerState.hour12 = parseInt(sel.value, 10);
-      else if (kind === "minute") _clockPickerState.minute = parseInt(sel.value, 10);
-      else if (kind === "ampm") _clockPickerState.pm = sel.value === "pm";
+      var modeEl = e.target.closest("[data-clockmode]");
+      if (modeEl) { s.mode = modeEl.getAttribute("data-clockmode"); renderClockPicker(); return; }
+      var ampmEl = e.target.closest("[data-clockampm]");
+      if (ampmEl) { s.pm = ampmEl.getAttribute("data-clockampm") === "pm"; renderClockPicker(); return; }
+      var face = e.target.closest("[data-clockface]");
+      if (face) {
+        var r = face.getBoundingClientRect();
+        var x = e.clientX - r.left - r.width / 2;
+        var y = e.clientY - r.top - r.height / 2;
+        if (Math.sqrt(x * x + y * y) < 24) return; /* ignore dead center */
+        var ang = Math.atan2(x, -y) * 180 / Math.PI;
+        if (ang < 0) ang += 360;
+        if (s.mode === "h") {
+          var hh = Math.round(ang / 30) % 12;
+          s.hour12 = hh === 0 ? 12 : hh;
+          s.mode = "m";
+        } else {
+          s.minute = Math.round(ang / 6) % 60;
+        }
+        renderClockPicker();
+      }
     });
   }
 
@@ -3791,7 +3822,8 @@
     var label = value ? formatRoutineTime(value) : "Select time";
     return (
       '<button type="button" id="' + id + '" class="lt-clock-field' + (value ? '' : ' lt-clock-empty') + '" data-value="' + escapeHtml(value || "") + '">' +
-        '<span class="lt-clock-icon">\uD83D\uDD52</span><span>' + escapeHtml(label) + '</span><span class="lt-clock-caret">\u25BC</span>' +
+        '<span class="lt-clock-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 2"></path></svg></span>' +
+        '<span>' + escapeHtml(label) + '</span><span class="lt-clock-caret">\u25BC</span>' +
       '</button>'
     );
   }
@@ -3905,12 +3937,12 @@
     activeOverlay.innerHTML = (
       '<div class="lt-tool-shell" style="padding-bottom:110px">' +
         '<div class="lt-tool-top">' +
+          '<button class="lt-tool-close" data-lt-action="close">\u2190 Back</button>' +
           '<div>' +
             '<p class="lt-tool-kicker">Life Hub</p>' +
             '<h1 class="lt-tool-heading">Routine Trackers</h1>' +
             '<p class="lt-tool-description">' + (isEmpty ? 'Build your daily time table.' : (doneCount + ' of ' + items.length + ' done today')) + '</p>' +
           '</div>' +
-          '<button class="lt-tool-close" data-lt-action="close">\u2190 Back</button>' +
         '</div>' +
         '<p class="lt-routine-resetnote">Ticks reset automatically every day at 12:00 AM \u2014 tick any slot independently, no need to finish the whole table.</p>' +
         listHtml +
@@ -4136,12 +4168,12 @@
     activeOverlay.innerHTML = (
       '<div class="lt-tool-shell" style="padding-bottom:110px">' +
         '<div class="lt-tool-top">' +
+          '<button class="lt-tool-close" data-lt-action="close">\u2190 Back</button>' +
           '<div>' +
             '<p class="lt-tool-kicker">Life Hub</p>' +
             '<h1 class="lt-tool-heading">My Tasks</h1>' +
             '<p class="lt-tool-description">' + (active ? active + ' task' + (active === 1 ? '' : 's') + ' remaining' : 'All done!') + '</p>' +
           '</div>' +
-          '<button class="lt-tool-close" data-lt-action="close">\u2190 Back</button>' +
         '</div>' +
 
         (isEmpty
@@ -7444,12 +7476,12 @@
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
         '<div class="lt-tool-top">' +
+          '<button class="lt-tool-close" id="lt-jar-back">\u2190 Back</button>' +
           '<div>' +
             '<p class="lt-tool-kicker">Life Hub</p>' +
             '<h1 class="lt-tool-heading">Jar Settings</h1>' +
             '<p class="lt-tool-description">Rename jars and set monthly percentages. They should add up to 100%.</p>' +
           '</div>' +
-          '<button class="lt-tool-close" id="lt-jar-back">\u2190 Back</button>' +
         '</div>' +
         '<div class="lt-tool-card">' +
           '<p class="lt-card-title">Your ' + config.jars.length + ' jars</p>' +

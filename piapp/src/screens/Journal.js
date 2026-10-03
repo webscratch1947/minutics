@@ -229,8 +229,7 @@ export function JournalScreen() {
     className: "flex flex-col",
     children: [
 
-      // Inject keyframe animation for today's glowing circle
-      jsx("style", { children: "@keyframes journalPulse { 0%, 100% { box-shadow: 0 0 8px 2px rgba(22,163,74,0.6); } 50% { box-shadow: 0 0 16px 4px rgba(22,163,74,0.9); } }" }),      /* ── 1. Streak & Week Block ────────────────────────────────────────────── */
+      /* ── 1. Streak & Week Block ────────────────────────────────────────────── */
       jsxs("div", {
         className: "px-5 pt-5",
         children: [
@@ -394,11 +393,11 @@ export function JournalScreen() {
                   jsxs("div", {
                     className: "flex items-center gap-2.5",
                     children: [
-                       // Circle indicator: solid green+pulse for today, solid black for other days
+                       // Circle indicator: solid green for today, solid black for other days
                        jsx("span", {
                          className: "w-3 h-3 shrink-0 rounded-full",
                          style: isToday
-                           ? { backgroundColor: "#16a34a", animation: "journalPulse 1.5s ease-in-out infinite" }
+                           ? { backgroundColor: "#16a34a" }
                            : { backgroundColor: "#111827" }
                        }),
                        // Date label
@@ -416,10 +415,10 @@ export function JournalScreen() {
                         className: "font-mono text-sm font-bold text-muted-foreground",
                         children: dg.totalSeconds > 0 ? formatDuration(dg.totalSeconds) : "\u2014"
                       }),
-                      // Expand arrow (rotates when open)
+                      // Expand indicator (static, flips instantly)
                       jsx("span", {
-                        className: "text-muted-foreground text-xs transition-transform " + (isOpen ? "rotate-90" : ""),
-                        children: "\u25B6"
+                        className: "text-muted-foreground text-xs",
+                        children: isOpen ? "\u25BE" : "\u25B8"
                       })
                     ]
                   })
