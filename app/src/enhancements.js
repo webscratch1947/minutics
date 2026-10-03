@@ -1279,8 +1279,8 @@
          (2147483400), so the picker was rendered but sat BEHIND the panel —
          invisible until the panel was closed, which is exactly the bug where
          the time dialog only "appeared" after tapping Back. */
-      "#lt-clockpicker-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px}",
-      ".lt-clockpicker{width:100%;max-width:320px;background:hsl(var(--card));color:hsl(var(--foreground));border-radius:22px;padding:22px 20px 16px;box-sizing:border-box;box-shadow:0 20px 50px rgba(0,0,0,.35)}",
+      "#lt-clockpicker-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}",
+      ".lt-clockpicker{width:100%;max-width:320px;background:hsl(var(--card));color:hsl(var(--foreground));border-radius:22px;padding:22px 20px 16px;box-sizing:border-box;box-shadow:0 20px 50px rgba(0,0,0,.35);margin:auto}",
       ".lt-clockpicker-title{font-size:14px;font-weight:800;text-align:center;margin-bottom:18px;color:hsl(var(--muted-foreground))}",
       ".lt-clockpicker-digital{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:14px}",
       ".lt-clockpicker-digital button{font-size:29px;font-weight:900;line-height:1;width:56px;height:56px;border:none;border-radius:50%;background:transparent;color:hsl(var(--muted-foreground));cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:background .12s,color .12s;display:flex;align-items:center;justify-content:center;box-sizing:border-box}",
@@ -1296,7 +1296,7 @@
       ".lt-clockpicker-ampm{display:flex;justify-content:center;gap:8px;margin-top:14px}",
       ".lt-clockpicker-ampm button{min-width:66px;padding:8px 14px;border-radius:999px;border:1px solid hsl(var(--border));background:hsl(var(--card));color:hsl(var(--muted-foreground));font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}",
       ".lt-clockpicker-ampm button.on{background:#111114;color:#fff;border-color:#111114}",
-      ".lt-clockpicker-actions{display:flex;justify-content:flex-start;gap:14px}",
+      ".lt-clockpicker-actions{display:flex;justify-content:space-between;gap:14px}",
       ".lt-clockpicker-actions button{background:none;border:none;color:#111114;font-size:13.5px;font-weight:800;cursor:pointer;padding:8px 6px;font-family:inherit;-webkit-tap-highlight-color:transparent}",
       ".lt-clockpicker-actions button.lt-cancel{color:#DC2626}",
       ".lt-clockpicker-face{touch-action:none}",
@@ -2496,6 +2496,35 @@
   }
 
   /* ── Shared helpers ────────────────────────────────────────────────────── */
+
+  /* Safety net for "sometimes the whole app stops scrolling / is stuck".
+     Every vanilla overlay and scroll lock is paired with a state flag, but
+     one missed close (a fast back press, a navigation racing a modal) can
+     leave a fixed layer or body overflow:hidden behind with no way to
+     dismiss it. Run on every enhancement pass: anything whose owner says
+     it should not exist gets force-cleared. */
+  function sweepStuckUi() {
+    try {
+      if (activeOverlay && !document.getElementById("lt-overlay-root")) {
+        activeOverlay = null; /* root vanished — drop the stale flag so
+                                  enhancements + scroll restore resume */
+        document.body.style.overflow = "";
+      }
+      if (!activeOverlay) {
+        if (document.body.style.overflow === "hidden") document.body.style.overflow = "";
+        var strayRoot = document.getElementById("lt-overlay-root");
+        if (strayRoot) strayRoot.remove();
+      }
+      if (!catModalRoot) {
+        var strayCat = document.getElementById("lt-cat-modal-overlay");
+        if (strayCat) strayCat.remove();
+      }
+      if (!_clockPickerState) {
+        var strayClock = document.getElementById("lt-clockpicker-overlay");
+        if (strayClock) strayClock.remove();
+      }
+    } catch (e) {}
+  }
 
   function toolHeader(title, description) {
     return (
@@ -7705,6 +7734,7 @@
 
   function runEnhancements() {
     var p = location.pathname + location.hash;
+    sweepStuckUi();
     var onHome = (location.pathname === "/" && !location.hash) || location.hash === "#/" || location.hash === "#";
     var onActivity = p.indexOf("/activity") !== -1;
     var onTimerOrActivity = onHome || onActivity || location.pathname === "/";
@@ -7768,6 +7798,9 @@
   function runEnhancementsImmediate() {
     _enhanceScheduled = false;
     _lastEnhanceRun = Date.now();
+    sweepStuckUi(); /* runs even while a (possibly stale) overlay is flagged —
+                       the !activeOverlay gate below would otherwise never
+                       let a stuck pass recover on navigation */
     if (!activeOverlay) runEnhancements();
   }
 
@@ -7891,6 +7924,13 @@
        to the next poll. RouteWatcher in _slice_shell.js dispatches this on
        every pathname change. */
     window.addEventListener("lt-route-change", function () {
+      /* A tab switch must never leave an old screen's overlay, category
+         prompt, or clock picker sitting on top of the new one (the overlay
+         would also pause all enhancement passes while looking like a
+         frozen, unscrollable app). */
+      if (activeOverlay) closeOverlay();
+      if (catModalRoot) { catModalPushedHistory = false; closeCategoryModal("popstate"); }
+      if (document.getElementById("lt-clockpicker-overlay")) closeClockPicker();
       runEnhancementsImmediate();
     });
     setTimeout(maybeShowOverlayPermissionModal, 1200);
@@ -7928,6 +7968,6 @@
       if (!activeOverlay) runEnhancements();
       if (fastPolls >= 8) clearInterval(fastTimer); /* ~1.6s at 200ms */
     }, 200);
-    setInterval(function () { if (!activeOverlay) runEnhancements(); }, 3000);
+    setInterval(function () { sweepStuckUi(); if (!activeOverlay) runEnhancements(); }, 3000);
   });
 })();

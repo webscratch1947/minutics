@@ -940,7 +940,10 @@ function clockFaceSvgIcon() {
 function TimePicker({ label, value, onChange, labelClass }) {
   const [open, setOpen] = useState(false);
   const time = value ?? { h: 12, m: 0, ampm: 'AM' };
-  const display = `${String(time.h).padStart(2, '0')}:${String(time.m).padStart(2, '0')} ${time.ampm}`;
+  /* 12-hour dial: a stored h of 0 (legacy init) means 12 — never render or
+     keep "00", which leaves no number selected on the dial. */
+  const dispH = ((Number(time.h) % 12) || 12);
+  const display = `${String(dispH).padStart(2, '0')}:${String(Number(time.m) || 0).padStart(2, '0')} ${time.ampm === 'PM' ? 'PM' : 'AM'}`;
 
   return jsxs('div', {
     className: 'flex-1',
@@ -969,9 +972,11 @@ function TimePicker({ label, value, onChange, labelClass }) {
 
 function ClockFace({ initial, onCancel, onConfirm }) {
   const base = initial ?? { h: 12, m: 0, ampm: 'AM' };
-  const [h, setH] = useState(base.h);
-  const [m, setM] = useState(base.m);
-  const [ampm, setAmpm] = useState(base.ampm);
+  /* Normalize into 1..12: a stored h of 0 used to open the dial with NO
+     number circled (the hand just sat on top of 12). */
+  const [h, setH] = useState(((Number(base.h) % 12) || 12));
+  const [m, setM] = useState(Number(base.m) || 0);
+  const [ampm, setAmpm] = useState(base.ampm === 'PM' ? 'PM' : 'AM');
   const [mode, setMode] = useState('h');
   const modeRef = useRef(null);
   modeRef.current = mode;
@@ -1033,11 +1038,11 @@ function ClockFace({ initial, onCancel, onConfirm }) {
   }
 
   return jsxs('div', {
-    className: 'fixed inset-0 z-[80] flex items-center justify-center bg-black/55 backdrop-blur-[2px] p-5',
-    onClick: (e) => e.stopPropagation(),
+    className: 'fixed inset-0 z-[80] flex justify-center overflow-y-auto bg-black/55 backdrop-blur-[2px] p-5',
+    onClick: onCancel,
     children: [
       jsxs('div', {
-        className: 'w-full max-w-[330px] bg-white rounded-3xl p-5 shadow-[0_24px_60px_rgba(0,0,0,.35)]',
+        className: 'w-full max-w-[330px] my-auto bg-white rounded-3xl p-5 shadow-[0_24px_60px_rgba(0,0,0,.35)]',
         onClick: (e) => e.stopPropagation(),
         children: [
           // Digital readout — big circle on the active segment; tap to switch dial mode
@@ -1094,9 +1099,9 @@ function ClockFace({ initial, onCancel, onConfirm }) {
               }, p)
             )
           }),
-          // Cancel / OK (Cancel on the left, OK right next to it)
+          // Cancel / OK — Cancel pinned left, OK pinned right
           jsxs('div', {
-            className: 'flex justify-start gap-4 mt-4',
+            className: 'flex justify-between gap-4 mt-4',
             children: [
               jsx('button', {
                 type: 'button',
@@ -1126,8 +1131,8 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
   // Clean defaults: start and end both 00:00 — nothing pre-filled.
-  const [fromTime, setFromTime] = useState({ h: 0, m: 0, ampm: 'AM' });
-  const [toTime, setToTime] = useState({ h: 0, m: 0, ampm: 'AM' });
+  const [fromTime, setFromTime] = useState({ h: 12, m: 0, ampm: 'AM' });
+  const [toTime, setToTime] = useState({ h: 12, m: 0, ampm: 'AM' });
 
   // Convert time object to ISO string
   const toISOString = (dateStr, timeObj) => {
