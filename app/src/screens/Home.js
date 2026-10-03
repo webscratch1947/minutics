@@ -1149,12 +1149,12 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
           jsxs('div', {
             className: 'overflow-y-auto flex-1 px-5 pb-5 flex flex-col gap-3',
             children: [
-              // From date — blue-tinted "start" group
+              // From date
               jsxs('div', {
-                className: 'rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-3.5',
+                className: 'rounded-2xl border border-black/[.08] bg-black/[.03] p-3.5',
                 children: [
                   jsx('label', {
-                    className: 'block text-[10px] font-black text-[#2563EB] uppercase tracking-[0.14em] mb-2',
+                    className: 'block text-[10px] font-black text-foreground/45 uppercase tracking-[.14em] mb-2',
                     children: 'Date'
                   }),
                   jsx('input', {
@@ -1167,13 +1167,12 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // From time
               jsxs('div', {
-                className: 'rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-3.5',
+                className: 'rounded-2xl border border-black/[.08] bg-black/[.03] p-3.5',
                 children: [
                   jsx(TimePicker, {
                     label: 'From',
                     value: fromTime,
-                    onChange: setFromTime,
-                    labelClass: 'text-[#2563EB]'
+                    onChange: setFromTime
                   })
                 ]
               }),
@@ -1189,16 +1188,16 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                   jsx('div', { className: 'flex-1 h-px bg-black/10' })
                 ]
               }),
-              // To date with "Ends next day" badge — amber-tinted "end" group
+              // To date with "Ends next day" badge — same neutral tint as the rest
               jsxs('div', {
-                className: 'rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-3.5',
+                className: 'rounded-2xl border border-black/[.08] bg-black/[.03] p-3.5',
                 children: [
                   jsxs('label', {
-                    className: 'flex items-center justify-between text-[10px] font-black text-[#D97706] uppercase tracking-[0.14em] mb-2',
+                    className: 'flex items-center justify-between text-[10px] font-black text-foreground/45 uppercase tracking-[.14em] mb-2',
                     children: [
                       jsx('span', { children: 'End date' }),
                       spansDays && jsx('span', {
-                        className: 'text-[#B45309] normal-case font-black tracking-normal',
+                        className: 'text-foreground/70 normal-case font-black tracking-normal',
                         children: 'Ends next day'
                       })
                     ]
@@ -1214,13 +1213,12 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // To time
               jsxs('div', {
-                className: 'rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-3.5',
+                className: 'rounded-2xl border border-black/[.08] bg-black/[.03] p-3.5',
                 children: [
                   jsx(TimePicker, {
                     label: 'To',
                     value: toTime,
-                    onChange: setToTime,
-                    labelClass: 'text-[#D97706]'
+                    onChange: setToTime
                   })
                 ]
               })
@@ -1234,8 +1232,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               durationMinutes !== null && durationMinutes > 0 && jsx('div', {
                 className: 'px-5 pt-3 pb-1 text-center',
                 children: jsx('p', {
-                  className: 'inline-block text-sm font-black text-white rounded-full px-4 py-1.5',
-                  style: { backgroundColor: activity.color || '#00C2A8' },
+                  className: 'inline-block text-sm font-black text-white bg-black rounded-full px-4 py-1.5',
                   children: durationMinutes >= 60
                     ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60}m`
                     : `${durationMinutes}m`
@@ -2082,9 +2079,16 @@ function EatTheFrog() {
   const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
   const starred = tasks.filter(t => t.starred);
+  /* Slots hold INCOMPLETE starred tasks first: completing one drops it down
+     the list so the next queued starred task switches into the card right
+     away (it used to sit there "finished" while queued tasks never appeared).
+     Completed ones only keep a visible slot while there is room left. */
+  const incompleteStarred = starred.filter(t => !t.completed);
+  const doneStarred = starred.filter(t => t.completed);
+  const slotPool = incompleteStarred.concat(doneStarred);
   const slots = [];
   for (let i = 0; i < MAX_FROG_TASKS; i++) {
-    slots.push(starred[i] || null);
+    slots.push(slotPool[i] || null);
   }
   const doneCount = starred.filter(t => t.completed).length;
   const activeCount = starred.length - doneCount;

@@ -2930,7 +2930,7 @@
           return (
             '<div class="lt-lv-row-wrap">' +
               '<div class="lt-lv-row">' +
-                '<span class="lt-lv-row-cat"><span class="lt-lv-dot" style="background:' + (isWaste ? "#ff3b30" : "#34c759") + '"></span>' + escapeHtml(c) + '</span>' +
+                '<span class="lt-lv-row-cat"><span class="lt-lv-dot" style="background:' + (isWaste ? "#ff3b30" : "#34c759") + '"></span>' + escapeHtml(c || "Uncategorized") + '</span>' +
                 '<span>' + mins + ' min \u00b7 ' + escapeHtml(money(mins * perMinute)) + '</span>' +
               '</div>' +
               itemsHtml +
