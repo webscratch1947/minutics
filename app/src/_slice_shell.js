@@ -105,7 +105,7 @@ export function ak({
   children: e
 }) {
   return jsxs("div", {
-    className: "relative mx-auto max-w-[430px] w-full h-[100dvh] overflow-hidden bg-background flex flex-col",
+    className: "relative mx-auto max-w-[430px] w-full h-[100dvh] overflow-hidden bg-transparent flex flex-col",
     children: [jsx(RouteWatcher, {}), jsx(LTTopNav, {}), jsx("main", {
       className: "flex-1 min-h-0 overflow-y-auto overscroll-contain pb-[88px] no-scrollbar",
       children: e
