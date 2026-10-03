@@ -26,6 +26,17 @@
     video.preload = "auto";
     video.loop = false;
     video.style.cssText = "width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .15s ease;";
+    /* Animated fallback UNDER the video: if the mp4 is slow or blocked the
+       splash still plays a branded animation instead of a dead navy screen. */
+    var fbStyle = document.createElement("style");
+    fbStyle.textContent = "@keyframes ltSplashPulse{0%,100%{transform:scale(1);opacity:.92}50%{transform:scale(1.1);opacity:1}}@keyframes ltSplashWord{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}";
+    document.head.appendChild(fbStyle);
+    var fb = document.createElement("div");
+    fb.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;pointer-events:none;";
+    fb.innerHTML =
+      '<div style="width:66px;height:66px;border-radius:20px;background:linear-gradient(135deg,#10b981,#0ea5e9);box-shadow:0 14px 44px rgba(14,165,233,.35);animation:ltSplashPulse 1.1s ease-in-out infinite"></div>' +
+      '<div style="color:#fff;font:800 14px/1 Inter,sans-serif;letter-spacing:.4em;padding-left:.4em;animation:ltSplashWord 1.2s ease both">MINUTICS</div>';
+    splash.appendChild(fb);
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
 
@@ -38,8 +49,9 @@
         if (splash.parentNode) splash.parentNode.removeChild(splash);
       }, 550);
     }
+    window.__ltSplashDismiss = dismiss;
 
-    video.addEventListener("playing", function () { video.style.opacity = "1"; });
+    video.addEventListener("playing", function () { window.__ltSplashVideoPlaying = true; video.style.opacity = "1"; });
     video.addEventListener("ended", function () {
       setTimeout(dismiss, 200);
     });

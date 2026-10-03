@@ -384,9 +384,22 @@ if (isDemoActive()) {
     renderGate();
   }
 } else {
+  /* If the network hangs, checkExistingSession never settles and neither
+     branch ever runs — the screen stays blank forever. Force the gate
+     after 7s; a later success still upgrades to the app. */
+  var sessionSettled = false;
+  setTimeout(function () {
+    if (sessionSettled) return;
+    renderGate();
+  }, 7000);
   checkExistingSession().then(function (user) {
+    sessionSettled = true;
     if (user) {
       document.body.classList.add("lt-authed");
+      var g = document.getElementById("lt-auth-gate");
+      if (g) g.remove();
+      var r = document.getElementById("root");
+      if (r) r.removeAttribute("style");
     } else {
       renderGate();
     }

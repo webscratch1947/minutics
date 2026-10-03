@@ -948,8 +948,35 @@ window.addEventListener("pageshow", function (e) {
   var gate = document.createElement("div");
   gate.id = "lt-auth-gate";
   gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#Fdfbf7;";
+  /* Never a dead white rectangle: show a spinner while auth resolves. */
+  var spin = document.createElement("div");
+  spin.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#6b7280;font-family:Inter,sans-serif;font-size:13px;font-weight:600;";
+  spin.innerHTML = '<div style="width:36px;height:36px;border-radius:50%;border:3px solid rgba(26,33,64,.14);border-top-color:#1a2140;animation:lt-auth-spin .8s linear infinite;"></div><span>Loading\u2026</span>';
+  gate.appendChild(spin);
   document.body.appendChild(gate);
 })();
+
+/* Firebase can hang forever (offline, blocked network, IndexedDB crash).
+   The opaque startup gate would then sit there as a permanent white screen.
+   After 7s with no auth answer: a device that signed in before enters the
+   app with its local data; a brand-new device gets the login gate. */
+setTimeout(function () {
+  if (_authStateChangedFired) return;
+  try {
+    var lastUid = localStorage.getItem("lt_last_uid");
+    if (lastUid) {
+      document.body.classList.add("lt-authed");
+      var g = document.getElementById("lt-auth-gate");
+      if (g) g.remove();
+      var s = document.getElementById("lt-startup-splash");
+      if (s && s.parentNode) s.parentNode.removeChild(s);
+      var rootEl = document.getElementById("root");
+      if (rootEl) rootEl.removeAttribute("style");
+    } else {
+      renderGate("welcome");
+    }
+  } catch (e) {}
+}, 7000);
 
 /* ── Auth state watcher: gate blocks the app until signed in ────────────── */
 onAuthStateChanged(auth, function (user) {
@@ -960,16 +987,38 @@ onAuthStateChanged(auth, function (user) {
   if (user) {
     console.log("Removing auth gate and adding lt-authed class");
     _logoutInProgress = false;
+    /* Surface the authenticated UI FIRST — no storage/session side effect
+       below may ever strand the user on the opaque gate (white screen). */
+    document.body.classList.add("lt-authed");
+    try { localStorage.setItem("lt_last_uid", user.uid); } catch (e) {}
+    /* Hard safety: whatever throws below, the gate and splash come off. */
+    setTimeout(function () {
+      try {
+        /* Only if this same user is still the active session — a sign-out
+           inside the window must win over the safety net. */
+        if (_prevAuthState !== user || _logoutInProgress) return;
+        document.body.classList.add("lt-authed");
+        var g = document.getElementById("lt-auth-gate");
+        if (g) g.remove();
+        var s = document.getElementById("lt-startup-splash");
+        if (s && s.parentNode && !window.__ltSplashVideoPlaying) {
+          if (window.__ltSplashDismiss) window.__ltSplashDismiss();
+          else s.parentNode.removeChild(s);
+        }
+        var r = document.getElementById("root");
+        if (r) r.removeAttribute("style");
+      } catch (e) {}
+    }, 2500);
     /* Swap per-account storage BEFORE any UI reads it. */
-    storageChanged = reconcileStorage(user);
+    try { storageChanged = reconcileStorage(user); } catch (e) { storageChanged = false; }
     _lastSeenUid = user.uid;
     var genuineLogin = _prevAuthState === null;
     _prevAuthState = user;
-    if (storageChanged) announceUserChanged();
+    if (storageChanged) { try { announceUserChanged(); } catch (e) {} }
     /* Single-device session: an explicit login/register claims this device;
        the watch kicks us out the moment another device takes the claim. */
-    if (genuineLogin) claimSessionNow();
-    startSessionWatch();
+    if (genuineLogin) { try { claimSessionNow(); } catch (e) {} }
+    try { startSessionWatch(); } catch (e) {}
     /* A genuine sign-in transition (the login gate was actually on screen
        a moment ago) must land on the Timer home screen — the router's URL
        was left wherever it was when the user logged out. On a normal page
@@ -1000,6 +1049,11 @@ onAuthStateChanged(auth, function (user) {
       requestAnimationFrame(function () {
         requestAnimationFrame(function () { g.remove(); });
       });
+      /* If the splash video never started playing, the branded fallback
+         animation has served its purpose — release it so the app shows. */
+      if (!window.__ltSplashVideoPlaying && window.__ltSplashDismiss) {
+        window.__ltSplashDismiss();
+      }
     };
     if (storageChanged) {
       var applied = false;
@@ -1024,6 +1078,9 @@ onAuthStateChanged(auth, function (user) {
        screen. MUST run before reconcileStorage(null), which clears the
        marker. */
     if (_authTryRecover("got a null user while still signed in")) return;
+    /* Genuine sign-out: drop the offline-recovery marker so the 7s
+       fallback can't pull a signed-out user back into the app. */
+    try { localStorage.removeItem("lt_last_uid"); } catch (e) {}
     /* Park the outgoing account's data under its uid and wipe the live
        keys so the next account (or a fresh signup) starts clean. */
     storageChanged = reconcileStorage(null);
