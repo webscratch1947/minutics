@@ -148,6 +148,35 @@ export function markServerSent(token, date, time) {
   } catch { return Promise.resolve(false); }
 }
 
+/** True when ANOTHER user already schedules reports with this bot token.
+    null = couldn't check (no session / offline) → caller should proceed. */
+export function checkTelegramTokenInUse(token) {
+  try {
+    if (!token || !window.LTAuth || !window.LTAuth.getToken) return Promise.resolve(null);
+    return window.LTAuth.getToken().then(function (idToken) {
+      if (!idToken) return null;
+      var payload = JSON.stringify({ action: "checkToken", token: token });
+      var hdrs = { "Content-Type": "application/json", "Authorization": "Bearer " + idToken };
+      var origin = window.location.origin;
+      var send = function (base) {
+        return fetch(base + "/api/telegram", { method: "POST", headers: hdrs, body: payload })
+          .then(function (r) { return (r && r.ok) ? r.json() : null; })
+          .then(function (d) { return (d && d.ok) ? !!d.used : null; })
+          .catch(function () { return null; });
+      };
+      return send(origin).then(function (res) {
+        if (res !== null) return res;
+        if (origin.indexOf("appassets.androidplatform.net") !== -1) {
+          return send("https://app.minutics.com");
+        }
+        return null;
+      });
+    }).catch(function () { return null; });
+  } catch {
+    return Promise.resolve(null);
+  }
+}
+
 /** Save telegram settings + sync Android bridge (was: gh) */
 export function saveTelegramSettings(settings) {
   const existing = getTelegramSettings();

@@ -673,7 +673,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
               children: [
                 jsx('button', {
                   onClick: () => setShowEdit(false),
-                  className: 'flex-1 py-4 text-muted-foreground font-semibold border-r border-border hover:bg-secondary text-sm',
+                  className: 'flex-1 py-4 text-white font-bold bg-red-500 hover:bg-red-600 text-sm',
                   children: 'Cancel'
                 }),
                 jsx('button', {
@@ -870,6 +870,7 @@ function ClockFace({ initial, onCancel, onConfirm }) {
   const [m, setM] = useState(base.m);
   const [ampm, setAmpm] = useState(base.ampm);
   const [mode, setMode] = useState('h');
+  const dialStart = useRef(null);
 
   const pickFromDial = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -915,32 +916,40 @@ function ClockFace({ initial, onCancel, onConfirm }) {
         className: 'w-full max-w-[330px] bg-white rounded-3xl p-5 shadow-[0_24px_60px_rgba(0,0,0,.35)]',
         onClick: (e) => e.stopPropagation(),
         children: [
-          // Digital readout — tap hour or minute to switch dial mode
+          // Digital readout — big circle on the active segment; tap to switch dial mode
           jsxs('div', {
             className: 'flex items-center justify-center gap-1 mb-4',
             children: [
               jsx('button', {
                 type: 'button',
                 onClick: () => setMode('h'),
-                className: 'text-[34px] font-black leading-none px-2 py-1 rounded-xl transition-colors ' +
-                  (mode === 'h' ? 'bg-black text-white' : 'text-foreground/40'),
+                className: 'w-[56px] h-[56px] rounded-full flex items-center justify-center text-[29px] font-black leading-none transition-colors ' +
+                  (mode === 'h' ? 'bg-black text-white shadow-[0_6px_16px_rgba(0,0,0,.3)]' : 'text-foreground/40'),
                 children: String(h).padStart(2, '0')
               }),
               jsx('span', { className: 'text-[30px] font-black text-foreground/60 leading-none', children: ':' }),
               jsx('button', {
                 type: 'button',
                 onClick: () => setMode('m'),
-                className: 'text-[34px] font-black leading-none px-2 py-1 rounded-xl transition-colors ' +
-                  (mode === 'm' ? 'bg-black text-white' : 'text-foreground/40'),
+                className: 'w-[56px] h-[56px] rounded-full flex items-center justify-center text-[29px] font-black leading-none transition-colors ' +
+                  (mode === 'm' ? 'bg-black text-white shadow-[0_6px_16px_rgba(0,0,0,.3)]' : 'text-foreground/40'),
                 children: String(m).padStart(2, '0')
               }),
-              jsx('span', { className: 'text-[14px] font-black text-foreground/45 ml-1.5 self-start mt-1.5', children: ampm })
+              jsx('span', { className: 'text-[14px] font-black text-foreground/45 ml-1.5 self-start mt-3.5', children: ampm })
             ]
           }),
-          // Clock dial
+          // Clock dial — tap only: the pin is clicked into place, never dragged
           jsxs('div', {
-            onClick: pickFromDial,
             className: 'relative w-[240px] h-[240px] rounded-full border border-black/10 bg-[#Fdfbf7] mx-auto cursor-pointer select-none touch-none',
+            onPointerDown: (e) => { dialStart.current = { x: e.clientX, y: e.clientY }; },
+            onPointerUp: (e) => {
+              const s = dialStart.current;
+              dialStart.current = null;
+              if (!s) return;
+              if (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10) return;
+              pickFromDial(e);
+            },
+            onPointerCancel: () => { dialStart.current = null; },
             children: [
               jsx('div', {
                 className: 'absolute left-1/2 top-1/2 w-[2.5px] -ml-[1.25px] bg-black/80 rounded-full',
@@ -970,13 +979,13 @@ function ClockFace({ initial, onCancel, onConfirm }) {
               jsx('button', {
                 type: 'button',
                 onClick: onCancel,
-                className: 'py-2 px-1 text-[13.5px] font-black text-foreground/45 cursor-pointer',
+                className: 'py-2.5 px-5 text-[13.5px] font-black text-white bg-red-500 hover:bg-red-600 rounded-full cursor-pointer transition-colors',
                 children: 'Cancel'
               }),
               jsx('button', {
                 type: 'button',
                 onClick: () => onConfirm({ h, m, ampm }),
-                className: 'py-2 px-1 text-[13.5px] font-black text-black cursor-pointer',
+                className: 'py-2.5 px-5 text-[13.5px] font-black text-white bg-black hover:bg-black/85 rounded-full cursor-pointer transition-colors',
                 children: 'OK'
               })
             ]
@@ -1207,13 +1216,13 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // Cancel / Log block buttons
               jsxs('div', {
-                className: 'flex gap-2.5 px-4 py-3.5',
-                children: [
-                  jsx('button', {
-                    onClick: onClose,
-                    className: 'flex-1 py-3.5 text-foreground/60 font-bold border border-black/[.08] bg-black/[.035] hover:bg-black/[.07] rounded-xl text-sm transition-colors',
-                    children: 'Cancel'
-                  }),
+                  className: 'flex gap-2.5 px-4 py-3.5',
+                  children: [
+                    jsx('button', {
+                      onClick: onClose,
+                      className: 'flex-1 py-3.5 text-white font-black bg-red-500 hover:bg-red-600 rounded-xl text-sm transition-colors',
+                      children: 'Cancel'
+                    }),
                   jsx('button', {
                     onClick: (e) => {
                       e.stopPropagation();
@@ -1383,7 +1392,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
             children: [
               jsx('button', {
                 onClick: onClose,
-                className: 'flex-1 py-3.5 text-foreground/60 font-bold border border-black/[.08] bg-black/[.035] hover:bg-black/[.07] rounded-xl text-sm transition-colors',
+                className: 'flex-1 py-3.5 text-white font-black bg-red-500 hover:bg-red-600 rounded-xl text-sm transition-colors',
                 children: 'Cancel'
               }),
               jsx('button', {

@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { getProfile } from '../lib/profile.js';
-import { getTelegramSettings, saveTelegramSettings, sendTelegramReport } from '../lib/telegram.js';
+import { getTelegramSettings, saveTelegramSettings, sendTelegramReport, checkTelegramTokenInUse } from '../lib/telegram.js';
 import { getCurrency, setCurrency } from '../lib/currency.js';
 import { saveGoalType, getGoalType, isPro as hasActivePaidPlan } from '../lib/settings.js';
 import { readJson, writeJson } from '../lib/settings.js';
@@ -330,12 +330,29 @@ export function SettingsScreen() {
   function handleSaveTelegram() {
     if (!isPro) { alert("Telegram daily reports require an active paid plan."); return; }
     setTgSaving(true);
-    saveTelegramSettings({
-      telegramBotToken: tgToken,
-      telegramChatId: tgChatId,
-      dailyReportTime: tgTime
-    });
-    setTimeout(function () { setTgSaving(false); }, 600);
+    setTgTestResult(null);
+    setTgTestMsg("");
+    var doSave = function () {
+      saveTelegramSettings({
+        telegramBotToken: tgToken,
+        telegramChatId: tgChatId,
+        dailyReportTime: tgTime
+      });
+      setTimeout(function () { setTgSaving(false); }, 600);
+    };
+    /* A bot token belongs to a single account — block the save with a clear
+       error when someone else already schedules reports with this token. */
+    checkTelegramTokenInUse((tgToken || "").trim())
+      .then(function (inUse) {
+        if (inUse) {
+          setTgTestResult("error");
+          setTgTestMsg("This bot token is already being used by another user. Try another bot token.");
+          setTgSaving(false);
+          return;
+        }
+        doSave();
+      })
+      .catch(doSave);
   }
 
   function handleTestTelegram() {

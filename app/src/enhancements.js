@@ -1036,10 +1036,11 @@
       ".lt-tool-heading{font-size:26px;line-height:1.18;font-weight:700;margin:0;letter-spacing:-.015em;color:#111114}",
       ".lt-tool-description{font-size:13.5px;line-height:1.55;color:hsl(var(--muted-foreground));margin:7px 0 0;max-width:460px}",
       ".lt-tool-close,.lt-tool-primary,.lt-tool-secondary,.lt-tool-danger{border:1px solid rgba(17,17,20,.14);padding:10px 16px;font-weight:700;font-size:13px;cursor:pointer;border-radius:999px;background:#fff;color:#111114;white-space:nowrap;transition:transform .1s,box-shadow .15s;-webkit-tap-highlight-color:transparent}",
-      ".lt-tool-close{flex-shrink:0;align-self:flex-start;border:none;background:transparent;padding:2px 0;color:hsl(var(--muted-foreground));box-shadow:none;letter-spacing:.01em}",
+      ".lt-tool-close{flex-shrink:0;align-self:flex-start;border:1px solid rgba(17,17,20,.16);background:#fff;color:#111114;padding:9px 16px;border-radius:999px;font-weight:700;font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,.07);letter-spacing:.01em}",
       ".lt-tool-primary{background:#111114;color:#fff;border-color:#111114;box-shadow:0 2px 6px rgba(17,17,20,.22)}",
       ".lt-tool-secondary{background:#fff;box-shadow:0 1px 2px rgba(17,17,20,.07)}",
       ".lt-tool-danger{color:#DC2626;border-color:rgba(220,38,38,.35);background:#FEF2F2;box-shadow:0 1px 2px rgba(220,38,38,.1)}",
+      ".lt-cancel-btn{background:#DC2626!important;border-color:#DC2626!important;color:#fff!important;box-shadow:0 2px 6px rgba(220,38,38,.3)!important}",
       ".lt-tool-close:active,.lt-tool-primary:active,.lt-tool-secondary:active,.lt-tool-danger:active{transform:translateY(1px);box-shadow:none}",
       ".lt-tool-card{border:1px solid rgba(17,17,20,.08);background:#fff;padding:18px;border-radius:18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(17,17,20,.05);word-break:break-word}",
       ".lt-card-title{font-weight:800;font-size:16px;margin:0 0 12px;letter-spacing:-.01em;color:#111114;display:flex;align-items:center;gap:9px}",
@@ -1281,9 +1282,9 @@
       "#lt-clockpicker-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px}",
       ".lt-clockpicker{width:100%;max-width:320px;background:hsl(var(--card));color:hsl(var(--foreground));border-radius:22px;padding:22px 20px 16px;box-sizing:border-box;box-shadow:0 20px 50px rgba(0,0,0,.35)}",
       ".lt-clockpicker-title{font-size:14px;font-weight:800;text-align:center;margin-bottom:18px;color:hsl(var(--muted-foreground))}",
-      ".lt-clockpicker-digital{display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:14px}",
-      ".lt-clockpicker-digital button{font-size:34px;font-weight:900;line-height:1;padding:5px 8px;border:none;border-radius:12px;background:transparent;color:hsl(var(--muted-foreground));cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:background .12s,color .12s}",
-      ".lt-clockpicker-digital button.on{background:#111114;color:#fff}",
+      ".lt-clockpicker-digital{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:14px}",
+      ".lt-clockpicker-digital button{font-size:29px;font-weight:900;line-height:1;width:56px;height:56px;border:none;border-radius:50%;background:transparent;color:hsl(var(--muted-foreground));cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:background .12s,color .12s;display:flex;align-items:center;justify-content:center;box-sizing:border-box}",
+      ".lt-clockpicker-digital button.on{background:#111114;color:#fff;box-shadow:0 6px 16px rgba(17,17,20,.3)}",
       ".lt-clockpicker-sep{font-size:30px;font-weight:900;padding:0 1px;color:hsl(var(--foreground))}",
       ".lt-clockpicker-amp{font-size:13px;font-weight:900;color:hsl(var(--muted-foreground));align-self:flex-start;margin-top:4px;margin-left:3px}",
       ".lt-clockpicker-face{position:relative;width:240px;height:240px;border-radius:50%;background:hsl(var(--muted));border:1px solid hsl(var(--border));margin:0 auto;cursor:pointer;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}",
@@ -1645,7 +1646,7 @@
           '<select id="lt-date-year" style="flex:1;padding:12px 8px;border:1px solid hsl(220 13% 85%);background:hsl(220 15% 97%);color:hsl(230 40% 16%);font-size:15px;font-family:inherit"></select>' +
         '</div>' +
         '<button id="lt-date-confirm" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">Confirm</button>' +
-        '<button id="lt-date-cancel" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:hsl(220 10% 40%);padding:12px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>' +
+        '<button id="lt-date-cancel" class="lt-cancel-btn" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:hsl(220 10% 40%);padding:12px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>' +
       '</div>';
     document.body.appendChild(sheet);
 
@@ -2519,7 +2520,7 @@
           field("Notes", "notes", item.notes, "Optional notes", "text", "full", "textarea") +
         '</div>' +
         '<div class="lt-form-actions">' +
-          '<button type="button" class="lt-tool-secondary" data-lt-action="budget-cancel">Cancel</button>' +
+          '<button type="button" class="lt-tool-secondary lt-cancel-btn" data-lt-action="budget-cancel">Cancel</button>' +
           '<button class="lt-tool-primary" type="submit">' + (isEdit ? "Save changes" : "Add expense") + '</button>' +
         '</div>' +
       '</form>'
@@ -3129,7 +3130,7 @@
         '<div style="width:36px;height:4px;border-radius:2px;background:hsl(var(--muted));margin:0 auto 14px"></div>' +
         '<p style="font-size:15px;font-weight:700;color:hsl(var(--foreground));margin:0 0 14px;text-align:center">Share to</p>' +
         '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px">' + appsHtml + '</div>' +
-        '<button id="lt-share-sheet-cancel" style="width:100%;margin-top:16px;padding:12px;border:1px solid hsl(var(--border));border-radius:12px;background:transparent;color:hsl(var(--foreground));font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>' +
+          '<button id="lt-share-sheet-cancel" class="lt-cancel-btn" style="width:100%;margin-top:16px;padding:12px;border:1px solid hsl(var(--border));border-radius:12px;background:transparent;color:hsl(var(--foreground));font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>' +
       '</div>';
     /* When a Life Hub overlay is open (e.g. Knowledge Gram), append the
        share sheet inside it so it paints above the overlay content — both
@@ -3690,7 +3691,7 @@
             '<button type="button" data-clockampm="pm" class="' + (s.pm ? "on" : "") + '">PM</button>' +
           '</div>' +
           '<div class="lt-clockpicker-actions">' +
-            '<button type="button" class="lt-cancel" data-clockaction="cancel">Cancel</button>' +
+            '<button type="button" class="lt-cancel lt-cancel-btn" data-clockaction="cancel">Cancel</button>' +
             '<button type="button" data-clockaction="ok">OK</button>' +
           '</div>' +
         '</div>' +
@@ -3701,6 +3702,11 @@
     document.documentElement.appendChild(wrap.firstChild);
 
     var overlay = document.getElementById("lt-clockpicker-overlay");
+    /* Tap-only dial: record where the pointer went down and ignore the
+       resulting click when the finger/mouse travelled — the pin must be
+       clicked into place, never dragged around the face. */
+    var clkDown = null;
+    overlay.addEventListener("pointerdown", function (e) { clkDown = { x: e.clientX, y: e.clientY }; });
     overlay.addEventListener("click", function (e) {
       if (e.target === overlay) { closeClockPicker(); return; }
       var actionEl = e.target.closest("[data-clockaction]");
@@ -3723,6 +3729,7 @@
       if (ampmEl) { s.pm = ampmEl.getAttribute("data-clockampm") === "pm"; renderClockPicker(); return; }
       var face = e.target.closest("[data-clockface]");
       if (face) {
+        if (clkDown && (Math.abs(e.clientX - clkDown.x) > 10 || Math.abs(e.clientY - clkDown.y) > 10)) return; /* drag ≠ tap */
         var r = face.getBoundingClientRect();
         var x = e.clientX - r.left - r.width / 2;
         var y = e.clientY - r.top - r.height / 2;
@@ -5034,7 +5041,13 @@
     var attempts = 10;
     (function poll() {
       var data = fvScrapeExpandedDetail(rowButton);
-      if (data !== null || attempts <= 0) { callback(data || []); return; }
+      if (data !== null || attempts <= 0) {
+        /* Close the row again — tapping Full view must not leave the
+           journal day's dropdown open behind the report. */
+        if (data !== null) rowButton.click();
+        callback(data || []);
+        return;
+      }
       attempts--;
       setTimeout(poll, 120);
     })();
@@ -6689,7 +6702,7 @@
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
           '<p style="color:hsl(230 40% 16%);font-size:14px;font-weight:700;margin:0">' + (isPro() ? "\u2B50 " + getPlanName() : "Free") + '</p>' +
           (isPro() && isSubscription()
-            ? '<button id="lt-plan-cancel-btn" style="flex-shrink:0;background:#fff;border:1px solid #c0392b;color:#c0392b;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>'
+            ? '<button id="lt-plan-cancel-btn" class="lt-cancel-btn" style="flex-shrink:0;background:#fff;border:1px solid #c0392b;color:#c0392b;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>'
             : '<button id="lt-plan-toggle-btn" style="flex-shrink:0;background:#fff;border:1px solid hsl(230 40% 16%);color:hsl(230 40% 16%);padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">' + (isPro() ? "Manage" : "View Plans") + '</button>'
           ) +
         '</div>' +
@@ -6946,7 +6959,7 @@
     modal.id = "lt-checkout-modal";
     modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
     modal.innerHTML =
-      '<style>#lt-checkout-modal #lt-checkout-cancel-btn{color:#DC2626!important;font-weight:700}</style>' +
+      '<style>#lt-checkout-modal #lt-checkout-cancel-btn{background:#DC2626!important;color:#fff!important;border:none!important;border-radius:12px;font-weight:700}</style>' +
       '<div style="width:100%;max-width:340px;background:#fff;border:1px solid rgba(17,17,20,.08);padding:26px;border-radius:24px;box-shadow:0 24px 60px -12px rgba(0,0,0,.35)" id="lt-checkout-card">' +
         '<p style="display:inline-block;padding:3px 10px;border-radius:999px;background:#FEF3C7;color:#92400E;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 10px">Minutics ' + plan.label + '</p>' +
         '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px">' + plan.price + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + plan.sub + '</span></p>' +
@@ -6967,7 +6980,7 @@
             '</div>' +
           '</div>' +
           '<button id="lt-checkout-pay-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px">Pay ' + plan.price + '</button>' +
-          '<button id="lt-checkout-cancel-btn" style="width:100%;background:transparent;border:none;color:#DC2626;padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>' +
+          '<button id="lt-checkout-cancel-btn" class="lt-cancel-btn" style="width:100%;background:transparent;border:none;color:#DC2626;padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>' +
           '<p style="color:hsl(220 10% 68%);font-size:9px;text-align:center;margin:10px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
       '</div>';
@@ -7349,7 +7362,7 @@
           '<label class="lt-form-label" for="lt-jars-salary-input">Monthly salary</label>' +
           '<input id="lt-jars-salary-input" class="lt-form-input" type="number" inputmode="decimal" min="0" step="1" placeholder="e.g. 50000" value="' + (current ? current : "") + '"/>' +
           '<div class="lt-form-actions" style="margin-top:16px;gap:10px">' +
-            '<button class="lt-tool-secondary" id="lt-jars-salary-cancel">Cancel</button>' +
+            '<button class="lt-tool-secondary lt-cancel-btn" id="lt-jars-salary-cancel">Cancel</button>' +
             '<button class="lt-tool-primary" id="lt-jars-salary-save">Save</button>' +
           '</div>' +
         '</div>' +

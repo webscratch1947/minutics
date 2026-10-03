@@ -241,8 +241,11 @@ export function LifeHubScreen({ profile }) {
     var iconTile = function (t, cls, white) {
       var c = colorsOf(t);
       return jsx("div", {
+        /* white → white tile with the tool's dark fg color: lucide symbols
+           inherit currentColor, which used to come out white-on-white and
+           made the featured banner icon invisible. */
         className: cls,
-        style: white ? { background: "#fff" } : { background: c.bg, color: c.fg },
+        style: { background: white ? "#fff" : c.bg, color: c.fg },
         children: t.id === "sixjars"
           ? jsx("img", {
               src: "assets/icons/jar-savings.png",

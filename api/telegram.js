@@ -91,6 +91,27 @@ export default async function handler(req, res) {
       let text = typeof body.text === "string" ? body.text : "";
       if (!text) text = "📊 Daily Report — no data synced yet. Open Minutics once to refresh.";
 
+      /* One bot token = one account. Reject when another user already
+         schedules with this token. Only scanned when the token actually
+         changes, so the routine 10-minute re-push never re-scans. */
+      const newToken = String(body.token).slice(0, 200);
+      const prevToken = (existing.tgs && existing.tgs.k) || "";
+      if (newToken && newToken !== prevToken) {
+        let tokPageToken;
+        try {
+          do {
+            const tokPage = await authApi.listUsers(1000, tokPageToken);
+            for (const other of tokPage.users) {
+              if (other.uid !== uid && other.customClaims && other.customClaims.tgs && other.customClaims.tgs.k === newToken) {
+                res.status(409).json({ ok: false, error: "This bot token is already being used by another user. Try another bot token." });
+                return;
+              }
+            }
+            tokPageToken = tokPage.pageToken;
+          } while (tokPageToken);
+        } catch { /* scan failure must not block a legitimate save */ }
+      }
+
       const tgs = {
         k: String(body.token).slice(0, 200),
         c: String(body.chatId).slice(0, 100),
@@ -110,6 +131,47 @@ export default async function handler(req, res) {
       return;
     } catch (e) {
       res.status(500).json({ error: "Store failed: " + String((e && e.message) || e) });
+      return;
+    }
+  }
+
+  if (action === "checkToken") {
+    /* Pre-save uniqueness probe: is this bot token already scheduled by a
+       DIFFERENT user? Auth = the caller's Firebase ID token, so a user can
+       only check (and later save) on their own behalf. */
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "Method not allowed" }); return; }
+
+    const authHeader = req.headers.authorization || "";
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!idToken) { res.status(401).json({ ok: false, error: "Missing authorization token" }); return; }
+
+    let uid, authApi;
+    try {
+      authApi = getAuth(getAdminApp());
+      const decoded = await authApi.verifyIdToken(idToken);
+      uid = decoded.uid;
+    } catch { res.status(401).json({ ok: false, error: "Invalid or expired token" }); return; }
+
+    let body = req.body;
+    if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
+    const token = String((body && body.token) || "").trim();
+    if (!token) { res.status(400).json({ ok: false, error: "Missing token" }); return; }
+
+    try {
+      let pageToken, used = false;
+      do {
+        const page = await authApi.listUsers(1000, pageToken);
+        for (const user of page.users) {
+          const tgs = user.customClaims && user.customClaims.tgs;
+          if (user.uid !== uid && tgs && tgs.k === token) { used = true; break; }
+        }
+        if (used) break;
+        pageToken = page.pageToken;
+      } while (pageToken);
+      res.status(200).json({ ok: true, used: used });
+      return;
+    } catch (e) {
+      res.status(500).json({ ok: false, error: "Lookup failed: " + String((e && e.message) || e) });
       return;
     }
   }
@@ -152,11 +214,18 @@ export default async function handler(req, res) {
           const due = nowMin >= Math.min(tMin + 1, 1439) && (tgs.sd !== date || tgs.st !== tgs.t);
           const inBackoff = tgs.fp && now - tgs.fp < 10 * 60 * 1000;
           const next = Object.assign({}, tgs); next.b = now;
+          /* Fresh date for the report: the client-generated text can sit in
+             claims for days (browser closed), which is how a "29/9" report kept
+             arriving on the 30th, 1st and 2nd. Rewrite the date line to today's
+             local date in the same d/M/yyyy format the client uses. */
+          const reportDate = local.getUTCDate() + "/" + (local.getUTCMonth() + 1) + "/" + local.getUTCFullYear();
+          let text = tgs.x || "\u{1F4CA} Daily Report — no data synced yet. Open Minutics once to refresh.";
+          text = text.replace(/^(\u{1F4CA} Daily Report — )\d{1,2}\/\d{1,2}\/\d{4}/, "$1" + reportDate);
           if (due && !inBackoff) {
             try {
               const tgRes = await fetch("https://api.telegram.org/bot" + tgs.k + "/sendMessage", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ chat_id: tgs.c, text: tgs.x || "📊 Daily Report — no data synced yet. Open Minutics once to refresh." })
+                body: JSON.stringify({ chat_id: tgs.c, text: text })
               });
               const data = await tgRes.json().catch(function () { return null; });
               if (data && data.ok) { next.sd = date; next.st = tgs.t; next.fp = null; sent++; }
@@ -268,5 +337,5 @@ export default async function handler(req, res) {
     return;
   }
 
-  res.status(400).json({ error: "Missing or invalid action (expected 'store', 'cron', 'send', 'state', 'mark', or 'health')" });
+  res.status(400).json({ error: "Missing or invalid action (expected 'store', 'checkToken', 'cron', 'send', 'state', 'mark', or 'health')" });
 }
