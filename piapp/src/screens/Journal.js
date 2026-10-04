@@ -374,7 +374,7 @@ export function JournalScreen() {
         ]
       }),
       jsx("div", {
-        className: "flex flex-col gap-2 px-5 pt-1 pb-2",
+        className: "flex flex-col gap-2 px-3 pt-1 pb-2",
         children: dayGroups.map(function(dg, idx) {
           var dayDate = days[idx];
           var isToday = isSameDay(dayDate, now);
@@ -388,7 +388,7 @@ export function JournalScreen() {
               jsxs("button", {
                 type: "button",
                 onClick: function() { setExpandedDay(isOpen ? -1 : idx); },
-                className: "w-full flex items-center justify-between px-4 py-4 bg-white transition-colors active:bg-black/[.04] [-webkit-tap-highlight-color:transparent]",
+                className: "w-full flex items-center justify-between px-3 py-4 bg-white transition-colors active:bg-black/[.04] [-webkit-tap-highlight-color:transparent]",
                 children: [
                   jsxs("div", {
                     className: "flex items-center gap-2.5",
