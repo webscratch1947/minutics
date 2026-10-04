@@ -2538,17 +2538,18 @@
                         <div class="screen-frame">
                             <div class="screen-shot-wrap">
                                 <img class="screen-shot" src="shots/01-timer.jpg" width="780" height="1688"
-                                    alt="Minutics Timer page: retirement countdown with years, months, hours, minutes and seconds, Today at a Glance activity bars and the Eat the Frog card"
+                                    alt="Minutics Timer page: retirement countdown with days, years, months, hours, minutes and seconds, Today at a Glance activity bars and the Eat the Frog card"
                                     loading="lazy" />
                             </div>
                         </div>
                         <h3><span class="screen-num">01</span>Timer</h3>
-                        <p class="screen-copy">The home dial. A live countdown to retirement — years, months, hours,
-                            minutes and seconds — with today's minutes broken down activity by activity underneath.</p>
+                        <p class="screen-copy">The home screen. A live countdown to retirement — years, months, days,
+                            hours, minutes and seconds — with today's minutes broken down activity by activity
+                            underneath.</p>
                         <ul>
                             <li>Running-timer strip pinned at the top with a one-tap Stop</li>
                             <li>Today at a Glance: per-activity bars with minutes tracked</li>
-                            <li>Eat the Frog card for the one task that matters today</li>
+                            <li>Eat the Frog card for your three most important tasks today</li>
                             <li>Greeting header with your plan badge</li>
                         </ul>
                     </article>
@@ -2562,13 +2563,14 @@
                             </div>
                         </div>
                         <h3><span class="screen-num">02</span>Activity</h3>
-                        <p class="screen-copy">Where your activities live. Four stat cards up top — time tracked, blocks,
-                            focus score, slots used — then every activity as a card with its own start button.</p>
+                        <p class="screen-copy">Where your activities live. Four stat cards up top — time tracked,
+                            blocks today, focus score, activities used — then every activity as a card with its own
+                            start button.</p>
                         <ul>
                             <li>Tap ▶ on any card to start tracking instantly</li>
                             <li>Live "47:08 tracking" state on the running activity</li>
                             <li>Edit and delete inline, add new ones with emoji</li>
-                            <li>Early-access slots shown honestly as 4 / 5</li>
+                            <li>Free-plan activity cap shown honestly as 4 / 5</li>
                         </ul>
                     </article>
 
@@ -2633,18 +2635,18 @@
                         <div class="screen-frame">
                             <div class="screen-shot-wrap">
                                 <img class="screen-shot" src="shots/06-settings.jpg" width="780" height="1688"
-                                    alt="Minutics Settings page: profile, plan, display currency, goal type options and feature toggles"
+                                    alt="Minutics Settings page: profile, plan, display currency, goal type options and the notifications toggle"
                                     loading="lazy" />
                             </div>
                         </div>
                         <h3><span class="screen-num">06</span>Settings</h3>
                         <p class="screen-copy">Your knobs and switches. Account, plan, display currency, goal type and
-                            every feature toggle — laid out plainly, with your data staying on the device.</p>
+                            notifications — laid out plainly, with your data staying on the device.</p>
                         <ul>
                             <li>Goal type: Retirement, Age Goal, FIRE or Milestone</li>
                             <li>Display currency switch (INR and more)</li>
                             <li>Plan card with clear free-tier status</li>
-                            <li>"Your data stays on this device" — no account required</li>
+                            <li>Notifications toggle with permission status and a Test button</li>
                         </ul>
                     </article>
 
@@ -3236,39 +3238,46 @@
                 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
                 float noise(vec2 p){
                     vec2 i = floor(p), f = fract(p);
+                    /* quintic ease — no visible grid creases between cells */
+                    vec2 u = f*f*f*(f*(f*6.0-15.0)+10.0);
                     float a = hash(i), b = hash(i+vec2(1.0,0.0));
                     float c = hash(i+vec2(0.0,1.0)), d = hash(i+vec2(1.0,1.0));
-                    vec2 u = f*f*(3.0-2.0*f);
-                    return mix(a,b,u.x) + (c-a)*u.y*(1.0-u.x) + (d-b)*u.x*u.y;
+                    return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
                 }
                 float fbm(vec2 p){
-                    float v = 0.0, amp = 0.55;
-                    for(int i=0;i<5;i++){ v += amp*noise(p); p *= 2.02; amp *= 0.55; }
+                    /* 4 octaves, gain .5, rotated each pass — soft, cloud-like,
+                       no axis-aligned grain */
+                    float v = 0.0, amp = 0.5;
+                    for(int i=0;i<4;i++){ v += amp*noise(p); p = mat2(1.6,1.2,-1.2,1.6)*p; amp *= 0.5; }
                     return v;
                 }
 
                 void main(){
                     vec2 uv = gl_FragCoord.xy / uRes.xy;
-                    vec2 p = uv * vec2(uRes.x/uRes.y, 1.0) * 2.4;
+                    vec2 p = uv * vec2(uRes.x/uRes.y, 1.0) * 2.1;
 
-                    float t = uTime * 0.045;
-                    vec2 drift = vec2(t*0.6, -t*0.4) + uScroll * 0.0009;
-                    vec2 mouseOff = (uMouse - 0.5) * 0.35;
+                    float t = uTime * 0.03;
+                    /* scroll parallax kept tiny so page scroll never lurches the clouds */
+                    vec2 drift = vec2(t*0.5, -t*0.33) + uScroll * 0.00008;
+                    vec2 mouseOff = (uMouse - 0.5) * 0.15;
 
                     float n1 = fbm(p + drift + mouseOff);
-                    float n2 = fbm(p * 1.6 - drift * 1.3 + 4.2);
-                    float blend = smoothstep(0.15, 0.85, n1 * 0.6 + n2 * 0.4);
+                    float n2 = fbm(p * 1.45 - drift * 1.1 + 4.2);
+                    float blend = smoothstep(0.1, 0.9, n1 * 0.62 + n2 * 0.38);
 
                     /* brand palette: warm paper -> brass -> soft navy ink, kept very light */
                     vec3 cPaper = vec3(0.976, 0.965, 0.941);
                     vec3 cBrass = vec3(0.749, 0.541, 0.176);
                     vec3 cInk   = vec3(0.694, 0.647, 0.573);
 
-                    vec3 col = mix(cPaper, cBrass, smoothstep(0.35, 0.75, blend) * 0.55);
-                    col = mix(col, cInk, smoothstep(0.55, 0.95, n2) * 0.35);
+                    vec3 col = mix(cPaper, cBrass, smoothstep(0.3, 0.8, blend) * 0.55);
+                    col = mix(col, cInk, smoothstep(0.5, 0.98, n2) * 0.32);
 
-                    float vign = smoothstep(1.15, 0.25, length(uv - 0.5));
+                    float vign = smoothstep(1.2, 0.3, length(uv - 0.5));
                     col = mix(cPaper, col, vign);
+
+                    /* static dither — removes 8-bit banding without temporal shimmer */
+                    col += (hash(gl_FragCoord.xy) - 0.5) * (2.0/255.0);
 
                     gl_FragColor = vec4(col, 1.0);
                 }`;
@@ -3310,7 +3319,7 @@
             });
 
             function resize() {
-                const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+                const dpr = Math.min(window.devicePixelRatio || 1, 2);
                 canvas.width = window.innerWidth * dpr;
                 canvas.height = window.innerHeight * dpr;
                 gl.viewport(0, 0, canvas.width, canvas.height);
@@ -3321,8 +3330,8 @@
             let start = performance.now();
             function frame(now) {
                 const t = (now - start) / 1000;
-                mouse[0] += (targetMouse[0] - mouse[0]) * 0.04;
-                mouse[1] += (targetMouse[1] - mouse[1]) * 0.04;
+                mouse[0] += (targetMouse[0] - mouse[0]) * 0.025;
+                mouse[1] += (targetMouse[1] - mouse[1]) * 0.025;
                 gl.uniform2f(uRes, canvas.width, canvas.height);
                 gl.uniform1f(uTime, t);
                 gl.uniform2f(uMouse, mouse[0], mouse[1]);
