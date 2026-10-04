@@ -5498,13 +5498,15 @@
       }
       if (row.button.getAttribute("data-lt-fv-injected") === "1") return;
       row.button.setAttribute("data-lt-fv-injected", "1");
-      /* Keep this control anchored to the date, not to the optional
-         duration/arrow group.  The latter changes width when a journal day
-         has no time or a short duration, which made Full view visibly jump
-         between rows. */
+      /* Anchored to the row's RIGHT side (between the duration and the
+         expand arrow) — NOT next to the date. It used to sit right after
+         the date text, dead-center of the row, so simply tapping a journal
+         date to open/close it hit the pill and flashed the dark Full view
+         report. Date and center taps now only expand/collapse the day. */
       var dateSpan = Array.prototype.slice.call(row.button.querySelectorAll("span"))
         .filter(function (s) { return (s.textContent || "").trim() === row.dateText; })[0];
-      var host = dateSpan && dateSpan.parentElement ? dateSpan.parentElement : row.button;
+      var rightGroup = row.button.querySelector(":scope > div:last-child");
+      var host = rightGroup || (dateSpan && dateSpan.parentElement) || row.button;
       var btn = document.createElement("span");
       btn.className = "lt-fv-btn";
       btn.setAttribute("role", "button");
@@ -5518,7 +5520,8 @@
           fvOpenReportModal(dateText, activities);
         });
       });
-      if (dateSpan && dateSpan.nextSibling) host.insertBefore(btn, dateSpan.nextSibling);
+      if (rightGroup && rightGroup.lastElementChild) host.insertBefore(btn, rightGroup.lastElementChild);
+      else if (dateSpan && dateSpan.nextSibling) host.insertBefore(btn, dateSpan.nextSibling);
       else host.appendChild(btn);
     });
     /* Journal Pro-lock notice removed — journal history is no longer gated in-UI. */
