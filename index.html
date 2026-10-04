@@ -606,7 +606,7 @@
             pointer-events: none;
             z-index: 1300;
             transform: translate(-100px, -100px);
-            transition: transform .35s cubic-bezier(.2, .8, .2, 1), width .3s ease, height .3s ease, background .3s ease, opacity .3s ease;
+            transition: width .3s ease, height .3s ease, background .3s ease, opacity .3s ease;
         }
 
         .cursor-ring {
@@ -621,7 +621,7 @@
             pointer-events: none;
             z-index: 1300;
             transform: translate(-100px, -100px);
-            transition: transform .55s cubic-bezier(.2, .8, .2, 1), width .35s ease, height .35s ease, opacity .3s ease, border-color .3s ease;
+            transition: width .35s ease, height .35s ease, opacity .3s ease, border-color .3s ease;
         }
 
         .cursor-dot.is-hover,
@@ -2568,7 +2568,7 @@
                         <ul>
                             <li>Tap ▶ on any card to start tracking instantly</li>
                             <li>The running activity shows a live elapsed timer</li>
-                            <li>Edit and delete inline, add new ones with emoji</li>
+                            <li>Edit or delete any activity in place — or add a new one with an emoji</li>
                             <li>Stat cards for time tracked, blocks today and focus score</li>
                         </ul>
                     </article>
@@ -3329,8 +3329,8 @@
             let start = performance.now();
             function frame(now) {
                 const t = (now - start) / 1000;
-                mouse[0] += (targetMouse[0] - mouse[0]) * 0.025;
-                mouse[1] += (targetMouse[1] - mouse[1]) * 0.025;
+                mouse[0] += (targetMouse[0] - mouse[0]) * 0.06;
+                mouse[1] += (targetMouse[1] - mouse[1]) * 0.06;
                 gl.uniform2f(uRes, canvas.width, canvas.height);
                 gl.uniform1f(uTime, t);
                 gl.uniform2f(uMouse, mouse[0], mouse[1]);
@@ -3346,13 +3346,16 @@
         (function () {
             const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             if (reduced || typeof Lenis === 'undefined') return;
-            lenis = new Lenis({ duration: 1.05, smoothWheel: true, syncTouch: false });
-            function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
-            requestAnimationFrame(raf);
-            if (window.ScrollTrigger) {
+            lenis = new Lenis({ duration: 0.8, smoothWheel: true, syncTouch: false });
+            /* drive Lenis from ONE clock only — stepping it from both rAF and
+               gsap.ticker (different time bases) made every scroll stutter */
+            if (window.gsap && window.ScrollTrigger) {
                 lenis.on('scroll', ScrollTrigger.update);
                 gsap.ticker.add((time) => { lenis.raf(time * 1000); });
                 gsap.ticker.lagSmoothing(0);
+            } else {
+                const raf = (time) => { lenis.raf(time); requestAnimationFrame(raf); };
+                requestAnimationFrame(raf);
             }
             // keep in-page anchor links working smoothly with Lenis
             document.querySelectorAll('a[href^="#"]').forEach(a => {
@@ -3427,8 +3430,8 @@
                 dot.style.transform = `translate(${mx}px, ${my}px)`;
             });
             (function ringLoop() {
-                rx += (mx - rx) * 0.16;
-                ry += (my - ry) * 0.16;
+                rx += (mx - rx) * 0.22;
+                ry += (my - ry) * 0.22;
                 ring.style.transform = `translate(${rx}px, ${ry}px)`;
                 requestAnimationFrame(ringLoop);
             })();
@@ -3445,10 +3448,10 @@
                         const r = btn.getBoundingClientRect();
                         const relX = e.clientX - r.left - r.width / 2;
                         const relY = e.clientY - r.top - r.height / 2;
-                        gsap.to(btn, { x: relX * 0.28, y: relY * 0.4, duration: 0.4, ease: 'power3.out' });
+                        gsap.to(btn, { x: relX * 0.22, y: relY * 0.3, duration: 0.3, ease: 'power3.out' });
                     });
                     btn.addEventListener('mouseleave', () => {
-                        gsap.to(btn, { x: 0, y: 0, duration: 0.6, ease: 'elastic.out(1, 0.4)' });
+                        gsap.to(btn, { x: 0, y: 0, duration: 0.5, ease: 'elastic.out(1, 0.4)' });
                     });
                 });
             }
