@@ -2955,11 +2955,24 @@
             }
 
             function recalc() {
-                let age = parseFloat(ageInput.value);
-                let retireAge = parseFloat(lifeInput.value);
-                if (!isFinite(age) || age < 0) age = 0;
-                if (!isFinite(retireAge) || retireAge <= age) retireAge = age + 1;
-                const yearsLeft = Math.max(0, retireAge - age);
+                const ageRaw = ageInput.value.trim();
+                const retireRaw = lifeInput.value.trim();
+                const age = parseFloat(ageRaw);
+                const retireAge = parseFloat(retireRaw);
+                const hasAge = ageRaw !== '' && isFinite(age) && age >= 0;
+                const hasRetire = retireRaw !== '' && isFinite(retireAge) && retireAge >= 0;
+
+                if (!hasAge || !hasRetire) {
+                    animateTo(figure, 0);
+                    sub.textContent = "Enter both ages above to see the minutes you have left.";
+                    return;
+                }
+                if (retireAge <= age) {
+                    animateTo(figure, 0);
+                    sub.textContent = "Set a target age above your current age to see the minutes you have left.";
+                    return;
+                }
+                const yearsLeft = retireAge - age;
                 const minutesLeft = Math.round(yearsLeft * 365.25 * 24 * 60);
                 animateTo(figure, minutesLeft);
                 sub.textContent = notes[Math.floor(Math.random() * notes.length)];
