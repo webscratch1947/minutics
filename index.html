@@ -357,6 +357,18 @@
             }
         }
 
+        @media (max-width: 640px) {
+            html {
+                overflow-x: hidden;
+            }
+
+            header.nav {
+                background: var(--cream);
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+            }
+        }
+
         /* ============================================================
      2. HERO
      ============================================================ */
@@ -551,6 +563,10 @@
 
             .hero {
                 padding-top: 108px;
+            }
+
+            .scroll-cue {
+                display: none;
             }
         }
 
@@ -829,6 +845,21 @@
                 margin: 0 14px;
                 padding: 56px 22px;
                 border-radius: 22px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .math {
+                margin: 0 calc(6px - var(--edge));
+                padding: 34px 18px;
+            }
+
+            .calc {
+                margin-top: 30px;
+            }
+
+            .calc-result {
+                padding-top: 24px;
             }
         }
 
@@ -1768,9 +1799,18 @@
 
         @media (max-width:720px) {
             .cta-final {
-                margin: 0 14px;
+                margin: 0 calc(6px - var(--edge));
                 padding: 64px 22px;
                 border-radius: 22px;
+            }
+
+            #download .eyebrow::before {
+                display: none;
+            }
+
+            #download .btn-pill {
+                width: 100%;
+                justify-content: center;
             }
         }
 
