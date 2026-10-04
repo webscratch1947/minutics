@@ -3179,6 +3179,9 @@
             const clock = new THREE.Clock();
             function animate() {
                 requestAnimationFrame(animate);
+                if (document.hidden) return;
+                const p = scrollProgress();
+                if (p <= 0.02) return; /* hero off-screen — skip the whole render */
                 const now = new Date();
                 const ms = now.getMilliseconds();
                 const s = now.getSeconds() + ms / 1000;
@@ -3197,7 +3200,6 @@
                     dust.rotation.y += 0.0006;
                 }
 
-                const p = scrollProgress();
                 const s2 = 0.82 + p * 0.18;
                 watch.scale.setScalar(s2);
                 canvas.style.opacity = String(Math.max(0.15, p));
@@ -3209,10 +3211,9 @@
     </script>
 
     <!-- ============================================================
-       EXTRA MOTION LAYER — Lenis smooth scroll, WebGL shader background,
+       EXTRA MOTION LAYER — WebGL shader background,
        GSAP/ScrollTrigger parallax, custom cursor, magnetic buttons
        ============================================================ -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lenis/1.1.14/lenis.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 
@@ -3318,16 +3319,21 @@
             });
 
             function resize() {
-                const dpr = Math.min(window.devicePixelRatio || 1, 2);
-                canvas.width = window.innerWidth * dpr;
-                canvas.height = window.innerHeight * dpr;
+                /* clouds are ultra-soft — half CSS resolution is visually
+                   identical after upscale and cuts fill cost ~8x */
+                canvas.width = Math.max(1, Math.round(window.innerWidth * 0.5));
+                canvas.height = Math.max(1, Math.round(window.innerHeight * 0.5));
                 gl.viewport(0, 0, canvas.width, canvas.height);
             }
             window.addEventListener('resize', resize);
             resize();
 
             let start = performance.now();
+            let lastDraw = -1e9;
             function frame(now) {
+                requestAnimationFrame(frame);
+                if (now - lastDraw < 32) return; /* ~30fps — plenty for slow clouds */
+                lastDraw = now;
                 const t = (now - start) / 1000;
                 mouse[0] += (targetMouse[0] - mouse[0]) * 0.06;
                 mouse[1] += (targetMouse[1] - mouse[1]) * 0.06;
@@ -3336,34 +3342,18 @@
                 gl.uniform2f(uMouse, mouse[0], mouse[1]);
                 gl.uniform1f(uScroll, window.scrollY || 0);
                 gl.drawArrays(gl.TRIANGLES, 0, 3);
-                requestAnimationFrame(frame);
             }
             requestAnimationFrame(frame);
         })();
 
-        /* ---------- Lenis smooth scroll ---------- */
-        let lenis;
+        /* ---------- scroll: native wheel (no inertia layer) + smooth anchors ---------- */
         (function () {
-            const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            if (reduced || typeof Lenis === 'undefined') return;
-            lenis = new Lenis({ duration: 0.8, smoothWheel: true, syncTouch: false });
-            /* drive Lenis from ONE clock only — stepping it from both rAF and
-               gsap.ticker (different time bases) made every scroll stutter */
-            if (window.gsap && window.ScrollTrigger) {
-                lenis.on('scroll', ScrollTrigger.update);
-                gsap.ticker.add((time) => { lenis.raf(time * 1000); });
-                gsap.ticker.lagSmoothing(0);
-            } else {
-                const raf = (time) => { lenis.raf(time); requestAnimationFrame(raf); };
-                requestAnimationFrame(raf);
-            }
-            // keep in-page anchor links working smoothly with Lenis
             document.querySelectorAll('a[href^="#"]').forEach(a => {
                 a.addEventListener('click', (e) => {
                     const id = a.getAttribute('href');
                     if (id.length > 1) {
                         const target = document.querySelector(id);
-                        if (target) { e.preventDefault(); lenis.scrollTo(target, { offset: -10 }); }
+                        if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
                     }
                 });
             });
@@ -3478,15 +3468,6 @@
                         scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true }
                     });
                 }
-
-                // section eyebrows / headings — subtle horizontal wipe-in tied to scroll
-                document.querySelectorAll('.section-head h2, .cta-final h2').forEach(h => {
-                    gsap.fromTo(h, { letterSpacing: '0.02em' }, {
-                        letterSpacing: '0em',
-                        ease: 'none',
-                        scrollTrigger: { trigger: h, start: 'top 90%', end: 'top 55%', scrub: true }
-                    });
-                });
 
                 // hero-glow already covered above; craft section gets a soft parallax on its background wrap
                 const craftWrap = document.querySelector('#craft .wrap');
