@@ -1478,7 +1478,7 @@
       /* Journal "Full view" button */
       ".lt-fv-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid hsl(var(--primary));color:hsl(var(--primary));background:#fff;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:800;letter-spacing:.02em;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap}",
       ".lt-fv-btn:active{opacity:.7}",
-      "#lt-fv-modal-overlay,#lt-fv-report-overlay,#lt-fv-share-overlay{position:fixed;inset:0;z-index:2147483200;background:rgba(0,0,0,.99);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:22px 16px 40px}",
+      "#lt-fv-modal-overlay,#lt-fv-report-overlay,#lt-fv-share-overlay{position:fixed;inset:0;z-index:2147483200;background:rgba(0,0,0,1);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:22px 16px 40px}",
       ".lt-fv-modal-head{width:100%;max-width:480px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}",
       ".lt-fv-modal-head h3{color:#fff;font-size:15px;font-weight:800;margin:0}",
       ".lt-fv-modal-close{background:rgba(255,255,255,.12);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer}",
