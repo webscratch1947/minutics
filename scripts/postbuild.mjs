@@ -16,7 +16,7 @@
 //
 // This is plain Node fs, so it works the same on Windows, macOS and Linux.
 
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,6 +33,21 @@ function copy(src, dest) {
   mkdirSync(dirname(dest), { recursive: true });
   copyFileSync(src, dest);
   console.log(`[postbuild] copied ${src} -> ${dest}`);
+}
+
+function copyDir(src, dest) {
+  if (!existsSync(src)) {
+    console.warn(`[postbuild] skipping missing dir: ${src}`);
+    return;
+  }
+  mkdirSync(dest, { recursive: true });
+  for (const entry of readdirSync(src)) {
+    const s = join(src, entry);
+    const d = join(dest, entry);
+    if (statSync(s).isDirectory()) copyDir(s, d);
+    else copyFileSync(s, d);
+  }
+  console.log(`[postbuild] copied dir ${src} -> ${dest}`);
 }
 
 if (target === "piapp") {
@@ -63,6 +78,8 @@ if (target === "piapp") {
   // Marketing website (served at the output root, i.e. minutics.com)
   copy(join(projectRoot, 'index.html'), join(outDir, 'index.html'));
   copy(join(projectRoot, 'favicon.svg'), join(outDir, 'favicon.svg'));
+  // Real app screenshots referenced by the Screens showcase section
+  copyDir(join(projectRoot, 'shots'), join(outDir, 'shots'));
 
   // Root-level app static files not covered by Vite's asset pipeline
   // (not referenced from app/index.html, so Vite doesn't copy them), but

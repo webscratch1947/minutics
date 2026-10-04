@@ -1876,6 +1876,114 @@
                 margin-bottom: 9px;
             }
         }
+
+        /* ============================================================
+     8. SCREENS — full-detail real app screenshot showcase
+     ============================================================ */
+        .screens-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 64px 42px;
+        }
+
+        .screen-card {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen-frame {
+            background: linear-gradient(160deg, #26221B, #17140F);
+            border-radius: 30px;
+            padding: 8px;
+            box-shadow: 0 34px 64px -28px rgba(29, 26, 21, .42), 0 4px 14px rgba(29, 26, 21, .16);
+            transition: transform .5s var(--ease), box-shadow .5s ease;
+        }
+
+        .screen-card:hover .screen-frame {
+            transform: translateY(-6px);
+            box-shadow: 0 46px 80px -30px rgba(29, 26, 21, .48), 0 6px 16px rgba(29, 26, 21, .18);
+        }
+
+        .screen-shot-wrap {
+            border-radius: 23px;
+            overflow: hidden;
+            line-height: 0;
+            background: var(--cream);
+        }
+
+        .screen-shot {
+            width: 100%;
+            display: block;
+        }
+
+        .screen-card h3 {
+            font-family: var(--display);
+            font-size: 21px;
+            font-weight: 500;
+            margin: 22px 0 0;
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+
+        .screen-num {
+            font-family: var(--mono);
+            font-size: 12px;
+            letter-spacing: .14em;
+            color: var(--brass-deep);
+            flex: none;
+        }
+
+        .screen-copy {
+            margin-top: 12px;
+            font-size: 14.5px;
+            line-height: 1.7;
+            color: var(--ink-soft);
+        }
+
+        .screen-card ul {
+            list-style: none;
+            margin: 16px 0 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+        }
+
+        .screen-card ul li {
+            position: relative;
+            padding-left: 20px;
+            font-size: 13.5px;
+            line-height: 1.55;
+            color: var(--ink);
+        }
+
+        .screen-card ul li::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: .5em;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--brass);
+        }
+
+        @media (max-width: 980px) {
+            .screens-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 52px 36px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .screens-grid {
+                grid-template-columns: 1fr;
+                gap: 48px;
+                max-width: 400px;
+                margin: 0 auto;
+            }
+        }
     </style>
 </head>
 
@@ -1899,6 +2007,7 @@
         <nav class="links" aria-label="Primary">
             <a href="#day">A day inside</a>
             <a href="#features">Complications</a>
+            <a href="#screens">Screens</a>
             <a href="#craft">The app</a>
             <a href="#download">Download</a>
         </nav>
@@ -2412,6 +2521,138 @@
         </section>
 
         <!-- ============================================================
+       SCREENS — full-detail showcase of real app pages
+       ============================================================ -->
+        <section id="screens">
+            <div class="wrap">
+                <div class="section-head reveal">
+                    <p class="eyebrow">Real screens, real pages</p>
+                    <h2>Every page of Minutics, up close.</h2>
+                    <p class="lede">These aren't concepts — each shot below is the actual Android app, captured running
+                        with a real week of data. Six pages, no cropping, no filters.</p>
+                </div>
+
+                <div class="screens-grid">
+
+                    <article class="screen-card reveal">
+                        <div class="screen-frame">
+                            <div class="screen-shot-wrap">
+                                <img class="screen-shot" src="shots/01-timer.jpg" width="780" height="1688"
+                                    alt="Minutics Timer page: retirement countdown with years, months, hours, minutes and seconds, Today at a Glance activity bars and the Eat the Frog card"
+                                    loading="lazy" />
+                            </div>
+                        </div>
+                        <h3><span class="screen-num">01</span>Timer</h3>
+                        <p class="screen-copy">The home dial. A live countdown to retirement — years, months, hours,
+                            minutes and seconds — with today's minutes broken down activity by activity underneath.</p>
+                        <ul>
+                            <li>Running-timer strip pinned at the top with a one-tap Stop</li>
+                            <li>Today at a Glance: per-activity bars with minutes tracked</li>
+                            <li>Eat the Frog card for the one task that matters today</li>
+                            <li>Greeting header with your plan badge</li>
+                        </ul>
+                    </article>
+
+                    <article class="screen-card reveal">
+                        <div class="screen-frame">
+                            <div class="screen-shot-wrap">
+                                <img class="screen-shot" src="shots/02-activity.jpg" width="780" height="1688"
+                                    alt="Minutics Activity page: time tracked, blocks today, focus score and activity cards with play buttons"
+                                    loading="lazy" />
+                            </div>
+                        </div>
+                        <h3><span class="screen-num">02</span>Activity</h3>
+                        <p class="screen-copy">Where your activities live. Four stat cards up top — time tracked, blocks,
+                            focus score, slots used — then every activity as a card with its own start button.</p>
+                        <ul>
+                            <li>Tap ▶ on any card to start tracking instantly</li>
+                            <li>Live "47:08 tracking" state on the running activity</li>
+                            <li>Edit and delete inline, add new ones with emoji</li>
+                            <li>Early-access slots shown honestly as 4 / 5</li>
+                        </ul>
+                    </article>
+
+                    <article class="screen-card reveal">
+                        <div class="screen-frame">
+                            <div class="screen-shot-wrap">
+                                <img class="screen-shot" src="shots/03-lifehub.jpg" width="780" height="1688"
+                                    alt="Minutics Life Hub page: searchable tool grid with category filters and featured Time Value Calculator"
+                                    loading="lazy" />
+                            </div>
+                        </div>
+                        <h3><span class="screen-num">03</span>Life Hub</h3>
+                        <p class="screen-copy">Sixteen tools behind one door. Search, filter by Time, Finance or
+                            Productivity, and open anything — calculators, trackers, gram, tasks — in one tap.</p>
+                        <ul>
+                            <li>Featured Time Value Calculator at the top</li>
+                            <li>EMI, Compound Interest and other finance tools</li>
+                            <li>Knowledge Gram, My Tasks, Routine Trackers</li>
+                            <li>Every figure calculated on your device</li>
+                        </ul>
+                    </article>
+
+                    <article class="screen-card reveal">
+                        <div class="screen-frame">
+                            <div class="screen-shot-wrap">
+                                <img class="screen-shot" src="shots/04-journal.jpg" width="780" height="1688"
+                                    alt="Minutics Journal page: consistency streak, week strip, dark daily summary card and expandable day rows with Full view button"
+                                    loading="lazy" />
+                            </div>
+                        </div>
+                        <h3><span class="screen-num">04</span>Journal</h3>
+                        <p class="screen-copy">The record. Streak and week strip on top, a dark summary of today, then
+                            every day of the month as a row you can expand down to individual time entries.</p>
+                        <ul>
+                            <li>Consistency streak + this-week logged dots</li>
+                            <li>Tap a day to expand activity entries and ranges</li>
+                            <li>Duration stays on one line at any screen width</li>
+                            <li>Full view button opens the day's full report</li>
+                        </ul>
+                    </article>
+
+                    <article class="screen-card reveal">
+                        <div class="screen-frame">
+                            <div class="screen-shot-wrap">
+                                <img class="screen-shot" src="shots/05-fullview.jpg" width="780" height="1688"
+                                    alt="Minutics Full view daily report: donut chart of tracked time with per-activity percentages, summary card and Share button"
+                                    loading="lazy" />
+                            </div>
+                        </div>
+                        <h3><span class="screen-num">05</span>Full view</h3>
+                        <p class="screen-copy">One day as one page. A donut split of every minute you tracked, exact
+                            percentages per activity, a summary block — and a Share button to send it anywhere.</p>
+                        <ul>
+                            <li>Per-activity time and percentage breakdown</li>
+                            <li>Summary: total tracked, categories used, top category</li>
+                            <li>Solid report overlay — nothing bleeds through</li>
+                            <li>Share as an image straight from the app</li>
+                        </ul>
+                    </article>
+
+                    <article class="screen-card reveal">
+                        <div class="screen-frame">
+                            <div class="screen-shot-wrap">
+                                <img class="screen-shot" src="shots/06-settings.jpg" width="780" height="1688"
+                                    alt="Minutics Settings page: profile, plan, display currency, goal type options and feature toggles"
+                                    loading="lazy" />
+                            </div>
+                        </div>
+                        <h3><span class="screen-num">06</span>Settings</h3>
+                        <p class="screen-copy">Your knobs and switches. Account, plan, display currency, goal type and
+                            every feature toggle — laid out plainly, with your data staying on the device.</p>
+                        <ul>
+                            <li>Goal type: Retirement, Age Goal, FIRE or Milestone</li>
+                            <li>Display currency switch (INR and more)</li>
+                            <li>Plan card with clear free-tier status</li>
+                            <li>"Your data stays on this device" — no account required</li>
+                        </ul>
+                    </article>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================
        PHILOSOPHY QUOTE
        ============================================================ -->
         <section class="philosophy">
@@ -2477,6 +2718,7 @@
                     <div class="foot-col">
                         <h5>Product</h5>
                         <a href="#features">Complications</a>
+                        <a href="#screens">Screens</a>
                         <a href="#day">A day inside</a>
                         <a href="#craft">Craft</a>
                     </div>
