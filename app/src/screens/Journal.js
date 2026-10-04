@@ -400,19 +400,19 @@ export function JournalScreen() {
                            ? { backgroundColor: "#16a34a" }
                            : { backgroundColor: "#111827" }
                        }),
-                       // Date label
-                      jsx("span", {
-                        className: "font-bold text-sm text-foreground",
-                        children: formatDate(dayDate)
-                      })
+                        // Date label
+                        jsx("span", {
+                          className: "font-bold text-sm text-foreground whitespace-nowrap",
+                          children: formatDate(dayDate)
+                        })
                     ]
                   }),
                   jsxs("div", {
-                    className: "flex items-center gap-3",
+                    className: "flex items-center gap-2",
                     children: [
                       // Total time for the day
                       jsx("span", {
-                        className: "font-mono text-sm font-bold text-muted-foreground",
+                        className: "font-mono text-sm font-bold text-muted-foreground whitespace-nowrap shrink-0",
                         children: dg.totalSeconds > 0 ? formatDuration(dg.totalSeconds) : "00:00"
                       }),
                       // Expand indicator (static, flips instantly)
@@ -450,7 +450,7 @@ export function JournalScreen() {
                                 children: a.activityName
                               }),
                               jsx("span", {
-                                className: "font-mono text-sm font-bold text-muted-foreground",
+                                className: "font-mono text-sm font-bold text-muted-foreground whitespace-nowrap shrink-0",
                                 children: formatDuration(activityTotal)
                               })
                             ]
