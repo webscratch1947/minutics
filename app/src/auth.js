@@ -337,11 +337,6 @@ function enterDemo(isNew) {
   hideBootSplash();
   var g = document.getElementById("lt-auth-gate");
   if (g) g.remove();
-  var s = document.getElementById("lt-startup-splash");
-  if (s && s.parentNode && !window.__ltSplashVideoPlaying) {
-    if (window.__ltSplashDismiss) window.__ltSplashDismiss();
-    else s.parentNode.removeChild(s);
-  }
   document.body.classList.add("lt-authed");
   var root = document.getElementById("root");
   if (root) root.removeAttribute("style");
@@ -1161,8 +1156,6 @@ setTimeout(function () {
       document.body.classList.add("lt-authed");
       var g = document.getElementById("lt-auth-gate");
       if (g) g.remove();
-      var s = document.getElementById("lt-startup-splash");
-      if (s && s.parentNode) s.parentNode.removeChild(s);
       var rootEl = document.getElementById("root");
       if (rootEl) rootEl.removeAttribute("style");
     } else {
@@ -1205,11 +1198,6 @@ onAuthStateChanged(auth, function (user) {
         document.body.classList.add("lt-authed");
         var g = document.getElementById("lt-auth-gate");
         if (g) g.remove();
-        var s = document.getElementById("lt-startup-splash");
-        if (s && s.parentNode && !window.__ltSplashVideoPlaying) {
-          if (window.__ltSplashDismiss) window.__ltSplashDismiss();
-          else s.parentNode.removeChild(s);
-        }
         var r = document.getElementById("root");
         if (r) r.removeAttribute("style");
       } catch (e) {}
@@ -1271,11 +1259,6 @@ onAuthStateChanged(auth, function (user) {
       requestAnimationFrame(function () {
         requestAnimationFrame(function () { g.remove(); });
       });
-      /* If the splash video never started playing, the branded fallback
-         animation has served its purpose — release it so the app shows. */
-      if (!window.__ltSplashVideoPlaying && window.__ltSplashDismiss) {
-        window.__ltSplashDismiss();
-      }
     };
     if (storageChanged) {
       var applied = false;

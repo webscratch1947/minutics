@@ -1,55 +1,6 @@
 ﻿(function () {
   "use strict";
 
-  /* ── Startup loading screen ────────────────────────────────────────────
-     Plays the branded splash video once (no loop); dismisses on end/error
-     with a hard cap so it can never trap the user. */
-  (function showStartupSplash() {
-    var MAX_MS = 3000;   /* navy empty screen alone: release by 3s */
-    var HARD_MS = 7000;  /* absolute escape hatch, even if a playing video runs to its full ~4s */
-    var splash  = document.createElement("div");
-    splash.id   = "lt-startup-splash";
-    splash.style.cssText =
-      "position:fixed;inset:0;z-index:2147483647;background:hsl(230 40% 16%);" +
-      "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
-      "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
-
-    var video = document.createElement("video");
-    video.id = "lt-startup-splash-video";
-    video.src = "assets/lt/minutics_splash.mp4";
-    video.autoplay = true;
-    video.muted = true;
-    video.setAttribute("playsinline", "");
-    video.setAttribute("webkit-playsinline", "");
-    video.preload = "auto";
-    video.loop = false;
-    video.style.cssText = "width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .15s ease;";
-    splash.appendChild(video);
-    (document.body || document.documentElement).appendChild(splash);
-
-    var dismissed = false;
-    var videoStarted = false;
-    function dismiss() {
-      if (dismissed) return;
-      dismissed = true;
-      splash.style.opacity = "0";
-      setTimeout(function () {
-        if (splash.parentNode) splash.parentNode.removeChild(splash);
-      }, 550);
-    }
-    window.__ltSplashDismiss = dismiss;
-
-    video.addEventListener("playing", function () { window.__ltSplashVideoPlaying = true; videoStarted = true; video.style.opacity = "1"; });
-    video.addEventListener("ended", function () { setTimeout(dismiss, 200); });
-    video.addEventListener("error", dismiss);
-    video.muted = true;
-    video.play().catch(function () {});
-    /* Empty navy released by MAX_MS; a playing video runs to its natural
-       end, with HARD_MS as the absolute escape hatch. */
-    setTimeout(function () { if (!videoStarted) dismiss(); }, MAX_MS);
-    setTimeout(dismiss, HARD_MS);
-  })();
-
   /* ── Storage keys ──────────────────────────────────────────────────────── */
   var BUDGET_KEY    = "lt_budget_tracker_v1";
   var EMI_KEY       = "lt_emi_history_v1";
