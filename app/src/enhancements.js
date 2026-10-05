@@ -18,7 +18,7 @@
 
     var video = document.createElement("video");
     video.id = "lt-startup-splash-video";
-    video.src = "assets/lt/minutics_splash.mp4";
+    video.src = "assets/lt/minutics_splash.mp4?v=1"; /* bump ?v=N when replacing the file (immutable 1y cache) */
     video.autoplay = true;
     video.muted = true;
     video.setAttribute("playsinline", "");
