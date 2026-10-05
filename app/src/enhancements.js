@@ -8,7 +8,8 @@
      Sits above the #lt-boot-splash from index.html, which already covers
      the first paint, so there is never a white flash. */
   (function showStartupSplash() {
-    var MAX_MS = 4500;
+    var MAX_MS = 3000;   /* static fallback alone: release by 3s — never a long navy stare */
+    var HARD_MS = 7000;  /* absolute escape hatch, even if a playing video runs to its full ~4s */
     var splash  = document.createElement("div");
     splash.id   = "lt-startup-splash";
     splash.style.cssText =
@@ -49,6 +50,7 @@
     (document.body || document.documentElement).appendChild(splash);
 
     var dismissed = false;
+    var videoStarted = false;
     function dismiss() {
       if (dismissed) return;
       dismissed = true;
@@ -59,7 +61,7 @@
     }
     window.__ltSplashDismiss = dismiss;
 
-    video.addEventListener("playing", function () { window.__ltSplashVideoPlaying = true; video.style.opacity = "1"; });
+    video.addEventListener("playing", function () { window.__ltSplashVideoPlaying = true; videoStarted = true; video.style.opacity = "1"; });
     video.addEventListener("ended", function () {
       setTimeout(dismiss, 200);
     });
@@ -74,7 +76,11 @@
     video.muted = true;
     video.play().catch(function () {});
 
-    setTimeout(dismiss, MAX_MS);
+    /* Static fallback alone is released by MAX_MS; a video that actually
+       started plays through to its natural end (ended → dismiss above),
+       with HARD_MS as the absolute escape hatch. */
+    setTimeout(function () { if (!videoStarted) dismiss(); }, MAX_MS);
+    setTimeout(dismiss, HARD_MS);
   })();
 
   /* ── Storage keys ──────────────────────────────────────────────────────── */

@@ -5,7 +5,8 @@
      Plays the branded splash video once (no loop); dismisses on end/error
      with a hard cap so it can never trap the user. */
   (function showStartupSplash() {
-    var MAX_MS = 4500;
+    var MAX_MS = 3000;   /* navy empty screen alone: release by 3s */
+    var HARD_MS = 7000;  /* absolute escape hatch, even if a playing video runs to its full ~4s */
     var splash  = document.createElement("div");
     splash.id   = "lt-startup-splash";
     splash.style.cssText =
@@ -27,6 +28,7 @@
     (document.body || document.documentElement).appendChild(splash);
 
     var dismissed = false;
+    var videoStarted = false;
     function dismiss() {
       if (dismissed) return;
       dismissed = true;
@@ -37,12 +39,15 @@
     }
     window.__ltSplashDismiss = dismiss;
 
-    video.addEventListener("playing", function () { window.__ltSplashVideoPlaying = true; video.style.opacity = "1"; });
+    video.addEventListener("playing", function () { window.__ltSplashVideoPlaying = true; videoStarted = true; video.style.opacity = "1"; });
     video.addEventListener("ended", function () { setTimeout(dismiss, 200); });
     video.addEventListener("error", dismiss);
     video.muted = true;
     video.play().catch(function () {});
-    setTimeout(dismiss, MAX_MS);
+    /* Empty navy released by MAX_MS; a playing video runs to its natural
+       end, with HARD_MS as the absolute escape hatch. */
+    setTimeout(function () { if (!videoStarted) dismiss(); }, MAX_MS);
+    setTimeout(dismiss, HARD_MS);
   })();
 
   /* ── Storage keys ──────────────────────────────────────────────────────── */
