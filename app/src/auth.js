@@ -53,12 +53,35 @@ var _lastSeenUid = null;
 var _justSignedUp = false;
 var _prevAuthState; /* undefined | null | user — genuine-login detection */
 var _logoutInProgress = false; /* a real signOut() is in flight (set by
-   LTAuth.logout / forceLogoutSingleSession) — distinguishes a genuine
-   sign-out from a transient IndexedDB read failure that reports null */
+    LTAuth.logout / forceLogoutSingleSession) — distinguishes a genuine
+    sign-out from a transient IndexedDB read failure that reports null */
+
+/* ── Early Access Demo ───────────────────────────────────────────────────
+   DEMO_MODE=true is the shipped Early Access Demo of the web app: the
+   login/register gate offers a 30-minute premium demo account whose data
+   is fully wiped when the timer runs out. Real Firebase register/login
+   still works, but while demo mode is on, free accounts can't buy a plan
+   (the paywall shows an "under construction — use the demo" notice).
+   To end the early-access period, flip DEMO_MODE to false: the demo
+   button disappears, the paywall sells normally, and the next time a real
+   account signs in on a browser that ever ran a demo (the
+   lt_early_access_demo_v1 marker survives every wipe; it is a flag, not
+   user data) that account is granted a free Lifetime plan — demo data
+   itself is never imported into real accounts. ─────────────────────────── */
+var DEMO_MODE = true;
+var DEMO_SESSION_KEY = "lt-demo-session-started";
+var DEMO_HISTORY_KEY = "lt_early_access_demo_v1";
+var DEMO_DURATION_MS = 30 * 60 * 1000;
+var DEMO_UID = "early-access-demo";
+var _demoTimerInterval = null;
 
 function nsKey(uid) { return "lt_ns_" + uid; }
 function isReservedKey(k) {
-  return k === ACTIVE_UID_KEY || k.indexOf("lt_ns_") === 0 || k.indexOf("firebase:") === 0;
+  /* Demo keys are device-level session state, never account data: they
+     must not be snapshotted into lt_ns_* blobs nor wiped by clearAppKeys
+     (only wipeDemoData / _killDemoForRealAuth remove them). */
+  return k === ACTIVE_UID_KEY || k.indexOf("lt_ns_") === 0 || k.indexOf("firebase:") === 0
+    || k === DEMO_SESSION_KEY || k === DEMO_HISTORY_KEY;
 }
 function appKeys() {
   var out = [];
@@ -227,9 +250,168 @@ function announceUserChanged() {
   try { window.dispatchEvent(new CustomEvent("lt-user-changed")); } catch (e) {}
 }
 
+/* ── Early Access Demo engine ──────────────────────────────────────────── */
+function isDemoActive() {
+  try { return !!localStorage.getItem(DEMO_SESSION_KEY); } catch (e) { return false; }
+}
+function demoTimeRemainingMs() {
+  try {
+    var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
+    if (!started) return 0;
+    return DEMO_DURATION_MS - (Date.now() - started);
+  } catch (e) { return 0; }
+}
+function markDemoHistory() {
+  /* Reserved key — survives every wipe (clearAppKeys skips it). After the
+     demo is removed (DEMO_MODE=false) it unlocks a free Lifetime plan. */
+  try { localStorage.setItem(DEMO_HISTORY_KEY, "1"); } catch (e) {}
+}
+function hasDemoHistory() {
+  try { return localStorage.getItem(DEMO_HISTORY_KEY) === "1"; } catch (e) { return false; }
+}
+function _stopDemoTimer() {
+  if (_demoTimerInterval) { clearInterval(_demoTimerInterval); _demoTimerInterval = null; }
+  var w = document.getElementById("lt-demo-timer");
+  if (w) w.remove();
+}
+/* Remove every trace of the demo account's data. Deliberately keeps:
+   - lt_early_access_demo_v1 (early-access flag, not user data)
+   - lt_ns_<real-uid> blobs (other accounts' parked data — never demo data)
+   - lt_device_id_v1 is an appKey and does get cleared here; it regenerates
+     on next use, which is harmless. */
+function wipeDemoData() {
+  try { clearAppKeys(); } catch (e) {}
+  try { localStorage.removeItem(DEMO_SESSION_KEY); } catch (e) {}
+  try { localStorage.removeItem(nsKey(DEMO_UID)); } catch (e) {}
+  try { if (getMarker() === DEMO_UID) setMarker(null); } catch (e) {}
+  try { localStorage.removeItem("lt_last_uid"); } catch (e) {}
+  try { sessionStorage.clear(); } catch (e) {}
+  markDemoHistory();
+}
+function endDemoSession() {
+  _stopDemoTimer();
+  wipeDemoData();
+  document.body.classList.remove("lt-authed");
+  try { announceUserChanged(); } catch (e) {}
+  renderGate("welcome"); /* demo key is gone → renders the normal welcome */
+}
+/* A real sign-in always beats a demo session: wipe the demo completely
+   FIRST so none of its data can be swept into the real account's
+   lt_ns_* namespace by reconcileStorage. */
+function killDemoForRealAuth() {
+  _stopDemoTimer();
+  wipeDemoData();
+}
+function enterDemo(isNew) {
+  if (isNew) {
+    /* A new demo always starts from zero — every previous demo's data is
+       removed before the fresh session begins. A live real account (only
+       possible via a weird edge) is parked, never destroyed. */
+    try { sessionStorage.clear(); } catch (e) {}
+    try {
+      var m = getMarker();
+      if (m && m !== DEMO_UID) snapshotAccount(m);
+      clearAppKeys();
+      setMarker(DEMO_UID);
+    } catch (e) {}
+    markDemoHistory();
+    try { localStorage.setItem(DEMO_SESSION_KEY, String(Date.now())); } catch (e) {}
+    try { localStorage.removeItem("lt_last_uid"); } catch (e) {}
+    /* Premium is free during the demo. */
+    if (window.LTPlan && window.LTPlan.setPlan) {
+      window.LTPlan.setPlan("lifetime");
+    } else {
+      try {
+        localStorage.setItem("lt_plan_v1", JSON.stringify("lifetime"));
+        localStorage.setItem("lt_plan_since_v1", JSON.stringify(Date.now()));
+      } catch (e) {}
+    }
+    try { window.dispatchEvent(new Event("lt-plan-changed")); } catch (e) {}
+    /* Land on the Timer home, exactly like a genuine login does. */
+    var hasRoute = location.pathname !== "/" ||
+      (location.hash && location.hash !== "#/" && location.hash !== "#");
+    if (hasRoute) {
+      try { history.pushState({}, "", "/"); window.dispatchEvent(new PopStateEvent("popstate")); } catch (e) {}
+    }
+  }
+  hideBootSplash();
+  var g = document.getElementById("lt-auth-gate");
+  if (g) g.remove();
+  var s = document.getElementById("lt-startup-splash");
+  if (s && s.parentNode && !window.__ltSplashVideoPlaying) {
+    if (window.__ltSplashDismiss) window.__ltSplashDismiss();
+    else s.parentNode.removeChild(s);
+  }
+  document.body.classList.add("lt-authed");
+  var root = document.getElementById("root");
+  if (root) root.removeAttribute("style");
+  try { window.dispatchEvent(new CustomEvent("lt-user-changed")); } catch (e) {}
+  showDemoTimer();
+}
+function showDemoTimer() {
+  injectDemoTimerStyles();
+  var existing = document.getElementById("lt-demo-timer");
+  if (existing) existing.remove();
+  var widget = document.createElement("div");
+  widget.id = "lt-demo-timer";
+  widget.innerHTML =
+    '<span class="lt-demo-timer-dot"></span>' +
+    '<span>Early Access Demo — <b id="lt-demo-timer-clock">30:00</b></span>';
+  document.body.appendChild(widget);
+  function tick() {
+    var remaining = demoTimeRemainingMs();
+    if (remaining <= 0) { endDemoSession(); return; }
+    var totalSec = Math.ceil(remaining / 1000);
+    var min = Math.floor(totalSec / 60);
+    var sec = totalSec % 60;
+    var clockEl = document.getElementById("lt-demo-timer-clock");
+    if (clockEl) clockEl.textContent = min + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+  tick();
+  if (_demoTimerInterval) clearInterval(_demoTimerInterval);
+  _demoTimerInterval = setInterval(tick, 1000);
+}
+function injectDemoTimerStyles() {
+  if (document.getElementById("lt-demo-timer-styles")) return;
+  var style = document.createElement("style");
+  style.id = "lt-demo-timer-styles";
+  style.textContent = `
+    #lt-demo-timer {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 999998;
+      background: hsl(230 40% 16%); color: #fff;
+      font-family: 'Geist', -apple-system, sans-serif; font-size: 12.5px;
+      padding: 8px 16px; display: flex; align-items: center; gap: 8px;
+      border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.18);
+      white-space: nowrap; flex-shrink: 0;
+    }
+    #lt-demo-timer b { font-variant-numeric: tabular-nums; }
+    .lt-demo-timer-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: hsl(0 80% 60%);
+      animation: lt-demo-pulse 1.2s infinite;
+    }
+    @keyframes lt-demo-pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: .35; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+/* Shared with enhancements.js (paywall messaging). */
+window.LTDemo = {
+  mode: function () { return DEMO_MODE; },
+  isActive: isDemoActive,
+  remainingMs: demoTimeRemainingMs,
+  start: function () { enterDemo(true); },
+  end: endDemoSession,
+};
+
 /* Expose logout for the Settings-page "Log out" row (added in lifetime-enhancements.js) */
 window.LTAuth = {
   logout: function () {
+    /* Demo session: "Log out" ends the demo — full data wipe, back to
+       the welcome screen (never a Firebase signOut of a null user). */
+    if (DEMO_MODE && isDemoActive()) { endDemoSession(); return; }
     /* IMPORTANT: do NOT clear localStorage here. */
     _logoutInProgress = true;
     
@@ -430,6 +612,25 @@ function injectStyles() {
       font-size: 10.5px; line-height: 1.6; color: #9AA0B0; text-align: center;
     }
     .lt-auth-disclaimer b { font-weight: 600; color: #6B7280; }
+    /* Early Access Demo CTA — sits under the login/register form on BOTH tabs */
+    .lt-auth-demobtn {
+      width: 100%; margin-top: 14px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+      border: none; border-radius: 999px;
+      padding: 13px 16px; cursor: pointer; font-family: inherit;
+      color: #78350F;
+      box-shadow: 0 14px 28px -14px rgba(245,158,11,.75);
+      transition: transform .15s, filter .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lt-auth-demobtn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    .lt-auth-demobtn:active { transform: translateY(0); }
+    .lt-auth-demobtn-main { font-size: 15px; font-weight: 800; letter-spacing: .01em; }
+    .lt-auth-demobtn-sub {
+      font-size: 10.5px; font-weight: 700; opacity: .72; letter-spacing: .05em;
+      text-transform: lowercase;
+    }
 
     /* ── Welcome / "Get Started for Free" screen (Leafboard-style arch:
        starry navy dome with the brand badge sitting on the curve, name,
@@ -481,6 +682,14 @@ function injectStyles() {
     .lt-auth-wlogin { margin: 18px 0 0; font-size: 13.5px; color: #6B7280; }
     .lt-auth-wlogin a { color: #4F46E5; font-weight: 700; cursor: pointer; text-underline-offset: 2px; }
     .lt-auth-wlogin a:hover { text-decoration: underline; }
+    .lt-auth-earlyaccess {
+      display: inline-block; margin: 0 auto 14px;
+      padding: 7px 16px; border-radius: 999px;
+      background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+      color: #78350F;
+      font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
+      box-shadow: 0 10px 22px -10px rgba(245,158,11,.6);
+    }
 
     @media (max-height: 680px) {
       .lt-auth-hero { height: 260px; }
@@ -526,6 +735,13 @@ function hideBootSplash() {
 }
 
 function renderGate(mode) {
+  /* An active Early Access Demo session resumes here (welcome is only
+     ever requested by the signed-out paths); an expired one is wiped in
+     full before the welcome screen is shown. */
+  if (mode === "welcome" && DEMO_MODE && isDemoActive()) {
+    if (demoTimeRemainingMs() > 0) { enterDemo(false); return; }
+    endDemoSession(); return; /* wipes first — demo key gone → no recursion */
+  }
   hideBootSplash();
   injectStyles();
   var existing = document.getElementById("lt-auth-gate");
@@ -588,6 +804,12 @@ function renderGate(mode) {
             '<span id="lt-auth-submit-label">' + (isSignup ? "Sign up" : "Login") + '</span>' +
           '</button>' +
         '</form>' +
+        (DEMO_MODE
+          ? '<button type="button" class="lt-auth-demobtn" id="lt-auth-demo-btn">' +
+              '<span class="lt-auth-demobtn-main">Use Demo Account 30 Minute</span>' +
+              '<span class="lt-auth-demobtn-sub">auto delete all data</span>' +
+            '</button>'
+          : '') +
         '<p class="lt-auth-disclaimer"><b>Please note:</b> your data (activities, budget, tasks) is saved only on this device — it never leaves your phone. If you log in on another device, you\u2019ll start fresh there; your data won\u2019t carry over. We don\u2019t store your data on our own servers because we respect your privacy.</p>' +
       '</section>' +
     '</main>';
@@ -635,6 +857,11 @@ function renderGate(mode) {
   var forgotLink = document.getElementById("lt-auth-forgot-link");
   if (forgotLink) {
     forgotLink.addEventListener("click", function () { renderGate("forgot"); });
+  }
+
+  var demoBtn = document.getElementById("lt-auth-demo-btn");
+  if (demoBtn) {
+    demoBtn.addEventListener("click", function () { enterDemo(true); });
   }
 
   var form = document.getElementById("lt-auth-form");
@@ -710,6 +937,7 @@ function renderWelcomeGate() {
         '<div class="lt-auth-badge"><img class="lt-auth-badge-logo" src="./assets/icons/logo-512.png" alt="Minutics logo"></div>' +
       '</div>' +
       '<div class="lt-auth-wtext">' +
+        (DEMO_MODE ? '<span class="lt-auth-earlyaccess">This Is An Early Access Demo</span>' : '') +
         '<h1 class="lt-auth-wtitle">Minutics</h1>' +
         '<p class="lt-auth-wsub">Turn your time into minutes you can actually see — then point them at what matters.</p>' +
       '</div>' +
@@ -963,6 +1191,13 @@ window.addEventListener("pageshow", function (e) {
 setTimeout(function () {
   if (_authStateChangedFired) return;
   try {
+    /* An active demo is its own fallback — resume it (or wipe it if
+       the 30 minutes already ran out) regardless of Firebase state. */
+    if (DEMO_MODE && isDemoActive()) {
+      if (demoTimeRemainingMs() > 0) enterDemo(false);
+      else endDemoSession();
+      return;
+    }
     var lastUid = localStorage.getItem("lt_last_uid");
     if (lastUid) {
       document.body.classList.add("lt-authed");
@@ -982,6 +1217,18 @@ setTimeout(function () {
 onAuthStateChanged(auth, function (user) {
   _authStateChangedFired = true;
   console.log("AUTH STATE CHANGED:", user ? "AUTHENTICATED" : "NOT AUTHENTICATED", user);
+  /* Active Early Access Demo wins over "signed out": resume it, or wipe
+     it in full when the 30 minutes already ran out. Must run before the
+     null-branch storage recovery below (a demo sets lt_active_uid, which
+     would otherwise trigger a pointless reload loop). */
+  if (!user && DEMO_MODE && isDemoActive()) {
+    if (demoTimeRemainingMs() > 0) enterDemo(false);
+    else endDemoSession();
+    return;
+  }
+  /* A real sign-in always beats a demo session — wipe the demo first so
+     none of its data can be swept into the real account's namespace. */
+  if (user && isDemoActive()) killDemoForRealAuth();
   var gate = document.getElementById("lt-auth-gate");
   var storageChanged = false;
   if (user) {
@@ -1011,6 +1258,23 @@ onAuthStateChanged(auth, function (user) {
     }, 2500);
     /* Swap per-account storage BEFORE any UI reads it. */
     try { storageChanged = reconcileStorage(user); } catch (e) { storageChanged = false; }
+    /* Early Access Demo has been removed (DEMO_MODE=false): a browser
+       that ever ran a demo now gets a free Lifetime plan on any real
+       sign-in. Demo data itself is never imported — wipeDemoData already
+       removed it; only the lt_early_access_demo_v1 flag (not user data)
+       survived, and it is cleaned up here too. */
+    if (!DEMO_MODE && hasDemoHistory()) {
+      try {
+        if (window.LTPlan && window.LTPlan.setPlan) window.LTPlan.setPlan("lifetime");
+        else {
+          localStorage.setItem("lt_plan_v1", JSON.stringify("lifetime"));
+          localStorage.setItem("lt_plan_since_v1", JSON.stringify(Date.now()));
+        }
+        try { localStorage.removeItem(DEMO_SESSION_KEY); } catch (e) {}
+        try { localStorage.removeItem(nsKey(DEMO_UID)); } catch (e) {}
+        storageChanged = true;
+      } catch (e) {}
+    }
     _lastSeenUid = user.uid;
     var genuineLogin = _prevAuthState === null;
     _prevAuthState = user;

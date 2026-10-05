@@ -6973,11 +6973,84 @@
     });
   }
 
+  /* ── Early Access Demo paywall messaging ───────────────────────────────
+     While demo mode is on, real (non-demo) accounts can't buy anything:
+     the plans screen explains the app is under construction and points at
+     the 30-minute demo, which already has premium unlocked for free. */
+  function showDemoPlansNotice() {
+    addStyle3();
+    var existing = document.getElementById("lt-plans-modal");
+    if (existing) existing.remove();
+    var modal = document.createElement("div");
+    modal.id = "lt-plans-modal";
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
+    modal.innerHTML =
+      '<div style="width:100%;max-width:370px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);padding:26px 22px 20px;text-align:center">' +
+        '<span style="display:inline-block;padding:4px 12px;border-radius:999px;background:linear-gradient(135deg,#FCD34D,#F59E0B);color:#78350F;font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase">Early Access Demo</span>' +
+        '<p style="color:hsl(230 40% 16%);font-size:20px;font-weight:800;margin:12px 0 6px">Premium is free for 30 minutes</p>' +
+        '<p style="color:hsl(220 10% 50%);font-size:13.5px;line-height:1.55;margin:0 0 18px">This is an Early Access Demo. Your demo account gets every premium feature free for 30 minutes — when the timer runs out, the account and all of its data are deleted. Start a new demo anytime.</p>' +
+        '<button id="lt-demo-notice-close" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px">Got it</button>' +
+      '</div>';
+    var host = activeOverlay && document.body.contains(activeOverlay) ? activeOverlay : document.body;
+    host.appendChild(modal);
+    var openedAt = Date.now();
+    function noticeTap(e) {
+      if (Date.now() - openedAt < 450) { e.stopPropagation(); e.preventDefault(); return false; }
+      return true;
+    }
+    modal.addEventListener("click", function (e) { if (!noticeTap(e)) return; if (e.target === modal) modal.remove(); });
+    document.getElementById("lt-demo-notice-close").addEventListener("click", function (e) { if (!noticeTap(e)) return; modal.remove(); });
+  }
+
+  function showUnderConstructionNotice() {
+    addStyle3();
+    var existing = document.getElementById("lt-plans-modal");
+    if (existing) existing.remove();
+    var modal = document.createElement("div");
+    modal.id = "lt-plans-modal";
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
+    modal.innerHTML =
+      '<div style="width:100%;max-width:370px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);padding:26px 22px 20px;text-align:center">' +
+        '<span style="display:inline-block;padding:4px 12px;border-radius:999px;background:linear-gradient(135deg,#FCD34D,#F59E0B);color:#78350F;font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase">Early Access</span>' +
+        '<p style="color:hsl(230 40% 16%);font-size:20px;font-weight:800;margin:12px 0 6px">The app is under construction</p>' +
+        '<p style="color:hsl(220 10% 50%);font-size:13.5px;line-height:1.55;margin:0 0 18px">You can\u2019t use premium features here yet. Log out and create a demo account to use premium \u2014 every premium feature is free for 30 minutes.</p>' +
+        '<button id="lt-uc-demo" style="width:100%;background:linear-gradient(135deg,#4F46E5 0%,#9333EA 100%);border:none;color:#fff;padding:14px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;border-radius:999px;box-shadow:0 14px 30px -14px rgba(99,102,241,.85);margin-bottom:8px">Use Demo Account 30 Minute</button>' +
+        '<button id="lt-uc-logout" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:#DC2626;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:999px;margin-bottom:4px">Log out</button>' +
+        '<button id="lt-uc-close" style="width:100%;background:transparent;border:none;color:#8A8578;padding:11px 0 0;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>' +
+      '</div>';
+    var host = activeOverlay && document.body.contains(activeOverlay) ? activeOverlay : document.body;
+    host.appendChild(modal);
+    var openedAt = Date.now();
+    function ucTap(e) {
+      if (Date.now() - openedAt < 450) { e.stopPropagation(); e.preventDefault(); return false; }
+      return true;
+    }
+    modal.addEventListener("click", function (e) { if (!ucTap(e)) return; if (e.target === modal) modal.remove(); });
+    document.getElementById("lt-uc-demo").addEventListener("click", function (e) {
+      if (!ucTap(e)) return;
+      modal.remove();
+      if (window.LTDemo && window.LTDemo.start) window.LTDemo.start();
+    });
+    document.getElementById("lt-uc-logout").addEventListener("click", function (e) {
+      if (!ucTap(e)) return;
+      modal.remove();
+      if (window.LTAuth && window.LTAuth.logout) window.LTAuth.logout();
+    });
+    document.getElementById("lt-uc-close").addEventListener("click", function (e) { if (!ucTap(e)) return; modal.remove(); });
+  }
+
   /* Subscription plans selection screen (normal app — dummy payment). */
   function showPlansScreen() {
     addStyle3();
     var existing = document.getElementById("lt-plans-modal");
     if (existing) existing.remove();
+
+    /* Early Access Demo: no real purchases while demo mode is on. */
+    var demoApi = window.LTDemo;
+    if (demoApi && demoApi.mode && demoApi.mode()) {
+      if (demoApi.isActive && demoApi.isActive()) { showDemoPlansNotice(); return; }
+      if (!isPro()) { showUnderConstructionNotice(); return; }
+    }
 
     var plans = [
       { id: "basic",    name: "Basic",    price: "$1",  period: "/month", desc: "Essential premium access for one month.",
