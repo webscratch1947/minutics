@@ -2,39 +2,19 @@
   "use strict";
 
   /* ── Startup loading screen ────────────────────────────────────────────
-     Plays the branded splash video once (no loop) and dismisses right
-     after it ends — if the video is still going once we'd normally cut
-     it, we let it finish and freeze on the last frame instead of jumping.
-     Sits above the #lt-boot-splash from index.html, which already covers
-     the first paint, so there is never a white flash. */
+     Neutral grey while assets load (matches the inline #lt-boot-splash),
+     then the branded logo video plays once (no loop) and dismisses right
+     after it ends — a video that never starts is released by MAX_MS so
+     the grey can never linger. */
   (function showStartupSplash() {
-    var MAX_MS = 3000;   /* static fallback alone: release by 3s — never a long navy stare */
+    var MAX_MS = 3000;   /* grey alone: release by 3s — never a lingering empty screen */
     var HARD_MS = 7000;  /* absolute escape hatch, even if a playing video runs to its full ~4s */
     var splash  = document.createElement("div");
     splash.id   = "lt-startup-splash";
     splash.style.cssText =
-      "position:fixed;inset:0;z-index:2147483647;background:hsl(230 40% 16%);" +
+      "position:fixed;inset:0;z-index:2147483647;background:#3a3a3a;" +
       "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
       "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
-
-    /* Instant branded animation, visible from the VERY first frame. The
-       splash video is 2.6MB — until it buffers/decodes (or if autoplay or
-       loading fails entirely) the navy background alone used to show as a
-       dead grey screen with no animation at all. The logo breathes here
-       until the video fades in on top of it. */
-    var fallback = document.createElement("div");
-    fallback.className = "lt-splash-fallback";
-    fallback.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;";
-    fallback.innerHTML =
-      "<style>" +
-      ".lt-splash-logo{width:88px;height:88px;border-radius:22px;box-shadow:0 0 60px rgba(191,138,45,.35);animation:lt-splash-breathe 1.6s ease-in-out infinite;}" +
-      ".lt-splash-word{color:#F5F1E7;font-size:16px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;text-indent:.42em;animation:lt-splash-glow 1.6s ease-in-out infinite;}" +
-      "@keyframes lt-splash-breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.09);opacity:1}}" +
-      "@keyframes lt-splash-glow{0%,100%{opacity:.55}50%{opacity:1}}" +
-      "</style>" +
-      '<img class="lt-splash-logo" src="assets/icons/logo-512.png" alt="">' +
-      '<span class="lt-splash-word">Minutics</span>';
-    splash.appendChild(fallback);
 
     var video = document.createElement("video");
     video.id = "lt-startup-splash-video";

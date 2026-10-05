@@ -8,15 +8,11 @@
       .fixed.bottom-0 { padding-bottom: env(safe-area-inset-bottom, 0px) !important; }
       #root { display: none; background: #Fdfbf7; }
       body.lt-authed #root { display: block; }
-      /* Instant first-paint cover: branded navy from the very first frame —
-         never a white flash while the JS bundle loads. Fades via
-         hideBootSplash() when a real screen is ready; the CSS animation is
-         an independent failsafe so it can never get stuck. */
-      #lt-boot-splash { position: fixed; inset: 0; z-index: 2147483646; background: #181e39; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 1; transition: opacity .45s ease; animation: lt-boot-failsafe .45s ease 5s forwards; }
-      #lt-boot-splash img { width: 88px; height: 88px; border-radius: 22px; box-shadow: 0 0 60px rgba(191,138,45,.35); animation: lt-boot-breathe 1.6s ease-in-out infinite; }
+      /* Neutral grey from the very first paint — no white flash, no branding
+         while the bundle loads. Fades via hideBootSplash() when a real screen
+         is ready; the CSS animation is an independent failsafe (never stuck). */
+      #lt-boot-splash { position: fixed; inset: 0; z-index: 2147483646; background: #3a3a3a; pointer-events: none; opacity: 1; transition: opacity .45s ease; animation: lt-boot-failsafe .45s ease 5s forwards; }
       @keyframes lt-boot-failsafe { to { opacity: 0; visibility: hidden; } }
-      @keyframes lt-boot-breathe { 0%, 100% { transform: scale(1); opacity: .85; } 50% { transform: scale(1.09); opacity: 1; } }
-      @media (prefers-reduced-motion: reduce) { #lt-boot-splash img { animation: none; } }
     </style>
     <title>Minutics</title>
     <meta name="description" content="Minutics — Make every minute count." />
@@ -42,7 +38,7 @@
     <link rel="stylesheet" href="./src/styles/main.css">
   </head>
   <body>
-    <div id="lt-boot-splash"><img src="./assets/icons/logo-512.png" alt="" /></div>
+    <div id="lt-boot-splash"></div>
     <div id="root"></div>
   </body>
 </html>
