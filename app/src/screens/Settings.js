@@ -350,6 +350,15 @@ export function SettingsScreen() {
   }
 
   function handleDeleteAccount() {
+    /* Demo account: no Firebase user exists — "delete" means end the demo
+       (full local wipe + back to welcome), same as its logout path. */
+    var demoActive = !!(window.LTDemo && window.LTDemo.isActive && window.LTDemo.isActive());
+    if (demoActive) {
+      if (!confirm("Delete this demo account permanently?\n\n• ALL demo data is erased from this device\n• You return to the welcome screen\n\nThis cannot be undone.")) return;
+      if (window.LTAuth && window.LTAuth.logout) window.LTAuth.logout();
+      alert("This demo account and all of its data have been deleted.");
+      return;
+    }
     var u = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
     if (!u || !u.uid) { alert("No account is signed in."); return; }
     if (!confirm("Delete your account permanently?\n\n• Your account is deleted from Firebase — you can never log in with it again\n• ALL data for this account is erased from this device: activities, budget, tasks, profile AND your subscription plan\n\nThis cannot be undone.")) return;

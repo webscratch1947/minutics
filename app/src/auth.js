@@ -763,7 +763,6 @@ function renderGate(mode) {
             '<button type="button" class="lt-auth-pw-toggle" id="lt-auth-pw-toggle" aria-label="Show password">' + EYE_ICON + '</button>' +
           '</div>' +
           '<p class="lt-auth-hint" id="lt-auth-pw-hint" style="display:' + (isSignup ? "block" : "none") + '">Password must be at least 6 characters</p>' +
-          '<div class="lt-auth-frow" id="lt-auth-frow" style="display:' + (isSignup ? "none" : "flex") + '"><a class="lt-auth-forgot" id="lt-auth-forgot-link">Forgot Password?</a></div>' +
           '<button class="lt-auth-submit" type="submit" id="lt-auth-submit">' +
             '<span class="lt-auth-spinner"></span>' +
             '<span id="lt-auth-submit-label">' + (isSignup ? "Sign up" : "Login") + '</span>' +
@@ -803,7 +802,6 @@ function renderGate(mode) {
     document.getElementById("lt-auth-password").autocomplete =
       toSignup ? "new-password" : "current-password";
     document.getElementById("lt-auth-pw-hint").style.display = toSignup ? "block" : "none";
-    document.getElementById("lt-auth-frow").style.display = toSignup ? "none" : "flex";
     submitLabel.textContent = toSignup ? "Sign up" : "Login";
     hideError();
   }
@@ -818,11 +816,6 @@ function renderGate(mode) {
     pwToggle.innerHTML = showing ? EYE_ICON : EYE_OFF_ICON;
     pwToggle.setAttribute("aria-label", showing ? "Show password" : "Hide password");
   });
-
-  var forgotLink = document.getElementById("lt-auth-forgot-link");
-  if (forgotLink) {
-    forgotLink.addEventListener("click", function () { renderGate("forgot"); });
-  }
 
   var demoBtn = document.getElementById("lt-auth-demo-btn");
   if (demoBtn) {
