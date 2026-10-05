@@ -349,53 +349,18 @@ function enterDemo(isNew) {
   showDemoTimer();
 }
 function showDemoTimer() {
-  injectDemoTimerStyles();
+  /* The visible countdown now lives inside the app's top status bar
+     (DemoClock in _slice_shell.js) — the old floating pill covered the
+     "No activity running" bar. This ticker only drives expiry. */
   var existing = document.getElementById("lt-demo-timer");
   if (existing) existing.remove();
-  var widget = document.createElement("div");
-  widget.id = "lt-demo-timer";
-  widget.innerHTML =
-    '<span class="lt-demo-timer-dot"></span>' +
-    '<span>Early Access Demo — <b id="lt-demo-timer-clock">30:00</b></span>';
-  document.body.appendChild(widget);
   function tick() {
     var remaining = demoTimeRemainingMs();
     if (remaining <= 0) { endDemoSession(); return; }
-    var totalSec = Math.ceil(remaining / 1000);
-    var min = Math.floor(totalSec / 60);
-    var sec = totalSec % 60;
-    var clockEl = document.getElementById("lt-demo-timer-clock");
-    if (clockEl) clockEl.textContent = min + ":" + (sec < 10 ? "0" : "") + sec;
   }
   tick();
   if (_demoTimerInterval) clearInterval(_demoTimerInterval);
   _demoTimerInterval = setInterval(tick, 1000);
-}
-function injectDemoTimerStyles() {
-  if (document.getElementById("lt-demo-timer-styles")) return;
-  var style = document.createElement("style");
-  style.id = "lt-demo-timer-styles";
-  style.textContent = `
-    #lt-demo-timer {
-      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-      z-index: 999998;
-      background: hsl(230 40% 16%); color: #fff;
-      font-family: 'Geist', -apple-system, sans-serif; font-size: 12.5px;
-      padding: 8px 16px; display: flex; align-items: center; gap: 8px;
-      border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.18);
-      white-space: nowrap; flex-shrink: 0;
-    }
-    #lt-demo-timer b { font-variant-numeric: tabular-nums; }
-    .lt-demo-timer-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: hsl(0 80% 60%);
-      animation: lt-demo-pulse 1.2s infinite;
-    }
-    @keyframes lt-demo-pulse {
-      0%, 100% { opacity: 1; } 50% { opacity: .35; }
-    }
-  `;
-  document.head.appendChild(style);
 }
 /* Shared with enhancements.js (paywall messaging). */
 window.LTDemo = {

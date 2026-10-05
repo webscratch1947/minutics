@@ -10,6 +10,32 @@ import { useUpdateBlock } from './hooks/useUpdateBlock.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { blocksKey } from './lib/queryKeys.js';
 
+/* Early Access Demo countdown — rendered INSIDE the top status bar so it
+   never floats over it (the old fixed pill covered "No activity running").
+   Reads window.LTDemo directly; this component re-renders every second
+   with LTTopNav's clock. */
+function demoClockText() {
+  try {
+    const api = window.LTDemo;
+    if (!api || !api.isActive || !api.isActive()) return null;
+    const remaining = api.remainingMs();
+    if (!(remaining > 0)) return null;
+    const totalSec = Math.ceil(remaining / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return 'Demo ' + min + ':' + (sec < 10 ? '0' : '') + sec;
+  } catch (e) { return null; }
+}
+
+function DemoClock({ tone }) {
+  const text = demoClockText();
+  if (!text) return null;
+  return jsx('span', {
+    className: 'shrink-0 text-[11px] font-bold tabular-nums ' + (tone || 'text-white/55'),
+    children: text
+  });
+}
+
 function LTTopNav() {
   const { data: blocks = [] } = useBlocks();
   const { data: activities = [] } = useActivities();
@@ -36,7 +62,8 @@ function LTTopNav() {
         jsx('span', {
           className: 'flex-1 truncate',
           children: 'No activity running'
-        })
+        }),
+        jsx(DemoClock, {})
       ]
     });
   }
@@ -75,6 +102,7 @@ function LTTopNav() {
         className: 'flex-1 truncate',
         children: (activity ? activity.name : 'Activity') + ' — ' + timeStr
       }),
+      jsx(DemoClock, { tone: 'text-white/75' }),
       jsx('button', {
         onClick: stopTimer,
         className: 'bg-white/15 text-white border-none rounded-full px-2.5 py-1 text-[10px] font-extrabold shrink-0',
