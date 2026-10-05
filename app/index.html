@@ -8,7 +8,7 @@
       .fixed.bottom-0 { padding-bottom: env(safe-area-inset-bottom, 0px) !important; }
       #root { display: none; background: #Fdfbf7; }
       body.lt-authed #root { display: block; }
-      /* Neutral grey from the very first paint — no white flash, no branding
+      /* Neutral grey at the very first paint — no white flash, no branding
          while the bundle loads. Fades via hideBootSplash() when a real screen
          is ready; the CSS animation is an independent failsafe (never stuck). */
       #lt-boot-splash { position: fixed; inset: 0; z-index: 2147483646; background: #3a3a3a; pointer-events: none; opacity: 1; transition: opacity .45s ease; animation: lt-boot-failsafe .45s ease 5s forwards; }
@@ -30,9 +30,8 @@
     <!-- Video is cached immutable for 1y: bump ?v=N when replacing the file -->
     <link rel="preload" as="video" href="/assets/lt/minutics_splash.mp4?v=1" type="video/mp4" />
     <meta name="theme-color" content="#1a2140" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Fonts self-hosted (SRI-safe, no third-party request) -->
+    <link href="/fonts/inter.css" rel="stylesheet">
     <script type="module" src="./src/enhancements.js"></script>
     <script type="module" src="./src/auth.js"></script>
     <script type="module" crossorigin src="./src/main.js"></script>

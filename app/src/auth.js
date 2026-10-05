@@ -424,7 +424,7 @@ function injectStyles() {
 
   var fontLink = document.createElement("link");
   fontLink.rel = "stylesheet";
-  fontLink.href = "https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap";
+  fontLink.href = "/fonts/geist.css"; /* self-hosted — no Google request, SRI-safe */
   document.head.appendChild(fontLink);
 
   var style = document.createElement("style");
@@ -438,7 +438,7 @@ function injectStyles() {
       -webkit-overflow-scrolling: touch;
       font-family: 'Geist', -apple-system, sans-serif;
       /* NOTE: no opacity animation on this element itself. It has to be
-         100% opaque from the very first painted frame -- whatever screen
+         100% opaque at the very first painted frame -- whatever screen
          was on-screen a moment ago (an authenticated Settings page, a
          stale "Pro" badge, etc.) is still mounted behind this overlay for
          a beat, and animating THIS element's opacity made that stale

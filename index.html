@@ -12,11 +12,8 @@
 
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-        rel="stylesheet">
+    <!-- Fonts self-hosted (SRI-safe, no third-party request) -->
+    <link href="/fonts/marketing.css" rel="stylesheet">
 
     <style>
         /* ============================================================
@@ -3243,7 +3240,7 @@
                 mouseY = (e.clientY / window.innerHeight - 0.5);
             }, { passive: true });
 
-            // ---- scroll: shrink / fade watch as user leaves hero ----
+            // ---- scroll: shrink / fade watch as the hero scrolls away ----
             const heroSection = document.querySelector('.hero');
             function scrollProgress() {
                 const rect = heroSection.getBoundingClientRect();
@@ -3289,8 +3286,8 @@
        EXTRA MOTION LAYER — WebGL shader background,
        GSAP/ScrollTrigger parallax, custom cursor, magnetic buttons
        ============================================================ -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" integrity="sha384-g4NTh/Iv5PPU4xPyhEWqPcwtNXOvdaDI8LLnyYfyNZOjKJeYQyjzQ9X5275eBjpt" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" integrity="sha384-Z3REaz79l2IaAZqJsSABtTbhjgOUYyV3p90XNnAPCSHg3EMTz1fouunq9WZRtj3d" crossorigin="anonymous"></script>
 
     <script>
         /* ---------- animated WebGL shader background ---------- */

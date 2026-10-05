@@ -78,6 +78,8 @@ if (target === "piapp") {
   // Marketing website (served at the output root, i.e. minutics.com)
   copy(join(projectRoot, 'index.html'), join(outDir, 'index.html'));
   copy(join(projectRoot, 'favicon.svg'), join(outDir, 'favicon.svg'));
+  // Self-hosted Google Fonts for the marketing site (referenced as /fonts/...)
+  copyDir(join(projectRoot, 'fonts'), join(outDir, 'fonts'));
   // Real app screenshots referenced by the Screens showcase section
   copyDir(join(projectRoot, 'shots'), join(outDir, 'shots'));
 

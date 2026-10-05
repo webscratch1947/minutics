@@ -15,6 +15,7 @@
 //
 // Part of the Vercel Hobby 12-function budget (kept small on purpose).
 
+import { setCors } from "../lib/cors.js";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
@@ -54,7 +55,7 @@ function fitClaims(claims) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  setCors(req, res);
   res.setHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 

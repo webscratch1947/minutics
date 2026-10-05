@@ -5,6 +5,7 @@
 // Request body: { planId: "basic" | "yearly" | "lifetime" }
 // Response: { orderId, planId, usdPrice, piUsdPrice, piAmount, createdAt, expiresAt }
 
+import { setCors } from "../../lib/cors.js";
 import crypto from "crypto";
 
 const PLANS = {
@@ -16,7 +17,7 @@ const PLANS = {
 const QUOTE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  setCors(req, res);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 

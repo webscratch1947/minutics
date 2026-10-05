@@ -130,7 +130,7 @@ function injectStyles() {
   if (document.getElementById("lt-auth-styles")) return;
   var fontLink = document.createElement("link");
   fontLink.rel = "stylesheet";
-  fontLink.href = "https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap";
+  fontLink.href = "/fonts/geist.css"; /* self-hosted — no Google request, SRI-safe */
   document.head.appendChild(fontLink);
   var style = document.createElement("style");
   style.id = "lt-auth-styles";

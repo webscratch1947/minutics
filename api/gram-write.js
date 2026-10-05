@@ -1,3 +1,5 @@
+import { setCors } from "../lib/cors.js";
+
 // Server-side proxy for writing likes.json / comments.json to the
 // "infographics" GitHub repo. Runs on Vercel, never in the browser, so
 // the GitHub token (GH_WRITE_TOKEN env var) is never exposed to clients.
@@ -11,7 +13,7 @@ export default async function handler(req, res) {
   // different origin than app.minutics.com, so browsers/WebView require
   // this endpoint to explicitly opt in via CORS headers, and to answer the
   // preflight OPTIONS request the browser sends first for a JSON POST.
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  setCors(req, res);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 

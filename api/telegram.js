@@ -3,6 +3,7 @@
 //   POST { action: "store", ... }  → saves schedule to user's Firebase custom claims
 //   GET  ?action=cron              → runs daily-report scheduler (external cron hits this)
 //   POST { action: "send", ... }   → sends a Telegram message (legacy /api/telegram-send compat)
+import { setCors } from "../lib/cors.js";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
@@ -47,7 +48,7 @@ function normalizeTime(t) {
 function pad(n) { return (n < 10 ? "0" : "") + n; }
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  setCors(req, res);
   res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 

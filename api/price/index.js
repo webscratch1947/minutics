@@ -2,13 +2,15 @@
 // Server-side only: CG_API_KEY is never exposed to the frontend.
 // Price is cached for 5 minutes. Returns { piUsdPrice, fetchedAt, expiresAt }.
 
+import { setCors } from "../../lib/cors.js";
+
 const CG_BASE = "https://api.coingecko.com/api/v3";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 let priceCache = null; // { piUsdPrice, fetchedAt, expiresAt }
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  setCors(req, res);
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 

@@ -6,6 +6,7 @@
 // Admin SDK privileges, so it must happen server-side) → we email that
 // link ourselves via Brevo's transactional email API.
 
+import { setCors } from "../lib/cors.js";
 import admin from "firebase-admin";
 
 const BREVO_SENDER_NAME = "Minutics";
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
   // different origin than app.minutics.com, so browsers/WebView require
   // this endpoint to explicitly opt in via CORS headers, and to answer the
   // preflight OPTIONS request the browser sends first for a JSON POST.
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  setCors(req, res);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
