@@ -16,6 +16,25 @@
       "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
       "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
 
+    /* Instant branded animation, visible from the VERY first frame. The
+       splash video is 2.6MB — until it buffers/decodes (or if autoplay or
+       loading fails entirely) the navy background alone used to show as a
+       dead grey screen with no animation at all. The logo breathes here
+       until the video fades in on top of it. */
+    var fallback = document.createElement("div");
+    fallback.className = "lt-splash-fallback";
+    fallback.style.cssText = "position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;";
+    fallback.innerHTML =
+      "<style>" +
+      ".lt-splash-logo{width:88px;height:88px;border-radius:22px;box-shadow:0 0 60px rgba(191,138,45,.35);animation:lt-splash-breathe 1.6s ease-in-out infinite;}" +
+      ".lt-splash-word{color:#F5F1E7;font-size:16px;font-weight:700;letter-spacing:.42em;text-transform:uppercase;text-indent:.42em;animation:lt-splash-glow 1.6s ease-in-out infinite;}" +
+      "@keyframes lt-splash-breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.09);opacity:1}}" +
+      "@keyframes lt-splash-glow{0%,100%{opacity:.55}50%{opacity:1}}" +
+      "</style>" +
+      '<img class="lt-splash-logo" src="assets/icons/logo-512.png" alt="">' +
+      '<span class="lt-splash-word">Minutics</span>';
+    splash.appendChild(fallback);
+
     var video = document.createElement("video");
     video.id = "lt-startup-splash-video";
     video.src = "assets/lt/minutics_splash.mp4";
@@ -25,7 +44,7 @@
     video.setAttribute("webkit-playsinline", "");
     video.preload = "auto";
     video.loop = false;
-    video.style.cssText = "width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .15s ease;";
+    video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s ease;";
     splash.appendChild(video);
     (document.body || document.documentElement).appendChild(splash);
 
@@ -44,7 +63,9 @@
     video.addEventListener("ended", function () {
       setTimeout(dismiss, 200);
     });
-    video.addEventListener("error", dismiss);
+    /* Video broken/missing: give the branded fallback a beat of animation,
+       then release — never a dead colour screen, never a stuck splash. */
+    video.addEventListener("error", function () { setTimeout(dismiss, 1200); });
 
     /* ALWAYS muted — decision: no splash audio, ever. Autoplay-with-sound
        is blocked without a user gesture, so audio used to play only after
