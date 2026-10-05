@@ -754,7 +754,12 @@
     var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     var node;
     while ((node = walker.nextNode())) {
-      if (node.parentElement && node.parentElement.closest("[data-lt-enhancement]")) continue;
+      var pEl = node.parentElement;
+      /* Never rewrite <style>/<script>/<template> content: the duration fixup
+         below would corrupt CSS — e.g. "1.6s" -> "1.6sec" makes Chrome drop
+         the whole animation declaration (this is what killed the splash
+         fallback's breathing animation). */
+      if (pEl && pEl.closest("[data-lt-enhancement],style,script,template,noscript")) continue;
       var t = node.nodeValue;
       if (t.indexOf("years left") !== -1 || t.indexOf("year left") !== -1) {
         node.nodeValue = t.replace(/(\d+) years? left/g, function (m, n) {
