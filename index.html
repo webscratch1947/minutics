@@ -1717,6 +1717,26 @@
             margin-bottom: 30px;
         }
 
+        .soon-demo {
+            display: block;
+            text-align: center;
+            margin: -16px 0 30px;
+            padding: 14px 22px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #23262F 0%, #14161C 100%);
+            border: 1px solid rgba(255, 255, 255, .10);
+            color: #F5F1E7;
+            font-size: 14.5px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform .2s ease, border-color .3s ease;
+        }
+
+        .soon-demo:hover {
+            transform: translateY(-2px);
+            border-color: rgba(191, 138, 45, .6);
+        }
+
         .soon-socials {
             display: flex;
             justify-content: center;
@@ -2722,6 +2742,12 @@
                                 </svg></span>
                             <span class="lab">Download for Android</span>
                         </a>
+                        <a href="https://app.minutics.com" class="btn btn-primary" id="webDemoBtn">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                            Try the Early Access Demo
+                        </a>
                         <a href="#top" class="btn btn-ghost">Back to the top</a>
                     </div>
                     <p class="cta-note">Replace this button with your Play Store link when Minutics goes live.</p>
@@ -2797,6 +2823,7 @@
             <h3 id="soonTitle">App releasing soon</h3>
             <p class="soon-copy">We're polishing the last few minutes before launch. Stay tuned on our social
                 channels for the release date and early-access invites.</p>
+            <a href="https://app.minutics.com" class="soon-demo" id="soonDemoBtn">Try the Early Access Demo →</a>
             <div class="soon-socials">
                 <a href="https://www.threads.com/@minutics" target="_blank" rel="noopener" class="soon-social" data-label="Threads">
                     <span class="soon-social-icon icon-threads">
