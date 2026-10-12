@@ -17,6 +17,7 @@ import {
   browserSessionPersistence,
   inMemoryPersistence,
 } from "firebase/auth";
+import { pushTelegramSchedule } from "./lib/telegram.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBXruwmDU9SAX4nAe5_Do-x-5qmi_SFh7E",
@@ -172,6 +173,25 @@ function startSessionWatch() {
   _sessionWatchTimer = setInterval(checkSessionClaim, 60000);
   document.addEventListener("visibilitychange", _sessionOnVisible);
   setTimeout(checkSessionClaim, 8000);
+}
+
+/* Telegram daily reports must never outlive a session. On logout / account
+   deletion stop EVERY sender at once:
+     - the native Android alarm — cancelReport() also clears the stored
+       prefs, otherwise BootReceiver / the next app launch / the receiver
+       itself re-arm the alarm from prefs and reports keep coming forever;
+     - the local credentials (lifetime_telegram_settings_v1 is account
+       data: it must not survive into the welcome screen or the next
+       account);
+     - the server cron's schedule — pushing an empty schedule while the ID
+       token is still valid makes /api/telegram delete the tgs claims. */
+function disconnectTelegramAll() {
+  try {
+    var b = window.AndroidBridge;
+    if (b && b.cancelReport) b.cancelReport();
+  } catch (e) {}
+  try { localStorage.removeItem("lifetime_telegram_settings_v1"); } catch (e) {}
+  try { pushTelegramSchedule({ force: true }); } catch (e) {}
 }
 
 function stopSessionWatch() {
@@ -348,6 +368,19 @@ function enterDemo(isNew) {
   try { window.dispatchEvent(new CustomEvent("lt-user-changed")); } catch (e) {}
   showDemoTimer();
 }
+/* Keep the demo alive while it is actually in use: real input — or the
+   tab/app returning to the foreground — pushes the started-at stamp
+   forward, so an app being used (or simply backgrounded on a phone) is
+   never kicked back to the welcome screen. Writes are throttled to once
+   a minute; with no activity at all the demo still ends after 30 min. */
+function bumpDemoSession() {
+  try {
+    var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
+    if (!started) return;
+    if (Date.now() - started < 60000) return;
+    localStorage.setItem(DEMO_SESSION_KEY, String(Date.now()));
+  } catch (e) {}
+}
 function showDemoTimer() {
   /* The visible countdown now lives inside the app's top status bar
      (DemoClock in _slice_shell.js) — the old floating pill covered the
@@ -356,11 +389,24 @@ function showDemoTimer() {
   if (existing) existing.remove();
   function tick() {
     var remaining = demoTimeRemainingMs();
-    if (remaining <= 0) { endDemoSession(); return; }
+    if (remaining > 0) return;
+    /* Never end a demo that is only "expired" because the app sat in the
+       background (phone screen off / tab hidden) — refresh it instead. */
+    if (document.hidden) { bumpDemoSession(); return; }
+    endDemoSession();
   }
   tick();
   if (_demoTimerInterval) clearInterval(_demoTimerInterval);
   _demoTimerInterval = setInterval(tick, 1000);
+  /* Renew on real activity — the demo now closes only after 30 idle
+     minutes, not after 30 wall-clock minutes of active use. */
+  if (!window.__ltDemoActivityBound) {
+    window.__ltDemoActivityBound = true;
+    var evts = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart", "visibilitychange"];
+    for (var i = 0; i < evts.length; i++) {
+      window.addEventListener(evts[i], bumpDemoSession, { passive: true, capture: true });
+    }
+  }
 }
 /* Shared with enhancements.js (paywall messaging). */
 window.LTDemo = {
@@ -376,7 +422,7 @@ window.LTAuth = {
   logout: function () {
     /* Demo session: "Log out" ends the demo — full data wipe, back to
        the welcome screen (never a Firebase signOut of a null user). */
-    if (DEMO_MODE && isDemoActive()) { endDemoSession(); return; }
+    if (DEMO_MODE && isDemoActive()) { disconnectTelegramAll(); endDemoSession(); return; }
     /* IMPORTANT: do NOT clear localStorage here. */
     _logoutInProgress = true;
     
@@ -388,6 +434,10 @@ window.LTAuth = {
     // nav bar disappears on re-login.
     var root = document.getElementById("root");
     if (root) root.style.cssText = "display:none!important";
+
+    /* Before the token goes away: kill the native alarm + local
+       credentials and clear the server cron's schedule for this account. */
+    disconnectTelegramAll();
 
     try { signOut(auth).catch(function () {}); } catch (err) { console.error("signOut failed:", err); }
     /* FAILSAFE: if signOut never settles (IndexedDB/network hang), the null

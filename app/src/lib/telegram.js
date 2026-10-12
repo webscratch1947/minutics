@@ -20,6 +20,20 @@ function nullableTrim(str) {
   return (str ?? "").trim() || null;
 }
 
+/** Which account produced this message — embedded in every report so the
+    receiving chat can tell senders apart (many testers push to one bot). */
+function reportAccountLine() {
+  try {
+    var u = (window.LTAuth && window.LTAuth.currentUser) ? window.LTAuth.currentUser() : null;
+    if (u && u.email) return u.email;
+    if (u && u.uid) return "uid:" + String(u.uid).slice(0, 14);
+  } catch (e) {}
+  try {
+    if (localStorage.getItem("lt-demo-session-started")) return "Early Access Demo (not signed in)";
+  } catch (e) {}
+  return "unknown";
+}
+
 /** Read telegram settings from localStorage (was: Ns) */
 export function getTelegramSettings() {
   try {
@@ -224,6 +238,11 @@ export async function sendTelegramReport(token, chatId, text) {
   if (!token || !chatId) {
     return { success: false, message: "Add bot token and chat ID first" };
   }
+  /* Tag the message with the sending account (skipped when the text already
+     carries it — the daily report built by getTelegramReportData does). */
+  if (text && text.indexOf("Account:") === -1) {
+    text = text + "\n👤 Account: " + reportAccountLine();
+  }
   /* 1) Server proxy — the only path that exists on the deployed website.
         In the Android WebView (appassets.androidplatform.net) this route
         does not exist, so a failure here falls through to (2). */
@@ -304,11 +323,11 @@ export function getTelegramReportData() {
     const totalH = Math.floor(total / 3600);
     const totalM = Math.floor((total % 3600) / 60);
     
-    return `📊 Daily Report — ${now.toLocaleDateString("en-IN")}\n\n` +
+    return `📊 Daily Report — ${now.toLocaleDateString("en-IN")}\n👤 Account: ${reportAccountLine()}\n\n` +
       lines.join("\n") +
       `\n\n⏱ Total: ${totalH}h ${totalM}m`;
   } catch {
-    return "📊 Daily Report — No data available";
+    return `📊 Daily Report — No data available\n👤 Account: ${reportAccountLine()}`;
   }
 }
 
