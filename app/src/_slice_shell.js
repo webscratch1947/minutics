@@ -29,7 +29,9 @@ function demoClockText() {
     const totalSec = Math.ceil(remaining / 1000);
     const min = Math.floor(totalSec / 60);
     const sec = totalSec % 60;
-    return 'Demo ' + min + ':' + (sec < 10 ? '0' : '') + sec;
+    /* "Demo time left 23:18" — makes it obvious this is the fixed
+       30-minute demo window counting down, not a session clock. */
+    return 'Demo time left ' + min + ':' + (sec < 10 ? '0' : '') + sec;
   } catch (e) { return null; }
 }
 
@@ -58,10 +60,10 @@ function LTTopNav() {
   const running = blocks.find(b => !b.endTime);
 
   if (!running) {
-    /* Idle bar: subtle accent outline so the strip reads as a deliberate
-       card instead of blending into the dark page (user request). */
+    /* Idle bar: bright accent outline on all four sides (top/down/sides)
+       so the strip reads as a deliberate card (user request). */
     return jsxs('div', {
-      className: 'flex items-center gap-2 px-4 py-2 bg-[#060d28] text-white/40 text-xs font-bold border-b-2 border-accent/40',
+      className: 'flex items-center gap-2 px-4 py-2 bg-[#060d28] text-white/40 text-xs font-bold border-2 border-accent/70',
       style: { paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))' },
       children: [
         jsx('span', {
@@ -104,7 +106,7 @@ function LTTopNav() {
     onKeyDown: (event) => { if (event.key === 'Enter' || event.key === ' ') navigate('/activity'); },
     children: [
       jsx('span', {
-        className: 'w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 animate-pulse'
+        className: 'w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-pulse'
       }),
       jsx('span', {
         className: 'flex-1 truncate',
@@ -153,62 +155,115 @@ function AppRoutes({ profile, location }) {
   });
 }
 
-/* ── UI layout editor (hold → drag → persisted positions) ───────────────
-   Boxes marked with data-lt-move can be repositioned in editor mode. The
-   saved offsets are absolute positions inside the shared scroll container
-   (main, which is position:relative) and are re-applied on every render
-   pass, so the layout survives reloads and route switches. */
-const UI_LAYOUT_KEY = 'lt_ui_layout_v1';
+/* ── UI layout editor (hold a box → drop on another → swap places) ─────
+   Boxes marked with data-lt-move can be reordered by SWAPPING them with a
+   sibling box: sizes, margins and alignment never change — only the visual
+   order (CSS order inside the shared flex/grid parent). The store is a
+   flat map of box key → order number and survives reloads/route changes. */
+const UI_ORDER_KEY = 'lt_ui_order_v1';
+const UI_LAYOUT_KEY = 'lt_ui_layout_v1'; // legacy absolute-position store
+/* One-time cleanup: anyone who used the old free-position editor gets a
+   clean default layout back. */
+try { localStorage.removeItem(UI_LAYOUT_KEY); } catch (e) {}
 
-function uiLayoutRead() {
+function uiOrderRead() {
   try {
-    const o = JSON.parse(localStorage.getItem(UI_LAYOUT_KEY) || '{}');
+    const o = JSON.parse(localStorage.getItem(UI_ORDER_KEY) || '{}');
     return (o && typeof o === 'object') ? o : {};
   } catch (e) { return {}; }
 }
-function uiLayoutWrite(o) {
-  try { localStorage.setItem(UI_LAYOUT_KEY, JSON.stringify(o)); } catch (e) {}
+function uiOrderWrite(o) {
+  try { localStorage.setItem(UI_ORDER_KEY, JSON.stringify(o)); } catch (e) {}
+}
+/* Effective order value of a box: stored number, or its natural DOM slot. */
+function uiOrderEff(el, store) {
+  const s = store[el.getAttribute('data-lt-move')];
+  if (typeof s === 'number') return s;
+  return Array.prototype.indexOf.call(el.parentElement.children, el) + 1;
 }
 export function uiLayoutHasEntries() {
-  const o = uiLayoutRead();
-  for (const k in o) { if (o[k] && typeof o[k].x === 'number') return true; }
+  const o = uiOrderRead();
+  for (const k in o) { if (typeof o[k] === 'number') return true; }
   return false;
 }
 export function applyUiLayout() {
   let store;
-  try { store = uiLayoutRead(); } catch (e) { return; }
+  try { store = uiOrderRead(); } catch (e) { return; }
+  /* Collect the parents of every marked box, and scrub any leftover
+     absolute positioning from the old editor. */
+  const parents = [];
+  const seen = [];
   const nodes = document.querySelectorAll('[data-lt-move]');
   for (let i = 0; i < nodes.length; i++) {
     const el = nodes[i];
-    /* Never fight an in-progress drag (the periodic re-apply pass would
-       otherwise snap the box back to its last saved spot). */
+    /* Never fight an in-progress drag. */
     if (el.classList && el.classList.contains('lt-dragging')) continue;
-    const s = store[el.getAttribute('data-lt-move')];
-    if (s && typeof s.x === 'number') {
-      el.style.position = 'absolute';
-      el.style.left = s.x + 'px';
-      el.style.top = s.y + 'px';
-      if (s.w) el.style.width = s.w + 'px';
-      el.style.zIndex = '4';
-      el.style.margin = '0px';
-    } else if (el.style.position === 'absolute' && el.style.left) {
-      el.style.position = '';
-      el.style.left = '';
-      el.style.top = '';
-      el.style.width = '';
-      el.style.zIndex = '';
-      el.style.margin = '';
+    if (el.style.position === 'absolute') {
+      el.style.position = ''; el.style.left = ''; el.style.top = '';
+      el.style.width = ''; el.style.zIndex = ''; el.style.margin = '';
+    }
+    const p = el.parentElement;
+    if (p && seen.indexOf(p) === -1) { seen.push(p); parents.push(p); }
+  }
+  /* Assign an order value to EVERY child of each such parent — unmarked
+     siblings get their natural slot so a marked box can never jump past
+     them accidentally; marked boxes get their stored value. */
+  for (let pi = 0; pi < parents.length; pi++) {
+    const kids = parents[pi].children;
+    for (let j = 0; j < kids.length; j++) {
+      const el = kids[j];
+      const key = el.getAttribute ? el.getAttribute('data-lt-move') : null;
+      const s = key ? store[key] : undefined;
+      el.style.order = (typeof s === 'number') ? String(s) : String(j + 1);
     }
   }
 }
 
-/* Pointer controller: long-press (350ms) a marked box to lift it, drag to
-   move (text/buttons stay attached — the whole box moves), release to save. */
+/* Pointer controller: long-press (350ms) a marked box to pick it up, drag
+   it over a SIBLING box (highlighted as the drop target), release to swap
+   the two boxes' persisted order. Same size, same alignment — only the
+   order changes. */
 let _uiBound = false;
 let _hold = null;
 let _dragEl = null;
-let _dragStart = null;
+let _dropEl = null;
 let _justDragged = false;
+
+function uiSwapFindTarget(x, y) {
+  if (!_dragEl) return null;
+  const el = document.elementFromPoint(x, y);
+  if (!el || !el.closest) return null;
+  const parent = _dragEl.parentElement;
+  if (!parent) return null;
+  /* Walk up to the direct child of the dragged box's parent that contains
+     the hit point. Marked boxes can be NESTED (e.g. timer.block contains
+     timer.hero, both marked), so closest('[data-lt-move]') would resolve to
+     the inner box and fail the sibling check — "drop on the timer card"
+     would then never register. Resolving to the top-level sibling keeps the
+     rule (same parent, same size, same line) and makes the whole card a
+     valid drop zone. */
+  let node = el;
+  while (node && node.parentElement !== parent) node = node.parentElement;
+  if (!node || node === parent) return null;     // not inside a child of the parent
+  if (node === _dragEl) return null;            // over the dragged box itself
+  if (node.contains && node.contains(_dragEl)) return null;
+  if (!node.hasAttribute || !node.hasAttribute('data-lt-move')) return null;
+  return node;
+}
+function uiSwapSetTarget(t) {
+  if (_dropEl === t) return;
+  if (_dropEl) _dropEl.classList.remove('lt-swap-target');
+  _dropEl = t;
+  if (_dropEl) _dropEl.classList.add('lt-swap-target');
+}
+function uiSwapBoxes(a, b) {
+  const store = uiOrderRead();
+  const ea = uiOrderEff(a, store);
+  const eb = uiOrderEff(b, store);
+  store[a.getAttribute('data-lt-move')] = eb;
+  store[b.getAttribute('data-lt-move')] = ea;
+  uiOrderWrite(store);
+}
 
 function uiEditorBind() {
   if (_uiBound) return;
@@ -225,12 +280,6 @@ function uiEditorBind() {
     _hold = { el: el, x: px, y: py, t: setTimeout(() => {
       if (!_hold) return;
       _dragEl = _hold.el;
-      _dragStart = {
-        px: px, py: py,
-        ox: _dragEl.offsetLeft, oy: _dragEl.offsetTop,
-        w: _dragEl.offsetWidth,
-        key: _dragEl.getAttribute('data-lt-move')
-      };
       try {
         _dragEl.classList.add('lt-dragging');
         document.body.style.userSelect = 'none';
@@ -247,28 +296,30 @@ function uiEditorBind() {
       }
       return;
     }
-    if (!_dragEl) return;
+    if (!_dragEl || !_hold) return;
     try { e.preventDefault(); } catch (err) {}
-    _dragEl.style.left = (_dragStart.ox + (e.clientX - _dragStart.px)) + 'px';
-    _dragEl.style.top = (_dragStart.oy + (e.clientY - _dragStart.py)) + 'px';
+    /* The box rides the finger (visual only — no layout change). */
+    _dragEl.style.transform = 'translate(' + (e.clientX - _hold.x) + 'px,' +
+      (e.clientY - _hold.y) + 'px) scale(1.02)';
+    uiSwapSetTarget(uiSwapFindTarget(e.clientX, e.clientY));
   };
 
   const up = () => {
-    if (_hold) { clearTimeout(_hold.t); _hold = null; }
-    if (!_dragEl) return;
+    if (_hold) { clearTimeout(_hold.t); }
+    if (!_dragEl) { _hold = null; return; }
+    const target = _dropEl;
     try {
-      const store = uiLayoutRead();
-      store[_dragStart.key] = {
-        x: parseInt(_dragEl.style.left, 10) || 0,
-        y: parseInt(_dragEl.style.top, 10) || 0,
-        w: _dragStart.w
-      };
-      uiLayoutWrite(store);
       _dragEl.classList.remove('lt-dragging');
+      _dragEl.style.transform = '';
+      if (target) {
+        uiSwapBoxes(_dragEl, target);
+        if (navigator.vibrate) navigator.vibrate(20);
+      }
     } catch (err) {}
+    uiSwapSetTarget(null);
     document.body.style.userSelect = '';
     _dragEl = null;
-    _dragStart = null;
+    _hold = null;
     _justDragged = true;
     setTimeout(() => { _justDragged = false; }, 400);
     applyUiLayout();
@@ -296,8 +347,13 @@ const SHELL_CSS = [
   '@keyframes lt-page-in-l{from{transform:translateX(-100%)}to{transform:translateX(0)}}',
   '.lt-page-in-r{animation:lt-page-in-r .3s cubic-bezier(.22,.61,.36,1)}',
   '.lt-page-in-l{animation:lt-page-in-l .3s cubic-bezier(.22,.61,.36,1)}',
+  '@keyframes lt-sheet-up{from{transform:translateY(100%)}to{transform:translateY(0)}}',
+  '@keyframes lt-fade-in{from{opacity:0}to{opacity:1}}',
+  '.lt-sheet-in{animation:lt-sheet-up .26s cubic-bezier(.22,.61,.36,1)}',
+  '.lt-fade-in{animation:lt-fade-in .2s ease}',
   'body.lt-ui-editing [data-lt-move]{outline:1px dashed rgba(0,194,168,.55);outline-offset:-2px;touch-action:none;cursor:grab}',
-  'body.lt-ui-editing [data-lt-move].lt-dragging{outline:2px solid #00C2A8;cursor:grabbing;box-shadow:0 14px 34px rgba(4,9,30,.35);opacity:.96;z-index:60!important;transition:none}'
+  'body.lt-ui-editing [data-lt-move].lt-dragging{outline:2px solid #00C2A8;cursor:grabbing;box-shadow:0 14px 34px rgba(4,9,30,.35);opacity:.96;pointer-events:none;z-index:60!important;transition:none;will-change:transform}',
+  'body.lt-ui-editing [data-lt-move].lt-swap-target{outline:2px solid #FFB020;outline-offset:-2px;box-shadow:0 0 0 5px rgba(255,176,32,.25)}'
 ].join('');
 
 /* ── Shell ─────────────────────────────────────────────────────────────
@@ -311,14 +367,20 @@ export function ak({ profile }) {
   const shellRef = useRef(null);
 
   /* Enter-direction for the slide animation: computed synchronously during
-     render so the keyed page wrapper mounts with its class already set. */
+     render so the keyed page wrapper mounts with its class already set.
+     suppressAnimRef: a swipe COMMIT navigates while the target page is
+     already half-visible under the finger — the new page must continue
+     gliding from that offset instead of re-sliding in from the edge. */
   const animRef = useRef({ prev: pathname, dir: 0 });
+  const suppressAnimRef = useRef(false);
   if (animRef.current.prev !== pathname) {
     const pi = tabIndex(animRef.current.prev);
     const ni = tabIndex(pathname);
+    const suppress = suppressAnimRef.current;
+    suppressAnimRef.current = false;
     animRef.current = {
       prev: pathname,
-      dir: (pi >= 0 && ni >= 0 && pi !== ni) ? (ni > pi ? 1 : -1) : 1
+      dir: suppress ? 0 : ((pi >= 0 && ni >= 0 && pi !== ni) ? (ni > pi ? 1 : -1) : 1)
     };
   }
   const enterDir = animRef.current.dir;
@@ -357,8 +419,30 @@ export function ak({ profile }) {
     };
   }, [editorOn]);
 
+  const glideTRef = useRef(null);
+  const glideTargetRef = useRef(null);
+
+  /* Completes an in-flight swipe commit: the target page (the peek pane,
+     which has been gliding to rest) is swapped for the real current route
+     in one batch — both render identical content at the same offset, so the
+     swap is invisible. The enter animation is suppressed, so there is no
+     re-slide and no teleport. */
+  const finishCommit = () => {
+    if (!glideTRef.current) return;
+    clearTimeout(glideTRef.current);
+    glideTRef.current = null;
+    suppressAnimRef.current = true;
+    navigate(glideTargetRef.current);
+    glideTargetRef.current = null;
+    setDragX(0);
+    setPeek(null);
+  };
+
   const onTouchStart = (e) => {
     if (editorOn) return;
+    /* A new gesture finishes any in-flight commit right away so the stale
+       timer can never stomp this gesture's dragX. */
+    if (glideTRef.current) finishCommit();
     if (!e.touches || e.touches.length !== 1) {
       gRef.current.locked = 'v';
       return;
@@ -409,14 +493,14 @@ export function ak({ profile }) {
     const w = g.width || 1;
     const target = peek;
     if (target && Math.abs(dragX) > w * 0.26) {
-      /* Commit: glide fully to the edge, then navigate — the new tab
-         mounts with its own slide-in from the same side. */
+      /* Commit WITHOUT a jump: glide the whole strip to the edge (the
+         target page — the peek pane — continues its slide from exactly
+         where the finger left off) and then swap it for the real route in
+         one batch, with the enter animation suppressed. The result is one
+         continuous slide, no teleport, no re-entry animation. */
       setDragX(dragX > 0 ? w : -w);
-      setTimeout(() => {
-        navigate(target);
-        setDragX(0);
-        setPeek(null);
-      }, 230);
+      glideTargetRef.current = target;
+      glideTRef.current = setTimeout(finishCommit, 250);
     } else {
       setDragX(0);
       setPeek(null);
@@ -431,7 +515,10 @@ export function ak({ profile }) {
 
   const resetLayout = (e) => {
     e.preventDefault();
-    try { localStorage.removeItem(UI_LAYOUT_KEY); } catch (err) {}
+    try {
+      localStorage.removeItem(UI_ORDER_KEY);
+      localStorage.removeItem(UI_LAYOUT_KEY);
+    } catch (err) {}
     applyUiLayout();
   };
 
@@ -484,7 +571,7 @@ export function ak({ profile }) {
         className: 'fixed left-1/2 -translate-x-1/2 z-[70] flex items-center gap-1.5 bg-[#04091e] text-white rounded-full px-2 py-1.5 shadow-[0_10px_30px_rgba(4,9,30,.4)] border border-white/10',
         style: { bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))' },
         children: [
-          jsx('span', { className: 'text-[10px] font-bold text-white/70 pl-1 pr-0.5', children: 'Hold a box to move it' }),
+          jsx('span', { className: 'text-[10px] font-bold text-white/70 pl-1 pr-0.5', children: 'Hold a box, drop on another to swap' }),
           jsx('button', {
             className: 'w-7 h-7 rounded-full bg-white/10 text-white text-xs font-black active:bg-white/20',
             onPointerDown: scrollMain(-1),

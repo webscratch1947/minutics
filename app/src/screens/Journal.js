@@ -232,7 +232,7 @@ export function JournalScreen() {
 
       /* ── 1. Streak & Week Block ────────────────────────────────────────────── */
       jsxs("div", {
-        className: "px-5 pt-5",
+        className: "px-5 pt-5 flex flex-col",
         children: [
 
           // Two cards side by side

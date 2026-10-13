@@ -249,13 +249,25 @@ export function SettingsScreen() {
 
   /* ── handlers ── */
   /* UI layout editor: hand control back to the shell overlay, which tracks
-     pointer drags on any [data-lt-move] box and persists the offsets. */
+     long-press + drop on any [data-lt-move] box and swaps their order. */
   var openUiEditor = function () {
     try { window.dispatchEvent(new CustomEvent("lt-ui-editor-open")); } catch (e) {}
-    try { if (location.hash !== "#/" && location.hash !== "#") location.hash = "#/"; } catch (e) {}
+    /* The editor works on every tab — stay where we are. Only jump to the
+       Timer tab when the current route isn't a tab at all. */
+    try {
+      var h = (location.hash || "").replace(/^#/, "") || "/";
+      var tabs = ["/", "/activity", "/timeline", "/journal", "/settings"];
+      var onTab = tabs.some(function (t) {
+        return t === "/" ? (h === "/") : h.indexOf(t) === 0;
+      });
+      if (!onTab) location.hash = "#/";
+    } catch (e) {}
   };
   var resetUiLayout = function () {
-    try { localStorage.removeItem("lt_ui_layout_v1"); } catch (e) {}
+    try {
+      localStorage.removeItem("lt_ui_order_v1");
+      localStorage.removeItem("lt_ui_layout_v1");
+    } catch (e) {}
     alert("Layout reset \u2014 every box is back in its default place.");
   };
 
@@ -706,8 +718,8 @@ export function SettingsScreen() {
           jsx(SectionHeader, { children: "Layout" }),
           jsx(Card, {
             children: jsx(CardRow, {
-              label: "\u270F\uFE0F UI Layout Editor",
-              desc: "Hold any box to drag it somewhere new \u2014 your layout saves on this device.",
+              label: "\uD83C\uDFA1 UI Layout Editor",
+              desc: "Hold a box and drop it on another box to swap their places \u2014 same size, same line. Saves on this device, works on every tab.",
               children: jsxs("div", { className: "flex gap-2", children: [
                 jsx("button", {
                   onClick: openUiEditor,

@@ -609,7 +609,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                   jsx('button', {
                     onClick: handleDelete,
                     title: 'Remove',
-                    className: 'w-9 h-9 flex items-center justify-center rounded-full bg-red-500/10 border border-red-200 text-red-500 hover:text-red-600 hover:bg-red-500/20 transition-colors shrink-0',
+                    className: 'w-9 h-9 flex items-center justify-center rounded-full bg-red-600/10 border border-red-300 text-red-600 hover:text-red-700 hover:bg-red-600/20 transition-colors shrink-0',
                     children: jsx(lk, { className: 'w-4 h-4' })
                   }),
                   jsx('span', {
@@ -634,14 +634,14 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
         children: jsxs('div', {
           className: 'flex flex-col',
           children: [
-            // Header with emoji button
+            // Header with circle emoji button
             jsxs('div', {
-              className: 'px-5 pt-5 pb-3 border-b border-border flex items-center gap-3',
+              className: 'px-5 pt-5 pb-3 border-b border-black/[.07] flex items-center gap-3',
               children: [
                 jsx('button', {
                   type: 'button',
                   onClick: () => setShowPicker(true),
-                  className: 'w-11 h-11 flex items-center justify-center text-2xl bg-secondary border border-border shrink-0',
+                  className: 'w-12 h-12 rounded-full bg-secondary border border-black/[.12] flex items-center justify-center text-2xl shrink-0 active:scale-95 transition-transform',
                   children: editEmoji || '+'
                 }),
                 jsxs('div', {
@@ -658,29 +658,29 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                 })
               ]
             }),
-            // Name input
+            // Name input (rounded box)
             jsx('div', {
               className: 'px-5 py-4',
               children: jsx('input', {
                 type: 'text',
                 value: editName,
                 onChange: (e) => setEditName(e.target.value),
-                className: 'w-full border border-border bg-secondary px-3 py-2.5 text-sm font-medium outline-none focus:border-primary text-foreground'
+                className: 'w-full border border-black/[.12] bg-secondary rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none focus:border-primary text-foreground'
               })
             }),
-            // Cancel / Save buttons
+            // Cancel / Save buttons (rounded pills)
             jsxs('div', {
-              className: 'flex border-t border-border',
+              className: 'flex gap-2.5 px-5 pb-1',
               children: [
                 jsx('button', {
                   onClick: () => setShowEdit(false),
-                  className: 'flex-1 py-4 text-red-500 font-bold hover:bg-red-50 text-sm',
+                  className: 'flex-1 py-3 rounded-full text-red-600 font-bold bg-white border border-red-200 hover:bg-red-50 text-sm transition-colors',
                   children: 'Cancel'
                 }),
                 jsx('button', {
                   onClick: saveEdit,
                   disabled: !editName.trim(),
-                  className: 'flex-1 py-4 text-primary font-bold hover:bg-secondary text-sm disabled:opacity-40',
+                  className: 'flex-1 py-3 rounded-full bg-black text-white font-bold text-sm disabled:opacity-40 hover:bg-black/85 transition-colors',
                   children: 'Save'
                 })
               ]
@@ -699,28 +699,86 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
 }
 
 // ─── Bottom Sheet (hh) ──────────────────────────────────────────────────────
-// Modal overlay container — fixed overlay with backdrop, bottom-aligned panel.
+// Modal overlay container — fixed overlay with backdrop, bottom-aligned
+// panel. The panel slides UP on open and back DOWN on close, and the grabber
+// line is draggable: pull it down past the threshold to dismiss, pull it up
+// to expand the sheet toward the tall size.
 
 function BottomSheet({ children, onDismiss }) {
+  const [closing, setClosing] = useState(false);
+  const panelRef = useRef(null);
+  const closeTRef = useRef(null);
+  const dragRef = useRef(null);
+
+  const requestClose = () => {
+    if (closing) return;
+    setClosing(true);
+    closeTRef.current = setTimeout(() => {
+      try { onDismiss(); } catch (e) {}
+    }, 200);
+  };
+  useEffect(() => () => clearTimeout(closeTRef.current), []);
+
+  /* Grabber drag: follow the finger down (with resistance past 120px),
+     expand on the way up. */
+  const onGripDown = (e) => {
+    if (closing) return;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+    dragRef.current = { y: e.clientY, dy: 0 };
+    const panel = panelRef.current;
+    if (panel) panel.style.transition = 'none';
+  };
+  const onGripMove = (e) => {
+    const d = dragRef.current;
+    const panel = panelRef.current;
+    if (!d || !panel) return;
+    d.dy = e.clientY - d.y;
+    if (d.dy > 0) {
+      panel.style.transform = 'translateY(' + (d.dy > 120 ? 120 + (d.dy - 120) * 0.3 : d.dy) + 'px)';
+    } else {
+      /* Drag up → expand toward the tall size */
+      panel.style.transform = '';
+      panel.style.maxHeight = Math.min(92, 85 + Math.min(7, -d.dy / 20)).toFixed(1) + 'dvh';
+    }
+  };
+  const onGripUp = () => {
+    const d = dragRef.current;
+    const panel = panelRef.current;
+    dragRef.current = null;
+    if (!panel) return;
+    panel.style.transition = 'transform 200ms cubic-bezier(.22,.61,.36,1)';
+    panel.style.transform = '';
+    if (d && d.dy > 90) requestClose();
+  };
+
   return jsxs('div', {
     className: 'fixed inset-0 z-[60] flex items-end',
-    onClick: onDismiss,
+    onClick: requestClose,
     children: [
       // Backdrop
       jsx('div', {
-        className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px]'
+        className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px] lt-fade-in' +
+          (closing ? ' opacity-0 transition-opacity duration-200' : '')
       }),
       // Panel
       jsxs('div', {
-        className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
+        ref: panelRef,
+        className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh] lt-sheet-in',
+        style: closing
+          ? { transform: 'translateY(100%)', transition: 'transform 200ms cubic-bezier(.22,.61,.36,1)', animation: 'none' }
+          : undefined,
         onClick: (e) => e.stopPropagation(),
         children: [
-          // Drag handle — tap = back (dismisses the sheet, like a back button)
+          // Drag handle — drag down to dismiss, tap = back (like a back button)
           jsx('button', {
             type: 'button',
-            onClick: onDismiss,
+            onPointerDown: onGripDown,
+            onPointerMove: onGripMove,
+            onPointerUp: onGripUp,
+            onPointerCancel: onGripUp,
+            onClick: requestClose,
             'aria-label': 'Back',
-            className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors',
+            className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors touch-none',
             children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
           }),
           jsx('div', {
@@ -1004,7 +1062,7 @@ function ClockFace({ initial, onCancel, onConfirm }) {
               jsx('button', {
                 type: 'button',
                 onClick: onCancel,
-                className: 'py-2.5 px-5 text-[13.5px] font-black text-red-500 bg-white border border-red-200 hover:bg-red-50 rounded-full cursor-pointer transition-colors',
+                className: 'py-2.5 px-5 text-[13.5px] font-black text-red-600 bg-white border border-red-300 hover:bg-red-50 rounded-full cursor-pointer transition-colors',
                 children: 'Cancel'
               }),
               jsx('button', {
@@ -1245,7 +1303,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                   children: [
                     jsx('button', {
                       onClick: onClose,
-                      className: 'flex-1 py-3.5 text-red-500 font-black bg-white border border-red-200 hover:bg-red-50 rounded-xl text-sm transition-colors',
+                      className: 'flex-1 py-3.5 text-red-600 font-black bg-white border border-red-300 hover:bg-red-50 rounded-xl text-sm transition-colors',
                       children: 'Cancel'
                     }),
                   jsx('button', {
@@ -1417,7 +1475,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
             children: [
               jsx('button', {
                 onClick: onClose,
-                className: 'flex-1 py-3.5 text-red-500 font-black bg-white border border-red-200 hover:bg-red-50 rounded-xl text-sm transition-colors',
+                className: 'flex-1 py-3.5 text-red-600 font-black bg-white border border-red-300 hover:bg-red-50 rounded-xl text-sm transition-colors',
                 children: 'Cancel'
               }),
               jsx('button', {
@@ -1446,9 +1504,15 @@ function AddActivityBar() {
   const [name, setName] = useState('');
   const [newEmoji, setNewEmoji] = useState('');
   const [showNewPicker, setShowNewPicker] = useState(false);
+  /* Add sheet — the Add button opens it (emoji + name + Cancel/Save),
+     mirroring the edit sheet. */
+  const [showAddSheet, setShowAddSheet] = useState(false);
+  const [sheetName, setSheetName] = useState('');
+  const [sheetEmoji, setSheetEmoji] = useState('');
   const createActivity = useCreateActivity();
   const queryClient = useQueryClient();
   const inputRef = useRef(null); // zh = React
+  const sheetInputRef = useRef(null);
   const { data: activities = [] } = useActivities();
   const freePlan = !isPro();
   const atLimit = freePlan && activities.length >= FREE_ACTIVITY_LIMIT;
@@ -1459,15 +1523,15 @@ function AddActivityBar() {
     if (armedAt) trimDaysLeft = Math.max(1, Math.ceil((Number(armedAt) + FREE_TRIM_DAYS * 86400000 - Date.now()) / 86400000));
   } catch (e) { /* ignore */ }
 
-  const handleAdd = () => {
-    if (!name.trim()) return;
+  const createWith = (actName, actEmoji) => {
+    if (!actName.trim()) return;
     if (atLimit) return;
     const randomColor = getDistinctColor(activities.map((a) => a.color));
     createActivity.mutate({
       data: {
-        name: name.trim(),
+        name: actName.trim(),
         color: randomColor,
-        emoji: newEmoji
+        emoji: actEmoji
       }
     }, {
       onSuccess: () => {
@@ -1477,6 +1541,23 @@ function AddActivityBar() {
         inputRef.current?.focus();
       }
     });
+  };
+
+  const handleAdd = () => createWith(name, newEmoji);
+
+  /* The Add button opens the add sheet (typed text carries over; Enter in
+     the bar still adds directly for speed). */
+  const openAddSheet = () => {
+    if (atLimit) return;
+    setSheetName(name);
+    setSheetEmoji(newEmoji);
+    setShowAddSheet(true);
+    setTimeout(() => sheetInputRef.current?.focus(), 280);
+  };
+  const saveSheet = () => {
+    if (!sheetName.trim()) return;
+    createWith(sheetName, sheetEmoji);
+    setShowAddSheet(false);
   };
 
   return jsxs(Fragment, {
@@ -1513,10 +1594,10 @@ function AddActivityBar() {
             title: 'Choose emoji',
             children: newEmoji || '🙂'
           }),
-          // Add button (black)
+          // Add button (black) — opens the add sheet
           jsxs('button', {
-            onClick: handleAdd,
-            disabled: atLimit || !name.trim() || createActivity.isPending,
+            onClick: openAddSheet,
+            disabled: atLimit || createActivity.isPending,
             className: 'h-9 px-4 rounded-full bg-black text-white font-extrabold text-[13px] flex items-center gap-1.5 disabled:opacity-40 shrink-0 transition-all hover:bg-black/85',
             children: [
               jsx(rk, { className: 'w-4 h-4' }),
@@ -1542,10 +1623,72 @@ function AddActivityBar() {
           })
         ]
       }),
-      // Emoji picker for new activity
+      // Add activity sheet — emoji + name + Cancel/Save (like the edit sheet)
+      showAddSheet && jsx(BottomSheet, {
+        onDismiss: () => setShowAddSheet(false),
+        children: jsxs('div', {
+          className: 'flex flex-col',
+          children: [
+            // Header with circle emoji button
+            jsxs('div', {
+              className: 'px-5 pt-5 pb-3 border-b border-black/[.07] flex items-center gap-3',
+              children: [
+                jsx('button', {
+                  type: 'button',
+                  onClick: () => setShowNewPicker(true),
+                  className: 'w-12 h-12 rounded-full bg-secondary border border-black/[.12] flex items-center justify-center text-2xl shrink-0 active:scale-95 transition-transform',
+                  children: sheetEmoji || '+'
+                }),
+                jsxs('div', {
+                  children: [
+                    jsx('p', {
+                      className: 'font-bold text-foreground',
+                      children: 'Add activity'
+                    }),
+                    jsx('p', {
+                      className: 'text-xs text-muted-foreground',
+                      children: 'Tap the icon to change emoji'
+                    })
+                  ]
+                })
+              ]
+            }),
+            // Name input (rounded box)
+            jsx('div', {
+              className: 'px-5 py-4',
+              children: jsx('input', {
+                ref: sheetInputRef,
+                type: 'text',
+                value: sheetName,
+                onChange: (e) => setSheetName(e.target.value),
+                placeholder: 'Activity name',
+                className: 'w-full border border-black/[.12] bg-secondary rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none focus:border-primary text-foreground'
+              })
+            }),
+            // Cancel / Save buttons (rounded pills)
+            jsxs('div', {
+              className: 'flex gap-2.5 px-5 pb-1',
+              children: [
+                jsx('button', {
+                  onClick: () => setShowAddSheet(false),
+                  className: 'flex-1 py-3 rounded-full text-red-600 font-bold bg-white border border-red-200 hover:bg-red-50 text-sm transition-colors',
+                  children: 'Cancel'
+                }),
+                jsx('button', {
+                  onClick: saveSheet,
+                  disabled: !sheetName.trim() || createActivity.isPending,
+                  className: 'flex-1 py-3 rounded-full bg-black text-white font-bold text-sm disabled:opacity-40 hover:bg-black/85 transition-colors',
+                  children: 'Save'
+                })
+              ]
+            })
+          ]
+        })
+      }),
+      // Emoji picker — targets the add sheet when it's open
       showNewPicker && jsx(LTEmojiPicker, {
-        value: newEmoji,
-        onSelect: setNewEmoji,
+        value: showAddSheet ? sheetEmoji : newEmoji,
+        onSelect: showAddSheet ? setSheetEmoji : setNewEmoji,
         onClose: () => setShowNewPicker(false)
       })
     ]
@@ -1730,6 +1873,7 @@ function LifeProgressCard({ profile }) {
   });
 
   return jsxs('div', {
+    'data-lt-move': 'timer.block',
     className: 'mx-4 mt-3 flex flex-col gap-3',
     children: [
       // Countdown hero — reference-style light card with dotted-arc hero number
@@ -1773,8 +1917,9 @@ function LifeProgressCard({ profile }) {
               })
             })
           }),
-          /* Hero: the big box is YEARS; below it three pills — MONTHS,
-             DAYS, SECONDS — sit slightly lower than before. */
+          /* Hero: the big box is YEARS, hugging the dotted arcs tightly
+             like before; the three pills — MONTHS, DAYS, SECONDS — sit on
+             their own centered row below so they can't push the arcs out. */
           jsxs('div', {
             className: 'flex items-center justify-center gap-1',
             children: [
@@ -1783,18 +1928,18 @@ function LifeProgressCard({ profile }) {
                 className: 'flex flex-col items-center px-1',
                 children: [
                   jsx('span', { className: 'text-[54px] font-black text-primary tabular-nums leading-none', children: p2(breakdown.years) }),
-                  jsx('span', { className: 'text-[10px] font-extrabold tracking-[0.3em] text-foreground/45 mt-1.5', children: 'YEARS' }),
-                  jsxs('div', {
-                    className: 'flex gap-1.5 mt-4',
-                    children: [
-                      heroPill(months, 'MONTHS'),
-                      heroPill(remDays, 'DAYS'),
-                      heroPill(breakdown.seconds, 'SECONDS')
-                    ]
-                  })
+                  jsx('span', { className: 'text-[10px] font-extrabold tracking-[0.3em] text-foreground/45 mt-1.5', children: 'YEARS' })
                 ]
               }),
               dotArc(true)
+            ]
+          }),
+          jsxs('div', {
+            className: 'flex justify-center gap-1.5 mt-3',
+            children: [
+              heroPill(months, 'MONTHS'),
+              heroPill(remDays, 'DAYS'),
+              heroPill(breakdown.seconds, 'SECONDS')
             ]
           }),
           jsxs('div', {
@@ -2320,7 +2465,7 @@ function StatCard({ icon, iconBg, label, value, suffix, danger }) {
         children: icon
       }),
       jsx('p', { className: 'text-[9.5px] font-extrabold uppercase tracking-[0.16em] text-foreground/45 m-0 mb-1', children: label }),
-      jsxs('p', { className: cn('text-[21px] font-black m-0 leading-none tabular-nums', danger ? 'text-red-500' : 'text-foreground'), children: [
+      jsxs('p', { className: cn('text-[21px] font-black m-0 leading-none tabular-nums', danger ? 'text-red-600' : 'text-foreground'), children: [
         value,
         suffix && jsx('span', { className: 'text-[11px] font-bold text-foreground/40 ml-0.5', children: suffix })
       ] })
@@ -2370,6 +2515,16 @@ export function ActivityScreen({ profile }) {
 
   const freePlan = !isPro();
   const limitReached = freePlan && activities.length >= FREE_ACTIVITY_LIMIT;
+
+  /* Persist name→emoji so the Journal Full View (which can't read the
+     activity store directly) can show the same emoji circles. */
+  useEffect(() => {
+    try {
+      const map = {};
+      activities.forEach((a) => { if (a.emoji) map[a.name] = a.emoji; });
+      localStorage.setItem('lt_activity_emoji_map_v1', JSON.stringify(map));
+    } catch (e) { /* ignore */ }
+  }, [activities]);
 
   const handleActivityTap = (activity) => {
     if (runningBlock?.activityId === activity.id) {
@@ -2467,7 +2622,7 @@ export function ActivityScreen({ profile }) {
             className: cn(
               'shrink-0 w-11 h-11 rounded-full border flex flex-col items-center justify-center leading-none',
               limitReached
-                ? 'bg-red-500 text-white border-red-600 shadow-[0_6px_16px_rgba(239,68,68,0.35)]'
+                ? 'bg-red-600 text-white border-red-700 shadow-[0_6px_16px_rgba(220,38,38,0.35)]'
                 : 'text-foreground bg-white border-black/[.25]'
             ),
             children: [
@@ -2540,9 +2695,9 @@ export function ActivityScreen({ profile }) {
         children: [
           jsx(ModalHeader, { activity: activeBlockInfo.activity, subtitle: 'Timer is running' }),
           jsx(ModalOption, {
-            icon: jsx(rh, { className: 'w-5 h-5 text-destructive' }),
+            icon: jsx(rh, { className: 'w-5 h-5 text-red-600' }),
             label: 'Stop timer',
-            labelClass: 'text-destructive',
+            labelClass: 'text-red-700',
             description: 'Started at ' + formatTime(activeBlockInfo.block.startTime),
             onClick: stopTimer
           }),

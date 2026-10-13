@@ -1051,6 +1051,7 @@
       /* Tools slide in from the right instead of popping (the root node is
          recreated on every open, so the animation re-runs each time). */
       "@keyframes lt-tool-in{from{transform:translateX(100%)}to{transform:translateX(0)}}",
+      "@keyframes lt-tool-out{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:.7}}",
       ".lt-tool-shell{max-width:700px;margin:0 auto;padding:18px 16px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%}",
       /* Classic borderless header — Back link on top, plain kicker, title, description */
       ".lt-tool-top{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin:0 0 18px;color:#111114}",
@@ -1467,7 +1468,9 @@
       /* Category selection modal */
       "#lt-cat-modal-overlay{position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center}",
       ".lt-cat-modal{width:100%;max-width:480px;background:#fff;color:hsl(var(--foreground));border-radius:28px 28px 0 0;box-sizing:border-box;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -24px 64px rgba(15,23,42,.28);position:relative}",
-      ".lt-cat-modal::before{content:'';display:block;width:40px;height:5px;border-radius:99px;background:rgba(15,23,42,.15);margin:10px auto 0;flex:0 0 auto}",
+      ".lt-sheet-grip{display:flex;align-items:center;justify-content:center;flex:0 0 auto;padding:10px 0 6px;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}",
+      ".lt-sheet-grip:active{cursor:grabbing}",
+      ".lt-sheet-grip::before{content:'';display:block;width:40px;height:5px;border-radius:99px;background:rgba(15,23,42,.15)}",
       ".lt-cat-modal-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 18px 10px;flex:1 1 auto;min-height:0}",
       ".lt-cat-modal-head{display:flex;align-items:flex-start;gap:12px;margin:0 0 14px}",
       ".lt-cat-modal-head>div{flex:1;min-width:0}",
@@ -1476,8 +1479,8 @@
       ".lt-cat-modal-close{flex:0 0 auto;width:32px;height:32px;border:none;background:rgba(15,23,42,.05);color:#64748b;border-radius:50%;font-size:20px;line-height:1;font-weight:700;padding:0;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent}",
       ".lt-cat-modal-close:hover{background:rgba(15,23,42,.1);color:#0f172a}",
       ".lt-cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}",
-      ".lt-cat-chip{border:1.5px solid rgba(15,23,42,.08);background:#Fdfbf7;color:#0f172a;border-radius:14px;padding:12px 8px;font-size:12.5px;font-weight:800;text-align:center;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}",
-      ".lt-cat-chip:hover{border-color:rgba(15,23,42,.25);transform:translateY(-1px)}",
+      ".lt-cat-chip{border:1.5px solid rgba(17,17,17,.3);background:#Fdfbf7;color:#0f172a;border-radius:14px;padding:12px 8px;font-size:12.5px;font-weight:800;text-align:center;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}",
+      ".lt-cat-chip:hover{border-color:rgba(17,17,17,.55);transform:translateY(-1px)}",
       ".lt-cat-chip.lt-cat-selected{background:#000;border-color:#000;color:#fff;box-shadow:0 10px 22px rgba(0,0,0,.28)}",
       ".lt-cat-reason{width:100%;min-height:70px;resize:vertical;border:1.5px solid rgba(15,23,42,.08);background:#Fdfbf7;color:hsl(var(--foreground));border-radius:14px;padding:11px 12px;font:inherit;font-size:13px;box-sizing:border-box;outline:none}",
       ".lt-cat-reason:focus{border-color:rgba(15,23,42,.4)}",
@@ -1509,33 +1512,43 @@
       ".lt-lv-row-wrap .lt-lv-row{border-top:none;padding:11px 2px 4px}",
       ".lt-lv-items{padding:0 2px 10px 17px}",
       ".lt-lv-item{display:flex;justify-content:space-between;font-size:12px;color:hsl(var(--muted-foreground));padding:3px 0}",
-      /* Journal "Full view" button */
+      /* Journal "Full view" — a cream, Screen-Time-style tab: no grey
+         anywhere; the theme colour (indigo #3730A3) is deliberately NOT one
+         of the activity colours, so it can never appear on an activity. */
       ".lt-fv-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid hsl(var(--primary));color:hsl(var(--primary));background:#fff;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:800;letter-spacing:.02em;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;flex-shrink:0}",
       ".lt-fv-btn:active{opacity:.7}",
-      "#lt-fv-modal-overlay,#lt-fv-report-overlay,#lt-fv-share-overlay{position:fixed;inset:0;z-index:2147483200;background:rgba(0,0,0,1);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:22px 16px 40px}",
-      ".lt-fv-modal-head{width:100%;max-width:480px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}",
-      ".lt-fv-modal-head h3{color:#fff;font-size:15px;font-weight:800;margin:0}",
-      ".lt-fv-modal-close{background:rgba(255,255,255,.12);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer}",
-      ".lt-fv-card-wrap{width:100%;max-width:480px;background:#000;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5)}",
+      "#lt-fv-modal-overlay,#lt-fv-report-overlay,#lt-fv-share-overlay{position:fixed;inset:0;z-index:2147483200;background:#FDFBF7;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:0 0 40px;animation:lt-tool-in .3s cubic-bezier(.22,.61,.36,1);-webkit-overflow-scrolling:touch}",
+      "#lt-fv-modal-overlay.lt-fv-out,#lt-fv-report-overlay.lt-fv-out,#lt-fv-share-overlay.lt-fv-out{animation:lt-tool-out .24s ease-in forwards;pointer-events:none}",
+      ".lt-fv-modal-head{position:sticky;top:0;z-index:2;width:100%;max-width:480px;display:flex;align-items:center;gap:10px;padding:14px 16px 10px;background:#FDFBF7;box-sizing:border-box}",
+      ".lt-fv-back{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid rgba(55,48,163,.18);background:#fff;color:#3730A3;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(55,48,163,.08);-webkit-tap-highlight-color:transparent}",
+      ".lt-fv-back:active{opacity:.7}",
+      ".lt-fv-modal-head h3{color:#1E1B4B;font-size:15.5px;font-weight:800;margin:0}",
+      ".lt-fv-modal-head p{color:rgba(55,48,163,.6);font-size:11.5px;font-weight:700;margin:1px 0 0}",
+      ".lt-fv-modal-close{margin-left:auto;background:#fff;border:1px solid rgba(55,48,163,.18);color:#3730A3;width:30px;height:30px;border-radius:50%;font-size:14px;cursor:pointer}",
+      ".lt-fv-card-wrap{width:calc(100% - 32px);max-width:480px;background:#fff;border:1px solid rgba(55,48,163,.12);border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(55,48,163,.10);box-sizing:border-box}",
       ".lt-fv-card-wrap img{display:block;width:100%;height:auto}",
-      ".lt-fv-modal-actions{width:100%;max-width:480px;display:flex;gap:10px;margin-top:16px}",
-      ".lt-fv-modal-actions button{flex:1;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}",
-      "#lt-fv-share-btn{background:hsl(var(--primary));color:#fff}",
-      "#lt-fv-save-btn{background:rgba(255,255,255,.14);color:#fff}",
-      ".lt-fv-hint{width:100%;max-width:480px;color:rgba(255,255,255,.55);font-size:11.5px;text-align:center;margin-top:10px;line-height:1.4}",
-      ".lt-fv-loading{color:rgba(255,255,255,.75);font-size:13px;padding:40px 0}",
-      /* Journal report tab (stage 1) */
-      ".lt-fv-report-card{width:100%;max-width:480px;background:#161a34;border-radius:14px;padding:18px;box-sizing:border-box;margin-bottom:14px}",
-      ".lt-fv-donut{width:180px;height:180px;border-radius:50%;position:relative;margin:4px auto 18px}",
-      ".lt-fv-donut-hole{position:absolute;inset:26px;background:#161a34;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}",
-      ".lt-fv-donut-hole strong{color:#fff;font-size:19px;font-weight:800}",
-      ".lt-fv-donut-hole span{color:rgba(255,255,255,.5);font-size:10px;font-weight:700;letter-spacing:.08em;margin-top:2px}",
-      ".lt-fv-legend{display:flex;flex-direction:column;gap:2px}",
-      ".lt-fv-row{display:flex;align-items:center;justify-content:space-between;padding:9px 2px;border-top:1px solid rgba(255,255,255,.08);font-size:13.5px}",
-      ".lt-fv-row:first-child{border-top:none}",
-      ".lt-fv-row-left{display:flex;align-items:center;gap:8px;color:#fff;font-weight:600}",
-      ".lt-fv-row-right{color:rgba(255,255,255,.6);font-weight:600;font-variant-numeric:tabular-nums}",
+      ".lt-fv-modal-actions{width:calc(100% - 32px);max-width:480px;display:flex;gap:10px;margin-top:14px;box-sizing:border-box}",
+      ".lt-fv-modal-actions button{flex:1;border:none;border-radius:999px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}",
+      "#lt-fv-share-btn{background:#3730A3;color:#fff;box-shadow:0 8px 20px rgba(55,48,163,.30)}",
+      "#lt-fv-save-btn{background:#fff;color:#3730A3;border:1.5px solid rgba(55,48,163,.30)}",
+      ".lt-fv-hint{width:calc(100% - 32px);max-width:480px;color:rgba(55,48,163,.55);font-size:11.5px;text-align:center;margin-top:10px;line-height:1.4;box-sizing:border-box}",
+      ".lt-fv-loading{color:rgba(55,48,163,.6);font-size:13px;padding:40px 0}",
+      /* Report tab (stage 1) */
+      ".lt-fv-report-card{width:calc(100% - 32px);max-width:480px;background:#fff;border:1px solid rgba(55,48,163,.12);border-radius:18px;padding:16px;box-sizing:border-box;margin:0 0 12px;box-shadow:0 6px 20px rgba(55,48,163,.07)}",
+      ".lt-fv-donut{width:180px;height:180px;border-radius:50%;position:relative;margin:4px auto 14px}",
+      ".lt-fv-donut-hole{position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-shadow:inset 0 0 0 1px rgba(55,48,163,.06)}",
+      ".lt-fv-donut-hole strong{color:#1E1B4B;font-size:19px;font-weight:800}",
+      ".lt-fv-donut-hole span{color:rgba(55,48,163,.55);font-size:10px;font-weight:700;letter-spacing:.08em;margin-top:2px}",
+      ".lt-fv-legend{display:flex;flex-direction:column}",
+      ".lt-fv-row{display:flex;align-items:center;justify-content:space-between;font-size:13.5px}",
+      ".lt-fv-row-left{display:flex;align-items:center;gap:9px;color:#1F1B36;font-weight:700}",
+      ".lt-fv-row-right{color:rgba(55,48,163,.7);font-weight:700;font-variant-numeric:tabular-nums}",
       ".lt-fv-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}",
+      ".lt-fv-emo{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif}",
+      ".lt-fv-pill{background:rgba(55,48,163,.08);color:#3730A3;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}",
+      ".lt-fv-bar{height:10px;border-radius:99px;background:rgba(55,48,163,.08);overflow:hidden;margin-top:6px}",
+      ".lt-fv-bar>i{display:block;height:100%;border-radius:99px}",
+      ".lt-fv-sec-title{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(55,48,163,.55);margin:0 0 10px}",
     ].join("");
     document.head.appendChild(s);
   }
@@ -1602,11 +1615,64 @@
     return Array.isArray(items) ? items : [];
   }
 
+  /* Generic bottom-sheet grabber drag: pull the sheet DOWN past the
+     threshold to close it, pull UP to expand toward the tall size.
+     Engages only for gestures that start on the sheet's grabber line. */
+  function ltSheetDragAttach(overlay, panel, onClose) {
+    var st = null;
+    overlay.addEventListener("pointerdown", function (e) {
+      var grip = e.target && e.target.closest ? e.target.closest(".lt-sheet-grip") : null;
+      if (!grip || !panel.contains(grip)) return;
+      st = { y: e.clientY, dy: 0 };
+      panel.style.transition = "none";
+    });
+    overlay.addEventListener("pointermove", function (e) {
+      if (!st) return;
+      st.dy = e.clientY - st.y;
+      if (st.dy > 0) {
+        /* Follow the finger down; slight resistance past 120px. */
+        panel.style.transform = "translateY(" + (st.dy > 120 ? 120 + (st.dy - 120) * 0.3 : st.dy) + "px)";
+      } else {
+        /* Drag up → expand toward the tall size. */
+        panel.style.transform = "";
+        panel.style.maxHeight = Math.min(92, 82 + Math.min(10, -st.dy / 18)).toFixed(1) + "vh";
+      }
+    });
+    var end = function () {
+      if (!st) return;
+      var dy = st.dy;
+      st = null;
+      panel.style.transition = "transform .2s ease";
+      panel.style.transform = "";
+      if (dy > 90 && typeof onClose === "function") onClose();
+    };
+    overlay.addEventListener("pointerup", end);
+    overlay.addEventListener("pointercancel", end);
+  }
+
   function closeCategoryModal(reason) {
     if (catModalRoot) {
       var root = catModalRoot;
       catModalRoot = null;
-      root.remove();
+      /* Slide the sheet back DOWN before removing (mirror of the open),
+         so the modal doesn't just vanish. */
+      var panel = root.querySelector(".lt-cat-modal");
+      var removed = false;
+      var doRemove = function () {
+        if (removed) return;
+        removed = true;
+        if (root.parentNode) root.remove();
+      };
+      if (panel) {
+        root.style.pointerEvents = "none";
+        panel.style.transition = "transform .22s ease-in";
+        panel.style.transform = "translateY(100%)";
+        root.style.transition = "background .22s ease";
+        root.style.background = "rgba(0,0,0,0)";
+        setTimeout(doRemove, 240);
+      } else {
+        doRemove();
+      }
       /* Closing the optional picker must never cancel the activity start. */
       if (reason !== "saved" && typeof root.__ltOnCancel === "function") {
         var onCancel = root.__ltOnCancel;
@@ -1944,6 +2010,7 @@
     root.id = "lt-cat-modal-overlay";
     root.innerHTML =
       '<div class="lt-cat-modal">' +
+      '<div class="lt-sheet-grip" id="lt-cat-grip" aria-hidden="true"></div>' +
       '<div class="lt-cat-modal-scroll">' +
         '<div class="lt-cat-modal-head">' +
           '<div>' +
@@ -1997,6 +2064,10 @@
     document.body.appendChild(root);
     catModalRoot = root;
     root.__ltOnCancel = opts.onCancel;
+    /* Grabber line is draggable: pull down to dismiss, pull up to expand. */
+    ltSheetDragAttach(root, root.querySelector(".lt-cat-modal"), function () {
+      closeCategoryModal("cancel");
+    });
     /* Push a history state so Android back closes this modal instead of
        navigating the SPA (or appearing to "open" it via a ghost click). */
     if (!catModalPushedHistory) {
@@ -2437,6 +2508,8 @@
 
   function getOverlayRoot() {
     var r = document.getElementById("lt-overlay-root");
+    /* A root that is animating out must never be reused — remove it now. */
+    if (r && r.getAttribute("data-lt-closing")) { r.remove(); r = null; }
     if (!r) {
       r = document.createElement("div");
       r.id = "lt-overlay-root";
@@ -2447,7 +2520,17 @@
 
   function closeOverlay() {
     var r = document.getElementById("lt-overlay-root");
-    if (r) r.remove();
+    if (r && !r.getAttribute("data-lt-closing")) {
+      /* Slide OUT to the right (mirrors the slide-in) before teardown, so
+         closing a Life Hub tool plays the same animation backwards. */
+      r.setAttribute("data-lt-closing", "1");
+      r.style.pointerEvents = "none";
+      r.style.animation = "lt-tool-out .24s ease-in forwards";
+      var dead = r;
+      setTimeout(function () { if (dead.parentNode) dead.remove(); }, 250);
+    } else if (r) {
+      r.remove();
+    }
     activeOverlay   = null;
     budgetEditingId = null;
     budgetAddingNew = false;
@@ -5193,6 +5276,17 @@
     return rows;
   }
 
+  /* The Journal's day detail carries no emoji, but the app persists a
+     name→emoji map when the Activity screen renders — use it so the Full
+     View rows can show the same emoji circles. */
+  function fvEmojiFor(name) {
+    try {
+      var map = JSON.parse(localStorage.getItem("lt_activity_emoji_map_v1") || "{}");
+      var em = map && map[name];
+      return typeof em === "string" ? em : "";
+    } catch (e) { return ""; }
+  }
+
   /* Reads the already-expanded (or about-to-expand) day's per-activity
      breakdown straight from the DOM, matching the app's own journal
      markup: each activity group's header div carries a
@@ -5217,7 +5311,7 @@
       var durText = spans[1] ? spans[1].textContent.trim() : "0m";
       var colorMatch = style.match(/solid\s*([^;]+)/i);
       var color = colorMatch ? colorMatch[1].trim() : "#7c8cff";
-      acts.push({ name: name, color: color, minutes: fvParseDurationText(durText) });
+      acts.push({ name: name, color: color, minutes: fvParseDurationText(durText), emoji: fvEmojiFor(name) });
     }
     return acts;
   }
@@ -5251,26 +5345,27 @@
     canvas.width = W; canvas.height = H;
     var ctx = canvas.getContext("2d");
 
-    /* Background \u2014 app's own primary navy, as a subtle gradient */
+    /* Background — warm cream (same family as the app background), so the
+       card never looks grey or dark. */
     var grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, "#1c2447");
-    grad.addColorStop(1, "#10142b");
+    grad.addColorStop(0, "#FDFBF7");
+    grad.addColorStop(1, "#F5EFE1");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    /* Faint decorative ring, top-right */
+    /* Faint decorative indigo ring, top-right */
     ctx.beginPath();
     ctx.arc(W - 60, 60, 220, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.strokeStyle = "rgba(55,48,163,0.06)";
     ctx.lineWidth = 40;
     ctx.stroke();
 
-    /* Brand \u2014 top-left */
-    ctx.fillStyle = "#ffffff";
+    /* Brand — top-left (deep indigo on cream) */
+    ctx.fillStyle = "#1E1B4B";
     ctx.font = "800 40px Inter, Arial, sans-serif";
     ctx.textBaseline = "top";
     ctx.fillText("Minutics", 48, 44);
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillStyle = "rgba(55,48,163,0.6)";
     ctx.font = "600 18px Inter, Arial, sans-serif";
     ctx.fillText(dateText, 48, 94);
 
@@ -5295,27 +5390,27 @@
       });
       ctx.beginPath();
       ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
-      ctx.fillStyle = "#161a34";
+      ctx.fillStyle = "#FFFFFF";
       ctx.fill();
     } else {
       ctx.beginPath();
       ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
+      ctx.fillStyle = "rgba(55,48,163,0.08)";
       ctx.fill();
       ctx.beginPath();
       ctx.arc(cx, cy, rInner, 0, Math.PI * 2);
-      ctx.fillStyle = "#161a34";
+      ctx.fillStyle = "#FFFFFF";
       ctx.fill();
     }
 
     /* Center label \u2014 total tracked time */
     var totalH = Math.floor(total / 60), totalM = Math.round(total % 60);
     var centerLabel = total > 0 ? (totalH > 0 ? (totalH + "h " + totalM + " min") : (totalM + " min")) : "No data";
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#1E1B4B";
     ctx.textAlign = "center";
     ctx.font = "800 36px Inter, Arial, sans-serif";
     ctx.fillText(centerLabel, cx, cy - 20);
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.fillStyle = "rgba(55,48,163,0.55)";
     ctx.font = "600 14px Inter, Arial, sans-serif";
     ctx.fillText("TRACKED", cx, cy + 22);
     ctx.textAlign = "left";
@@ -5329,27 +5424,27 @@
       ctx.arc(lx + 8, y + 10, 8, 0, Math.PI * 2);
       ctx.fillStyle = a.color;
       ctx.fill();
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = "#1F1B36";
       ctx.font = "700 20px Inter, Arial, sans-serif";
       var name = a.name.length > 20 ? a.name.slice(0, 19) + "\u2026" : a.name;
       ctx.fillText(name, lx + 26, y);
-      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.fillStyle = "rgba(55,48,163,0.62)";
       ctx.font = "600 16px Inter, Arial, sans-serif";
       var mh = Math.floor(a.minutes / 60), mm2 = Math.round(a.minutes % 60);
       var durLabel = mh > 0 ? (mh + "h " + mm2 + " min") : (mm2 + " min") + (total ? "  \u00b7  " + Math.round(a.minutes / total * 100) + "%" : "");
       ctx.fillText(mh > 0 ? (mh + "h " + mm2 + " min  \u00b7  " + Math.round(a.minutes / total * 100) + "%") : durLabel, lx + 26, y + 22);
     });
     if (!shown.length) {
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.fillStyle = "rgba(55,48,163,0.5)";
       ctx.font = "600 18px Inter, Arial, sans-serif";
       ctx.fillText("No activity tagged on this day.", lx, ly + 10);
     }
 
-    /* Footer \u2014 sharer's name + tagline */
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    /* Footer — sharer's name + tagline (deep indigo, never grey) */
+    ctx.fillStyle = "rgba(30,27,75,0.85)";
     ctx.font = "700 20px Inter, Arial, sans-serif";
     ctx.fillText("Shared by " + (sharerName || "a Minutics user"), 48, H - 66);
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillStyle = "rgba(55,48,163,0.45)";
     ctx.font = "600 14px Inter, Arial, sans-serif";
     ctx.fillText("Make every minute count \u2014 Minutics", 48, H - 38);
 
@@ -5362,7 +5457,7 @@
   }
 
   function fvConicGradient(activities, total) {
-    if (!total || !activities.length) return "conic-gradient(rgba(255,255,255,.08) 0 100%)";
+    if (!total || !activities.length) return "conic-gradient(rgba(55,48,163,.10) 0 100%)";
     var acc = 0, stops = [];
     activities.forEach(function (a, i) {
       var startPct = (acc / total) * 100;
@@ -5376,7 +5471,7 @@
       var last = i === activities.length - 1;
       var solidEnd = last ? endPct : Math.max(startPct, endPct - g);
       stops.push(a.color + " " + startPct.toFixed(2) + "% " + solidEnd.toFixed(2) + "%");
-      if (!last && solidEnd < endPct) stops.push("#161a34 " + solidEnd.toFixed(2) + "% " + endPct.toFixed(2) + "%");
+      if (!last && solidEnd < endPct) stops.push("#FFFFFF " + solidEnd.toFixed(2) + "% " + endPct.toFixed(2) + "%");
     });
     return "conic-gradient(" + stops.join(",") + ")";
   }
@@ -5407,7 +5502,7 @@
   function fvDistinctColors(acts) {
     if (!acts || !acts.length) return acts;
     var out = acts.map(function (a) {
-      return { name: a.name, minutes: a.minutes, color: String(a.color || "").trim() || "#7c8cff" };
+      return { name: a.name, minutes: a.minutes, color: String(a.color || "").trim() || "#7c8cff", emoji: a.emoji || "" };
     });
     /* Every activity keeps its OWN color here — the Activity list and the
        Journal both show activity.color, so re-assigning a palette color in
@@ -5432,21 +5527,35 @@
     return out;
   }
 
-  /* Stage 1: the report tab — chart, per-activity/category breakdown, and
-     a summary, with its own "Share" button that leads to the shareable
-     visiting-card image (stage 2). */
+  /* Closes a full-view overlay with the same slide animation the open
+     plays, but backwards (like leaving a tab). */
+  function fvCloseOverlay(el) {
+    if (!el || el.getAttribute("data-lt-fv-closing")) return;
+    el.setAttribute("data-lt-fv-closing", "1");
+    el.classList.add("lt-fv-out");
+    setTimeout(function () { if (el.parentNode) el.remove(); }, 250);
+  }
+
+  /* Stage 1: the report tab — donut + per-activity bars + summary, with a
+     "Share" button that leads to the shareable visiting-card image. */
   function fvOpenReportModal(dateText, activities) {
     activities = fvDistinctColors(activities);
     var total = activities.reduce(function (s, a) { return s + a.minutes; }, 0);
     var topActivity = activities.length ? activities[0] : null;
 
     var rowsHtml = activities.length
-      ? activities.map(function (a) {
+      ? '<p class="lt-fv-sec-title">By activity</p>' + activities.map(function (a) {
           var pct = total ? Math.round((a.minutes / total) * 100) : 0;
+          var lead = a.emoji
+            ? '<span class="lt-fv-emo" style="background:' + a.color + '22">' + escapeHtml(a.emoji) + '</span>'
+            : '<span class="lt-fv-dot" style="background:' + a.color + '"></span>';
           return (
-            '<div class="lt-fv-row">' +
-              '<span class="lt-fv-row-left"><span class="lt-fv-dot" style="background:' + a.color + '"></span>' + escapeHtml(a.name) + '</span>' +
-              '<span class="lt-fv-row-right">' + fvFormatMinutes(a.minutes) + ' \u00b7 ' + pct + '%</span>' +
+            '<div style="margin-bottom:12px">' +
+              '<div class="lt-fv-row">' +
+                '<span class="lt-fv-row-left">' + lead + escapeHtml(a.name) + '</span>' +
+                '<span class="lt-fv-pill">' + fvFormatMinutes(a.minutes) + ' \u00b7 ' + pct + '%</span>' +
+              '</div>' +
+              '<div class="lt-fv-bar"><i style="width:' + pct + '%;background:' + a.color + '"></i></div>' +
             '</div>'
           );
         }).join("")
@@ -5455,26 +5564,29 @@
     var overlay = document.createElement("div");
     overlay.id = "lt-fv-report-overlay";
     overlay.innerHTML =
-      '<div class="lt-fv-modal-head"><h3>Full view \u00b7 ' + escapeHtml(dateText) + '</h3><button class="lt-fv-modal-close" id="lt-fv-report-close">\u2715</button></div>' +
+      '<div class="lt-fv-modal-head">' +
+        '<button class="lt-fv-back" id="lt-fv-report-close" aria-label="Back">\u2190</button>' +
+        '<div><h3>Full view</h3><p>' + escapeHtml(dateText) + '</p></div>' +
+      '</div>' +
       '<div class="lt-fv-report-card">' +
         '<div class="lt-fv-donut" style="background:' + fvConicGradient(activities, total) + '">' +
           '<div class="lt-fv-donut-hole"><strong>' + fvFormatMinutes(total) + '</strong><span>TRACKED</span></div>' +
         '</div>' +
-        '<div class="lt-fv-legend">' + rowsHtml + '</div>' +
+        rowsHtml +
       '</div>' +
       '<div class="lt-fv-report-card">' +
-        '<p class="lt-card-title" style="margin:0 0 10px;color:#fff">Summary</p>' +
-        '<div class="lt-fv-row"><span class="lt-fv-row-left">Total tracked</span><span class="lt-fv-row-right">' + fvFormatMinutes(total) + '</span></div>' +
-        '<div class="lt-fv-row"><span class="lt-fv-row-left">Categories used</span><span class="lt-fv-row-right">' + activities.length + '</span></div>' +
-        '<div class="lt-fv-row"><span class="lt-fv-row-left">Top category</span><span class="lt-fv-row-right">' + (topActivity ? '<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + topActivity.color + '"></span>' + escapeHtml(topActivity.name) + ' \u00b7 ' + fvFormatMinutes(topActivity.minutes) + '</span>' : "0") + '</span></div>' +
+        '<p class="lt-fv-sec-title">Summary</p>' +
+        '<div class="lt-fv-row" style="margin-bottom:10px"><span class="lt-fv-row-left">Total tracked</span><span class="lt-fv-row-right">' + fvFormatMinutes(total) + '</span></div>' +
+        '<div class="lt-fv-row" style="margin-bottom:10px"><span class="lt-fv-row-left">Categories used</span><span class="lt-fv-row-right">' + activities.length + '</span></div>' +
+        '<div class="lt-fv-row"><span class="lt-fv-row-left">Top category</span><span class="lt-fv-row-right">' + (topActivity ? '<span style="display:inline-flex;align-items:center;gap:5px"><span class="lt-fv-dot" style="background:' + topActivity.color + '"></span>' + escapeHtml(topActivity.name) + ' \u00b7 ' + fvFormatMinutes(topActivity.minutes) + '</span>' : "0") + '</span></div>' +
       '</div>' +
       '<div class="lt-fv-modal-actions">' +
-        '<button id="lt-fv-report-share-btn" style="background:hsl(var(--primary));color:#fff;box-shadow:0 6px 18px rgba(0,194,168,.35)">Share</button>' +
+        '<button id="lt-fv-report-share-btn">Share</button>' +
       '</div>';
     document.body.appendChild(overlay);
 
     overlay.addEventListener("click", function (e) {
-      if (e.target === overlay || e.target.id === "lt-fv-report-close") { overlay.remove(); return; }
+      if (e.target === overlay || e.target.id === "lt-fv-report-close") { fvCloseOverlay(overlay); return; }
       if (e.target.id === "lt-fv-report-share-btn") {
         fvOpenShareCard(dateText, activities);
       }
@@ -5490,7 +5602,10 @@
     var overlay = document.createElement("div");
     overlay.id = "lt-fv-share-overlay";
     overlay.innerHTML =
-      '<div class="lt-fv-modal-head"><h3>Share \u00b7 ' + escapeHtml(dateText) + '</h3><button class="lt-fv-modal-close" id="lt-fv-share-close">\u2715</button></div>' +
+      '<div class="lt-fv-modal-head">' +
+        '<button class="lt-fv-back" id="lt-fv-share-close" aria-label="Back">\u2190</button>' +
+        '<div><h3>Share</h3><p>' + escapeHtml(dateText) + '</p></div>' +
+      '</div>' +
       '<div class="lt-fv-card-wrap" id="lt-fv-card-wrap"><div class="lt-fv-loading">Building your day\u2019s graphic\u2026</div></div>' +
       '<div class="lt-fv-modal-actions" id="lt-fv-actions" style="display:none">' +
         '<button id="lt-fv-share-btn">Share</button>' +
@@ -5500,7 +5615,7 @@
     document.body.appendChild(overlay);
 
     overlay.addEventListener("click", function (e) {
-      if (e.target === overlay || e.target.id === "lt-fv-share-close") { overlay.remove(); }
+      if (e.target === overlay || e.target.id === "lt-fv-share-close") { fvCloseOverlay(overlay); }
     });
 
     var canvas = fvDrawCard(dateText, activities, sharerName);
