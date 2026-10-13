@@ -313,7 +313,6 @@ export function LifeHubScreen({ profile }) {
       "data-lifetime-tool": featured.id,
       "data-lt-category": featured.category,
       "data-lt-tile-injected": "1",
-      "data-lt-move": "tool.featured",
       className: "group col-span-2 w-full relative overflow-hidden rounded-3xl p-4 text-left bg-foreground text-background ring-1 ring-white/25 shadow-[0_14px_34px_rgba(0,0,0,.28)] transition active:scale-[.99] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50 [-webkit-tap-highlight-color:transparent]",
       children: [
         jsx("div", { className: "absolute -right-10 -top-12 w-40 h-40 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.07)" } }),
@@ -360,7 +359,6 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": spotlight.id,
         "data-lt-category": spotlight.category,
         "data-lt-tile-injected": "1",
-      "data-lt-move": "tool.spotlight",
         className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl text-left shadow-[0_4px_14px_rgba(0,0,0,.07)] transition active:scale-[.99] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black/40 [-webkit-tap-highlight-color:transparent]",
         style: {
           background: "linear-gradient(115deg, " + c.bg + " 0%, rgba(255,255,255,.92) 160%)",

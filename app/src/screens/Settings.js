@@ -263,12 +263,16 @@ export function SettingsScreen() {
       if (!onTab) location.hash = "#/";
     } catch (e) {}
   };
+  var _layoutResetState = useState(false);
+  var layoutReset = _layoutResetState[0];
+  var setLayoutReset = _layoutResetState[1];
   var resetUiLayout = function () {
     try {
       localStorage.removeItem("lt_ui_order_v1");
       localStorage.removeItem("lt_ui_layout_v1");
     } catch (e) {}
-    alert("Layout reset \u2014 every box is back in its default place.");
+    setLayoutReset(true);
+    setTimeout(function () { setLayoutReset(false); }, 1500);
   };
 
   function handleCurrencyChange(code) {
@@ -717,21 +721,35 @@ export function SettingsScreen() {
         children: [
           jsx(SectionHeader, { children: "Layout" }),
           jsx(Card, {
-            children: jsx(CardRow, {
-              label: "\uD83C\uDFA1 UI Layout Editor",
-              desc: "Hold a box and drop it on another box to swap their places \u2014 same size, same line. Saves on this device, works on every tab.",
-              children: jsxs("div", { className: "flex gap-2", children: [
-                jsx("button", {
-                  onClick: openUiEditor,
-                  className: "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/20 transition",
-                  children: "Open editor"
-                }),
-                jsx("button", {
-                  onClick: resetUiLayout,
-                  className: "rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-muted-foreground active:bg-secondary/80 transition",
-                  children: "Reset"
-                })
-              ] })
+            children: jsxs("div", {
+              className: "p-4",
+              children: [
+                jsxs("div", { className: "flex items-start gap-3", children: [
+                  jsx("span", {
+                    className: "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg",
+                    children: "\uD83C\uDFA1"
+                  }),
+                  jsxs("div", { className: "min-w-0 flex-1", children: [
+                    jsx("p", { className: "text-sm font-bold text-foreground", children: "UI Layout Editor" }),
+                    jsx("p", {
+                      className: "mt-1 text-xs leading-relaxed text-muted-foreground",
+                      children: "Hold a box, drop it on another to swap \u2014 same size, same line. Timer, Activity and Journal tabs only; saved on this device."
+                    })
+                  ]})
+                ]}),
+                jsxs("div", { className: "mt-3.5 flex items-center gap-2", children: [
+                  jsx("button", {
+                    onClick: openUiEditor,
+                    className: "h-10 flex-1 rounded-full bg-primary text-primary-foreground text-xs font-black tracking-wide transition active:scale-[.97]",
+                    children: "Open editor"
+                  }),
+                  jsx("button", {
+                    onClick: resetUiLayout,
+                    className: "h-10 min-w-[78px] rounded-full border border-border bg-background px-4 text-xs font-bold text-muted-foreground transition active:scale-[.97]",
+                    children: layoutReset ? "Reset \u2713" : "Reset"
+                  })
+                ]})
+              ]
             })
           })
         ]

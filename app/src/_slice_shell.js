@@ -271,28 +271,36 @@ function uiEditorBind() {
 
   const editing = () => document.body.classList.contains('lt-ui-editing');
 
+  /* Picks the held box up: bright outline, rides the finger from here. */
+  const activate = () => {
+    if (!_hold || _dragEl) return;
+    _dragEl = _hold.el;
+    try {
+      _dragEl.classList.add('lt-dragging');
+      document.body.style.userSelect = 'none';
+      if (navigator.vibrate) navigator.vibrate(10);
+    } catch (err) {}
+  };
+
   const down = (e) => {
     if (!editing() || _dragEl) return;
     const el = (e.target && e.target.closest) ? e.target.closest('[data-lt-move]') : null;
     if (!el) return;
     _justDragged = false;
     const px = e.clientX, py = e.clientY;
-    _hold = { el: el, x: px, y: py, t: setTimeout(() => {
-      if (!_hold) return;
-      _dragEl = _hold.el;
-      try {
-        _dragEl.classList.add('lt-dragging');
-        document.body.style.userSelect = 'none';
-        if (navigator.vibrate) navigator.vibrate(10);
-      } catch (err) {}
-    }, 350) };
+    _hold = { el: el, x: px, y: py, t: setTimeout(() => { activate(); }, 300) };
   };
 
   const move = (e) => {
     if (_hold && !_dragEl) {
-      if (Math.abs(e.clientX - _hold.x) > 10 || Math.abs(e.clientY - _hold.y) > 10) {
+      const hx = Math.abs(e.clientX - _hold.x), hy = Math.abs(e.clientY - _hold.y);
+      if (hx > 8 || hy > 8) {
+        /* Moving before the hold completes means the user is ALREADY
+           dragging — pick the box up now. Cancelling here was the main
+           reason drags "never worked": every real finger drifts a few
+           pixels, so the hold almost always got thrown away. */
         clearTimeout(_hold.t);
-        _hold = null;
+        activate();
       }
       return;
     }
@@ -351,7 +359,7 @@ const SHELL_CSS = [
   '@keyframes lt-fade-in{from{opacity:0}to{opacity:1}}',
   '.lt-sheet-in{animation:lt-sheet-up .26s cubic-bezier(.22,.61,.36,1)}',
   '.lt-fade-in{animation:lt-fade-in .2s ease}',
-  'body.lt-ui-editing [data-lt-move]{outline:1px dashed rgba(0,194,168,.55);outline-offset:-2px;touch-action:none;cursor:grab}',
+  'body.lt-ui-editing [data-lt-move]{outline:1px dashed rgba(0,194,168,.55);outline-offset:-2px;touch-action:none;cursor:grab;transition:order .28s cubic-bezier(.22,.61,.36,1),outline .15s,box-shadow .15s}',
   'body.lt-ui-editing [data-lt-move].lt-dragging{outline:2px solid #00C2A8;cursor:grabbing;box-shadow:0 14px 34px rgba(4,9,30,.35);opacity:.96;pointer-events:none;z-index:60!important;transition:none;will-change:transform}',
   'body.lt-ui-editing [data-lt-move].lt-swap-target{outline:2px solid #FFB020;outline-offset:-2px;box-shadow:0 0 0 5px rgba(255,176,32,.25)}'
 ].join('');
@@ -385,14 +393,28 @@ export function ak({ profile }) {
   }
   const enterDir = animRef.current.dir;
 
-  /* Horizontal swipe state */
-  const gRef = useRef({ active: false, locked: null, startX: 0, startY: 0, width: 0 });
+  /* Horizontal swipe state (x/sign track the finger during the gesture) */
+  const gRef = useRef({ active: false, locked: null, startX: 0, startY: 0, width: 0, x: 0, sign: 0 });
   const [dragX, setDragX] = useState(0);
   const [peek, setPeek] = useState(null);
   const [tracking, setTracking] = useState(false);
+  /* Imperative style targets. pointermove fires up to ~120×/s — pushing
+     dragX through React re-rendered the whole page tree on EVERY event,
+     which made the slide feel heavy and then suddenly "detach". During the
+     gesture the transforms are written straight to the DOM; React only
+     writes these styles when dragX/peek/tracking actually change (lock,
+     direction flip, release), so the imperative values stick. */
+  const wrapRef = useRef(null);
+  const peekRef = useRef(null);
+  const applyDragStyles = (x) => {
+    const w = gRef.current.width || 1;
+    if (wrapRef.current) wrapRef.current.style.transform = x ? 'translateX(' + x + 'px)' : '';
+    if (peekRef.current) peekRef.current.style.transform = 'translateX(' + (x + (x > 0 ? -w : w)) + 'px)';
+  };
 
   /* UI editor state */
   const [editorOn, setEditorOn] = useState(false);
+  const [resetFlash, setResetFlash] = useState(false);
 
   useEffect(() => {
     const onOpen = () => setEditorOn(true);
@@ -451,7 +473,8 @@ export function ak({ profile }) {
     gRef.current = {
       active: true, locked: null,
       startX: t.clientX, startY: t.clientY,
-      width: shellRef.current ? shellRef.current.clientWidth : 0
+      width: shellRef.current ? shellRef.current.clientWidth : 0,
+      x: 0, sign: 0
     };
   };
 
@@ -462,15 +485,28 @@ export function ak({ profile }) {
     const dx = t.clientX - g.startX;
     const dy = t.clientY - g.startY;
     if (!g.locked) {
-      if (Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+      /* Lock fast (8px): the page attaches to the finger almost
+         immediately — the old 14px dead zone felt like resistance and then
+         a sudden release. The 1.15× direction ratio keeps vertical list
+         scrolling from ever starting a slide. */
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.15) {
         g.locked = 'h';
+        const idx0 = tabIndex(pathname);
+        const next0 = dx > 0 ? idx0 - 1 : idx0 + 1;
+        const has0 = idx0 >= 0 && next0 >= 0 && next0 < TABS.length;
+        let x0 = has0 ? dx : dx * 0.22;
+        const w0 = g.width || 1;
+        if (x0 > w0) x0 = w0;
+        if (x0 < -w0) x0 = -w0;
+        g.x = x0;
+        g.sign = dx > 0 ? 1 : -1;
         setTracking(true);
-      } else if (Math.abs(dy) > 14) {
-        g.locked = 'v';
-        return;
-      } else {
+        setDragX(x0); /* one render — styles are correct from the start */
+        setPeek(has0 ? TABS[next0] : null);
         return;
       }
+      if (Math.abs(dy) > 14) { g.locked = 'v'; return; }
+      return;
     }
     if (g.locked !== 'h') return;
     const idx = tabIndex(pathname);
@@ -480,8 +516,17 @@ export function ak({ profile }) {
     const w = g.width || 1;
     if (x > w) x = w;
     if (x < -w) x = -w;
-    setDragX(x);
-    setPeek(has ? TABS[nextIdx] : null);
+    g.x = x;
+    const sign = x > 0 ? 1 : x < 0 ? -1 : g.sign;
+    if ((has ? TABS[nextIdx] : null) !== peek || sign !== g.sign) {
+      /* Neighbour or direction changed → one state sync (rare), then
+         straight back to imperative updates. */
+      g.sign = sign;
+      setDragX(x);
+      setPeek(has ? TABS[nextIdx] : null);
+      return;
+    }
+    applyDragStyles(x);
   };
 
   const onTouchEnd = () => {
@@ -491,14 +536,15 @@ export function ak({ profile }) {
     g.locked = null;
     setTracking(false);
     const w = g.width || 1;
+    const x = g.x || 0;
     const target = peek;
-    if (target && Math.abs(dragX) > w * 0.26) {
+    if (target && Math.abs(x) > w * 0.26) {
       /* Commit WITHOUT a jump: glide the whole strip to the edge (the
          target page — the peek pane — continues its slide from exactly
          where the finger left off) and then swap it for the real route in
          one batch, with the enter animation suppressed. The result is one
          continuous slide, no teleport, no re-entry animation. */
-      setDragX(dragX > 0 ? w : -w);
+      setDragX(x > 0 ? w : -w);
       glideTargetRef.current = target;
       glideTRef.current = setTimeout(finishCommit, 250);
     } else {
@@ -520,6 +566,8 @@ export function ak({ profile }) {
       localStorage.removeItem(UI_LAYOUT_KEY);
     } catch (err) {}
     applyUiLayout();
+    setResetFlash(true);
+    setTimeout(() => setResetFlash(false), 1400);
   };
 
   const paneW = gRef.current.width || 0;
@@ -542,6 +590,7 @@ export function ak({ profile }) {
         children: [
           jsx('div', {
             key: pathname,
+            ref: wrapRef,
             className: cn('h-full', enterDir === 1 ? 'lt-page-in-r' : enterDir === -1 ? 'lt-page-in-l' : ''),
             style: {
               transform: dragX ? 'translateX(' + dragX + 'px)' : undefined,
@@ -554,6 +603,7 @@ export function ak({ profile }) {
           }),
           peek ? jsx('div', {
             key: 'peek-' + peek,
+            ref: peekRef,
             className: 'absolute inset-0 bg-background pointer-events-none overflow-hidden',
             style: {
               transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
@@ -568,31 +618,46 @@ export function ak({ profile }) {
       }),
       jsx(ck, {}),
       editorOn ? jsxs('div', {
-        className: 'fixed left-1/2 -translate-x-1/2 z-[70] flex items-center gap-1.5 bg-[#04091e] text-white rounded-full px-2 py-1.5 shadow-[0_10px_30px_rgba(4,9,30,.4)] border border-white/10',
-        style: { bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))' },
+        className: 'fixed left-1/2 -translate-x-1/2 z-[70] w-[min(344px,calc(100vw-20px))] rounded-2xl bg-[#04091e]/95 backdrop-blur-md border border-white/10 shadow-[0_18px_50px_rgba(4,9,30,.55)] px-3.5 py-3',
+        style: { bottom: 'calc(74px + env(safe-area-inset-bottom, 0px))' },
         children: [
-          jsx('span', { className: 'text-[10px] font-bold text-white/70 pl-1 pr-0.5', children: 'Hold a box, drop on another to swap' }),
-          jsx('button', {
-            className: 'w-7 h-7 rounded-full bg-white/10 text-white text-xs font-black active:bg-white/20',
-            onPointerDown: scrollMain(-1),
-            'aria-label': 'Scroll up',
-            children: '\u25B2'
+          jsxs('div', {
+            className: 'flex items-start gap-2 pb-2.5',
+            children: [
+              jsx('span', { className: 'text-accent text-[13px] leading-none mt-[1px]', children: '\u2725' }),
+              jsx('span', { className: 'text-[11.5px] leading-snug font-semibold text-white/75', children: 'Hold a box, then drop it on another to swap \u2014 same size, same line.' })
+            ]
           }),
-          jsx('button', {
-            className: 'w-7 h-7 rounded-full bg-white/10 text-white text-xs font-black active:bg-white/20',
-            onPointerDown: scrollMain(1),
-            'aria-label': 'Scroll down',
-            children: '\u25BC'
-          }),
-          jsx('button', {
-            className: 'h-7 px-2.5 rounded-full bg-white/10 text-white text-[11px] font-black active:bg-white/20',
-            onPointerDown: resetLayout,
-            children: 'Reset'
-          }),
-          jsx('button', {
-            className: 'h-7 px-3 rounded-full bg-accent text-black text-[11px] font-black active:opacity-80',
-            onPointerDown: (e) => { e.preventDefault(); setEditorOn(false); try { window.dispatchEvent(new CustomEvent('lt-ui-editor-done')); } catch (err) {} },
-            children: 'Done'
+          jsxs('div', {
+            className: 'flex items-center justify-between gap-2',
+            children: [
+              jsxs('div', { className: 'flex items-center gap-1.5', children: [
+                jsx('button', {
+                  className: 'w-8 h-8 rounded-xl bg-white/10 text-white/85 text-[11px] font-black active:bg-white/20 transition',
+                  onPointerDown: scrollMain(-1),
+                  'aria-label': 'Scroll up',
+                  children: '\u25B2'
+                }),
+                jsx('button', {
+                  className: 'w-8 h-8 rounded-xl bg-white/10 text-white/85 text-[11px] font-black active:bg-white/20 transition',
+                  onPointerDown: scrollMain(1),
+                  'aria-label': 'Scroll down',
+                  children: '\u25BC'
+                })
+              ]}),
+              jsxs('div', { className: 'flex items-center gap-1.5', children: [
+                jsx('button', {
+                  className: 'h-9 min-w-[74px] px-4 rounded-full border border-white/15 text-white/85 text-[11px] font-bold active:bg-white/10 transition',
+                  onPointerDown: resetLayout,
+                  children: resetFlash ? 'Reset \u2713' : 'Reset'
+                }),
+                jsx('button', {
+                  className: 'h-9 px-6 rounded-full bg-accent text-black text-[11px] font-black tracking-wide active:opacity-80 transition shadow-[0_6px_18px_rgba(0,194,168,.35)]',
+                  onPointerDown: (e) => { e.preventDefault(); setEditorOn(false); try { window.dispatchEvent(new CustomEvent('lt-ui-editor-done')); } catch (err) {} },
+                  children: 'Done'
+                })
+              ]})
+            ]
           })
         ]
       }) : null

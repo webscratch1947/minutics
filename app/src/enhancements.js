@@ -1525,16 +1525,18 @@
       ".lt-fv-modal-head h3{color:#1E1B4B;font-size:15.5px;font-weight:800;margin:0}",
       ".lt-fv-modal-head p{color:rgba(55,48,163,.6);font-size:11.5px;font-weight:700;margin:1px 0 0}",
       ".lt-fv-modal-close{margin-left:auto;background:#fff;border:1px solid rgba(55,48,163,.18);color:#3730A3;width:30px;height:30px;border-radius:50%;font-size:14px;cursor:pointer}",
-      ".lt-fv-card-wrap{width:calc(100% - 32px);max-width:480px;background:#fff;border:1px solid rgba(55,48,163,.12);border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(55,48,163,.10);box-sizing:border-box}",
+      ".lt-fv-card-wrap{width:calc(100% - 32px);max-width:480px;background:#fff;border:1.4px solid rgba(55,48,163,.22);border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(55,48,163,.10);box-sizing:border-box}",
       ".lt-fv-card-wrap img{display:block;width:100%;height:auto}",
       ".lt-fv-modal-actions{width:calc(100% - 32px);max-width:480px;display:flex;gap:10px;margin-top:14px;box-sizing:border-box}",
       ".lt-fv-modal-actions button{flex:1;border:none;border-radius:999px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}",
-      "#lt-fv-share-btn{background:#3730A3;color:#fff;box-shadow:0 8px 20px rgba(55,48,163,.30)}",
+      "#lt-fv-share-btn,#lt-fv-report-share-btn{background:#3730A3;color:#fff;box-shadow:0 8px 20px rgba(55,48,163,.30)}",
+      "#lt-fv-report-share-btn:active,#lt-fv-share-btn:active{transform:translateY(1px);opacity:.92}",
       "#lt-fv-save-btn{background:#fff;color:#3730A3;border:1.5px solid rgba(55,48,163,.30)}",
       ".lt-fv-hint{width:calc(100% - 32px);max-width:480px;color:rgba(55,48,163,.55);font-size:11.5px;text-align:center;margin-top:10px;line-height:1.4;box-sizing:border-box}",
       ".lt-fv-loading{color:rgba(55,48,163,.6);font-size:13px;padding:40px 0}",
       /* Report tab (stage 1) */
-      ".lt-fv-report-card{width:calc(100% - 32px);max-width:480px;background:#fff;border:1px solid rgba(55,48,163,.12);border-radius:18px;padding:16px;box-sizing:border-box;margin:0 0 12px;box-shadow:0 6px 20px rgba(55,48,163,.07)}",
+      ".lt-fv-report-card{width:calc(100% - 32px);max-width:480px;background:#fff;border:1.4px solid rgba(55,48,163,.22);border-radius:18px;padding:16px;box-sizing:border-box;margin:0 0 12px;box-shadow:0 6px 20px rgba(55,48,163,.07)}",
+      "#lt-fv-report-body{width:100%;display:flex;flex-direction:column;align-items:center}",
       ".lt-fv-donut{width:180px;height:180px;border-radius:50%;position:relative;margin:4px auto 14px}",
       ".lt-fv-donut-hole{position:absolute;inset:26px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-shadow:inset 0 0 0 1px rgba(55,48,163,.06)}",
       ".lt-fv-donut-hole strong{color:#1E1B4B;font-size:19px;font-weight:800}",
@@ -5316,24 +5318,38 @@
     return acts;
   }
 
+  /* True when the day's detail block is rendered (the container has more
+     than just the row button) — independent of the scrape selector, so the
+     restore can never be skipped. */
+  function fvRowOpen(rowButton) {
+    var cont = rowButton.parentElement;
+    return !!(cont && cont.children.length > 1);
+  }
+
   function fvScrapeJournalDay(rowButton, callback) {
-    var already = fvScrapeExpandedDetail(rowButton);
-    if (already !== null) { callback(already); return; }
-    /* Not expanded yet \u2014 trigger the app's own row click to expand it,
-       then wait for React to render before reading it. */
+    if (fvScrapeExpandedDetail(rowButton) !== null) {
+      callback(fvScrapeExpandedDetail(rowButton));
+      return;
+    }
+    /* Not expanded yet — trigger the app's own row click to expand it,
+       then wait for React to render before reading it. The caller has
+       already covered the screen with the report overlay, so this
+       expand/scrape cycle is never visible. */
+    var opened = false;
     rowButton.click();
-    var attempts = 10;
+    var attempts = 14;
     (function poll() {
       var data = fvScrapeExpandedDetail(rowButton);
+      if (data !== null) opened = true;
       if (data !== null || attempts <= 0) {
-        /* Close the row again — tapping Full view must not leave the
-           journal day's dropdown open behind the report. */
-        if (data !== null) rowButton.click();
+        /* ALWAYS restore what we opened (or what is open per the DOM) —
+           tapping Full view must never leave the day's dropdown open. */
+        if (opened || fvRowOpen(rowButton)) rowButton.click();
         callback(data || []);
         return;
       }
       attempts--;
-      setTimeout(poll, 120);
+      setTimeout(poll, 100);
     })();
   }
 
@@ -5538,29 +5554,12 @@
 
   /* Stage 1: the report tab — donut + per-activity bars + summary, with a
      "Share" button that leads to the shareable visiting-card image. */
+  /* Opens the report overlay IMMEDIATELY in a loading state and returns a
+     fill(activities) function. The journal day row is expanded, scraped
+     and restored only AFTER the overlay covers the screen, so tapping
+     Full view never visibly opens the day's dropdown. */
   function fvOpenReportModal(dateText, activities) {
-    activities = fvDistinctColors(activities);
-    var total = activities.reduce(function (s, a) { return s + a.minutes; }, 0);
-    var topActivity = activities.length ? activities[0] : null;
-
-    var rowsHtml = activities.length
-      ? '<p class="lt-fv-sec-title">By activity</p>' + activities.map(function (a) {
-          var pct = total ? Math.round((a.minutes / total) * 100) : 0;
-          var lead = a.emoji
-            ? '<span class="lt-fv-emo" style="background:' + a.color + '22">' + escapeHtml(a.emoji) + '</span>'
-            : '<span class="lt-fv-dot" style="background:' + a.color + '"></span>';
-          return (
-            '<div style="margin-bottom:12px">' +
-              '<div class="lt-fv-row">' +
-                '<span class="lt-fv-row-left">' + lead + escapeHtml(a.name) + '</span>' +
-                '<span class="lt-fv-pill">' + fvFormatMinutes(a.minutes) + ' \u00b7 ' + pct + '%</span>' +
-              '</div>' +
-              '<div class="lt-fv-bar"><i style="width:' + pct + '%;background:' + a.color + '"></i></div>' +
-            '</div>'
-          );
-        }).join("")
-      : '<div class="lt-empty">No activity tagged on this day yet.</div>';
-
+    var pendingActivities = Array.isArray(activities) ? activities : null;
     var overlay = document.createElement("div");
     overlay.id = "lt-fv-report-overlay";
     overlay.innerHTML =
@@ -5568,29 +5567,63 @@
         '<button class="lt-fv-back" id="lt-fv-report-close" aria-label="Back">\u2190</button>' +
         '<div><h3>Full view</h3><p>' + escapeHtml(dateText) + '</p></div>' +
       '</div>' +
-      '<div class="lt-fv-report-card">' +
-        '<div class="lt-fv-donut" style="background:' + fvConicGradient(activities, total) + '">' +
-          '<div class="lt-fv-donut-hole"><strong>' + fvFormatMinutes(total) + '</strong><span>TRACKED</span></div>' +
-        '</div>' +
-        rowsHtml +
-      '</div>' +
-      '<div class="lt-fv-report-card">' +
-        '<p class="lt-fv-sec-title">Summary</p>' +
-        '<div class="lt-fv-row" style="margin-bottom:10px"><span class="lt-fv-row-left">Total tracked</span><span class="lt-fv-row-right">' + fvFormatMinutes(total) + '</span></div>' +
-        '<div class="lt-fv-row" style="margin-bottom:10px"><span class="lt-fv-row-left">Categories used</span><span class="lt-fv-row-right">' + activities.length + '</span></div>' +
-        '<div class="lt-fv-row"><span class="lt-fv-row-left">Top category</span><span class="lt-fv-row-right">' + (topActivity ? '<span style="display:inline-flex;align-items:center;gap:5px"><span class="lt-fv-dot" style="background:' + topActivity.color + '"></span>' + escapeHtml(topActivity.name) + ' \u00b7 ' + fvFormatMinutes(topActivity.minutes) + '</span>' : "0") + '</span></div>' +
-      '</div>' +
-      '<div class="lt-fv-modal-actions">' +
-        '<button id="lt-fv-report-share-btn">Share</button>' +
+      '<div id="lt-fv-report-body">' +
+        (pendingActivities !== null ? '' : '<p class="lt-fv-loading">Building your report\u2026</p>') +
       '</div>';
     document.body.appendChild(overlay);
 
     overlay.addEventListener("click", function (e) {
-      if (e.target === overlay || e.target.id === "lt-fv-report-close") { fvCloseOverlay(overlay); return; }
-      if (e.target.id === "lt-fv-report-share-btn") {
-        fvOpenShareCard(dateText, activities);
+      /* ONLY the back button closes the report — tapping anywhere in the
+         content must never kick the user back. */
+      if (e.target.id === "lt-fv-report-close") { fvCloseOverlay(overlay); return; }
+      if (e.target.id === "lt-fv-report-share-btn" && pendingActivities) {
+        fvOpenShareCard(dateText, pendingActivities);
       }
     });
+
+    var fill = function (raw) {
+      var acts = fvDistinctColors(raw || []);
+      pendingActivities = acts;
+      var total = acts.reduce(function (s, a) { return s + a.minutes; }, 0);
+      var topActivity = acts.length ? acts[0] : null;
+      var rowsHtml = acts.length
+        ? '<p class="lt-fv-sec-title">By activity</p>' + acts.map(function (a) {
+            var pct = total ? Math.round((a.minutes / total) * 100) : 0;
+            var lead = a.emoji
+              ? '<span class="lt-fv-emo" style="background:' + a.color + '22">' + escapeHtml(a.emoji) + '</span>'
+              : '<span class="lt-fv-dot" style="background:' + a.color + '"></span>';
+            return (
+              '<div style="margin-bottom:12px">' +
+                '<div class="lt-fv-row">' +
+                  '<span class="lt-fv-row-left">' + lead + escapeHtml(a.name) + '</span>' +
+                  '<span class="lt-fv-pill">' + fvFormatMinutes(a.minutes) + ' \u00b7 ' + pct + '%</span>' +
+                '</div>' +
+                '<div class="lt-fv-bar"><i style="width:' + pct + '%;background:' + a.color + '"></i></div>' +
+              '</div>'
+            );
+          }).join("")
+        : '<div class="lt-empty">No activity tagged on this day yet.</div>';
+      var body = document.getElementById("lt-fv-report-body");
+      if (!body) return;
+      body.innerHTML =
+        '<div class="lt-fv-report-card">' +
+          '<div class="lt-fv-donut" style="background:' + fvConicGradient(acts, total) + '">' +
+            '<div class="lt-fv-donut-hole"><strong>' + fvFormatMinutes(total) + '</strong><span>TRACKED</span></div>' +
+          '</div>' +
+          rowsHtml +
+        '</div>' +
+        '<div class="lt-fv-report-card">' +
+          '<p class="lt-fv-sec-title">Summary</p>' +
+          '<div class="lt-fv-row" style="margin-bottom:10px"><span class="lt-fv-row-left">Total tracked</span><span class="lt-fv-row-right">' + fvFormatMinutes(total) + '</span></div>' +
+          '<div class="lt-fv-row" style="margin-bottom:10px"><span class="lt-fv-row-left">Categories used</span><span class="lt-fv-row-right">' + acts.length + '</span></div>' +
+          '<div class="lt-fv-row"><span class="lt-fv-row-left">Top category</span><span class="lt-fv-row-right">' + (topActivity ? '<span style="display:inline-flex;align-items:center;gap:5px"><span class="lt-fv-dot" style="background:' + topActivity.color + '"></span>' + escapeHtml(topActivity.name) + ' \u00b7 ' + fvFormatMinutes(topActivity.minutes) + '</span>' : "0") + '</span></div>' +
+        '</div>' +
+        '<div class="lt-fv-modal-actions">' +
+          '<button id="lt-fv-report-share-btn">Share</button>' +
+        '</div>';
+    };
+    if (pendingActivities !== null) fill(pendingActivities);
+    return fill;
   }
 
   /* Stage 2: builds the visiting-card-shaped image and offers Share/Save
@@ -5615,7 +5648,8 @@
     document.body.appendChild(overlay);
 
     overlay.addEventListener("click", function (e) {
-      if (e.target === overlay || e.target.id === "lt-fv-share-close") { fvCloseOverlay(overlay); }
+      /* Only the back button closes — content taps do nothing. */
+      if (e.target.id === "lt-fv-share-close") { fvCloseOverlay(overlay); }
     });
 
     var canvas = fvDrawCard(dateText, activities, sharerName);
@@ -5677,9 +5711,13 @@
         e.preventDefault();
         e.stopPropagation();
         var dateText = row.dateText;
+        /* Open the report FIRST (loading state), then expand/scrape/restore
+           the day row BEHIND it — tapping Full view never visibly opens
+           the date's dropdown. */
+        var fill = fvOpenReportModal(dateText, null);
         fvScrapeJournalDay(row.button, function (activities) {
           activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
-          fvOpenReportModal(dateText, activities);
+          fill(activities);
         });
       });
       if (rightGroup && rightGroup.lastElementChild) host.insertBefore(btn, rightGroup.lastElementChild);

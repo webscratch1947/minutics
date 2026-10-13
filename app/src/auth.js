@@ -336,6 +336,18 @@ function endDemoSession() {
   document.body.classList.remove("lt-authed");
   try { announceUserChanged(); } catch (e) {}
   renderGate("welcome"); /* demo key is gone → renders the normal welcome */
+  /* Full teardown: reload once so NO in-memory React/enhancement state can
+     survive the wipe and repopulate the next session (deleting the demo
+     used to look like a mere "reset" — data came back). The wipe already
+     removed the session key, so boot lands on the welcome screen and this
+     can never loop. */
+  var wipedClean = false;
+  try { wipedClean = !isDemoActive(); } catch (e) { wipedClean = true; }
+  if (wipedClean) {
+    /* 400ms: also gives disconnectTelegramAll's schedule-purge fetch a
+       moment to land before the page goes away. */
+    try { setTimeout(function () { location.reload(); }, 400); } catch (e) {}
+  }
 }
 /* A real sign-in always beats a demo session: wipe the demo completely
    FIRST so none of its data can be swept into the real account's
@@ -380,11 +392,10 @@ function enterDemo(isNew) {
   hideBootSplash();
   var g = document.getElementById("lt-auth-gate");
   if (g) g.remove();
-  var s = document.getElementById("lt-startup-splash");
-  if (s && s.parentNode && !window.__ltSplashVideoPlaying) {
-    if (window.__ltSplashDismiss) window.__ltSplashDismiss();
-    else s.parentNode.removeChild(s);
-  }
+  /* #lt-startup-splash is deliberately NOT touched here: it plays its full
+     logo animation and releases itself (ended / 3s never-started / 7s hard
+     cap). Dismissing it whenever auth won the race against the video is
+     exactly why the splash appeared only "sometimes". */
   document.body.classList.add("lt-authed");
   var root = document.getElementById("root");
   if (root) root.removeAttribute("style");
@@ -1283,11 +1294,8 @@ onAuthStateChanged(auth, function (user) {
         document.body.classList.add("lt-authed");
         var g = document.getElementById("lt-auth-gate");
         if (g) g.remove();
-        var s = document.getElementById("lt-startup-splash");
-        if (s && s.parentNode && !window.__ltSplashVideoPlaying) {
-          if (window.__ltSplashDismiss) window.__ltSplashDismiss();
-          else s.parentNode.removeChild(s);
-        }
+        /* The startup splash keeps its own lifecycle (see enterDemo) —
+           never cut it short here. */
         var r = document.getElementById("root");
         if (r) r.removeAttribute("style");
       } catch (e) {}
