@@ -1,5 +1,5 @@
 import { jsx, jsxs } from 'react/jsx-runtime';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen, LayoutGrid, ListTodo, Settings, Timer } from 'lucide-react';
 import { cn } from './lib/cn.js';
@@ -106,7 +106,7 @@ function LTTopNav() {
     onKeyDown: (event) => { if (event.key === 'Enter' || event.key === ' ') navigate('/activity'); },
     children: [
       jsx('span', {
-        className: 'w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-pulse'
+        className: 'w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 animate-pulse'
       }),
       jsx('span', {
         className: 'flex-1 truncate',
@@ -115,7 +115,7 @@ function LTTopNav() {
       jsx(DemoClock, { tone: 'text-white/75' }),
       jsx('button', {
         onClick: stopTimer,
-        className: 'bg-white/15 text-white border-none rounded-full px-2.5 py-1 text-[10px] font-extrabold shrink-0',
+        className: 'bg-white/15 text-white border-none rounded-full px-2 py-0.5 text-[9px] font-extrabold shrink-0',
         children: 'Stop'
       })
     ]
@@ -309,6 +309,14 @@ function uiEditorBind() {
     /* The box rides the finger (visual only — no layout change). */
     _dragEl.style.transform = 'translate(' + (e.clientX - _hold.x) + 'px,' +
       (e.clientY - _hold.y) + 'px) scale(1.02)';
+    /* Hold near a screen edge → the page SLOWLY scrolls with the drag
+       (both directions), so a box below the fold can still be reached. */
+    const m = document.querySelector('#root main') || document.querySelector('main');
+    if (m) {
+      const r = m.getBoundingClientRect();
+      if (e.clientY > r.bottom - 90) m.scrollTop += 7;
+      else if (e.clientY < r.top + 90) m.scrollTop -= 7;
+    }
     uiSwapSetTarget(uiSwapFindTarget(e.clientX, e.clientY));
   };
 
@@ -316,12 +324,30 @@ function uiEditorBind() {
     if (_hold) { clearTimeout(_hold.t); }
     if (!_dragEl) { _hold = null; return; }
     const target = _dropEl;
+    const drag = _dragEl;
     try {
-      _dragEl.classList.remove('lt-dragging');
-      _dragEl.style.transform = '';
       if (target) {
-        uiSwapBoxes(_dragEl, target);
+        /* Smooth drop: measure where the box IS (under the finger) and
+           where its new slot will be AFTER the swap, then glide the box
+           from one to the other. Clearing the transform first (the old
+           way) made the box snap back to its origin and then re-slide —
+           the "flicker / teleport" the user saw. */
+        const r1 = drag.getBoundingClientRect();
+        uiSwapBoxes(drag, target);
+        applyUiLayout();
+        const r2 = drag.getBoundingClientRect();
+        const dx = r1.left - r2.left, dy = r1.top - r2.top;
+        drag.classList.remove('lt-dragging');
+        drag.style.transition = 'none';
+        drag.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(1.02)';
+        void drag.offsetWidth; /* reflow — arm the transition */
+        drag.style.transition = 'transform .28s cubic-bezier(.22,.61,.36,1)';
+        drag.style.transform = '';
+        setTimeout(() => { drag.style.transition = ''; }, 320);
         if (navigator.vibrate) navigator.vibrate(20);
+      } else {
+        drag.classList.remove('lt-dragging');
+        drag.style.transform = '';
       }
     } catch (err) {}
     uiSwapSetTarget(null);
@@ -417,7 +443,18 @@ export function ak({ profile }) {
   const [resetFlash, setResetFlash] = useState(false);
 
   useEffect(() => {
-    const onOpen = () => setEditorOn(true);
+    /* The editor only makes sense on the three editable tabs. Opening it
+       from Settings / Life Hub jumps straight to Timer so the user never
+       lands in the editor with nothing to edit. */
+    const onOpen = () => {
+      setEditorOn(true);
+      try {
+        const p = window.location.pathname;
+        if (p === '/timeline' || p === '/settings' || p.indexOf('/timeline') === 0 || p.indexOf('/settings') === 0) {
+          navigate('/');
+        }
+      } catch (err) {}
+    };
     const onDone = () => setEditorOn(false);
     window.addEventListener('lt-ui-editor-open', onOpen);
     window.addEventListener('lt-ui-editor-done', onDone);
@@ -425,7 +462,7 @@ export function ak({ profile }) {
       window.removeEventListener('lt-ui-editor-open', onOpen);
       window.removeEventListener('lt-ui-editor-done', onDone);
     };
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     document.body.classList.toggle('lt-ui-editing', editorOn);
@@ -443,6 +480,21 @@ export function ak({ profile }) {
 
   const glideTRef = useRef(null);
   const glideTargetRef = useRef(null);
+
+  /* Page trees are memoized: drag-state changes (setDragX on a direction
+     flip or neighbor change) used to re-render BOTH full route trees
+     mid-gesture — that re-render storm was the swipe "flicker". Now only
+     the wrapper's style updates; the screens themselves are untouched
+     until the pathname actually changes. */
+  const pageEl = useMemo(() => jsx('main', {
+    className: 'relative h-full overflow-y-auto overscroll-contain pb-[calc(96px+env(safe-area-inset-bottom,0px))] no-scrollbar',
+    children: jsx(AppRoutes, { profile })
+  }), [pathname, profile]);
+
+  const peekEl = useMemo(() => (peek ? jsx(AppRoutes, {
+    profile,
+    location: { pathname: peek, search: '', hash: '', state: null, key: 'peek' }
+  }) : null), [peek, profile]);
 
   /* Completes an in-flight swipe commit: the target page (the peek pane,
      which has been gliding to rest) is swapped for the real current route
@@ -596,10 +648,7 @@ export function ak({ profile }) {
               transform: dragX ? 'translateX(' + dragX + 'px)' : undefined,
               transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'
             },
-            children: jsx('main', {
-              className: 'relative h-full overflow-y-auto overscroll-contain pb-[calc(96px+env(safe-area-inset-bottom,0px))] no-scrollbar',
-              children: jsx(AppRoutes, { profile })
-            })
+            children: pageEl
           }),
           peek ? jsx('div', {
             key: 'peek-' + peek,
@@ -609,10 +658,7 @@ export function ak({ profile }) {
               transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
               transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'
             },
-            children: jsx(AppRoutes, {
-              profile,
-              location: { pathname: peek, search: '', hash: '', state: null, key: 'peek' }
-            })
+            children: peekEl
           }) : null
         ]
       }),
@@ -707,6 +753,25 @@ const uk = [{
     button: Timer, Activity, Life Hub, Journal, Settings. */
 export function ck() {
   const { pathname: e } = useLocation();
+  /* While the UI editor is open, only the three editable tabs (Timer,
+     Activity, Journal) stay reachable — Life Hub + Settings are hidden so
+     the editor can't touch them. Reacts to the same events the shell uses. */
+  const [editing, setEditing] = useState(
+    () => typeof document !== 'undefined' && document.body.classList.contains('lt-ui-editing')
+  );
+  useEffect(() => {
+    const on = () => setEditing(true);
+    const off = () => setEditing(false);
+    window.addEventListener('lt-ui-editor-open', on);
+    window.addEventListener('lt-ui-editor-done', off);
+    return () => {
+      window.removeEventListener('lt-ui-editor-open', on);
+      window.removeEventListener('lt-ui-editor-done', off);
+    };
+  }, []);
+  const items = editing
+    ? uk.filter((it) => it.href !== '/timeline' && it.href !== '/settings')
+    : uk;
 
   return jsx("div", {
     className: "fixed inset-x-0 z-50 px-3",
@@ -717,7 +782,7 @@ export function ck() {
     children: jsx("nav", {
       className: "pointer-events-auto mx-auto w-full max-w-[406px] bg-white rounded-full border border-border px-2 py-1.5 flex items-center",
       style: { boxShadow: "0 10px 30px rgba(4, 9, 30, 0.18)" },
-      children: uk.map(({ href: t, icon: n, label: r }) => {
+      children: items.map(({ href: t, icon: n, label: r }) => {
         const o = t === "/" ? e === "/" : e.startsWith(t);
         return jsxs(Link, {
           to: t,

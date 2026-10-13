@@ -1090,6 +1090,27 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
   const [fromTime, setFromTime] = useState({ h: 12, m: 0, ampm: 'AM' });
   const [toTime, setToTime] = useState({ h: 12, m: 0, ampm: 'AM' });
 
+  // Grabber drag-to-dismiss (matches BottomSheet behaviour)
+  const panelRef = useRef(null);
+  const dragRef = useRef(null);
+  const onGripDown = (e) => {
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+    dragRef.current = { y: e.clientY, dy: 0 };
+    if (panelRef.current) panelRef.current.style.transition = 'none';
+  };
+  const onGripMove = (e) => {
+    const d = dragRef.current; const panel = panelRef.current;
+    if (!d || !panel) return;
+    d.dy = e.clientY - d.y;
+    if (d.dy > 0) panel.style.transform = 'translateY(' + (d.dy > 120 ? 120 + (d.dy - 120) * 0.3 : d.dy) + 'px)';
+  };
+  const onGripUp = () => {
+    const d = dragRef.current; const panel = panelRef.current;
+    dragRef.current = null;
+    if (panel) { panel.style.transition = 'transform 200ms cubic-bezier(.22,.61,.36,1)'; panel.style.transform = ''; }
+    if (d && d.dy > 90) onClose();
+  };
+
   // Convert time object to ISO string
   const toISOString = (dateStr, timeObj) => {
     return new Date(`${dateStr}T${timeTo24(timeObj)}`).toISOString();
@@ -1140,15 +1161,20 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
     children: [
       jsx('div', { className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px]' }),
       jsxs('div', {
+        ref: panelRef,
         className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
-          // Drag handle — tap = back (dismisses the sheet, like a back button)
+          // Drag handle — drag down to dismiss, tap = back (like a back button)
           jsx('button', {
             type: 'button',
+            onPointerDown: onGripDown,
+            onPointerMove: onGripMove,
+            onPointerUp: onGripUp,
+            onPointerCancel: onGripUp,
             onClick: onClose,
             'aria-label': 'Back',
-            className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors',
+            className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors touch-none',
             children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
           }),
           // Header
@@ -1347,21 +1373,47 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
   const [endValue, setEndValue] = useState(() => toLocalDatetime(now.toISOString()));
   const [keepRunning, setKeepRunning] = useState(true); // default checked
 
+  // Grabber drag-to-dismiss (matches BottomSheet behaviour)
+  const panelRef = useRef(null);
+  const dragRef = useRef(null);
+  const onGripDown = (e) => {
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+    dragRef.current = { y: e.clientY, dy: 0 };
+    if (panelRef.current) panelRef.current.style.transition = 'none';
+  };
+  const onGripMove = (e) => {
+    const d = dragRef.current; const panel = panelRef.current;
+    if (!d || !panel) return;
+    d.dy = e.clientY - d.y;
+    if (d.dy > 0) panel.style.transform = 'translateY(' + (d.dy > 120 ? 120 + (d.dy - 120) * 0.3 : d.dy) + 'px)';
+  };
+  const onGripUp = () => {
+    const d = dragRef.current; const panel = panelRef.current;
+    dragRef.current = null;
+    if (panel) { panel.style.transition = 'transform 200ms cubic-bezier(.22,.61,.36,1)'; panel.style.transform = ''; }
+    if (d && d.dy > 90) onClose();
+  };
+
   return jsxs('div', {
     className: 'fixed inset-0 z-[60] flex items-end',
     onClick: onClose,
     children: [
       jsx('div', { className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px]' }),
       jsxs('div', {
+        ref: panelRef,
         className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
         onClick: (e) => e.stopPropagation(),
         children: [
-          // Drag handle — tap = back (dismisses the sheet, like a back button)
+          // Drag handle — drag down to dismiss, tap = back (like a back button)
           jsx('button', {
             type: 'button',
+            onPointerDown: onGripDown,
+            onPointerMove: onGripMove,
+            onPointerUp: onGripUp,
+            onPointerCancel: onGripUp,
             onClick: onClose,
             'aria-label': 'Back',
-            className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors',
+            className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors touch-none',
             children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
           }),
           // Header
@@ -1727,8 +1779,6 @@ function LifeProgressCard({ profile }) {
   deathDate.setFullYear(deathDate.getFullYear() + (profile.lifespanYears || 80));
   const retirementDateStr = deathDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const h = new Date().getHours();
-  const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
   /* Goal setting from Settings (retirement / age / FIRE / milestone) — the
      countdown headline + footer line follow the saved choice instead of
      always claiming "Retirement" (the text never changed before). */
@@ -1830,29 +1880,6 @@ function LifeProgressCard({ profile }) {
     tvSplit = [s.slice(0, dot), s.slice(dot + 1)];
   }
 
-  // Area chart for the money timer — deterministic day-decline curve with a
-  // marker dot at the current position and a "% left" tooltip bubble.
-  let tvChart = null;
-  if (tvData) {
-    const CW = 280, CH = 56;
-    const yAt = (f) => 8 + f * 36 + 3 * Math.sin(f * Math.PI * 2.6);
-    const N = 48;
-    let d = '';
-    for (let i = 0; i <= N; i++) {
-      const f = i / N;
-      d += (i === 0 ? 'M' : 'L') + (f * CW).toFixed(1) + ' ' + yAt(f).toFixed(1) + ' ';
-    }
-    d = d.trim();
-    const ef = Math.max(0, Math.min(0.975, tvData.elapsedFrac || 0));
-    tvChart = {
-      line: d,
-      area: d + ' L' + CW + ' ' + CH + ' L0 ' + CH + ' Z',
-      dx: ef * CW,
-      dy: yAt(ef),
-      tipX: Math.max(27, Math.min(CW - 27, ef * CW)),
-      tipY: Math.max(1, yAt(ef) - 23)
-    };
-  }
   const tvMoney = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const tvTile = (o) => jsxs('div', {
     className: cn('rounded-2xl px-2 py-2 flex flex-col gap-1 min-w-0 overflow-hidden', o.bg),
@@ -1885,19 +1912,17 @@ function LifeProgressCard({ profile }) {
             children: '@keyframes ltTick{0%{transform:scale(1);opacity:.6}35%{transform:scale(1.22);opacity:1}100%{transform:scale(1);opacity:1}}' +
               '.lt-tick{animation:ltTick .4s ease-out}'
           }),
-          /* Badge sits on the greeting line; the name gets the full card
-             width below it so long names fit on one line. */
+          /* Plan badge sits centered at the very top of the card, above the
+             countdown arc. Greeting + name are removed per feedback. */
           jsxs('div', {
-            className: 'flex items-center justify-between gap-3 mb-1',
+            className: 'flex justify-center mb-1.5',
             children: [
-              jsx('p', { className: 'text-[13px] font-semibold text-foreground/50 min-w-0 truncate', children: greeting + ',' }),
               jsx('span', {
-                className: 'flex items-center bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap shrink-0',
+                className: 'flex items-center bg-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap',
                 children: ['\u2605 ' + planLabel]
               })
             ]
           }),
-          jsx('h2', { className: 'text-[24px] font-black text-primary truncate leading-tight', children: profile.name }),
           jsx('div', {
             className: 'mt-1 mb-0.5',
             children: jsx('svg', {
@@ -2008,54 +2033,6 @@ function LifeProgressCard({ profile }) {
                   jsx('span', { className: 'text-[21px] font-black leading-none tabular-nums text-accent/70 ml-0.5', children: '.' + tvSplit[1] })
                 ]
               })
-            ]
-          }),
-          // Area chart — day-decline curve, marker dot + "% left" bubble
-          tvChart && jsx('div', {
-            className: 'mt-2',
-            children: jsxs('svg', {
-              viewBox: '0 0 280 56',
-              className: 'w-full h-auto block',
-              children: [
-                jsx('defs', {
-                  children: jsxs('linearGradient', {
-                    id: 'ltTvChartFill', x1: '0', y1: '0', x2: '0', y2: '1',
-                    children: [
-                      jsx('stop', { offset: '0%', stopColor: '#00C2A8', stopOpacity: 0.32 }),
-                      jsx('stop', { offset: '100%', stopColor: '#00C2A8', stopOpacity: 0.02 })
-                    ]
-                  })
-                }),
-                jsx('path', { d: tvChart.area, fill: 'url(#ltTvChartFill)', stroke: 'none' }),
-                jsx('path', { d: tvChart.line, fill: 'none', stroke: '#00C2A8', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round' }),
-                jsx('rect', { x: tvChart.tipX - 25, y: tvChart.tipY, width: 50, height: 15, rx: 7.5, fill: '#E6FAF6', stroke: '#00C2A8', strokeOpacity: 0.35 }),
-                jsx('text', { x: tvChart.tipX, y: tvChart.tipY + 10.5, textAnchor: 'middle', fontSize: 8.5, fontWeight: 800, fill: '#00A98F', children: tvData.pct + '% left' }),
-                jsx('circle', { cx: tvChart.dx, cy: tvChart.dy, r: 4, fill: '#00C2A8', stroke: '#fff', strokeWidth: 2 })
-              ]
-            })
-          }),
-          // Segmented bar — partial fill from the left = remaining today
-          jsxs('div', {
-            className: 'flex gap-[2px] mt-3 pt-3 border-t border-foreground/10',
-            children:
-              Array.from({ length: 9 }, (_, k) => {
-                const fill = Math.max(0, Math.min(1, (tvData.pct / 100) * 9 - k));
-                return jsx('span', {
-                  className: 'relative h-2 flex-1 rounded-full bg-foreground/[0.08] overflow-hidden',
-                  children: fill > 0 && jsx('span', {
-                    className: 'absolute inset-y-0 left-0 bg-accent rounded-full',
-                    style: { width: (fill * 100).toFixed(1) + '%' }
-                  })
-                }, k);
-              })
-          }),
-          // Segment axis labels under the chart
-          jsxs('div', {
-            className: 'flex items-center justify-between mt-1.5',
-            children: [
-              jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' }),
-              jsx('span', { className: 'text-[9.5px] font-bold text-foreground/50 tabular-nums', children: tvData.pct + '% of today\u2019s value left' }),
-              jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' })
             ]
           })
         ]

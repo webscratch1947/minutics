@@ -142,13 +142,12 @@
     writeJson(CURRENCY_KEY, { code: code });
   }
 
-  /* ── Activity categories (15) ─────────────────────────────────────────── */
+  /* ── Activity categories ──────────────────────────────────────────────── */
+  /* Trimmed to the two options the user asked to keep: a productive bucket
+     and a waste bucket. Existing logged entries that used older category
+     names still display fine — this only governs the picker. */
   var CATEGORIES = [
-    "Job", "Business", "Time Waste", "Social Media", "Study / Learning",
-    "Exercise / Fitness", "Sleep / Rest", "Family / Relationships",
-    "Household Chores", "Entertainment", "Commute / Travel",
-    "Health / Self-care", "Creative / Hobby", "Shopping / Errands",
-    "Food / Cooking", "Other"
+    "Work / Productivity", "Time Waste"
   ];
   /* categories counted as "wasted" time when calculating value lost */
   var WASTE_CATEGORIES = ["Time Waste", "Social Media", "Entertainment"];
@@ -1071,17 +1070,26 @@
       ".lt-card-title::before{content:'';width:4px;height:15px;background:#111114;border-radius:2px;flex-shrink:0}",
       ".lt-card-subtitle{font-size:12px;line-height:1.5;color:hsl(var(--muted-foreground));margin:-6px 0 14px}",
       ".lt-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}",
-      ".lt-summary-card{border:1px solid rgba(17,17,20,.2);background:#fff;padding:14px;border-radius:14px;box-shadow:0 1px 3px rgba(17,17,20,.05)}",
-      ".lt-summary-card small{display:block;text-transform:uppercase;letter-spacing:.09em;font-size:9.5px;color:hsl(var(--muted-foreground));font-weight:800}",
-      ".lt-summary-card strong{display:block;font-size:21px;margin-top:6px;font-weight:800;color:#111114}",
+      ".lt-summary-card{border:1px solid rgba(17,17,20,.2);background:#fff;padding:12px 10px;border-radius:14px;box-shadow:0 1px 3px rgba(17,17,20,.05)}",
+      ".lt-summary-card small{display:block;text-transform:uppercase;letter-spacing:.07em;font-size:8.5px;color:hsl(var(--muted-foreground));font-weight:800;line-height:1.25}",
+      /* Numbers shrink to fit and wrap to a second line if a value is too
+         wide for its box, so the full money amount is always visible. */
+      ".lt-summary-card strong{display:block;font-size:15px;margin-top:5px;font-weight:800;color:#111114;line-height:1.15;overflow-wrap:anywhere;word-break:break-word;font-variant-numeric:tabular-nums}",
+      ".lt-summary-count strong{font-size:12px;color:hsl(var(--muted-foreground))}",
       ".lt-budget-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}",
-      ".lt-budget-actions input,.lt-budget-actions select{flex:1;min-width:140px;border:1px solid hsl(var(--border));background:#fff;padding:10px 12px;border-radius:12px;color:#111114;font:inherit;font-size:13px;font-weight:600;box-sizing:border-box;-webkit-tap-highlight-color:transparent}",
-      ".lt-table-wrap{overflow-x:auto;border:1px solid rgba(17,17,20,.08);border-radius:16px;background:#fff;box-shadow:0 1px 3px rgba(17,17,20,.05)}",
-      ".lt-budget-table{width:100%;border-collapse:collapse;min-width:700px;font-size:12px}",
-      ".lt-budget-table th{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;text-align:left;color:hsl(var(--muted-foreground));background:hsl(var(--secondary));padding:11px 10px;white-space:nowrap;font-weight:800;border-bottom:1px solid rgba(17,17,20,.08)}",
-      ".lt-budget-table td{border-top:1px solid rgba(17,17,20,.06);padding:11px 10px;vertical-align:middle;color:#111114}",
-      ".lt-budget-table td:first-child{font-weight:700}",
-      ".lt-cell-clamp{display:block;width:160px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;line-height:1.4}",
+      ".lt-budget-actions input{flex:1;min-width:140px;border:1px solid hsl(var(--border));background:#fff;padding:10px 12px;border-radius:12px;color:#111114;font:inherit;font-size:13px;font-weight:600;box-sizing:border-box;-webkit-tap-highlight-color:transparent}",
+      /* Expense list — compact cards: name + amount on one line, then a
+         meta line (date · category · payment), extra details, actions. */
+      ".lt-budget-list{display:flex;flex-direction:column;gap:10px}",
+      ".lt-eb-row{border:1px solid rgba(17,17,20,.1);background:#fff;border-radius:14px;padding:11px 13px;box-shadow:0 1px 3px rgba(17,17,20,.05)}",
+      ".lt-eb-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}",
+      ".lt-eb-name{font-size:14px;font-weight:800;color:#111114;line-height:1.25;overflow-wrap:anywhere;flex:1;min-width:0}",
+      ".lt-eb-amt{font-size:14px;font-weight:800;color:#111114;white-space:nowrap;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:right}",
+      ".lt-eb-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px}",
+      ".lt-eb-meta-bit{font-size:11px;font-weight:700;color:hsl(var(--muted-foreground));white-space:nowrap}",
+      ".lt-eb-extra{margin-top:6px;font-size:11.5px;font-weight:600;color:hsl(var(--muted-foreground));line-height:1.45;overflow-wrap:anywhere}",
+      ".lt-eb-actions{display:flex;gap:8px;margin-top:10px}",
+      ".lt-eb-actions .lt-tool-secondary,.lt-eb-actions .lt-tool-danger{flex:1;padding:8px 10px;font-size:12px}",
       ".lt-tag{display:inline-block;padding:3px 9px;border:1px solid rgba(17,17,20,.1);border-radius:8px;background:#D1FAE5;color:#047857;font-size:10px;font-weight:800;white-space:nowrap}",
       ".lt-tag.blue{background:#DBEAFE;color:#1D4ED8}",
       ".lt-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}",
@@ -1091,6 +1099,10 @@
       ".lt-field input,.lt-field select,.lt-field textarea{width:100%;box-sizing:border-box;border:1px solid rgba(17,17,20,.28);background:#fff;padding:11px 13px;border-radius:12px;color:#111114;font:inherit;font-size:15px;font-weight:600;transition:box-shadow .12s,border-color .12s;-webkit-tap-highlight-color:transparent}",
       ".lt-field input:focus,.lt-field select:focus,.lt-field textarea:focus{outline:none;border-color:#111114;box-shadow:0 0 0 3px rgba(17,17,20,.07)}",
       ".lt-field textarea{min-height:70px;resize:vertical}",
+      /* Real dropdown for Category — custom chevron so it reads as a picker. */
+      ".lt-dropdown{appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23111114' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>\");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}",
+      /* Greyed-out + locked state when \"No validation\" is ticked. */
+      ".lt-field.locked input{background:hsl(var(--secondary));color:hsl(var(--muted-foreground));border-color:rgba(17,17,20,.15);opacity:.75}",
       ".lt-check{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#111114;padding:5px 0;grid-column:1/-1}",
       ".lt-form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}",
       ".lt-calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}",
@@ -1394,6 +1406,8 @@
       "#lt-curr-sheet-card{background:#111114;border-radius:20px 20px 0 0;padding:20px 16px 36px;width:100%;max-width:480px;margin:0 auto;box-sizing:border-box;max-height:80vh;display:flex;flex-direction:column}",
       "#lt-curr-sheet-card h3{color:#fff;font-size:16px;font-weight:900;margin:0 0 4px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}",
       "#lt-curr-sheet-card h3 button{background:rgba(255,255,255,.12);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer}",
+      "#lt-curr-grip::before{background:rgba(255,255,255,.28)}",
+      "#lt-curr-grip{margin:-8px auto 2px}",
       "#lt-curr-search{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:10px;color:#fff;padding:9px 12px;font-size:13px;margin-bottom:10px;margin-top:10px;box-sizing:border-box;flex-shrink:0}",
       "#lt-curr-search:focus{outline:none;border-color:rgba(255,255,255,.4)}",
       "#lt-curr-list{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}",
@@ -1515,8 +1529,8 @@
       /* Journal "Full view" — a cream, Screen-Time-style tab: no grey
          anywhere; the theme colour (indigo #3730A3) is deliberately NOT one
          of the activity colours, so it can never appear on an activity. */
-      ".lt-fv-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid hsl(var(--primary));color:hsl(var(--primary));background:#fff;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:800;letter-spacing:.02em;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;flex-shrink:0}",
-      ".lt-fv-btn:active{opacity:.7}",
+      ".lt-fv-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid hsl(var(--primary));color:#fff;background:hsl(var(--primary));border-radius:999px;padding:5px 11px;font-size:11px;font-weight:800;letter-spacing:.02em;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;flex-shrink:0;box-shadow:0 1px 3px rgba(17,17,20,.18)}",
+      ".lt-fv-btn:active{opacity:.75;transform:scale(.97)}",
       "#lt-fv-modal-overlay,#lt-fv-report-overlay,#lt-fv-share-overlay{position:fixed;inset:0;z-index:2147483200;background:#FDFBF7;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:0 0 40px;animation:lt-tool-in .3s cubic-bezier(.22,.61,.36,1);-webkit-overflow-scrolling:touch}",
       "#lt-fv-modal-overlay.lt-fv-out,#lt-fv-report-overlay.lt-fv-out,#lt-fv-share-overlay.lt-fv-out{animation:lt-tool-out .24s ease-in forwards;pointer-events:none}",
       ".lt-fv-modal-head{position:sticky;top:0;z-index:2;width:100%;max-width:480px;display:flex;align-items:center;gap:10px;padding:14px 16px 10px;background:#FDFBF7;box-sizing:border-box}",
@@ -1650,6 +1664,73 @@
     };
     overlay.addEventListener("pointerup", end);
     overlay.addEventListener("pointercancel", end);
+  }
+
+  /* ── Universal top-grabber drag-to-close ─────────────────────────────────
+     Every bottom sheet shows the little grabber line at its top. This single
+     delegated handler makes that line draggable on ALL of them (category
+     modal, routine sheet, new-task sheet, gram comments, share sheet,
+     currency sheet). Drag down past ~90px and the sheet dismisses itself
+     through the SAME mechanism it normally uses, so state stays consistent. */
+  function ltCloseSheetPanel(panel) {
+    if (!panel) return;
+    var id = panel.id || "";
+    if (id === "lt-routine-sheet") {
+      panel.style.transform = "translateY(110%)";
+      panel.style.maxHeight = "";
+      routineEditingId = null;
+      routineDraftRows = null;
+      return;
+    }
+    if (id === "lt-tasks-sheet") { panel.style.transform = "translateY(110%)"; return; }
+    if (id === "lt-gram-cp") { gramHideComments(); return; }
+    if (panel.closest("#lt-curr-sheet")) {
+      var cb = document.querySelector("#lt-curr-sheet-card h3 button");
+      if (cb) { cb.click(); return; }
+    }
+    if (panel.classList.contains("lt-share-sheet")) {
+      var sc = document.getElementById("lt-share-sheet-cancel");
+      if (sc) { sc.click(); return; }
+    }
+    if (panel.classList.contains("lt-cat-modal")) {
+      var cc = document.getElementById("lt-cat-close");
+      if (cc) { cc.click(); return; }
+    }
+    panel.style.transition = "";
+    panel.style.transform = "translateY(110%)";
+  }
+
+  var _gripDrag = null;
+  function ltUniversalGripDrag() {
+    var GRIPS = ".lt-sheet-grip, .lt-tasks-sheet-handle, .lt-gram-cp-handle, #lt-curr-grip, .lt-share-grip";
+    var PANELS = ".lt-tasks-sheet, .lt-gram-cp, #lt-curr-sheet-card, .lt-share-sheet, .lt-cat-modal";
+    document.addEventListener("pointerdown", function (e) {
+      var grip = e.target && e.target.closest ? e.target.closest(GRIPS) : null;
+      if (!grip) return;
+      var panel = grip.closest(PANELS);
+      if (!panel) return;
+      _gripDrag = { panel: panel, y: e.clientY, dy: 0 };
+      panel.style.transition = "none";
+      try { if (grip.setPointerCapture) grip.setPointerCapture(e.pointerId); } catch (err) {}
+    }, true);
+    document.addEventListener("pointermove", function (e) {
+      if (!_gripDrag) return;
+      _gripDrag.dy = e.clientY - _gripDrag.y;
+      if (_gripDrag.dy > 0) {
+        _gripDrag.panel.style.transform = "translateY(" + (_gripDrag.dy > 120 ? 120 + (_gripDrag.dy - 120) * 0.3 : _gripDrag.dy) + "px)";
+      } else {
+        _gripDrag.panel.style.transform = "";
+      }
+    }, true);
+    var end = function () {
+      if (!_gripDrag) return;
+      var d = _gripDrag; _gripDrag = null;
+      d.panel.style.transition = "";
+      if (d.dy > 90) { ltCloseSheetPanel(d.panel); }
+      else { d.panel.style.transform = ""; }
+    };
+    document.addEventListener("pointerup", end, true);
+    document.addEventListener("pointercancel", end, true);
   }
 
   function closeCategoryModal(reason) {
@@ -2690,6 +2771,21 @@
     categories = categories || [];
     payments   = payments   || [];
     var isEdit = !!budgetEditingId;
+    /* Category = a real dropdown (not a free-text datalist). Existing used
+       categories first, then a few sensible defaults so it's never empty. */
+    var DEFAULT_CATS = ["Food", "Groceries", "Travel", "Bills", "Shopping", "Health", "Other"];
+    var catOpts = Array.from(new Set(categories.concat(DEFAULT_CATS)));
+    var catSelect =
+      '<div class="lt-field">' +
+        '<label>Category</label>' +
+        '<select name="category" class="lt-dropdown">' +
+          '<option value="">Select category</option>' +
+          catOpts.map(function (c) {
+            return '<option' + (item.category === c ? " selected" : "") + '>' + escapeHtml(c) + '</option>';
+          }).join("") +
+        '</select>' +
+      '</div>';
+    var locked = item.noValidation ? " locked" : "";
     return (
       '<form class="lt-tool-card" data-lt-budget-form>' +
         '<p class="lt-card-title">' + (isEdit ? "Edit expense" : "New expense") + '</p>' +
@@ -2698,13 +2794,16 @@
           field("Name", "name", item.name, "e.g. Electricity bill") +
           field("Amount paid (" + getCurrency().symbol + ")", "amount", item.amount, "0", "number") +
           field("Purchase date", "purchaseDate", item.purchaseDate || today(), "", "date") +
-          datalistField("Category", "category", item.category, "e.g. Food", "lt-dl-category", categories) +
+          catSelect +
           datalistField("Payment method", "paymentMethod", item.paymentMethod, "e.g. UPI", "lt-dl-payment", payments) +
           field("Payment details", "paymentDetails", item.paymentDetails, "Bank, UPI app, card") +
-          field("Valid until", "validUntil", item.validUntil, "", "date") +
+          '<div class="lt-field' + locked + '" data-lt-valid-wrap>' +
+            '<label>Valid until</label>' +
+            '<input name="validUntil" data-lt-valid-input type="date" value="' + escapeHtml(item.validUntil || "") + '"' + (item.noValidation ? " disabled" : "") + '>' +
+          '</div>' +
+          '<label class="lt-check"><input type="checkbox" name="noValidation" data-lt-noval' + (item.noValidation ? " checked" : "") + '> No validation</label>' +
           field("Phone number", "phone", item.phone, "Optional") +
           field("Email", "email", item.email, "Optional", "email") +
-          '<label class="lt-check"><input type="checkbox" name="noValidation"' + (item.noValidation ? " checked" : "") + '> No validation</label>' +
           field("Notes", "notes", item.notes, "Optional notes", "text", "full", "textarea") +
         '</div>' +
         '<div class="lt-form-actions">' +
@@ -2733,58 +2832,75 @@
     var payments   = Array.from(new Set(items.map(function (i) { return i.paymentMethod; }).filter(Boolean)));
 
     var rows = filtered.map(function (i) {
-      return '<tr>' +
-        '<td><div class="lt-cell-clamp">' + escapeHtml(i.name || "Untitled") + '</div></td>' +
-        '<td>' + escapeHtml(money(i.amount)) + '</td>' +
-        '<td>' + escapeHtml(formatDate(i.purchaseDate)) + '</td>' +
-        '<td><span class="lt-tag">' + escapeHtml(i.category || "Uncategorized") + '</span></td>' +
-        '<td><span class="lt-tag blue">' + escapeHtml(i.paymentMethod || "\u2014") + '</span></td>' +
-        '<td><div class="lt-cell-clamp">' + escapeHtml(i.paymentDetails || "\u2014") + '</div></td>' +
-        '<td>' + escapeHtml(formatDate(i.validUntil)) + '</td>' +
-        '<td>' + (i.noValidation ? "\u2713" : "\u2014") + '</td>' +
-        '<td>' + escapeHtml(i.phone || "\u2014") + '</td>' +
-        '<td>' + escapeHtml(i.email || "\u2014") + '</td>' +
-        '<td><div class="lt-cell-clamp">' + escapeHtml(i.notes || "\u2014") + '</div></td>' +
-        '<td style="white-space:nowrap">' +
-          '<button class="lt-tool-secondary" style="margin-right:6px" data-lt-action="budget-edit" data-id="' + escapeHtml(i.id) + '">Edit</button>' +
-          '<button class="lt-tool-danger" data-lt-action="budget-delete" data-id="' + escapeHtml(i.id) + '">Delete</button>' +
-        '</td>' +
-      '</tr>';
+      var name = escapeHtml(i.name || "Untitled");
+      var amt  = escapeHtml(money(i.amount));
+      var metaBits = [];
+      if (i.purchaseDate) metaBits.push('<span class="lt-eb-meta-bit">' + escapeHtml(formatDate(i.purchaseDate)) + '</span>');
+      metaBits.push('<span class="lt-tag">' + escapeHtml(i.category || "Uncategorized") + '</span>');
+      if (i.paymentMethod) metaBits.push('<span class="lt-tag blue">' + escapeHtml(i.paymentMethod) + '</span>');
+      if (i.noValidation) metaBits.push('<span class="lt-eb-meta-bit">No validation</span>');
+      else if (i.validUntil) metaBits.push('<span class="lt-eb-meta-bit">Valid until ' + escapeHtml(formatDate(i.validUntil)) + '</span>');
+      var extraBits = [];
+      if (i.paymentDetails) extraBits.push(escapeHtml(i.paymentDetails));
+      if (i.phone) extraBits.push(escapeHtml(i.phone));
+      if (i.email) extraBits.push(escapeHtml(i.email));
+      if (i.notes) extraBits.push(escapeHtml(i.notes));
+      return '' +
+        '<div class="lt-eb-row">' +
+          '<div class="lt-eb-top">' +
+            '<span class="lt-eb-name" title="' + name + '">' + name + '</span>' +
+            '<span class="lt-eb-amt">' + amt + '</span>' +
+          '</div>' +
+          '<div class="lt-eb-meta">' + metaBits.join("") + '</div>' +
+          (extraBits.length ? '<div class="lt-eb-extra">' + extraBits.join(" \u00b7 ") + '</div>' : "") +
+          '<div class="lt-eb-actions">' +
+            '<button class="lt-tool-secondary" data-lt-action="budget-edit" data-id="' + escapeHtml(i.id) + '">Edit</button>' +
+            '<button class="lt-tool-danger" data-lt-action="budget-delete" data-id="' + escapeHtml(i.id) + '">Delete</button>' +
+          '</div>' +
+        '</div>';
     }).join("");
 
+    /* While the add/edit form is open, show ONLY the form: the 3 summary
+       boxes, the search/filters row and the expense list are hidden so the
+       user isn't distracted (per feedback). */
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
         toolHeader("Budget Tracker", "Private expense tracking \u2014 stored only on this device.") +
-        '<div class="lt-summary-grid">' +
-          '<div class="lt-summary-card"><small>Expenses</small><strong>' + items.length + '</strong></div>' +
-          '<div class="lt-summary-card"><small>Total paid</small><strong>' + escapeHtml(money(total)) + '</strong></div>' +
-          '<div class="lt-summary-card"><small>This month</small><strong>' + escapeHtml(money(monthTotal)) + '</strong></div>' +
-        '</div>' +
+        (showForm ? "" :
+          '<div class="lt-summary-grid">' +
+            '<div class="lt-summary-card lt-summary-count"><small>Expenses</small><strong>' + items.length + '</strong></div>' +
+            '<div class="lt-summary-card"><small>Total paid</small><strong>' + escapeHtml(money(total)) + '</strong></div>' +
+            '<div class="lt-summary-card"><small>This month</small><strong>' + escapeHtml(money(monthTotal)) + '</strong></div>' +
+          '</div>') +
         (showForm ? renderBudgetForm(editing || {}, categories, payments) : "") +
+        (showForm ? "" :
         '<div class="lt-budget-actions">' +
           '<input data-lt-budget-search placeholder="Search expenses" value="' + escapeHtml(budgetQuery) + '">' +
-          '<select data-lt-budget-category>' +
-            '<option value="">All categories</option>' +
-            categories.map(function (v) { return '<option' + (budgetCategory === v ? " selected" : "") + '>' + escapeHtml(v) + '</option>'; }).join("") +
-          '</select>' +
-          '<select data-lt-budget-payment>' +
-            '<option value="">All payment methods</option>' +
-            payments.map(function (v) { return '<option' + (budgetPayment === v ? " selected" : "") + '>' + escapeHtml(v) + '</option>'; }).join("") +
-          '</select>' +
-          (!showForm ? '<button class="lt-tool-primary" data-lt-action="budget-new">+ New expense</button>' : "") +
-        '</div>' +
-        '<div class="lt-table-wrap"><table class="lt-budget-table">' +
-          '<thead><tr><th>Name</th><th>Amount</th><th>Date</th><th>Category</th><th>Payment</th><th>Details</th><th>Valid until</th><th>No val.</th><th>Phone</th><th>Email</th><th>Notes</th><th>Actions</th></tr></thead>' +
-          '<tbody>' + (rows || '<tr><td colspan="12"><div class="lt-empty">No expenses yet. Tap \u201C+ New expense\u201D to add one.</div></td></tr>') + '</tbody>' +
-        '</table></div>' +
+          '<button class="lt-tool-primary" data-lt-action="budget-new">+ New expense</button>' +
+        '</div>') +
+        (showForm ? "" :
+        '<div class="lt-budget-list">' +
+          (rows || '<div class="lt-empty">No expenses yet. Tap \u201C+ New expense\u201D to add one.</div>') +
+        '</div>') +
       '</div>';
 
     var search = activeOverlay.querySelector("[data-lt-budget-search]");
     if (search) search.addEventListener("input", function () { budgetQuery = this.value; renderBudget(); });
-    var catSel = activeOverlay.querySelector("[data-lt-budget-category]");
-    if (catSel) catSel.addEventListener("change", function () { budgetCategory = this.value; renderBudget(); });
-    var paySel = activeOverlay.querySelector("[data-lt-budget-payment]");
-    if (paySel) paySel.addEventListener("change", function () { budgetPayment = this.value; renderBudget(); });
+
+    /* No-validation checkbox: greys out + locks the "Valid until" date. */
+    var noval = activeOverlay.querySelector("[data-lt-noval]");
+    if (noval) noval.addEventListener("change", function () {
+      var wrap = activeOverlay.querySelector("[data-lt-valid-wrap]");
+      var inp  = activeOverlay.querySelector("[data-lt-valid-input]");
+      if (!wrap || !inp) return;
+      if (this.checked) {
+        wrap.classList.add("locked");
+        inp.setAttribute("disabled", "disabled");
+      } else {
+        wrap.classList.remove("locked");
+        inp.removeAttribute("disabled");
+      }
+    });
 
     var form = activeOverlay.querySelector("[data-lt-budget-form]");
     if (form) form.addEventListener("submit", function (e) {
@@ -3315,7 +3431,7 @@
     overlay.innerHTML =
       '<style>@keyframes lt-share-fade-in{from{opacity:0}to{opacity:1}}@keyframes lt-share-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}</style>' +
       '<div class="lt-share-sheet" style="background:hsl(var(--card));border-radius:20px 20px 0 0;padding:20px 16px 28px;width:100%;max-width:400px;animation:lt-share-slide-up .25s ease;box-shadow:0 -4px 20px rgba(0,0,0,.2)">' +
-        '<div style="width:36px;height:4px;border-radius:2px;background:hsl(var(--muted));margin:0 auto 14px"></div>' +
+        '<div class="lt-share-grip" style="width:36px;height:4px;border-radius:2px;background:hsl(var(--muted));margin:0 auto 14px;touch-action:none;cursor:grab"></div>' +
         '<p style="font-size:15px;font-weight:700;color:hsl(var(--foreground));margin:0 0 14px;text-align:center">Share to</p>' +
         '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px">' + appsHtml + '</div>' +
           '<button id="lt-share-sheet-cancel" class="lt-cancel-btn" style="width:100%;margin-top:16px;padding:12px;border:1px solid hsl(var(--border));border-radius:12px;background:transparent;color:hsl(var(--foreground));font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>' +
@@ -7047,6 +7163,7 @@
     sheet.id = "lt-curr-sheet";
     sheet.innerHTML =
       '<div id="lt-curr-sheet-card">' +
+        '<div class="lt-sheet-grip" id="lt-curr-grip" aria-hidden="true"></div>' +
         '<h3>Currency <button id="lt-curr-close">\u2715</button></h3>' +
         '<input id="lt-curr-search" placeholder="\uD83D\uDD0D Search currency\u2026" type="text">' +
         '<div id="lt-curr-list">' + buildOptions("") + '</div>' +
@@ -8271,6 +8388,7 @@
        longer needed since React owns route-based visibility. */
     killHighlighting();
     runEnhancements();
+    ltUniversalGripDrag();
     /* React Router swapped screens (nav tap) → run the pass right now. The
        MutationObserver path above is throttled to one run per 500ms, so a
        fast tab switch right after another one dropped the new screen's
