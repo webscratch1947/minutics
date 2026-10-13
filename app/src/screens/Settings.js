@@ -234,6 +234,9 @@ export function SettingsScreen() {
   var _tgSavingState = useState(false);
   var tgSaving = _tgSavingState[0];
   var setTgSaving = _tgSavingState[1];
+  var _tgSavedState = useState(false);
+  var tgSaved = _tgSavedState[0];
+  var setTgSaved = _tgSavedState[1];
   var _tgTestResultState = useState(null);
   var tgTestResult = _tgTestResultState[0];
   var setTgTestResult = _tgTestResultState[1];
@@ -245,6 +248,16 @@ export function SettingsScreen() {
   var setTgTestLoading = _tgTestLoadingState[1];
 
   /* ── handlers ── */
+  /* UI layout editor: hand control back to the shell overlay, which tracks
+     pointer drags on any [data-lt-move] box and persists the offsets. */
+  var openUiEditor = function () {
+    try { window.dispatchEvent(new CustomEvent("lt-ui-editor-open")); } catch (e) {}
+    try { if (location.hash !== "#/" && location.hash !== "#") location.hash = "#/"; } catch (e) {}
+  };
+  var resetUiLayout = function () {
+    try { localStorage.removeItem("lt_ui_layout_v1"); } catch (e) {}
+    alert("Layout reset \u2014 every box is back in its default place.");
+  };
 
   function handleCurrencyChange(code) {
     setSelectedCurrencyCode(code);
@@ -408,6 +421,9 @@ export function SettingsScreen() {
         dailyReportTime: tgTime
       });
       setTimeout(function () { setTgSaving(false); }, 600);
+      /* Success flash: green "Saved ✓" for ~3.5s, then back to normal. */
+      setTgSaved(true);
+      setTimeout(function () { setTgSaved(false); }, 3500);
     };
     /* A bot token belongs to a single account — block the save with a clear
        error when someone else already schedules reports with this token. */
@@ -683,6 +699,32 @@ export function SettingsScreen() {
       }),
 
       /* ─── Goal Type ─── */
+      /* ── UI Layout Editor ── */
+      jsxs("div", {
+        className: "mx-4",
+        children: [
+          jsx(SectionHeader, { children: "Layout" }),
+          jsx(Card, {
+            children: jsx(CardRow, {
+              label: "\u270F\uFE0F UI Layout Editor",
+              desc: "Hold any box to drag it somewhere new \u2014 your layout saves on this device.",
+              children: jsxs("div", { className: "flex gap-2", children: [
+                jsx("button", {
+                  onClick: openUiEditor,
+                  className: "rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/20 transition",
+                  children: "Open editor"
+                }),
+                jsx("button", {
+                  onClick: resetUiLayout,
+                  className: "rounded-lg bg-secondary px-3 py-1.5 text-xs font-semibold text-muted-foreground active:bg-secondary/80 transition",
+                  children: "Reset"
+                })
+              ] })
+            })
+          })
+        ]
+      }),
+
       jsxs("div", {
         className: "mx-4",
         children: [
@@ -855,7 +897,8 @@ export function SettingsScreen() {
                 jsx("div", {
                   className: "px-4 pt-2 pb-1",
                   children: jsx("input", {
-                    type: "text",
+                    type: "password",
+                    autoComplete: "off",
                     value: tgChatId,
                     onChange: function (e) { setTgChatId(e.target.value); },
                     placeholder: "Chat ID",
@@ -888,11 +931,13 @@ export function SettingsScreen() {
                       disabled: tgSaving || !tgToken || !tgChatId,
                       className: [
                         "flex-1 py-3 text-sm font-semibold transition",
-                        tgSaving || !tgToken || !tgChatId
-                          ? "text-muted-foreground cursor-not-allowed"
-                          : "text-primary active:bg-primary/5"
+                        tgSaved
+                          ? "bg-green-600 text-white rounded-md"
+                          : tgSaving || !tgToken || !tgChatId
+                            ? "text-muted-foreground cursor-not-allowed"
+                            : "text-primary active:bg-primary/5"
                       ].join(" "),
-                      children: tgSaving ? "Saving\u2026" : "Save"
+                      children: tgSaved ? "Saved \u2713" : tgSaving ? "Saving\u2026" : "Save"
                     }),
                     jsx("button", {
                       onClick: handleTestTelegram,

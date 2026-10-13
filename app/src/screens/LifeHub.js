@@ -133,7 +133,7 @@ export function LifeHubScreen({ profile }) {
       }));
     } catch { /* ignore */ }
     setSaved(true);
-    setTimeout(function () { setSaved(false); }, 2000);
+    setTimeout(function () { setSaved(false); }, 3500);
   };
 
   // ── Screen Time → Life Cost input
@@ -294,7 +294,7 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": t.id,
         "data-lt-category": t.category,
         "data-lt-tile-injected": "1",
-        className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/10 shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 transition active:scale-[.98] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black/40 [-webkit-tap-highlight-color:transparent]",
+        className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-white border border-black/[.25] shadow-[0_1px_3px_rgba(0,0,0,.05)] gap-2 transition active:scale-[.98] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black/40 [-webkit-tap-highlight-color:transparent]",
         children: [
           iconTile(t, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 shadow-[0_2px_8px_rgba(0,0,0,.07)] ring-1 ring-black/[.04]"),
           jsx("span", { className: "font-bold text-sm text-foreground leading-snug", children: t.label }),
@@ -313,7 +313,8 @@ export function LifeHubScreen({ profile }) {
       "data-lifetime-tool": featured.id,
       "data-lt-category": featured.category,
       "data-lt-tile-injected": "1",
-      className: "group col-span-2 w-full relative overflow-hidden rounded-3xl p-4 text-left bg-foreground text-background ring-1 ring-white/10 shadow-[0_14px_34px_rgba(0,0,0,.28)] transition active:scale-[.99] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50 [-webkit-tap-highlight-color:transparent]",
+      "data-lt-move": "tool.featured",
+      className: "group col-span-2 w-full relative overflow-hidden rounded-3xl p-4 text-left bg-foreground text-background ring-1 ring-white/25 shadow-[0_14px_34px_rgba(0,0,0,.28)] transition active:scale-[.99] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50 [-webkit-tap-highlight-color:transparent]",
       children: [
         jsx("div", { className: "absolute -right-10 -top-12 w-40 h-40 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.07)" } }),
         jsx("div", { className: "absolute -right-4 top-16 w-24 h-24 rounded-full pointer-events-none", style: { background: "rgba(255,255,255,.05)" } }),
@@ -340,7 +341,7 @@ export function LifeHubScreen({ profile }) {
             jsxs("span", {
               className: "px-2 py-[3px] rounded-full text-[10px] font-bold",
               style: { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.18)", color: "rgba(253,251,247,.92)" },
-              children: ["1 min \u2248 ", currSymbol, statPM.toFixed(2)]
+              children: ["1 min = ", currSymbol, statPM.toFixed(2)]
             }),
             hoursNum > 0 && jsx("span", {
               className: "px-2 py-[3px] rounded-full text-[10px] font-bold",
@@ -359,10 +360,11 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": spotlight.id,
         "data-lt-category": spotlight.category,
         "data-lt-tile-injected": "1",
+      "data-lt-move": "tool.spotlight",
         className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl text-left shadow-[0_4px_14px_rgba(0,0,0,.07)] transition active:scale-[.99] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black/40 [-webkit-tap-highlight-color:transparent]",
         style: {
           background: "linear-gradient(115deg, " + c.bg + " 0%, rgba(255,255,255,.92) 160%)",
-          border: "1px solid " + c.fg + "3d"
+          border: "1px solid rgba(0,0,0,.25)"
         },
         children: [
           iconTile(spotlight, "w-12 h-12 rounded-xl flex items-center justify-center text-[23px] shrink-0 shadow-[0_4px_12px_rgba(0,0,0,.12)]", true),
@@ -386,7 +388,7 @@ export function LifeHubScreen({ profile }) {
         "data-lifetime-tool": tail.id,
         "data-lt-category": tail.category,
         "data-lt-tile-injected": "1",
-        className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-black/10 shadow-[0_1px_3px_rgba(0,0,0,.05)] text-left transition active:scale-[.99] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black/40 [-webkit-tap-highlight-color:transparent]",
+        className: "group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-black/[.25] shadow-[0_1px_3px_rgba(0,0,0,.05)] text-left transition active:scale-[.99] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black/40 [-webkit-tap-highlight-color:transparent]",
         children: [
           iconTile(tail, "w-11 h-11 rounded-xl flex items-center justify-center text-[21px] shrink-0 shadow-[0_2px_8px_rgba(0,0,0,.07)] ring-1 ring-black/[.04]"),
           jsxs("div", { className: "flex-1 min-w-0", children: [
@@ -436,7 +438,7 @@ export function LifeHubScreen({ profile }) {
               value: search,
               onChange: function (ev) { setSearch(ev.target.value); },
               placeholder: "Search tools...",
-              className: "w-full bg-white border border-black/[.07] rounded-full pl-10 pr-11 py-2.5 text-sm font-medium outline-none focus:border-foreground/40 shadow-[0_1px_2px_rgba(0,0,0,.04)] placeholder:text-muted-foreground placeholder:font-normal"
+              className: "w-full bg-white border border-black/[.25] rounded-full pl-10 pr-11 py-2.5 text-sm font-medium outline-none focus:border-foreground/40 shadow-[0_1px_2px_rgba(0,0,0,.04)] placeholder:text-muted-foreground placeholder:font-normal"
             }),
             search && jsx("button", {
               type: "button",
@@ -457,7 +459,7 @@ export function LifeHubScreen({ profile }) {
               className: "shrink-0 px-4 py-1.5 text-xs font-bold rounded-full border transition-colors " +
                 (activeCat === f.key
                   ? "bg-foreground text-background border-foreground"
-                  : "bg-white text-foreground border-black/[.07]"),
+                  : "bg-white text-foreground border-black/[.25]"),
               children: f.label
             }, f.key);
           })
@@ -670,7 +672,9 @@ export function LifeHubScreen({ profile }) {
               type: "button",
               onClick: saveTimeValue,
               disabled: perMinute <= 0,
-              className: "w-full py-3 bg-primary text-white font-semibold rounded-xl disabled:opacity-40",
+              className: saved
+                ? "w-full py-3 bg-green-600 text-white font-semibold rounded-xl shadow-[0_6px_18px_rgba(22,163,74,0.35)] transition-colors"
+                : "w-full py-3 bg-primary text-white font-semibold rounded-xl disabled:opacity-40 transition-colors",
               children: saved ? "Saved \u2713" : "Save"
             })
           ]

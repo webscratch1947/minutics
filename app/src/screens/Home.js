@@ -5,7 +5,7 @@ import { jsx, jsxs } from 'react/jsx-runtime';
 // App logic
 import { getStore, setStore, nextId, enrichBlocksForRange } from '../lib/storage.js';
 import { calcRemainingTime, msToBreakdown } from '../lib/lifeCalc.js';
-import { getDistinctColor } from '../lib/constants.js';
+import { getDistinctColor, resolveActivityColor } from '../lib/constants.js';
 import { blocksKey, activitiesKey, todayStatsKey } from '../lib/queryKeys.js';
 import { useActivities } from '../hooks/useActivities.js';
 import { useBlocks } from '../hooks/useBlocks.js';
@@ -536,6 +536,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
     children: [
       // Main row
       jsxs('div', {
+        'data-lt-move': 'act.item.' + activity.id,
         role: 'button',
         tabIndex: 0,
         onClick: onTap,
@@ -549,14 +550,14 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
           'group relative overflow-hidden flex items-center w-full cursor-pointer select-none rounded-2xl bg-white border transition-all',
           isActive
             ? 'border-accent/60 shadow-[0_12px_30px_rgba(0,194,168,0.18)]'
-            : 'border-black/[.06] shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_26px_rgba(15,23,42,0.09)]'
+            : 'border-black/[.16] shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_26px_rgba(15,23,42,0.09)]'
         ),
         children: [
           // Activity color rail
           jsx('span', {
             'aria-hidden': true,
             className: 'absolute left-0 top-0 bottom-0 w-[5px]',
-            style: { background: activity.color || '#00C2A8' }
+            style: { background: resolveActivityColor(activity) }
           }),
           // Left: emoji tile + name/status + actions
           jsxs('div', {
@@ -567,17 +568,17 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                 ? jsx('span', {
                     className: 'w-11 h-11 rounded-2xl flex items-center justify-center text-[20px] shrink-0',
                     style: {
-                      background: (activity.color || '#00C2A8') + '22',
+                      background: resolveActivityColor(activity) + '22',
                       fontFamily: "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"
                     },
                     children: activity.emoji
                   })
                 : jsx('span', {
                     className: 'w-11 h-11 rounded-2xl flex items-center justify-center shrink-0',
-                    style: { background: (activity.color || '#00C2A8') + '1A' },
+                    style: { background: resolveActivityColor(activity) + '1A' },
                     children: jsx('span', {
                       className: cn('w-3 h-3 rounded-full', isActive && 'animate-pulse'),
-                      style: { backgroundColor: activity.color }
+                      style: { backgroundColor: resolveActivityColor(activity) }
                     })
                   }),
               // Name + status line
@@ -602,13 +603,13 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                     onClick: openEdit,
                     title: 'Edit',
                     'data-lt-edit-replaced': '1',
-                    className: 'w-8 h-8 flex items-center justify-center rounded-full text-foreground/35 hover:text-foreground hover:bg-foreground/5 transition-colors',
+                    className: 'w-9 h-9 flex items-center justify-center rounded-full bg-foreground/[0.07] border border-black/10 text-foreground/70 hover:bg-foreground/15 hover:text-foreground transition-colors shrink-0',
                     children: jsx(tk, { className: 'w-4 h-4' })
                   }),
                   jsx('button', {
                     onClick: handleDelete,
                     title: 'Remove',
-                    className: 'w-8 h-8 flex items-center justify-center rounded-full text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-colors',
+                    className: 'w-9 h-9 flex items-center justify-center rounded-full bg-red-500/10 border border-red-200 text-red-500 hover:text-red-600 hover:bg-red-500/20 transition-colors shrink-0',
                     children: jsx(lk, { className: 'w-4 h-4' })
                   }),
                   jsx('span', {
@@ -616,7 +617,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                       'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all',
                       isActive ? 'text-white shadow-[0_6px_16px_rgba(0,0,0,0.18)]' : 'bg-black text-white group-hover:bg-black/85 group-hover:scale-105'
                     ),
-                    style: isActive ? { backgroundColor: activity.color } : {},
+                    style: isActive ? { backgroundColor: resolveActivityColor(activity) } : {},
                     children: isActive
                       ? jsx(Zb, { className: 'w-4 h-4' })
                       : jsx(nk, { className: 'w-4 h-4 ml-0.5' })
@@ -748,17 +749,17 @@ function ModalHeader({ activity, subtitle }) {
         ? jsx('span', {
             className: 'w-12 h-12 rounded-2xl flex items-center justify-center text-[22px] shrink-0',
             style: {
-              background: (activity.color || '#00C2A8') + '22',
+              background: resolveActivityColor(activity) + '22',
               fontFamily: "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"
             },
             children: activity.emoji
           })
         : jsx('span', {
             className: 'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
-            style: { background: (activity.color || '#00C2A8') + '1A' },
+            style: { background: resolveActivityColor(activity) + '1A' },
             children: jsx('span', {
               className: 'w-3.5 h-3.5 rounded-full',
-              style: { backgroundColor: activity.color }
+              style: { backgroundColor: resolveActivityColor(activity) }
             })
           }),
       // Name + subtitle
@@ -1103,17 +1104,17 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                     ? jsx('span', {
                         className: 'w-12 h-12 rounded-2xl flex items-center justify-center text-[22px] shrink-0',
                         style: {
-                          background: (activity.color || '#00C2A8') + '22',
+                          background: resolveActivityColor(activity) + '22',
                           fontFamily: "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"
                         },
                         children: activity.emoji
                       })
                     : jsx('span', {
                         className: 'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
-                        style: { background: (activity.color || '#00C2A8') + '1A' },
+                        style: { background: resolveActivityColor(activity) + '1A' },
                         children: jsx('span', {
                           className: 'w-3.5 h-3.5 rounded-full',
-                          style: { backgroundColor: activity.color }
+                          style: { backgroundColor: resolveActivityColor(activity) }
                         })
                       }),
                   jsxs('div', {
@@ -1316,17 +1317,17 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
                     ? jsx('span', {
                         className: 'w-12 h-12 rounded-2xl flex items-center justify-center text-[22px] shrink-0',
                         style: {
-                          background: (activity.color || '#00C2A8') + '22',
+                          background: resolveActivityColor(activity) + '22',
                           fontFamily: "'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"
                         },
                         children: activity.emoji
                       })
                     : jsx('span', {
                         className: 'w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
-                        style: { background: (activity.color || '#00C2A8') + '1A' },
+                        style: { background: resolveActivityColor(activity) + '1A' },
                         children: jsx('span', {
                           className: 'w-3.5 h-3.5 rounded-full',
-                          style: { backgroundColor: activity.color }
+                          style: { backgroundColor: resolveActivityColor(activity) }
                         })
                       }),
                   jsxs('div', {
@@ -1482,11 +1483,12 @@ function AddActivityBar() {
     children: [
       // Add bar
       jsxs('div', {
+        'data-lt-move': 'act.add',
         className: cn(
           'mx-4 mt-3 mb-1 rounded-2xl flex items-center gap-1 pr-2 pl-4 border',
           atLimit
             ? 'bg-red-50 border-red-300 shadow-[0_6px_20px_rgba(239,68,68,0.12)]'
-            : 'bg-white border-black/[.06] shadow-[0_6px_20px_rgba(15,23,42,0.05)]'
+            : 'bg-white border-black/[.16] shadow-[0_6px_20px_rgba(15,23,42,0.05)]'
         ),
         children: [
           // Text input
@@ -1584,6 +1586,20 @@ function LifeProgressCard({ profile }) {
 
   const h = new Date().getHours();
   const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+  /* Goal setting from Settings (retirement / age / FIRE / milestone) — the
+     countdown headline + footer line follow the saved choice instead of
+     always claiming "Retirement" (the text never changed before). */
+  const goal = (() => { try { return JSON.parse(localStorage.getItem('lt_goal_type_v1') || 'null') || {}; } catch (e) { return {}; } })();
+  const goalType = goal.type || 'retirement';
+  const goalArc = goalType === 'milestone' ? 'TIME LEFT UNTIL MILESTONE'
+    : goalType === 'age' ? 'TIME LEFT UNTIL AGE GOAL'
+    : goalType === 'fire' ? 'TIME LEFT UNTIL FIRE'
+    : 'TIME LEFT UNTIL RETIREMENT';
+  const goalLineLabel = goalType === 'milestone' ? 'Milestone'
+    : goalType === 'age' ? 'Age Goal'
+    : goalType === 'fire' ? 'FIRE Goal'
+    : 'Retirement';
+  const goalLineValue = (goalType === 'milestone' && goal.milestoneLabel) ? goal.milestoneLabel : retirementDateStr;
 
   const planLabel = (() => { const p = localStorage.getItem('lt_plan_v1'); if (!p) return 'Free'; try { const v = JSON.parse(p); return v === 'basic' ? 'Basic' : v === 'yearly' ? '1 Year' : v === 'lifetime' || v === 'pro' ? 'Lifetime' : 'Free'; } catch { return 'Free'; } })();
 
@@ -1627,7 +1643,7 @@ function LifeProgressCard({ profile }) {
     const bars = (opts && opts.bars) || 9;
     const filled = Math.max(1, Math.min(bars, Math.ceil(frac * bars)));
     return jsxs('div', {
-      className: 'bg-white border border-black/[.06] rounded-2xl px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)] overflow-hidden',
+      className: 'bg-white border border-black/[.16] rounded-2xl px-2.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)] overflow-hidden',
       children: [
         jsxs('div', { className: 'flex items-baseline justify-center gap-1 min-w-0', children: [
           jsx('span', { className: cn('text-[18px] font-black text-primary tabular-nums leading-none', isSec && 'lt-tick inline-block'), children: p2(value) }, isSec ? value : undefined),
@@ -1718,28 +1734,26 @@ function LifeProgressCard({ profile }) {
     children: [
       // Countdown hero — reference-style light card with dotted-arc hero number
       jsxs('div', {
-        className: 'relative bg-white rounded-3xl px-4 pt-4 pb-3.5 border border-black/[.06] shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
+        'data-lt-move': 'timer.hero',
+        className: 'relative bg-white rounded-3xl px-4 pt-4 pb-3.5 border border-black/[.16] shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
         children: [
           jsx('style', {
             children: '@keyframes ltTick{0%{transform:scale(1);opacity:.6}35%{transform:scale(1.22);opacity:1}100%{transform:scale(1);opacity:1}}' +
               '.lt-tick{animation:ltTick .4s ease-out}'
           }),
+          /* Badge sits on the greeting line; the name gets the full card
+             width below it so long names fit on one line. */
           jsxs('div', {
-            className: 'flex items-start justify-between gap-3 mb-1',
+            className: 'flex items-center justify-between gap-3 mb-1',
             children: [
-              jsxs('div', {
-                className: 'flex-1 min-w-0',
-                children: [
-                  jsx('p', { className: 'text-[13px] font-semibold text-foreground/50', children: greeting + ',' }),
-                  jsx('h2', { className: 'text-[24px] font-black text-primary truncate leading-tight', children: profile.name })
-                ]
-              }),
+              jsx('p', { className: 'text-[13px] font-semibold text-foreground/50 min-w-0 truncate', children: greeting + ',' }),
               jsx('span', {
-                className: 'flex items-center bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap mt-1',
+                className: 'flex items-center bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap shrink-0',
                 children: ['\u2605 ' + planLabel]
               })
             ]
           }),
+          jsx('h2', { className: 'text-[24px] font-black text-primary truncate leading-tight', children: profile.name }),
           jsx('div', {
             className: 'mt-1 mb-0.5',
             children: jsx('svg', {
@@ -1753,12 +1767,14 @@ function LifeProgressCard({ profile }) {
                     letterSpacing: 1.7,
                     fontWeight: 800,
                     fill: 'rgba(15,23,42,0.42)',
-                    children: jsx('textPath', { href: '#ltHeroArc', startOffset: '50%', textAnchor: 'middle', children: 'TIME LEFT UNTIL RETIREMENT' })
+                    children: jsx('textPath', { href: '#ltHeroArc', startOffset: '50%', textAnchor: 'middle', children: goalArc })
                   })
                 ]
               })
             })
           }),
+          /* Hero: the big box is YEARS; below it three pills — MONTHS,
+             DAYS, SECONDS — sit slightly lower than before. */
           jsxs('div', {
             className: 'flex items-center justify-center gap-1',
             children: [
@@ -1766,13 +1782,14 @@ function LifeProgressCard({ profile }) {
               jsxs('div', {
                 className: 'flex flex-col items-center px-1',
                 children: [
-                  jsx('span', { className: 'text-[54px] font-black text-primary tabular-nums leading-none', children: p2(remDays) }),
-                  jsx('span', { className: 'text-[10px] font-extrabold tracking-[0.3em] text-foreground/45 mt-1.5', children: 'DAYS' }),
+                  jsx('span', { className: 'text-[54px] font-black text-primary tabular-nums leading-none', children: p2(breakdown.years) }),
+                  jsx('span', { className: 'text-[10px] font-extrabold tracking-[0.3em] text-foreground/45 mt-1.5', children: 'YEARS' }),
                   jsxs('div', {
-                    className: 'flex gap-1.5 mt-2.5',
+                    className: 'flex gap-1.5 mt-4',
                     children: [
-                      heroPill(breakdown.years, 'YEARS'),
-                      heroPill(months, 'MONTHS')
+                      heroPill(months, 'MONTHS'),
+                      heroPill(remDays, 'DAYS'),
+                      heroPill(breakdown.seconds, 'SECONDS')
                     ]
                   })
                 ]
@@ -1781,19 +1798,11 @@ function LifeProgressCard({ profile }) {
             ]
           }),
           jsxs('div', {
-            className: 'grid grid-cols-3 gap-2 mt-3.5',
-            children: [
-              tickTile(breakdown.hours, 'HOURS', breakdown.hours / 24),
-              tickTile(breakdown.minutes, 'MINUTES', breakdown.minutes / 60, { bars: 6 }),
-              tickTile(breakdown.seconds, 'SECONDS', breakdown.seconds / 60, { isSec: true, bars: 6 })
-            ]
-          }),
-          jsxs('div', {
             className: 'flex items-center justify-between mt-3 pt-3 border-t border-foreground/10',
             children: [
               jsxs('span', {
                 className: 'text-[11px] font-semibold text-foreground/55',
-                children: ['Retirement: ', jsx('span', { className: 'text-primary font-bold', children: retirementDateStr })]
+                children: [goalLineLabel + ': ', jsx('span', { className: 'text-primary font-bold', children: goalLineValue })]
               }),
               jsx('span', {
                 className: 'text-[11px] font-bold text-foreground/40 tabular-nums',
@@ -1806,7 +1815,8 @@ function LifeProgressCard({ profile }) {
       // Money timer — reference-style card: header, remaining row, big
       // number, area chart, segmented bar + three stat tiles.
       tvData && jsxs('div', {
-        className: 'relative bg-white border border-black/[.06] rounded-2xl px-4 py-3.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
+        'data-lt-move': 'timer.money',
+        className: 'relative bg-white border border-black/[.16] rounded-2xl px-4 py-3.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
         style: { backgroundImage: 'radial-gradient(120% 90% at 100% 0%, rgba(0,194,168,0.08), rgba(0,194,168,0) 55%)' },
         children: [
           jsxs('div', {
@@ -1894,21 +1904,13 @@ function LifeProgressCard({ profile }) {
                 }, k);
               })
           }),
+          // Segment axis labels under the chart
           jsxs('div', {
             className: 'flex items-center justify-between mt-1.5',
             children: [
               jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' }),
               jsx('span', { className: 'text-[9.5px] font-bold text-foreground/50 tabular-nums', children: tvData.pct + '% of today\u2019s value left' }),
               jsx('span', { className: 'text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground/35', children: '12 AM' })
-            ]
-          }),
-          // Three stat tiles: spent today / per hour / remaining
-          jsxs('div', {
-            className: 'grid grid-cols-3 gap-2 mt-3',
-            children: [
-              tvTile({ bg: 'bg-accent/10', chip: 'bg-accent/20', icon: Ri, iconCls: 'text-accent', sym: 'Rs.', amount: tvMoney(tvData.spent), valCls: 'text-accent', label: 'Spent Today' }),
-              tvTile({ bg: 'bg-violet-500/10', chip: 'bg-violet-500/15', icon: Cc, iconCls: 'text-violet-600', sym: 'Rs.', amount: tvMoney(tvData.rate), valCls: 'text-foreground', label: 'Per Hour' }),
-              tvTile({ bg: 'bg-amber-500/10', chip: 'bg-amber-500/15', icon: Zb, iconCls: 'text-amber-600', sym: '', amount: tvData.remHours + 'h ' + tvData.remMin + 'min', valCls: 'text-foreground', label: 'Remaining' })
             ]
           })
         ]
@@ -1980,10 +1982,9 @@ function TodayGlance({ activities, blocks }) {
     return rem > 0 ? h + 'h ' + rem + 'm' : h + 'h';
   };
 
-  const palette = ['#4F46E5', '#0EA5E9', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444'];
-
   return jsxs('div', {
-    className: 'mx-4 mt-3 bg-white border border-black/[.06] rounded-3xl px-3.5 pt-3.5 pb-2.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
+    'data-lt-move': 'timer.glance',
+    className: 'mx-4 mt-3 bg-white border border-black/[.16] rounded-3xl px-3.5 pt-3.5 pb-2.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
     children: [
       jsxs('div', {
         className: 'flex items-center justify-between mb-1.5',
@@ -2005,7 +2006,7 @@ function TodayGlance({ activities, blocks }) {
         className: 'flex flex-col',
         children: display.map((a, i) => {
           const pct = totalMinutes > 0 ? Math.round((a.minutes / totalMinutes) * 100) : 0;
-          const color = a.color && /^#|hsl|rgb/i.test(a.color) ? a.color : palette[i % palette.length];
+          const color = resolveActivityColor(a);
           const hex = /^#[0-9a-fA-F]{6}$/.test(color) ? color : null;
           const tint = hex ? hex + '1A' : color;
           const emoji = typeof a.emoji === 'string' && a.emoji.trim() ? a.emoji.trim() : null;
@@ -2131,7 +2132,8 @@ function EatTheFrog() {
   };
 
   return jsxs('div', {
-    className: 'mx-4 mt-3 rounded-3xl border border-black/[.06] bg-white shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
+    'data-lt-move': 'timer.frog',
+    className: 'mx-4 mt-3 rounded-3xl border border-black/[.16] bg-white shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
     style: { backgroundImage: 'radial-gradient(130% 100% at 100% 0%, rgba(0,194,168,0.10), rgba(0,194,168,0) 55%),' + 'radial-gradient(90% 80% at 0% 100%, rgba(0,194,168,0.05), rgba(0,194,168,0) 60%)' },
     children: [
       jsxs('div', {
@@ -2229,6 +2231,14 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
         type: 'text',
         value: localTitle,
         onChange: handleInput,
+        onFocus: (e) => {
+          /* Never let the on-screen keyboard or bottom nav hide the row
+             being typed into — re-center it in the scroll viewport. */
+          const t = e.target;
+          setTimeout(() => {
+            try { t.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (err) {}
+          }, 80);
+        },
         placeholder: index === 0 ? 'Add your most important task\u2026' : 'Add another task\u2026',
         className: cn(
           'flex-1 bg-transparent border-none text-sm text-foreground outline-none min-w-0 py-0.5 placeholder:text-foreground/35',
@@ -2302,7 +2312,7 @@ function calcFocusScore(statsActivities) {
 
 function StatCard({ icon, iconBg, label, value, suffix, danger }) {
   return jsxs('div', {
-    className: 'rounded-3xl border border-black/[.06] bg-white p-4 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
+    className: 'rounded-3xl border border-black/[.16] bg-white p-4 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
     children: [
       jsx('div', {
         className: 'w-9 h-9 rounded-full flex items-center justify-center text-base mb-2.5',
@@ -2336,11 +2346,22 @@ export function ActivityScreen({ profile }) {
   const todayEntries = todayStats?.activities || [];
   const totalMinutesTracked = Math.round((todayStats?.totalSeconds || 0) / 60);
 
-  const todayBlockCount = blocks.filter((b) => {
-    const d = new Date(b.startTime);
-    const n = new Date();
-    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
-  }).length;
+  /* Consecutive days (ending today, or yesterday if today isn't tracked
+     yet) with at least one block — replaces the old "Blocks Today" card. */
+  const streakDays = (() => {
+    const days = new Set();
+    blocks.forEach((b) => {
+      if (!b.startTime) return;
+      const d = new Date(b.startTime);
+      days.add(d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate());
+    });
+    const has = (dt) => days.has(dt.getFullYear() + '-' + dt.getMonth() + '-' + dt.getDate());
+    const cur = new Date();
+    if (!has(cur)) cur.setDate(cur.getDate() - 1);
+    let streak = 0;
+    while (has(cur)) { streak++; cur.setDate(cur.getDate() - 1); }
+    return streak;
+  })();
 
   const focusScore = calcFocusScore(todayEntries);
   const dateLabel = new Date().toLocaleDateString(undefined, {
@@ -2410,7 +2431,7 @@ export function ActivityScreen({ profile }) {
         children: [
           jsx('h1', { className: 'text-[26px] font-black text-foreground m-0 leading-none', children: 'Activity' }),
           jsxs('span', {
-            className: 'inline-flex items-center gap-1.5 text-[11px] font-bold text-foreground/55 bg-white border border-black/[.06] rounded-full px-3 py-1.5 shadow-[0_6px_18px_rgba(15,23,42,0.05)] whitespace-nowrap',
+            className: 'inline-flex items-center gap-1.5 text-[11px] font-bold text-foreground/55 bg-white border border-black/[.16] rounded-full px-3 py-1.5 shadow-[0_6px_18px_rgba(15,23,42,0.05)] whitespace-nowrap',
             children: [
               jsx('span', { className: 'w-1.5 h-1.5 rounded-full bg-accent' }),
               dateLabel
@@ -2421,10 +2442,11 @@ export function ActivityScreen({ profile }) {
 
       // 2x2 stats grid
       jsxs('div', {
+        'data-lt-move': 'act.stats',
         className: 'grid grid-cols-2 gap-3 px-4 pt-3.5 pb-1',
         children: [
           jsx(StatCard, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
-          jsx(StatCard, { icon: '📋', iconBg: '#E0F2FE', label: 'Blocks Today', value: todayBlockCount }),
+          jsx(StatCard, { icon: '📋', iconBg: '#FEF3C7', label: 'Day Streak', value: streakDays }),
           jsx(StatCard, { icon: '🎯', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore, suffix: '/100' }),
           jsx(StatCard, { icon: '🔥', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
         ]
@@ -2443,12 +2465,21 @@ export function ActivityScreen({ profile }) {
           }),
           activities.length > 0 && jsx('span', {
             className: cn(
-              'shrink-0 text-[10px] font-extrabold uppercase tracking-[0.12em] rounded-full px-2.5 py-1.5 border',
+              'shrink-0 w-11 h-11 rounded-full border flex flex-col items-center justify-center leading-none',
               limitReached
                 ? 'bg-red-500 text-white border-red-600 shadow-[0_6px_16px_rgba(239,68,68,0.35)]'
-                : 'text-foreground/45 bg-white border-black/[.06]'
+                : 'text-foreground bg-white border-black/[.25]'
             ),
-            children: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length + ' total'
+            children: [
+              jsx('span', {
+                className: 'text-[13px] font-black tabular-nums',
+                children: freePlan ? activities.length + '/' + FREE_ACTIVITY_LIMIT : String(activities.length)
+              }),
+              jsx('span', {
+                className: 'text-[6.5px] font-extrabold uppercase tracking-[0.14em] mt-0.5 opacity-70',
+                children: 'total'
+              })
+            ]
           })
         ]
       }),
@@ -2458,7 +2489,7 @@ export function ActivityScreen({ profile }) {
         className: 'flex flex-col gap-2.5 px-4',
         children: [
           activities.length === 0 && jsxs('div', {
-            className: 'flex flex-col items-center justify-center py-12 px-8 text-center bg-white rounded-3xl border border-black/[.06] shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
+            className: 'flex flex-col items-center justify-center py-12 px-8 text-center bg-white rounded-3xl border border-black/[.16] shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
             children: [
               jsx(rh, { className: 'w-8 h-8 text-muted-foreground mb-4 opacity-30' }),
               jsx('p', { className: 'text-muted-foreground font-medium', children: 'No activities yet.' }),

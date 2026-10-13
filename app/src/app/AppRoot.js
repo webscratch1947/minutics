@@ -1,15 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import { getProfile } from '../lib/profile.js';
-import { HC } from './AndroidBridge.js';
-import { ak, dk } from '../_slice_shell.js';
+import { ak } from '../_slice_shell.js';
 import { mk } from '../_slice_onboarding.js';
-import { TimerScreen, ActivityScreen } from '../screens/Home.js';
-import { LifeHubScreen } from '../screens/LifeHub.js';
-import { SettingsScreen } from '../screens/Settings.js';
-import { JournalScreen } from '../screens/Journal.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,21 +17,7 @@ const queryClient = new QueryClient({
 
 function AuthenticatedApp({ profile }) {
   return jsx(HashRouter, {
-    children: jsxs(ak, {
-      children: [
-        jsx(HC, {}),
-        jsx(Routes, {
-          children: [
-            jsx(Route, { path: '/', element: jsx(TimerScreen, { profile }) }),
-            jsx(Route, { path: '/activity', element: jsx(ActivityScreen, { profile }) }),
-            jsx(Route, { path: '/timeline', element: jsx(LifeHubScreen, { profile }) }),
-            jsx(Route, { path: '/journal', element: jsx(JournalScreen, {}) }),
-            jsx(Route, { path: '/settings', element: jsx(SettingsScreen, {}) }),
-            jsx(Route, { path: '*', element: jsx(dk, {}) })
-          ]
-        })
-      ]
-    })
+    children: jsx(ak, { profile })
   });
 }
 
@@ -62,6 +43,17 @@ export function QC() {
     }
     window.addEventListener("lt-user-changed", onUserChanged);
     return () => window.removeEventListener("lt-user-changed", onUserChanged);
+  }, []);
+
+  // profile.js saveProfile dispatches this on every Settings edit (dob,
+  // lifespan, name) so the Timer countdown/retirement line updates live.
+  useEffect(() => {
+    function onProfileChanged() {
+      profileRef.current = getProfile();
+      setProfile(profileRef.current);
+    }
+    window.addEventListener("lt-profile-changed", onProfileChanged);
+    return () => window.removeEventListener("lt-profile-changed", onProfileChanged);
   }, []);
 
   // Tell auth.js the remount has committed so it can safely drop the gate

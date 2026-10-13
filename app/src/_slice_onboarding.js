@@ -330,7 +330,7 @@ export function mk({
         img,
         jsx("p", {
           className: "text-gray-500 text-sm leading-relaxed mt-2 px-2",
-          children: "A few quick questions and your life countdown will be ready."
+          children: "A few quick questions and your minutes will start tracking."
         })
       ]
     });
@@ -342,7 +342,7 @@ export function mk({
       children: [
         img,
         jsx("div", { className: "mt-2", children: jsxs("div", {
-          className: "bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4",
+          className: "bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]",
           children: [
             label("Your name"),
             jsx("input", {
@@ -351,7 +351,7 @@ export function mk({
               onChange: g => o(g.target.value.replace(/[^A-Za-z\s]/g, "")),
               placeholder: "e.g. Alex",
               autoFocus: true,
-              className: "w-full bg-gray-200 text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-400 rounded-lg px-3 py-2"
+              className: "w-full bg-[#F5F6F8] border border-black/10 text-gray-900 text-lg font-semibold rounded-xl px-3.5 py-3 outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all"
             })
           ]
         }) })
@@ -384,11 +384,11 @@ export function mk({
         i("");
       }
     };
-    const _selStyle = "flex-1 bg-gray-200 text-gray-900 text-base font-bold outline-none border border-gray-300 rounded-xl px-2 py-3 text-center focus:border-[#157347] transition-colors min-w-0";
+    const _selStyle = "flex-1 bg-[#F5F6F8] border border-black/10 text-gray-900 text-base font-bold outline-none rounded-xl px-2 py-3 text-center focus:border-[#157347] focus:bg-white focus:ring-2 focus:ring-[#157347]/15 transition-all min-w-0";
     body = jsxs("div", {
       children: [
         img,
-        jsxs("div", { className: "mt-2 bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4", children: [
+        jsxs("div", { className: "mt-2 bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]", children: [
           label("Date of birth"),
           jsxs("div", {
             className: "flex items-center gap-2",
@@ -423,7 +423,7 @@ export function mk({
             ]
           })
         ]}),
-        jsxs("div", { className: "mt-3 bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4", children: [
+        jsxs("div", { className: "mt-3 bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]", children: [
           jsxs("label", {
             className: "block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2",
             children: ["Retire age \u2014 ", jsx("span", { style: { color: GREEN }, children: d })]
@@ -445,7 +445,7 @@ export function mk({
             ]
           })
         ]}),
-        u && s && jsxs("div", { className: "mt-3 bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4", children: [
+        u && s && jsxs("div", { className: "mt-3 bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]", children: [
           label("Your timeline"),
           jsxs("div", {
             className: "flex h-4 w-full border border-[#E5DFCF] overflow-hidden rounded-full",
@@ -476,7 +476,7 @@ export function mk({
       children: [
         img,
         jsx("div", { className: "mt-2", children: jsxs("div", {
-          className: "bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4",
+          className: "bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]",
           children: [
             label("Your monthly salary"),
             jsxs("div", {
@@ -491,7 +491,7 @@ export function mk({
                   onChange: g => setSal(g.target.value),
                   placeholder: "e.g. 50,000",
                   autoFocus: true,
-                  className: "w-full bg-gray-200 rounded-lg px-3 py-2 text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-400 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className: "w-full bg-[#F5F6F8] border border-black/10 rounded-xl px-3.5 py-3 text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 })
               ]
             }),

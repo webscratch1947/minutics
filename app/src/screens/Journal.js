@@ -5,6 +5,7 @@ import { enrichBlocksForRange } from '../lib/storage.js';
 import { cn } from '../lib/cn.js';
 import { CircleCheckBig as eh } from 'lucide-react';
 import { useBlocks } from '../hooks/useBlocks.js';
+import { resolveActivityColor } from '../lib/constants.js';
 
 /* ─── Helper Functions ──────────────────────────────────────────────────────── */
 
@@ -100,7 +101,7 @@ function enrichBlocksForDay(blocks, activities, dayStart, dayEnd) {
     var entry = map.get(act.id) || {
       activityId: act.id,
       activityName: act.name,
-      activityColor: act.color,
+      activityColor: resolveActivityColor(act),
       totalSeconds: 0,
       blocks: []
     };
@@ -241,6 +242,7 @@ export function JournalScreen() {
 
               // Consistency Streak card
               jsxs("div", {
+                'data-lt-move': 'journal.streak',
                 className: "rounded-2xl p-4 shadow-[0_1px_3px_rgba(0,0,0,.05)]",
                 style: { backgroundColor: "#FEF3E2", border: "1px solid #FBD38D" },
                 children: [
@@ -263,6 +265,7 @@ export function JournalScreen() {
 
               // This Week card
               jsxs("div", {
+                'data-lt-move': 'journal.week',
                 className: "rounded-2xl p-4 bg-white border border-border shadow-[0_1px_3px_rgba(0,0,0,.05)]",
                 children: [
                   jsx("p", {
@@ -284,7 +287,8 @@ export function JournalScreen() {
 
           // Week calendar grid (Mon–Sun) — light card
           jsx("div", {
-            className: "grid grid-cols-7 gap-1 w-full mb-4 rounded-2xl border border-black/[.07] bg-white px-2 py-3 shadow-[0_1px_3px_rgba(0,0,0,.05)]",
+            'data-lt-move': 'journal.calendar',
+            className: "grid grid-cols-7 gap-1 w-full mb-4 rounded-2xl border border-black/[.16] bg-white px-2 py-3 shadow-[0_1px_3px_rgba(0,0,0,.05)]",
             children: weekDates.map(function(d, i) {
               var isToday = isSameDay(d, now);
               // Check if this day has tracked time
@@ -324,6 +328,7 @@ export function JournalScreen() {
 
       /* ── 2. Today's Time Summary (inset primary card) ──────────────────────── */
       jsxs("div", {
+        'data-lt-move': 'journal.hero',
         className: "bg-primary text-white px-5 pt-8 pb-6 mx-4 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,.18)]",
         children: [
           // Full date: "Wednesday, September 9"
@@ -382,7 +387,8 @@ export function JournalScreen() {
           var activities = dg.activities;
 
           return jsxs("div", {
-            className: "rounded-2xl border border-black/[.07] bg-white overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,.04)]",
+            'data-lt-move': 'journal.day.' + (dayDate && dayDate.toISOString ? dayDate.toISOString().slice(0, 10) : idx),
+            className: "rounded-2xl border border-black/[.16] bg-white overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,.04)]",
             children: [
               // Day row button (tap to expand)
               jsxs("button", {

@@ -71,6 +71,10 @@ var _logoutInProgress = false; /* a real signOut() is in flight (set by
    itself is never imported into real accounts. ─────────────────────────── */
 var DEMO_MODE = true;
 var DEMO_SESSION_KEY = "lt-demo-session-started";
+/* Sliding renewal stamp (activity pushed it forward). Kept separate from
+   DEMO_SESSION_KEY so the VISIBLE countdown can count down monotonically
+   from the original start while the session itself never expires in use. */
+var DEMO_RENEW_KEY = "lt-demo-session-renewed";
 var DEMO_HISTORY_KEY = "lt_early_access_demo_v1";
 var DEMO_DURATION_MS = 30 * 60 * 1000;
 var DEMO_UID = "early-access-demo";
@@ -82,7 +86,7 @@ function isReservedKey(k) {
      must not be snapshotted into lt_ns_* blobs nor wiped by clearAppKeys
      (only wipeDemoData / _killDemoForRealAuth remove them). */
   return k === ACTIVE_UID_KEY || k.indexOf("lt_ns_") === 0 || k.indexOf("firebase:") === 0
-    || k === DEMO_SESSION_KEY || k === DEMO_HISTORY_KEY;
+    || k === DEMO_SESSION_KEY || k === DEMO_RENEW_KEY || k === DEMO_HISTORY_KEY;
 }
 function appKeys() {
   var out = [];
@@ -274,11 +278,28 @@ function announceUserChanged() {
 function isDemoActive() {
   try { return !!localStorage.getItem(DEMO_SESSION_KEY); } catch (e) { return false; }
 }
+/* EXPIRY clock — measured from the most recent renewal, so an app in use
+   (or backgrounded on a phone) never expires. */
 function demoTimeRemainingMs() {
   try {
     var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
+    var renewed = parseInt(localStorage.getItem(DEMO_RENEW_KEY) || "0", 10);
+    var base = Math.max(started || 0, renewed || 0);
+    if (!base) return 0;
+    return DEMO_DURATION_MS - (Date.now() - base);
+  } catch (e) { return 0; }
+}
+/* DISPLAY clock — always measured from the ORIGINAL start stamp, so the
+   visible "Demo 30:00" counts straight down and never jumps back to 30:00
+   when the session renews (the old countdown-reset "infinite loop"). After
+   a full 30 minutes of active use it cleanly wraps to a fresh 30:00. */
+function demoDisplayRemainingMs() {
+  try {
+    var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
     if (!started) return 0;
-    return DEMO_DURATION_MS - (Date.now() - started);
+    var elapsed = Date.now() - started;
+    if (elapsed < 0) elapsed = 0;
+    return DEMO_DURATION_MS - (elapsed % DEMO_DURATION_MS);
   } catch (e) { return 0; }
 }
 function markDemoHistory() {
@@ -302,6 +323,7 @@ function _stopDemoTimer() {
 function wipeDemoData() {
   try { clearAppKeys(); } catch (e) {}
   try { localStorage.removeItem(DEMO_SESSION_KEY); } catch (e) {}
+  try { localStorage.removeItem(DEMO_RENEW_KEY); } catch (e) {}
   try { localStorage.removeItem(nsKey(DEMO_UID)); } catch (e) {}
   try { if (getMarker() === DEMO_UID) setMarker(null); } catch (e) {}
   try { localStorage.removeItem("lt_last_uid"); } catch (e) {}
@@ -336,6 +358,7 @@ function enterDemo(isNew) {
     } catch (e) {}
     markDemoHistory();
     try { localStorage.setItem(DEMO_SESSION_KEY, String(Date.now())); } catch (e) {}
+    try { localStorage.removeItem(DEMO_RENEW_KEY); } catch (e) {}
     try { localStorage.removeItem("lt_last_uid"); } catch (e) {}
     /* Premium is free during the demo. */
     if (window.LTPlan && window.LTPlan.setPlan) {
@@ -377,8 +400,12 @@ function bumpDemoSession() {
   try {
     var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
     if (!started) return;
-    if (Date.now() - started < 60000) return;
-    localStorage.setItem(DEMO_SESSION_KEY, String(Date.now()));
+    var renewed = parseInt(localStorage.getItem(DEMO_RENEW_KEY) || "0", 10);
+    var last = Math.max(started, renewed);
+    if (Date.now() - last < 60000) return;
+    /* Renewal moves the separate renew stamp only — the original start
+       stamp (which drives the visible countdown) is never touched. */
+    localStorage.setItem(DEMO_RENEW_KEY, String(Date.now()));
   } catch (e) {}
 }
 function showDemoTimer() {
@@ -413,6 +440,7 @@ window.LTDemo = {
   mode: function () { return DEMO_MODE; },
   isActive: isDemoActive,
   remainingMs: demoTimeRemainingMs,
+  displayMs: demoDisplayRemainingMs,
   start: function () { enterDemo(true); },
   end: endDemoSession,
 };
@@ -1279,6 +1307,7 @@ onAuthStateChanged(auth, function (user) {
           localStorage.setItem("lt_plan_since_v1", JSON.stringify(Date.now()));
         }
         try { localStorage.removeItem(DEMO_SESSION_KEY); } catch (e) {}
+        try { localStorage.removeItem(DEMO_RENEW_KEY); } catch (e) {}
         try { localStorage.removeItem(nsKey(DEMO_UID)); } catch (e) {}
         storageChanged = true;
       } catch (e) {}

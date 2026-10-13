@@ -13,8 +13,33 @@ export const COLOR_PALETTE = [
   "#E11D48",
   "#BE185D",
   "#15803D",
-  "#B91C1C"
+  "#B91C1C",
+  /* Extended tail (existing indexes unchanged) so every activity up to
+     well past the free-plan limit can hold a distinct color. */
+  "#0891B2",
+  "#65A30D",
+  "#DB2777",
+  "#4F46E5",
+  "#EA580C",
+  "#0D9488",
+  "#9333EA",
+  "#CA8A04"
 ];
+
+/**
+ * THE single source of truth for an activity's color (was: every screen
+ * resolved its own fallback — e.g. Today at a Glance used an index palette,
+ * so "Dancing" showed pink there while the Journal showed its real blue).
+ * The stored color always wins; the deterministic id-based fallback gives
+ * the same answer on every screen, so one activity = one color everywhere.
+ */
+export function resolveActivityColor(activity) {
+  if (!activity) return COLOR_PALETTE[0];
+  const c = String(activity.color || "").trim();
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c) || /^(hsl|rgb)/i.test(c)) return c;
+  const id = Number(activity.id) || 0;
+  return COLOR_PALETTE[Math.abs(Math.trunc(id)) % COLOR_PALETTE.length];
+}
 
 /** Get a random color from the palette */
 export function getRandomColor() {

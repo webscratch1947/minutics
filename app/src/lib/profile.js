@@ -32,6 +32,10 @@ export function saveProfile(profile) {
   if (!localStorage.getItem("lifetime_install_date")) {
     localStorage.setItem("lifetime_install_date", new Date().toISOString());
   }
+  /* Let the app (AppRoot profile state → Timer countdown/retirement text)
+     know a Settings edit happened — without this the Timer kept showing
+     the profile values captured at mount. */
+  try { window.dispatchEvent(new CustomEvent("lt-profile-changed")); } catch (e) {}
 }
 
 /** Remove profile + local DB from localStorage (was: hk) */

@@ -646,6 +646,13 @@
   }
 
   function today() { return new Date().toISOString().slice(0, 10); }
+  /* Local-day key — the waste budget window rolls over at LOCAL midnight
+     every 24h (the UTC-based today() reset at 5:30 AM IST, which read as
+     "the limit never resets when I expect"). */
+  function localDayKey() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
 
   function formatDate(v) {
     if (!v) return "\u2014";
@@ -1040,7 +1047,10 @@
       ".lt-tile-icon-wrap{width:56px!important;height:56px!important;border-radius:14px!important;background:hsl(var(--secondary))!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:24px!important;color:hsl(var(--primary))!important;margin-bottom:2px!important}",
       ".lt-tile-label{font-size:11px!important;font-weight:600!important;color:hsl(var(--foreground))!important;line-height:1.3!important;max-width:68px!important}",
       /* overlay root */
-      "#lt-overlay-root{position:fixed;inset:0;z-index:2147483647;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;background:hsl(var(--background));color:hsl(var(--foreground));box-sizing:border-box;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}",
+      "#lt-overlay-root{position:fixed;inset:0;z-index:2147483647;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;background:hsl(var(--background));color:hsl(var(--foreground));box-sizing:border-box;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;animation:lt-tool-in .3s cubic-bezier(.22,.61,.36,1)}",
+      /* Tools slide in from the right instead of popping (the root node is
+         recreated on every open, so the animation re-runs each time). */
+      "@keyframes lt-tool-in{from{transform:translateX(100%)}to{transform:translateX(0)}}",
       ".lt-tool-shell{max-width:700px;margin:0 auto;padding:18px 16px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%}",
       /* Classic borderless header — Back link on top, plain kicker, title, description */
       ".lt-tool-top{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin:0 0 18px;color:#111114}",
@@ -1055,12 +1065,12 @@
       ".lt-tool-danger{color:#DC2626;border-color:rgba(220,38,38,.35);background:#FEF2F2;box-shadow:0 1px 2px rgba(220,38,38,.1)}",
       ".lt-cancel-btn{background:#fff!important;border-color:#F1C7C7!important;color:#DC2626!important;box-shadow:none!important}",
       ".lt-tool-close:active,.lt-tool-primary:active,.lt-tool-secondary:active,.lt-tool-danger:active{transform:translateY(1px);box-shadow:none}",
-      ".lt-tool-card{border:1px solid rgba(17,17,20,.08);background:#fff;padding:18px;border-radius:18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(17,17,20,.05);word-break:break-word}",
+      ".lt-tool-card{border:1px solid rgba(17,17,20,.2);background:#fff;padding:18px;border-radius:18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(17,17,20,.05);word-break:break-word}",
       ".lt-card-title{font-weight:800;font-size:16px;margin:0 0 12px;letter-spacing:-.01em;color:#111114;display:flex;align-items:center;gap:9px}",
       ".lt-card-title::before{content:'';width:4px;height:15px;background:#111114;border-radius:2px;flex-shrink:0}",
       ".lt-card-subtitle{font-size:12px;line-height:1.5;color:hsl(var(--muted-foreground));margin:-6px 0 14px}",
       ".lt-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}",
-      ".lt-summary-card{border:1px solid rgba(17,17,20,.08);background:#fff;padding:14px;border-radius:14px;box-shadow:0 1px 3px rgba(17,17,20,.05)}",
+      ".lt-summary-card{border:1px solid rgba(17,17,20,.2);background:#fff;padding:14px;border-radius:14px;box-shadow:0 1px 3px rgba(17,17,20,.05)}",
       ".lt-summary-card small{display:block;text-transform:uppercase;letter-spacing:.09em;font-size:9.5px;color:hsl(var(--muted-foreground));font-weight:800}",
       ".lt-summary-card strong{display:block;font-size:21px;margin-top:6px;font-weight:800;color:#111114}",
       ".lt-budget-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}",
@@ -1077,7 +1087,7 @@
       ".lt-field{display:flex;flex-direction:column;gap:6px}",
       ".lt-field.full{grid-column:1/-1}",
       ".lt-field label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:hsl(var(--muted-foreground))}",
-      ".lt-field input,.lt-field select,.lt-field textarea{width:100%;box-sizing:border-box;border:1px solid hsl(var(--border));background:#fff;padding:11px 13px;border-radius:12px;color:#111114;font:inherit;font-size:15px;font-weight:600;transition:box-shadow .12s,border-color .12s;-webkit-tap-highlight-color:transparent}",
+      ".lt-field input,.lt-field select,.lt-field textarea{width:100%;box-sizing:border-box;border:1px solid rgba(17,17,20,.28);background:#fff;padding:11px 13px;border-radius:12px;color:#111114;font:inherit;font-size:15px;font-weight:600;transition:box-shadow .12s,border-color .12s;-webkit-tap-highlight-color:transparent}",
       ".lt-field input:focus,.lt-field select:focus,.lt-field textarea:focus{outline:none;border-color:#111114;box-shadow:0 0 0 3px rgba(17,17,20,.07)}",
       ".lt-field textarea{min-height:70px;resize:vertical}",
       ".lt-check{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#111114;padding:5px 0;grid-column:1/-1}",
@@ -1996,6 +2006,14 @@
       } catch (e) {}
     }
 
+    /* Selecting "Time Waste" (or a penalised Social Media sub) reveals the
+       Reason / Description fields below — bring them into view so the user
+       actually discovers them instead of thinking the selection did nothing. */
+    var scrollCatModalTo = function (el) {
+      if (!el) return;
+      try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+    };
+
     root.addEventListener("click", function (e) {
       if (e.target.id === "lt-cat-close") {
         closeCategoryModal("cancel");
@@ -2013,6 +2031,8 @@
         if (subPicker) subPicker.style.display = selected === "Social Media" ? "block" : "none";
         var reasonWrap = document.getElementById("lt-cat-reason-wrap");
         if (reasonWrap) reasonWrap.style.display = selected === "Time Waste" ? "block" : "none";
+        if (selected === "Time Waste") scrollCatModalTo(reasonWrap);
+        else if (selected === "Social Media" && subPicker) scrollCatModalTo(subPicker);
         return;
       }
       var subBtn = e.target.closest("[data-sub]");
@@ -2024,6 +2044,7 @@
         var reasonWrap2 = document.getElementById("lt-cat-reason-wrap");
         if (reasonWrap2) reasonWrap2.style.display =
           selected === "Social Media" && subBtn.getAttribute("data-penalty") === "true" ? "block" : "none";
+        if (reasonWrap2 && reasonWrap2.style.display === "block") scrollCatModalTo(reasonWrap2);
         return;
       }
       if (e.target.id === "lt-cat-save") {
@@ -2062,7 +2083,7 @@
     var entries = catLogEntries();
     entries.unshift({
       id: genId(), category: category, minutes: minutes || 0, label: label || "", reason: reason || "",
-      date: today(), savedAt: new Date().toISOString()
+      date: today(), ldate: localDayKey(), savedAt: new Date().toISOString()
     });
     writeJson(CATLOG_KEY, entries);
   }
@@ -5437,18 +5458,18 @@
       '<div class="lt-fv-modal-head"><h3>Full view \u00b7 ' + escapeHtml(dateText) + '</h3><button class="lt-fv-modal-close" id="lt-fv-report-close">\u2715</button></div>' +
       '<div class="lt-fv-report-card">' +
         '<div class="lt-fv-donut" style="background:' + fvConicGradient(activities, total) + '">' +
-          '<div class="lt-fv-donut-hole"><strong>' + (total ? fvFormatMinutes(total) : "\u2014") + '</strong><span>TRACKED</span></div>' +
+          '<div class="lt-fv-donut-hole"><strong>' + fvFormatMinutes(total) + '</strong><span>TRACKED</span></div>' +
         '</div>' +
         '<div class="lt-fv-legend">' + rowsHtml + '</div>' +
       '</div>' +
       '<div class="lt-fv-report-card">' +
         '<p class="lt-card-title" style="margin:0 0 10px;color:#fff">Summary</p>' +
-        '<div class="lt-fv-row"><span class="lt-fv-row-left">Total tracked</span><span class="lt-fv-row-right">' + (total ? fvFormatMinutes(total) : "\u2014") + '</span></div>' +
+        '<div class="lt-fv-row"><span class="lt-fv-row-left">Total tracked</span><span class="lt-fv-row-right">' + fvFormatMinutes(total) + '</span></div>' +
         '<div class="lt-fv-row"><span class="lt-fv-row-left">Categories used</span><span class="lt-fv-row-right">' + activities.length + '</span></div>' +
-        '<div class="lt-fv-row"><span class="lt-fv-row-left">Top category</span><span class="lt-fv-row-right">' + (topActivity ? '<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + topActivity.color + '"></span>' + escapeHtml(topActivity.name) + ' \u00b7 ' + fvFormatMinutes(topActivity.minutes) + '</span>' : "\u2014") + '</span></div>' +
+        '<div class="lt-fv-row"><span class="lt-fv-row-left">Top category</span><span class="lt-fv-row-right">' + (topActivity ? '<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + topActivity.color + '"></span>' + escapeHtml(topActivity.name) + ' \u00b7 ' + fvFormatMinutes(topActivity.minutes) + '</span>' : "0") + '</span></div>' +
       '</div>' +
       '<div class="lt-fv-modal-actions">' +
-        '<button id="lt-fv-report-share-btn" style="background:#111114;color:#fff">Share</button>' +
+        '<button id="lt-fv-report-share-btn" style="background:hsl(var(--primary));color:#fff;box-shadow:0 6px 18px rgba(0,194,168,.35)">Share</button>' +
       '</div>';
     document.body.appendChild(overlay);
 
@@ -6296,7 +6317,8 @@
      sub-category appeared to do nothing, because nothing is written to
      the log until the timer is actually stopped (see pollRunningTimer). */
   function computeWasteMinutesToday() {
-    var entries = catLogEntries().filter(function (e) { return e.date === today(); });
+    var day = localDayKey();
+    var entries = catLogEntries().filter(function (e) { return (e.ldate || e.date) === day; });
     var wasteMin = entries.reduce(function (s, e) {
       return WASTE_CATEGORIES.indexOf(e.category) !== -1 ? s + (Number(e.minutes) || 0) : s;
     }, 0);
@@ -6384,6 +6406,96 @@
     { days: 14, name: "14-Day Time Master" },
     { days: 30, name: "30-Day Life Champion" }
   ];
+
+  /* ── Time Waste budget: over-limit notification (once per budget day) ──
+     Runs app-wide, not just while the budget tool is open. The budget
+     window itself resets at local midnight every 24h (localDayKey above),
+     so each new local day re-arms the alert. */
+  var WASTE_NOTIFIED_DAY_KEY = "lt_waste_notified_day_v1";
+  var _wasteNotifiedDay = readJson(WASTE_NOTIFIED_DAY_KEY, "");
+
+  function notifyWasteOver(mins, limit) {
+    var body = "You've spent " + mins + " min on Time Waste \u2014 your " + limit + " min daily limit is crossed. Resets at midnight.";
+    var sent = false;
+    try {
+      if (window.AndroidBridge && typeof window.AndroidBridge.showNotification === "function") {
+        window.AndroidBridge.showNotification("Time Waste budget exceeded", body);
+        sent = true;
+      }
+    } catch (e) {}
+    if (!sent) {
+      try {
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          new Notification("Time Waste budget exceeded", { body: body });
+          sent = true;
+        }
+      } catch (e) {}
+    }
+    if (!sent) {
+      /* In-app banner fallback so the alert is never silently dropped. */
+      try {
+        var b = document.createElement("div");
+        b.style.cssText = "position:fixed;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top,0px));z-index:2147483647;background:#DC2626;color:#fff;padding:12px 14px;border-radius:14px;font:700 13px/1.4 Inter,system-ui,sans-serif;box-shadow:0 12px 30px rgba(0,0,0,.35);transform:translateY(-140%);transition:transform .3s ease";
+        b.textContent = "\u26A0\uFE0F " + body;
+        document.body.appendChild(b);
+        requestAnimationFrame(function () { b.style.transform = "translateY(0)"; });
+        setTimeout(function () {
+          b.style.transform = "translateY(-140%)";
+          setTimeout(function () { try { b.remove(); } catch (e) {} }, 400);
+        }, 5200);
+      } catch (e) {}
+    }
+  }
+
+  (function startWasteBudgetWatch() {
+    var check = function () {
+      try {
+        var cfg = readJson(WASTE_BUDGET_KEY, { minutes: 45 });
+        if (!cfg || !(cfg.minutes > 0)) return;
+        var day = localDayKey();
+        var mins = computeWasteMinutesToday();
+        if (mins > cfg.minutes && _wasteNotifiedDay !== day) {
+          _wasteNotifiedDay = day;
+          writeJson(WASTE_NOTIFIED_DAY_KEY, day);
+          notifyWasteOver(mins, cfg.minutes);
+        }
+      } catch (e) {}
+    };
+    setInterval(check, 60000);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
+    setTimeout(check, 4000);
+  })();
+
+  /* ── Save buttons turn green for ~3.5s after a successful save ──
+     Tool forms save synchronously to localStorage, so a submit is always a
+     success. The flash starts one tick later because most tools re-render
+     their innerHTML on save (the button node is replaced by then). */
+  document.addEventListener("submit", function (e) {
+    try {
+      var form = e.target;
+      if (!form || !form.querySelector) return;
+      var probe = form.querySelector("button.lt-tool-primary");
+      if (!probe || probe.disabled) return;
+      if (!/save/i.test((probe.textContent || "").trim())) return;
+      setTimeout(function () {
+        var overlay = document.getElementById("lt-overlay-root");
+        var btn = (overlay && overlay.querySelector("button.lt-tool-primary")) || probe;
+        var label = btn.textContent;
+        var prevBg = btn.style.background;
+        var prevColor = btn.style.color;
+        btn.style.background = "#16A34A";
+        btn.style.color = "#fff";
+        btn.style.boxShadow = "0 6px 18px rgba(22,163,74,.35)";
+        if (/save/i.test(label)) btn.textContent = "Saved \u2713";
+        setTimeout(function () {
+          btn.style.background = prevBg;
+          btn.style.color = prevColor;
+          btn.style.boxShadow = "";
+          if (btn.textContent === "Saved \u2713") btn.textContent = label;
+        }, 3500);
+      }, 150);
+    } catch (e) {}
+  }, true);
 
   function renderStreaksBadges() {
     var streak = readJson(STREAK_KEY, { lastDate: "", count: 0 });
