@@ -231,24 +231,30 @@ let _justDragged = false;
 
 function uiSwapFindTarget(x, y) {
   if (!_dragEl) return null;
-  const el = document.elementFromPoint(x, y);
-  if (!el || !el.closest) return null;
   const parent = _dragEl.parentElement;
   if (!parent) return null;
-  /* Walk up to the direct child of the dragged box's parent that contains
-     the hit point. Marked boxes can be NESTED (e.g. timer.block contains
-     timer.hero, both marked), so closest('[data-lt-move]') would resolve to
-     the inner box and fail the sibling check — "drop on the timer card"
-     would then never register. Resolving to the top-level sibling keeps the
-     rule (same parent, same size, same line) and makes the whole card a
-     valid drop zone. */
-  let node = el;
-  while (node && node.parentElement !== parent) node = node.parentElement;
-  if (!node || node === parent) return null;     // not inside a child of the parent
-  if (node === _dragEl) return null;            // over the dragged box itself
-  if (node.contains && node.contains(_dragEl)) return null;
-  if (!node.hasAttribute || !node.hasAttribute('data-lt-move')) return null;
-  return node;
+  /* Resolve the drop target by GEOMETRY over the parent's direct marked
+     children, not by document.elementFromPoint. elementFromPoint returns
+     whatever is topmost at the point — including floating overlays that have
+     nothing to do with the layout (the editor's own fixed hint panel, idle
+     nudges, toasts). Those overlays sit over a valid drop box and made the
+     old ancestor-walk escape to <body>, so the drop silently did nothing —
+     and only in one direction (whichever box happened to sit under the
+     overlay), which is exactly the "asymmetric swap" report. A bounding-box
+     test against the sibling boxes themselves ignores any overlay on top. */
+  const kids = Array.prototype.filter.call(parent.children, function (c) {
+    return c !== _dragEl && c.hasAttribute && c.hasAttribute('data-lt-move');
+  });
+  let best = null, bestArea = Infinity;
+  for (let i = 0; i < kids.length; i++) {
+    const r = kids[i].getBoundingClientRect();
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+    /* Overlapping siblings (nested marked boxes) → prefer the smallest so an
+       inner card wins over the big card containing it. */
+    const area = r.width * r.height;
+    if (area < bestArea) { best = kids[i]; bestArea = area; }
+  }
+  return best;
 }
 function uiSwapSetTarget(t) {
   if (_dropEl === t) return;
@@ -480,6 +486,16 @@ export function ak({ profile }) {
   const [dragX, setDragX] = useState(0);
   const [peek, setPeek] = useState(null);
   const [tracking, setTracking] = useState(false);
+  /* The peek pane is React-rendered mid-swipe, but the enhancement pass that
+     injects Journal "Full view" buttons is throttled (1 run / 500ms) and only
+     fires on DOM mutations — during a fast finger-drag it often didn't run
+     until AFTER release, so the peeked Journal showed no Full view button.
+     Fire the unthrottled immediate pass the moment the peek target changes so
+     the peek paints complete while the finger is still down. */
+  useEffect(() => {
+    if (!peek) return;
+    try { window.dispatchEvent(new CustomEvent('lt-route-change')); } catch (e) {}
+  }, [peek]);
   /* Imperative style targets. pointermove fires up to ~120×/s — pushing
      dragX through React re-rendered the whole page tree on EVERY event,
      which made the slide feel heavy and then suddenly "detach". During the
