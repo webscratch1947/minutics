@@ -256,10 +256,48 @@ function uiSwapSetTarget(t) {
   _dropEl = t;
   if (_dropEl) _dropEl.classList.add('lt-swap-target');
 }
+/* Give EVERY marked sibling a contiguous order in its parent's current DOM
+   order, so any later swap is a clean exchange of two numbers in the SAME
+   space. Without this, an unstored box fell back to its DOM index (1,2,3…)
+   and swapping it with a stored box (e.g. order 5) produced an asymmetric
+   5↔1 exchange — which is why dragging "Timer" onto a stored box never
+   moved it, while dragging a stored box onto "Timer" did. */
+/* Snapshot each box's CURRENT rendered order (style.order if set, else its
+   natural DOM slot) into a contiguous 1..N sequence per parent. This puts
+   every box in the SAME numeric space so any swap is a clean two-way
+   exchange. Reading style.order (not DOM index) is essential: after a swap
+   the CSS `order` reflow has already moved the boxes, so DOM index is stale. */
+function uiOrderNormalize(store) {
+  const nodes = Array.prototype.slice.call(document.querySelectorAll('[data-lt-move]'));
+  const parents = [];
+  nodes.forEach((el) => {
+    const p = el.parentElement;
+    if (p && parents.indexOf(p) === -1) parents.push(p);
+  });
+  parents.forEach((p) => {
+    const kids = Array.prototype.slice.call(p.children)
+      .filter((c) => c.hasAttribute && c.hasAttribute('data-lt-move'));
+    kids.sort((a, b) => {
+      const oa = (a.style && a.style.order !== '' && a.style.order != null) ? parseInt(a.style.order, 10) : NaN;
+      const ob = (b.style && b.style.order !== '' && b.style.order != null) ? parseInt(b.style.order, 10) : NaN;
+      /* Fallback to LIVE DOM index for boxes with no style.order yet (DOM
+         index, NOT build order — a box may have moved in the DOM). */
+      const va = isNaN(oa) ? (p.children.indexOf(a) + 1) : oa;
+      const vb = isNaN(ob) ? (p.children.indexOf(b) + 1) : ob;
+      return va - vb;
+    });
+    kids.forEach((c, j) => {
+      const key = c.getAttribute('data-lt-move');
+      if (key) store[key] = j + 1;
+    });
+  });
+  return store;
+}
 function uiSwapBoxes(a, b) {
-  const store = uiOrderRead();
-  const ea = uiOrderEff(a, store);
-  const eb = uiOrderEff(b, store);
+  let st = uiOrderRead();
+  st = uiOrderNormalize(st);
+  const ea = uiOrderEff(a, st);
+  const eb = uiOrderEff(b, st);
   store[a.getAttribute('data-lt-move')] = eb;
   store[b.getAttribute('data-lt-move')] = ea;
   uiOrderWrite(store);
@@ -306,17 +344,23 @@ function uiEditorBind() {
     }
     if (!_dragEl || !_hold) return;
     try { e.preventDefault(); } catch (err) {}
-    /* The box rides the finger (visual only — no layout change). */
-    _dragEl.style.transform = 'translate(' + (e.clientX - _hold.x) + 'px,' +
-      (e.clientY - _hold.y) + 'px) scale(1.02)';
-    /* Hold near a screen edge → the page SLOWLY scrolls with the drag
-       (both directions), so a box below the fold can still be reached. */
+    /* Hold near a screen edge → the page SLOWLY scrolls with the drag (both
+       directions) so a box below the fold can still be reached. */
     const m = document.querySelector('#root main') || document.querySelector('main');
     if (m) {
+      const prevScroll = m.scrollTop;
       const r = m.getBoundingClientRect();
       if (e.clientY > r.bottom - 90) m.scrollTop += 7;
       else if (e.clientY < r.top + 90) m.scrollTop -= 7;
+      /* Re-baseline the grab point by however much the page actually moved,
+         so the box stays glued under the cursor instead of drifting away as
+         the content slides beneath a stale offset. */
+      const scrolled = m.scrollTop - prevScroll;
+      if (scrolled) _hold.y -= scrolled;
     }
+    /* The box rides the finger (visual only — no layout change). */
+    _dragEl.style.transform = 'translate(' + (e.clientX - _hold.x) + 'px,' +
+      (e.clientY - _hold.y) + 'px) scale(1.02)';
     uiSwapSetTarget(uiSwapFindTarget(e.clientX, e.clientY));
   };
 
@@ -327,23 +371,31 @@ function uiEditorBind() {
     const drag = _dragEl;
     try {
       if (target) {
-        /* Smooth drop: measure where the box IS (under the finger) and
-           where its new slot will be AFTER the swap, then glide the box
-           from one to the other. Clearing the transform first (the old
-           way) made the box snap back to its origin and then re-slide —
-           the "flicker / teleport" the user saw. */
-        const r1 = drag.getBoundingClientRect();
+        /* FLIP both boxes: capture where each sits under the finger, do the
+           swap (both get their new order immediately), then animate each box
+           from its old rect to its new one. Animating only the dragged box
+           (the old way) left the target snapped to its new slot instantly and
+           flashed the dragged box back to its origin for a frame — the
+           "split-second flash then swap" the user saw. */
+        const dragR1 = drag.getBoundingClientRect();
+        const targR1 = target.getBoundingClientRect();
         uiSwapBoxes(drag, target);
         applyUiLayout();
-        const r2 = drag.getBoundingClientRect();
-        const dx = r1.left - r2.left, dy = r1.top - r2.top;
+        const dragR2 = drag.getBoundingClientRect();
+        const targR2 = target.getBoundingClientRect();
+        const anim = (el, r1, r2) => {
+          const dx = r1.left - r2.left, dy = r1.top - r2.top;
+          if (!dx && !dy) return;
+          el.style.transition = 'none';
+          el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+          void el.offsetWidth; /* reflow — arm the transition */
+          el.style.transition = 'transform .28s cubic-bezier(.22,.61,.36,1)';
+          el.style.transform = '';
+          setTimeout(() => { el.style.transition = ''; }, 320);
+        };
         drag.classList.remove('lt-dragging');
-        drag.style.transition = 'none';
-        drag.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(1.02)';
-        void drag.offsetWidth; /* reflow — arm the transition */
-        drag.style.transition = 'transform .28s cubic-bezier(.22,.61,.36,1)';
-        drag.style.transform = '';
-        setTimeout(() => { drag.style.transition = ''; }, 320);
+        anim(drag, dragR1, dragR2);
+        anim(target, targR1, targR2);
         if (navigator.vibrate) navigator.vibrate(20);
       } else {
         drag.classList.remove('lt-dragging');
@@ -448,10 +500,15 @@ export function ak({ profile }) {
        lands in the editor with nothing to edit. */
     const onOpen = () => {
       setEditorOn(true);
+      /* The app is hash-routed (#/settings), so location.pathname is always
+         "/" — read the hash instead, or the jump never fires. Delay a tick so
+         it lands after whatever screen is opening the editor (e.g. Settings'
+         own handler) and isn't immediately overridden. */
       try {
-        const p = window.location.pathname;
-        if (p === '/timeline' || p === '/settings' || p.indexOf('/timeline') === 0 || p.indexOf('/settings') === 0) {
-          navigate('/');
+        const h = (window.location.hash || '').replace(/^#/, '') || '/';
+        if (h === '/timeline' || h === '/settings' ||
+            h.indexOf('/timeline') === 0 || h.indexOf('/settings') === 0) {
+          setTimeout(() => { try { navigate('/'); } catch (err) {} }, 0);
         }
       } catch (err) {}
     };

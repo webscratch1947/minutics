@@ -12,7 +12,7 @@
     var splash  = document.createElement("div");
     splash.id   = "lt-startup-splash";
     splash.style.cssText =
-      "position:fixed;inset:0;z-index:2147483647;background:#3a3a3a;" +
+      "position:fixed;inset:0;z-index:2147483647;background:#FDFBF7;" +
       "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
       "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
 
@@ -644,6 +644,65 @@
     return cur.symbol + num;
   }
 
+  /* Save an image (data:URL) to the device in ONE place. Every "save image"
+     button in the app (Full View, Knowledge Gram) used to inline this, and
+     the inline copies drifted apart: on Android the code asked for
+     window.AndroidShareBridge — a bridge the app NEVER injects (only
+     AndroidBridge exists), so the native save silently failed and fell
+     through to an <a download> click that a WebView does not honour. The
+     image never got copied on Android, and on web the blob path broke for
+     data: URLs. This helper prefers the real native bridge (both names, for
+     safety), then a genuine file download, then the clipboard. */
+  function ltSaveImage(dataUrl, filename) {
+    var name = filename || ("minutics-" + Date.now() + ".png");
+    /* 1. Native — direct save into the device gallery/Downloads. Check the
+          REAL injected bridge first, then the legacy name, so a device that
+          provides either one still saves natively. */
+    try {
+      var share = window.AndroidShareBridge;
+      if (share && typeof share.saveImagePng === "function") { share.saveImagePng(dataUrl); return true; }
+    } catch (e) {}
+    try {
+      var bridge = window.AndroidBridge;
+      if (bridge && typeof bridge.saveImage === "function") { bridge.saveImage(dataUrl, name); return true; }
+      if (bridge && typeof bridge.saveImagePng === "function") { bridge.saveImagePng(dataUrl); return true; }
+    } catch (e) {}
+    /* 2. Web — convert the data URL to a real Blob so the anchor download is
+          a genuine same-origin file (a raw data: href is blocked by some
+          browsers/CSP and by every WebView). */
+    try {
+      var parts = String(dataUrl).split(",");
+      var mime = (parts[0].match(/data:(.*?);/) || [])[1] || "image/png";
+      var bin = atob(parts[1] || "");
+      var len = bin.length;
+      var arr = new Uint8Array(len);
+      for (var i = 0; i < len; i++) arr[i] = bin.charCodeAt(i);
+      var blob = new Blob([arr], { type: mime });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+      return true;
+    } catch (e) {}
+    /* 3. Last resort — put the image on the clipboard so the user can paste
+          it somewhere. Never leave the tap doing nothing at all. */
+    try {
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        fetch(dataUrl).then(function (r) { return r.blob(); }).then(function (b) {
+          return navigator.clipboard.write([new ClipboardItem({ "image/png": b })]);
+        }).then(function () { showSimpleToast("Copied image to clipboard", ""); })
+          .catch(function () { showSimpleToast("Couldn\u2019t save the image", ""); });
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+  window.LTSaveImage = ltSaveImage;
+
   function today() { return new Date().toISOString().slice(0, 10); }
   /* Local-day key — the waste budget window rolls over at LOCAL midnight
      every 24h (the UTC-based today() reset at 5:30 AM IST, which read as
@@ -1051,6 +1110,15 @@
          recreated on every open, so the animation re-runs each time). */
       "@keyframes lt-tool-in{from{transform:translateX(100%)}to{transform:translateX(0)}}",
       "@keyframes lt-tool-out{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:.7}}",
+      /* Every in-tool page/panel is drawn into a .lt-tool-shell. Animating it
+         here means every tool, sub-page, form and list transition slides up
+         and fades in the same way, instead of popping instantly. This runs on
+         each render because the shell node is rebuilt every time. */
+      "@keyframes lt-shell-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}",
+      ".lt-tool-shell{animation:lt-shell-in .26s cubic-bezier(.22,.61,.36,1) both}",
+      /* Closing mirror: tools and their shells slide out together. */
+      "#lt-overlay-root[data-lt-closing] .lt-tool-shell{animation:lt-shell-out .2s ease-in forwards}",
+      "@keyframes lt-shell-out{to{opacity:0;transform:translateY(10px)}}",
       ".lt-tool-shell{max-width:700px;margin:0 auto;padding:18px 16px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%}",
       /* Classic borderless header — Back link on top, plain kicker, title, description */
       ".lt-tool-top{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin:0 0 18px;color:#111114}",
@@ -1148,7 +1216,7 @@
       ".lt-gram-img{-webkit-touch-callout:none}",
       /* Comment panel */
       ".lt-gram-cp{position:absolute;bottom:0;left:0;right:0;height:68%;background:#1c1c1e;border-radius:20px 20px 0 0;transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:20;display:flex;flex-direction:column;overflow:hidden}",
-      ".lt-gram-cp-handle{width:36px;height:4px;background:#48484a;border-radius:2px;margin:10px auto 0;flex-shrink:0}",
+      ".lt-gram-cp-handle{width:36px;height:4px;background:#48484a;border-radius:2px;margin:10px auto 0;flex-shrink:0;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}",
       ".lt-gram-cp-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #2c2c2e;flex-shrink:0}",
       ".lt-gram-cp-title{color:#fff;font-size:15px;font-weight:700}",
       ".lt-gram-cp-close{background:none;border:none;color:#8e8e93;font-size:18px;cursor:pointer;padding:4px 8px;-webkit-tap-highlight-color:transparent}",
@@ -1205,7 +1273,7 @@
       ".lt-tasks-fab:active{opacity:.85;transform:scale(.96)}",
       /* Add-task bottom sheet */
       ".lt-tasks-sheet{position:fixed;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:22px 22px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom, 0px));box-shadow:0 -4px 28px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:2147483100;box-sizing:border-box;max-width:480px;margin:0 auto}",
-      ".lt-tasks-sheet-handle{width:36px;height:4px;background:hsl(var(--border));border-radius:2px;margin:0 auto 14px}",
+      ".lt-tasks-sheet-handle{width:36px;height:4px;background:hsl(var(--border));border-radius:2px;margin:0 auto 14px;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}",
       ".lt-tasks-sheet-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:hsl(var(--muted-foreground));margin:0 0 12px}",
       ".lt-tasks-sheet-main{font-size:16px;width:100%;border:1.5px solid hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--foreground));font-family:inherit;font-weight:600;padding:13px 14px;border-radius:14px;outline:none;caret-color:hsl(var(--primary));margin-bottom:14px;box-sizing:border-box;transition:border-color .15s}",
       ".lt-tasks-sheet-main:focus{border-color:#111114}",
@@ -1531,7 +1599,12 @@
          of the activity colours, so it can never appear on an activity. */
       ".lt-fv-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid hsl(var(--primary));color:#fff;background:hsl(var(--primary));border-radius:999px;padding:5px 11px;font-size:11px;font-weight:800;letter-spacing:.02em;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;flex-shrink:0;box-shadow:0 1px 3px rgba(17,17,20,.18)}",
       ".lt-fv-btn:active{opacity:.75;transform:scale(.97)}",
-      "#lt-fv-modal-overlay,#lt-fv-report-overlay,#lt-fv-share-overlay{position:fixed;inset:0;z-index:2147483200;background:#FDFBF7;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:0 0 40px;animation:lt-tool-in .3s cubic-bezier(.22,.61,.36,1);-webkit-overflow-scrolling:touch}",
+      "#lt-fv-modal-overlay,#lt-fv-report-overlay,#lt-fv-share-overlay{position:fixed;inset:0;z-index:2147483200;background:#FDFBF7;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:0 0 40px;-webkit-overflow-scrolling:touch}",
+      "#lt-fv-modal-overlay,#lt-fv-share-overlay{animation:lt-tool-in .3s cubic-bezier(.22,.61,.36,1)}",
+      /* The report opens instantly (no slide) so the day-row expand/collapse
+         that happens behind it during the scrape can never flash through a
+         transparent, animating-in overlay. */
+      "#lt-fv-report-overlay{opacity:1}",
       "#lt-fv-modal-overlay.lt-fv-out,#lt-fv-report-overlay.lt-fv-out,#lt-fv-share-overlay.lt-fv-out{animation:lt-tool-out .24s ease-in forwards;pointer-events:none}",
       ".lt-fv-modal-head{position:sticky;top:0;z-index:2;width:100%;max-width:480px;display:flex;align-items:center;gap:10px;padding:14px 16px 10px;background:#FDFBF7;box-sizing:border-box}",
       ".lt-fv-back{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid rgba(55,48,163,.18);background:#fff;color:#3730A3;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(55,48,163,.08);-webkit-tap-highlight-color:transparent}",
@@ -3539,18 +3612,9 @@
     gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
       if (!dataUrl) { alert("Couldn't save this image. Please try again."); return; }
-      /* Same pattern as Journal save — pass dataUrl directly to bridge */
-      if (window.AndroidShareBridge && typeof window.AndroidShareBridge.saveImagePng === "function") {
-        window.AndroidShareBridge.saveImagePng(dataUrl);
-        return;
-      }
-      /* Web fallback */
-      var a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = "minutics-" + id + ".jpg";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      /* Single shared save helper — native bridge (Android) or a real blob
+         download (web). */
+      ltSaveImage(dataUrl, "minutics-" + id + ".jpg");
     });
   }
 
@@ -5451,6 +5515,16 @@
        then wait for React to render before reading it. The caller has
        already covered the screen with the report overlay, so this
        expand/scrape cycle is never visible. */
+    /* If the day is ALREADY open, just read it — never click, or the restore
+       click would close the dropdown the user deliberately left open. */
+    if (fvRowOpen(rowButton)) {
+      callback(fvScrapeExpandedDetail(rowButton) || []);
+      return;
+    }
+    /* Not expanded yet — trigger the app's own row click to expand it,
+       then wait for React to render before reading it. The caller has
+       already covered the screen with the report overlay, so this
+       expand/scrape cycle is never visible. */
     var opened = false;
     rowButton.click();
     var attempts = 14;
@@ -5783,16 +5857,7 @@
 
     var saveBtn = document.getElementById("lt-fv-save-btn");
     if (saveBtn) saveBtn.addEventListener("click", function () {
-      if (window.AndroidShareBridge && typeof window.AndroidShareBridge.saveImagePng === "function") {
-        window.AndroidShareBridge.saveImagePng(dataUrl);
-        return;
-      }
-      var a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = "minutics-" + dateText.replace(/\//g, "-") + ".png";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      ltSaveImage(dataUrl, "minutics-" + dateText.replace(/\//g, "-") + ".png");
     });
   }
 

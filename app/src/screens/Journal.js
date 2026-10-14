@@ -464,7 +464,7 @@ export function JournalScreen() {
                           // Individual block rows
                           a.blocks.map(function(b) {
                             return jsxs("div", {
-                              className: "flex items-center justify-between px-5 py-2 pl-8 mt-[3px] mb-[3px] mx-2 rounded-lg border border-black/[.14] bg-white",
+                              className: "flex items-center justify-between px-5 py-2 pl-8 mt-[3px] mb-[3px] mx-2 rounded-lg border border-black/[.34] bg-white",
                               style: { borderLeft: "4px solid " + a.activityColor + "40" },
                               children: [
                                 jsxs("span", {

@@ -252,16 +252,12 @@ export function SettingsScreen() {
      long-press + drop on any [data-lt-move] box and swaps their order. */
   var openUiEditor = function () {
     try { window.dispatchEvent(new CustomEvent("lt-ui-editor-open")); } catch (e) {}
-    /* The editor works on every tab — stay where we are. Only jump to the
-       Timer tab when the current route isn't a tab at all. */
-    try {
-      var h = (location.hash || "").replace(/^#/, "") || "/";
-      var tabs = ["/", "/activity", "/timeline", "/journal", "/settings"];
-      var onTab = tabs.some(function (t) {
-        return t === "/" ? (h === "/") : h.indexOf(t) === 0;
-      });
-      if (!onTab) location.hash = "#/";
-    } catch (e) {}
+    /* The editor only owns Timer / Activity / Journal — opening it from
+       Settings (or Life Hub) must land the user on the Timer tab. The shell
+       also navigates on the event, but Settings' own handler runs after it
+       and used to snap the route straight back to /settings, so the jump
+       never appeared to happen. Routing here too makes it authoritative. */
+    try { location.hash = "#/"; } catch (e) {}
   };
   var _layoutResetState = useState(false);
   var layoutReset = _layoutResetState[0];

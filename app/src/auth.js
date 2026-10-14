@@ -75,6 +75,10 @@ var DEMO_SESSION_KEY = "lt-demo-session-started";
    DEMO_SESSION_KEY so the VISIBLE countdown can count down monotonically
    from the original start while the session itself never expires in use. */
 var DEMO_RENEW_KEY = "lt-demo-session-renewed";
+/* Set only when the demo is ended ON PURPOSE — Log out, Delete account, or
+   the timer reaching zero. This stamp must survive every wipe (it lives on
+   its own key) so a renewal can never resurrect a demo the user closed. */
+var DEMO_DEAD_KEY = "lt_demo_dead_at_v1";
 var DEMO_HISTORY_KEY = "lt_early_access_demo_v1";
 var DEMO_DURATION_MS = 30 * 60 * 1000;
 var DEMO_UID = "early-access-demo";
@@ -276,12 +280,20 @@ function announceUserChanged() {
 
 /* ── Early Access Demo engine ──────────────────────────────────────────── */
 function isDemoActive() {
-  try { return !!localStorage.getItem(DEMO_SESSION_KEY); } catch (e) { return false; }
+  try {
+    if (!localStorage.getItem(DEMO_SESSION_KEY)) return false;
+    /* A demo that was ended on purpose is no longer active, even if a
+       stale session key survived the wipe. */
+    return !demoAlreadyEnded();
+  } catch (e) { return false; }
 }
 /* EXPIRY clock — measured from the most recent renewal, so an app in use
    (or backgrounded on a phone) never expires. */
 function demoTimeRemainingMs() {
   try {
+    /* A demo that was ended on purpose is always expired, no matter what
+       any stale renewal stamp still says. */
+    if (demoAlreadyEnded()) return 0;
     var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
     var renewed = parseInt(localStorage.getItem(DEMO_RENEW_KEY) || "0", 10);
     var base = Math.max(started || 0, renewed || 0);
@@ -331,6 +343,10 @@ function wipeDemoData() {
   markDemoHistory();
 }
 function endDemoSession() {
+  /* Stamp the end FIRST: once this lands, no renewal (activity bump or
+     visibilitychange) can bring the demo back. The key is kept out of
+     clearAppKeys so the wipe below can't erase it either. */
+  try { localStorage.setItem(DEMO_DEAD_KEY, String(Date.now())); } catch (e) {}
   _stopDemoTimer();
   wipeDemoData();
   document.body.classList.remove("lt-authed");
@@ -358,6 +374,9 @@ function killDemoForRealAuth() {
 }
 function enterDemo(isNew) {
   if (isNew) {
+    /* A brand-new demo clears the "ended on purpose" stamp — the user is
+       explicitly starting over, so the previous end no longer applies. */
+    try { localStorage.removeItem(DEMO_DEAD_KEY); } catch (e) {}
     /* A new demo always starts from zero — every previous demo's data is
        removed before the fresh session begins. A live real account (only
        possible via a weird edge) is parked, never destroyed. */
@@ -407,8 +426,25 @@ function enterDemo(isNew) {
    forward, so an app being used (or simply backgrounded on a phone) is
    never kicked back to the welcome screen. Writes are throttled to once
    a minute; with no activity at all the demo still ends after 30 min. */
+/* Set only when the demo is ended ON PURPOSE — Log out, Delete account, or
+   the timer reaching zero. This stamp must survive every wipe (it lives on
+   its own key) so a renewal can never resurrect a demo the user closed. */
+function demoAlreadyEnded() {
+  try {
+    var dead = parseInt(localStorage.getItem(DEMO_DEAD_KEY) || "0", 10);
+    if (!dead) return false;
+    /* A stamp older than the current session belongs to a PREVIOUS demo —
+       the user started a fresh one since, which is allowed. */
+    var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
+    return !started || dead >= started;
+  } catch (e) { return false; }
+}
 function bumpDemoSession() {
   try {
+    /* An ended demo is never renewed — this was the bug that made the
+       "30 minute" demo immortal: every pointermove pushed the renewal
+       stamp forward, so an app left in use simply never expired. */
+    if (demoAlreadyEnded()) return;
     var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
     if (!started) return;
     var renewed = parseInt(localStorage.getItem(DEMO_RENEW_KEY) || "0", 10);

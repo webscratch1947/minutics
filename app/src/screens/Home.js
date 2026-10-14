@@ -1090,10 +1090,23 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
   const [fromTime, setFromTime] = useState({ h: 12, m: 0, ampm: 'AM' });
   const [toTime, setToTime] = useState({ h: 12, m: 0, ampm: 'AM' });
 
+  // Sheet open/close animation (matches BottomSheet): slide up on mount,
+  // slide down + fade the backdrop on dismiss, then actually unmount.
+  const [closing, setClosing] = useState(false);
+  const closeTRef = useRef(null);
+  const requestClose = () => {
+    if (closing) return;
+    setClosing(true);
+    closeTRef.current = setTimeout(() => { try { onClose(); } catch (e) {} }, 220);
+  };
+
+  useEffect(() => () => clearTimeout(closeTRef.current), []);
+
   // Grabber drag-to-dismiss (matches BottomSheet behaviour)
   const panelRef = useRef(null);
   const dragRef = useRef(null);
   const onGripDown = (e) => {
+    if (closing) return;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
     dragRef.current = { y: e.clientY, dy: 0 };
     if (panelRef.current) panelRef.current.style.transition = 'none';
@@ -1108,7 +1121,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
     const d = dragRef.current; const panel = panelRef.current;
     dragRef.current = null;
     if (panel) { panel.style.transition = 'transform 200ms cubic-bezier(.22,.61,.36,1)'; panel.style.transform = ''; }
-    if (d && d.dy > 90) onClose();
+    if (d && d.dy > 90) requestClose();
   };
 
   // Convert time object to ISO string
@@ -1157,12 +1170,13 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
 
   return jsxs('div', {
     className: 'fixed inset-0 z-[60] flex items-end',
-    onClick: onClose,
+    onClick: requestClose,
     children: [
-      jsx('div', { className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px]' }),
+      jsx('div', { className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px] lt-fade-in' + (closing ? ' opacity-0 transition-opacity duration-200' : '') }),
       jsxs('div', {
         ref: panelRef,
-        className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
+        className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh] lt-sheet-in',
+        style: closing ? { transform: 'translateY(100%)', transition: 'transform 220ms cubic-bezier(.22,.61,.36,1)', animation: 'none' } : undefined,
         onClick: (e) => e.stopPropagation(),
         children: [
           // Drag handle — drag down to dismiss, tap = back (like a back button)
@@ -1172,7 +1186,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
             onPointerMove: onGripMove,
             onPointerUp: onGripUp,
             onPointerCancel: onGripUp,
-            onClick: onClose,
+            onClick: requestClose,
             'aria-label': 'Back',
             className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors touch-none',
             children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
@@ -1217,7 +1231,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                 ]
               }),
               jsx('button', {
-                onClick: onClose,
+                onClick: requestClose,
                 className: 'w-9 h-9 flex items-center justify-center rounded-full bg-black/[.05] text-foreground/50 hover:text-foreground hover:bg-black/10 transition-colors shrink-0',
                 children: jsx('svg', {
                   className: 'w-4 h-4',
@@ -1328,7 +1342,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
                   className: 'flex gap-2.5 px-4 py-3.5',
                   children: [
                     jsx('button', {
-                      onClick: onClose,
+                      onClick: requestClose,
                       className: 'flex-1 py-3.5 text-red-600 font-black bg-white border border-red-300 hover:bg-red-50 rounded-xl text-sm transition-colors',
                       children: 'Cancel'
                     }),
@@ -1373,10 +1387,21 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
   const [endValue, setEndValue] = useState(() => toLocalDatetime(now.toISOString()));
   const [keepRunning, setKeepRunning] = useState(true); // default checked
 
+  // Sheet open/close animation (matches BottomSheet): slide up on mount,
+  // slide down + fade the backdrop on dismiss, then actually unmount.
+  const [closing, setClosing] = useState(false);
+  const closeTRef = useRef(null);
+  const requestClose = () => {
+    if (closing) return;
+    setClosing(true);
+    closeTRef.current = setTimeout(() => { try { onClose(); } catch (e) {} }, 220);
+  };
+
   // Grabber drag-to-dismiss (matches BottomSheet behaviour)
   const panelRef = useRef(null);
   const dragRef = useRef(null);
   const onGripDown = (e) => {
+    if (closing) return;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
     dragRef.current = { y: e.clientY, dy: 0 };
     if (panelRef.current) panelRef.current.style.transition = 'none';
@@ -1391,17 +1416,18 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
     const d = dragRef.current; const panel = panelRef.current;
     dragRef.current = null;
     if (panel) { panel.style.transition = 'transform 200ms cubic-bezier(.22,.61,.36,1)'; panel.style.transform = ''; }
-    if (d && d.dy > 90) onClose();
+    if (d && d.dy > 90) requestClose();
   };
 
   return jsxs('div', {
     className: 'fixed inset-0 z-[60] flex items-end',
-    onClick: onClose,
+    onClick: requestClose,
     children: [
-      jsx('div', { className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px]' }),
+      jsx('div', { className: 'absolute inset-0 bg-black/55 backdrop-blur-[2px] lt-fade-in' + (closing ? ' opacity-0 transition-opacity duration-200' : '') }),
       jsxs('div', {
         ref: panelRef,
-        className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh]',
+        className: 'relative w-full max-w-[430px] mx-auto bg-white rounded-t-[28px] shadow-[0_-24px_64px_rgba(15,23,42,0.28)] flex flex-col max-h-[85dvh] lt-sheet-in',
+        style: closing ? { transform: 'translateY(100%)', transition: 'transform 220ms cubic-bezier(.22,.61,.36,1)', animation: 'none' } : undefined,
         onClick: (e) => e.stopPropagation(),
         children: [
           // Drag handle — drag down to dismiss, tap = back (like a back button)
@@ -1411,7 +1437,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
             onPointerMove: onGripMove,
             onPointerUp: onGripUp,
             onPointerCancel: onGripUp,
-            onClick: onClose,
+            onClick: requestClose,
             'aria-label': 'Back',
             className: 'flex justify-center items-center w-full pt-2.5 pb-1 shrink-0 cursor-pointer bg-transparent border-0 rounded-t-[28px] hover:bg-foreground/[.04] active:bg-foreground/[.08] transition-colors touch-none',
             children: jsx('span', { className: 'w-10 h-1.5 rounded-full bg-foreground/15' })
@@ -1456,7 +1482,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
                 ]
               }),
               jsx('button', {
-                onClick: onClose,
+                onClick: requestClose,
                 className: 'w-9 h-9 flex items-center justify-center rounded-full bg-black/[.05] text-foreground/50 hover:text-foreground hover:bg-black/10 transition-colors shrink-0',
                 children: jsx('svg', {
                   className: 'w-4 h-4',
@@ -1526,7 +1552,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
             className: 'flex gap-2.5 px-4 py-3.5 border-t border-black/[.07] shrink-0 rounded-b-[28px]',
             children: [
               jsx('button', {
-                onClick: onClose,
+                onClick: requestClose,
                 className: 'flex-1 py-3.5 text-red-600 font-black bg-white border border-red-300 hover:bg-red-50 rounded-xl text-sm transition-colors',
                 children: 'Cancel'
               }),
@@ -2000,10 +2026,10 @@ function LifeProgressCard({ profile }) {
                 ]
               }),
               jsxs('span', {
-                className: 'inline-flex items-baseline gap-1 bg-accent/10 border border-accent/25 rounded-full px-2.5 py-1 shrink-0',
+                className: 'inline-flex items-baseline gap-1 bg-black/[.04] border border-black/[.14] rounded-full px-2.5 py-1 shrink-0',
                 children: [
-                  jsx('span', { className: 'text-[12px] font-black text-accent tabular-nums leading-none', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
-                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-accent/60', children: '/h' })
+                  jsx('span', { className: 'text-[12px] font-black tabular-nums leading-none text-foreground', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
+                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/45', children: '/h' })
                 ]
               })
             ]
@@ -2025,12 +2051,12 @@ function LifeProgressCard({ profile }) {
           jsxs('div', {
             className: 'mt-1.5 relative flex items-baseline gap-1.5 min-w-0',
             children: [
-              jsx('span', { className: 'text-[17px] font-black text-accent/70 leading-none', children: 'Rs.' }),
+              jsx('span', { className: 'text-[17px] font-black leading-none text-foreground/55', children: 'Rs.' }),
               jsxs('span', {
                 className: 'relative flex items-baseline min-w-0',
                 children: [
-                  jsx('span', { className: 'text-[42px] font-black leading-none tracking-tight tabular-nums bg-gradient-to-br from-accent to-emerald-600 bg-clip-text text-transparent', children: tvSplit[0] }),
-                  jsx('span', { className: 'text-[21px] font-black leading-none tabular-nums text-accent/70 ml-0.5', children: '.' + tvSplit[1] })
+                  jsx('span', { className: 'text-[42px] font-black leading-none tracking-tight tabular-nums text-foreground', children: tvSplit[0] }),
+                  jsx('span', { className: 'text-[21px] font-black leading-none tabular-nums text-foreground/55 ml-0.5', children: '.' + tvSplit[1] })
                 ]
               })
             ]
