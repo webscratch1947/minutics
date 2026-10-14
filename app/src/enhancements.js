@@ -1,6 +1,6 @@
-﻿/* The app's DEFAULT emoji data (Home.js LTEmojiPicker) — the routine/task
+﻿/* The app's DEFAULT emoji data (Home.js LTEmojiPicker) — the routine
    emoji bar must be this same full set with the same categories/recents,
-   never a short hand-picked list. */
+   never a short hand-picked list. (Tasks deliberately have no emoji.) */
 import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.js";
 
 (function () {
@@ -179,7 +179,6 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
   var gramCurrentId   = null;   /* which infographic's comments are open */
   var routineEditingId = null;  /* which routine item the sheet is editing, null = adding new */
   var routineEditingEmoji = ""; /* pending emoji picked in the edit sheet (kept until Save) */
-  var taskDraftEmoji = ""; /* emoji chosen in the New Task sheet (kept until Add) */
   var _routineMidnightTimer = null; /* re-renders the tool if the date rolls over while it's open */
   var catModalRoot     = null;  /* category-selection popup element */
   var catModalMinutes  = 0;
@@ -1410,7 +1409,6 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
          button (top-right) so the cross never sits on top of the text. */
       ".lt-routine-namewrap{display:flex;align-items:center;gap:9px;margin-bottom:12px}",
       ".lt-routine-namewrap .lt-routine-name-input{flex:1;min-width:0;margin-bottom:0}",
-      ".lt-routine-namewrap .lt-tasks-sheet-main{flex:1;min-width:0;margin-bottom:0}",
       ".lt-routine-draftrow .lt-routine-name-input{padding-right:44px}",
       ".lt-routine-emoji{flex-shrink:0;width:46px;height:46px;border-radius:14px;border:1.5px dashed hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--muted-foreground));font-size:19px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;padding:0;-webkit-tap-highlight-color:transparent;transition:transform .1s ease,background .15s ease}",
       ".lt-routine-emoji:active{transform:scale(.93);background:hsl(var(--border))}",
@@ -1419,7 +1417,12 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       /* Emoji picker dialog */
       /* The DEFAULT emoji bar (mirrors Home.js LTEmojiPicker: bottom sheet,
          search, category tab bar with recents, 8-col grid) — fed by the same
-         LT_EMOJIS data and the same lt_recent_emojis recents store. */
+         LT_EMOJIS data and the same lt_recent_emojis recents store.
+         z ties with #lt-overlay-root (both 2147483647 — higher values get
+         clamped by the browser), so it MUST be appended to <html> after the
+         panel (see openRoutineEmojiPicker) to win the DOM-order tie-break;
+         a body-level append renders BEHIND the panel and the bar only
+         "appears" after Back closes it. */
       ".lt-emoji-pop-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;padding:0;animation:lt-emoji-pop-in .16s ease}",
       "@keyframes lt-emoji-pop-in{from{opacity:0}to{opacity:1}}",
       ".lt-emoji-pop{width:min(480px,100%);max-height:80vh;background:hsl(var(--card));border-radius:26px 26px 0 0;padding:8px 0 calc(14px + env(safe-area-inset-bottom, 0px));box-shadow:0 -8px 34px rgba(0,0,0,.25);box-sizing:border-box;display:flex;flex-direction:column}",
@@ -4067,7 +4070,7 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       '<div class="lt-task-item' + (overdue ? ' lt-task-overdue' : '') + '">' +
         '<button class="lt-task-check' + (t.completed ? ' lt-task-checked' : '') + (overdue ? ' lt-task-check-overdue' : '') + '" data-task-toggle="' + t.id + '">' + checkIcon + '</button>' +
         '<div class="lt-task-body" data-task-expand="' + t.id + '">' +
-          '<span class="lt-task-title' + (t.completed ? ' lt-task-done' : '') + '">' + (t.emoji ? escapeHtml(t.emoji) + ' ' : '') + escapeHtml(t.title) + '</span>' +
+          '<span class="lt-task-title' + (t.completed ? ' lt-task-done' : '') + '">' + escapeHtml(t.title) + '</span>' +
           (dl ? '<span class="lt-task-date' + (overdue ? ' lt-overdue' : '') + '">' + dl + '</span>' : '') +
           queuedBadge +
           (t.notes ? '<span class="lt-task-notes">' + escapeHtml(t.notes) + '</span>' : '') +
@@ -4474,7 +4477,7 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
   /* ── The app's DEFAULT emoji bar ─────────────────────────────────────────
      Same data as Home.js's LTEmojiPicker (LT_EMOJIS + EMOJI_CATEGORIES +
      keyword search + the shared lt_recent_emojis recents), same bottom-sheet
-     chrome — so routine/task emoji picking is THE picker users already know,
+     chrome — so routine emoji picking is THE picker users already know,
      with the full emoji set instead of a short custom list. */
   function openRoutineEmojiPicker(onPick, current) {
     var old = document.getElementById("lt-emoji-pop-overlay");
@@ -4500,7 +4503,15 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
           '<p class="lt-emoji-pop-empty" style="display:none"></p>' +
         '</div>' +
       '</div>';
-    document.body.appendChild(overlay);
+    /* Append to <html>, NOT body: #lt-overlay-root (the full-screen panel)
+       hangs off documentElement at z-index 2147483647 — the max browsers
+       allow (anything higher is clamped) — so a body-level picker can never
+       beat it on value, only on DOM order. Since the picker only opens once
+       the panel exists, appending here makes it the LATER html child and it
+       wins the tie — otherwise it renders fully BEHIND the panel and only
+       "appears" after Back closes it (exactly how the clock picker had to be
+       fixed, see #lt-clockpicker-overlay). */
+    document.documentElement.appendChild(overlay);
 
     var searchEl = overlay.querySelector(".lt-emoji-pop-search");
     var tabsEl = overlay.querySelector(".lt-emoji-pop-tabs");
@@ -4987,10 +4998,7 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
           '<div><p class="lt-sheet-head-title">New Task</p>' +
           '<p class="lt-sheet-head-sub">Name it and set an optional deadline</p></div>' +
         '</div>' +
-        '<div class="lt-routine-namewrap" style="margin-bottom:14px">' +
-          '<button type="button" class="lt-routine-emoji" id="lt-task-emoji-btn" aria-label="Pick an emoji">\u2795</button>' +
-          '<input id="lt-task-name" class="lt-tasks-sheet-main" type="text" placeholder="Task name\u2026">' +
-        '</div>' +
+        '<input id="lt-task-name" class="lt-tasks-sheet-main" type="text" placeholder="Task name\u2026">' +
         '<div class="lt-sheet-group" id="lt-task-deadline-group">' +
           '<div class="lt-sheet-group-title"><span>Deadline</span><button type="button" class="lt-sheet-group-clear" id="lt-task-deadline-clear">Clear</button></div>' +
           '<div class="lt-tasks-sheet-row">' +
@@ -5026,16 +5034,6 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       var stepEl = e.target.closest("[data-clock-step]");
       if (stepEl) {
         clockFieldStep(stepEl.closest(".lt-clock-field"), Number(stepEl.getAttribute("data-clock-step")) || 0);
-        return;
-      }
-      /* Emoji slot → the app's DEFAULT emoji bar (same one routines use) */
-      var taskEmojiBtn = e.target.closest("#lt-task-emoji-btn");
-      if (taskEmojiBtn) {
-        openRoutineEmojiPicker(function (em) {
-          taskDraftEmoji = em || "";
-          var b = document.getElementById("lt-task-emoji-btn");
-          if (b) b.textContent = taskDraftEmoji || "\u2795";
-        }, taskDraftEmoji);
         return;
       }
       /* Clock-face time picker for the Task sheet's Time field */
@@ -5126,14 +5124,12 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
         var notesEl = document.getElementById("lt-task-notes");
         upsertTask({
           id: genId(), title: title,
-          emoji: taskDraftEmoji || "",
           date:  (dateEl && dateEl.value) ? dateEl.value : null,
           time:  taskTimeVal || null,
           notes: (notesEl && notesEl.value.trim()) || "",
           completed: false,
           createdAt: new Date().toISOString()
         });
-        taskDraftEmoji = "";
         renderTasks(); /* re-renders with new task and closes sheet */
         return;
       }

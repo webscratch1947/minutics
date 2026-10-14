@@ -98,7 +98,7 @@ function LTDailyValueBar() {
 // Stores recent emojis in localStorage "lt_recent_emojis" (max 24).
 
 // Complete list of 198 emojis with correct Unicode
-// (exported so enhancements.js reuses THIS default set for the routine/task
+// (exported so enhancements.js reuses THIS default set for the routine
 //  emoji bar instead of shipping its own short custom list)
 export const LT_EMOJIS = [
   // Smileys (indices 0-47)
