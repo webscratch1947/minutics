@@ -1748,6 +1748,23 @@
      modal, routine sheet, new-task sheet, gram comments, share sheet,
      currency sheet). Drag down past ~90px and the sheet dismisses itself
      through the SAME mechanism it normally uses, so state stays consistent. */
+  /* Opens a bottom sheet (.lt-tasks-sheet family) WITH its slide-up.
+     The sheets are re-created fresh by their render functions (innerHTML
+     swap), so setting transform:"translateY(0)" on the same frame the node
+     is inserted means the browser never renders the initial off-screen
+     (110%) frame — with nothing to animate from, the sheet just popped in
+     with no animation. Force one off-screen frame first (double rAF), then
+     apply 0 so the transition runs. */
+  function ltOpenSheetPanel(panel) {
+    if (!panel) return;
+    panel.style.transform = "translateY(110%)";
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        panel.style.transform = "translateY(0)";
+      });
+    });
+  }
+
   function ltCloseSheetPanel(panel) {
     if (!panel) return;
     var id = panel.id || "";
@@ -2868,6 +2885,8 @@
         '</select>' +
       '</div>';
     var locked = item.noValidation ? " locked" : "";
+    /* Back must step back to the expense LIST, not tear down the whole
+       Budget Tracker (the header's default action is close-overlay). */
     return (
       '<form class="lt-tool-card" data-lt-budget-form>' +
         '<p class="lt-card-title">' + (isEdit ? "Edit expense" : "New expense") + '</p>' +
@@ -2947,7 +2966,8 @@
        user isn't distracted (per feedback). */
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
-        toolHeader("Budget Tracker", "Private expense tracking \u2014 stored only on this device.") +
+        toolHeader("Budget Tracker", "Private expense tracking \u2014 stored only on this device.",
+                   showForm ? "lt-budget-back" : null) +
         (showForm ? "" :
           '<div class="lt-summary-grid">' +
             '<div class="lt-summary-card lt-summary-count"><small>Expenses</small><strong>' + items.length + '</strong></div>' +
@@ -2968,6 +2988,14 @@
 
     var search = activeOverlay.querySelector("[data-lt-budget-search]");
     if (search) search.addEventListener("input", function () { budgetQuery = this.value; renderBudget(); });
+
+    /* ← Back on the add/edit sub-page steps back to the expense list
+       instead of closing the whole Budget Tracker tool. Mirrors the 6 Jars
+       back wiring (lt-jars-salary-back). */
+    var budgetBack = activeOverlay.querySelector("#lt-budget-back");
+    if (budgetBack) budgetBack.addEventListener("click", function () {
+      budgetEditingId = null; budgetAddingNew = false; renderBudget();
+    });
 
     /* No-validation checkbox: greys out + locks the "Valid until" date. */
     var noval = activeOverlay.querySelector("[data-lt-noval]");
@@ -4451,8 +4479,7 @@
         routineEditingId = editBody.getAttribute("data-routine-edit");
         routineDraftRows = null;
         renderRoutine();
-        var s2 = document.getElementById("lt-routine-sheet");
-        if (s2) s2.style.transform = "translateY(0)";
+        ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
         return;
       }
       if (e.target.id === "lt-routine-fab") {
@@ -4460,8 +4487,7 @@
         routineEditingId = null;
         routineDraftRows = [newRoutineDraftRow()];
         renderRoutine();
-        var s3 = document.getElementById("lt-routine-sheet");
-        if (s3) s3.style.transform = "translateY(0)";
+        ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
         setTimeout(function () { var n = document.getElementById("lt-rdraft-name-" + routineDraftRows[0].uid); if (n) n.focus(); }, 100);
         return;
       }
@@ -4469,8 +4495,7 @@
         syncRoutineDraftFromDom();
         routineDraftRows.push(newRoutineDraftRow());
         renderRoutine();
-        var sAdd = document.getElementById("lt-routine-sheet");
-        if (sAdd) sAdd.style.transform = "translateY(0)";
+        ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
         var lastRow = routineDraftRows[routineDraftRows.length - 1];
         setTimeout(function () { var n = document.getElementById("lt-rdraft-name-" + lastRow.uid); if (n) n.focus(); }, 50);
         return;
@@ -4482,8 +4507,7 @@
         routineDraftRows = routineDraftRows.filter(function (r) { return r.uid !== rmUid; });
         if (!routineDraftRows.length) routineDraftRows = [newRoutineDraftRow()];
         renderRoutine();
-        var sRm = document.getElementById("lt-routine-sheet");
-        if (sRm) sRm.style.transform = "translateY(0)";
+        ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
         return;
       }
       if (e.target.id === "lt-routine-submit") {
@@ -4736,8 +4760,7 @@
            openOverlay() above — ignore a tap on the FAB that lands within
            400ms of this tool having opened. */
         if (Date.now() - Number(overlay.dataset.openedAt || 0) < 400) return;
-        var sheet = document.getElementById("lt-tasks-sheet");
-        if (sheet) sheet.style.transform = "translateY(0)";
+        ltOpenSheetPanel(document.getElementById("lt-tasks-sheet"));
         setTimeout(function () { var n = document.getElementById("lt-task-name"); if (n) n.focus(); }, 100);
         return;
       }
@@ -5542,8 +5565,23 @@
       if (data !== null) opened = true;
       if (data !== null || attempts <= 0) {
         /* ALWAYS restore what we opened (or what is open per the DOM) —
-           tapping Full view must never leave the day's dropdown open. */
-        if (opened || fvRowOpen(rowButton)) rowButton.click();
+           tapping Full view must never leave the day's dropdown open.
+           The expand/collapse is animated by the Journal, so the restore
+           click was still VISIBLE for ~250ms after the report closed: the
+           day dropdown slid open then shut on its own, which read as "I
+           tapped Full view but the date dropdown opened instead". Freeze
+           the row's transition for the instant restore only (never the
+           user's own taps) so the round-trip is invisible. */
+        if (opened || fvRowOpen(rowButton)) {
+          var _st = rowButton.style;
+          var _prevT = _st.transition;
+          _st.transition = "none";
+          rowButton.click();
+          /* Two frames: one to force the now-instant collapse to apply. */
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () { _st.transition = _prevT; });
+          });
+        }
         callback(data || []);
         return;
       }

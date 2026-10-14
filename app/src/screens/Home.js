@@ -550,7 +550,7 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
           'group relative overflow-hidden flex items-center w-full cursor-pointer select-none rounded-2xl bg-white border transition-all',
           isActive
             ? 'border-accent/60 shadow-[0_12px_30px_rgba(0,194,168,0.18)]'
-            : 'border-black/[.16] shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_26px_rgba(15,23,42,0.09)]'
+            : 'border-black/25 shadow-[0_6px_20px_rgba(15,23,42,0.05)] hover:shadow-[0_10px_26px_rgba(15,23,42,0.09)]'
         ),
         children: [
           // Activity color rail
@@ -2037,13 +2037,13 @@ function LifeProgressCard({ profile }) {
           jsxs('div', {
             className: 'mt-2.5 flex items-center justify-between gap-3',
             children: [
-              jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining budget' }),
+              jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining time left' }),
               jsxs('span', {
                 className: 'shrink-0 inline-flex items-center gap-1 text-[11px] font-extrabold tracking-wide text-foreground/50 tabular-nums',
                 children: [
                   jsx(Zb, { className: 'w-3 h-3 text-foreground/35' }),
                   tvData.remHours + 'h ' + tvData.remMin + 'min',
-                  jsx('span', { className: 'text-foreground/35', children: ' LEFT' })
+                  jsx('span', { className: 'text-foreground/35', children: ' LEFT TODAY' })
                 ]
               })
             ]
@@ -2123,11 +2123,13 @@ function TodayGlance({ activities, blocks }) {
   if (display.length === 0) return null;
 
   const formatMins = (m) => {
-    if (m === 0) return '0m';
-    if (m < 60) return m + 'm';
+    /* Full abbreviations at the source — short forms ("3m") were expanded by
+       a later DOM pass, so the card flashed the short text for ~2s first. */
+    if (m === 0) return '0min';
+    if (m < 60) return m + 'min';
     const h = Math.floor(m / 60);
     const rem = m % 60;
-    return rem > 0 ? h + 'h ' + rem + 'm' : h + 'h';
+    return rem > 0 ? h + 'h ' + rem + 'min' : h + 'h';
   };
 
   return jsxs('div', {
@@ -2698,9 +2700,9 @@ export function ActivityScreen({ profile }) {
         children: [
           jsx(ModalHeader, { activity: activeBlockInfo.activity, subtitle: 'Timer is running' }),
           jsx(ModalOption, {
-            icon: jsx(rh, { className: 'w-5 h-5 text-red-600' }),
+            icon: jsx(rh, { className: 'w-5 h-5 text-red-400' }),
             label: 'Stop timer',
-            labelClass: 'text-red-700',
+            labelClass: 'text-red-400',
             description: 'Started at ' + formatTime(activeBlockInfo.block.startTime),
             onClick: stopTimer
           }),
@@ -2708,7 +2710,16 @@ export function ActivityScreen({ profile }) {
             icon: jsx(tk, { className: 'w-5 h-5' }),
             label: 'Edit time',
             description: 'Adjust start or end time',
-            onClick: () => { setEditingBlock(activeBlockInfo); setActiveBlockInfo(null); }
+            /* Wait for the bottom sheet's slide-DOWN to finish before the
+               edit modal slides UP. Opening both in the same frame made the
+               modal appear while the play/stop sheet was still on screen —
+               the two panels overlapped for ~200ms, which read as a flicker
+               and flash (the play control vanished, then the modal landed). */
+            onClick: () => {
+              const info = activeBlockInfo;
+              setActiveBlockInfo(null);
+              setTimeout(() => setEditingBlock(info), 220);
+            }
           })
         ]
       }),

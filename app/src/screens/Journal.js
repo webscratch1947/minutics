@@ -9,13 +9,17 @@ import { resolveActivityColor } from '../lib/constants.js';
 
 /* ─── Helper Functions ──────────────────────────────────────────────────────── */
 
-// Format seconds to human-readable duration
+/* Format seconds to human-readable duration.
+   Abbreviations are written out in full ("3min", "5sec") at the SOURCE. They
+   used to render short ("3m"/"5s") and get expanded by a later DOM pass, so
+   every fresh screen flashed the short form for ~2s before snapping to the
+   long one — including on hours ("2h 5m" → "2h 5min"). */
 function formatDuration(totalSeconds) {
-  if (totalSeconds < 60) return totalSeconds + "s";
+  if (totalSeconds < 60) return totalSeconds + "sec";
   var hours = Math.floor(totalSeconds / 3600);
   var minutes = Math.floor((totalSeconds % 3600) / 60);
-  if (hours > 0) return hours + "h " + minutes + "m";
-  return minutes + "m";
+  if (hours > 0) return hours + "h " + minutes + "min";
+  return minutes + "min";
 }
 
 // Format ISO string to 12-hour time "3:45 PM"

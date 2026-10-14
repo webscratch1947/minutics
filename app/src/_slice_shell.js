@@ -735,7 +735,12 @@ export function ak({ profile }) {
                actually commits — otherwise the peeked Journal looked incomplete
                (no Full view pill) during the hold-slide. */
             'data-lt-peek': peek,
-            className: 'absolute inset-0 pointer-events-none overflow-hidden',
+            /* Opaque: the peek pane is the INCOMING page and slides over the
+               outgoing one. It used to be transparent, so during a fast swipe
+               you saw through it to the body's dark backdrop between the two
+               panes — the "lag flash". Painting it the page colour keeps the
+               slide solid the whole way across. */
+            className: 'absolute inset-0 pointer-events-none overflow-hidden bg-[hsl(var(--background))]',
             style: {
               transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
               transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'

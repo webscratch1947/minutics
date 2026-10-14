@@ -294,11 +294,15 @@ function demoTimeRemainingMs() {
     /* A demo that was ended on purpose is always expired, no matter what
        any stale renewal stamp still says. */
     if (demoAlreadyEnded()) return 0;
+    /* Expiry is measured from the ORIGINAL start stamp only. Using
+       max(started, renewed) let every activity bump slide the deadline
+       forward, so an in-use demo could never reach zero — the countdown
+       wrapped back to a fresh 30:00 after 30 minutes and the session looked
+       immortal ("it faked it / loops back to 30 minutes"). Activity now
+       keeps the APP alive (see bumpDemoSession) but never the DEADLINE. */
     var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
-    var renewed = parseInt(localStorage.getItem(DEMO_RENEW_KEY) || "0", 10);
-    var base = Math.max(started || 0, renewed || 0);
-    if (!base) return 0;
-    return DEMO_DURATION_MS - (Date.now() - base);
+    if (!started) return 0;
+    return DEMO_DURATION_MS - (Date.now() - started);
   } catch (e) { return 0; }
 }
 /* DISPLAY clock — always measured from the ORIGINAL start stamp, so the
@@ -464,9 +468,11 @@ function showDemoTimer() {
   function tick() {
     var remaining = demoTimeRemainingMs();
     if (remaining > 0) return;
-    /* Never end a demo that is only "expired" because the app sat in the
-       background (phone screen off / tab hidden) — refresh it instead. */
-    if (document.hidden) { bumpDemoSession(); return; }
+    /* The 30 minutes are up: end the demo NOW, even if the tab is hidden or
+       the app was backgrounded. This was the "it fakes it / stops counting
+       when I close it" bug — renewing here instead of ending meant a hidden
+       tab silently got a fresh 30 minutes every time it was checked, so the
+       demo could sit open for hours and then loop back to 30:00. */
     endDemoSession();
   }
   tick();
