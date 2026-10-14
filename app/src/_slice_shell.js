@@ -593,13 +593,15 @@ export function ak({ profile }) {
   };
 
   const onTouchStart = (e) => {
-    /* Tab-swipe is a BOTTOM-NAV-ONLY gesture: the finger must start on the
-       floating nav pill ([data-lt-bottomnav]). A touch anywhere else —
-       page content, sheets, modals — must never slide the whole page;
-       those areas keep plain vertical scrolling. */
+    /* Tab-swipe starts from anywhere on the main app (inside #root): the
+       bottom nav pill, page content, all of it — so switching tabs never
+       needs a nav tap. Enhancement sheets/modals are appended OUTSIDE
+       #root, so they (and their own grip-drag gestures) are untouched,
+       and form fields keep their text-selection/cursor gestures. */
     try {
       if (!(e.target && e.target.closest &&
-            e.target.closest('[data-lt-bottomnav]'))) {
+            e.target.closest('#root') &&
+            !e.target.closest('input, textarea, select, [data-lt-no-swipe]'))) {
         gRef.current.active = false;
         gRef.current.locked = null;
         return;
