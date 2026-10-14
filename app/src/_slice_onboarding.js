@@ -364,7 +364,15 @@ export function mk({
     const _maxYear = new Date().getFullYear();
     const _minYear = 1920;
     const _months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const _daysInMonth = (dY && dM) ? new Date(Number(dY), Number(dM), 0).getDate() : 31;
+    /* Calendar view month/year: the picked DOB when set, otherwise the
+       current month — so the day grid always renders something tappable. */
+    const _now = new Date();
+    const _viewY = dY || String(_now.getFullYear());
+    const _viewM = dM || String(_now.getMonth() + 1).padStart(2, "0");
+    const _viewYear = Number(_viewY);
+    const _viewMonth = Number(_viewM);
+    const _daysInMonth = new Date(_viewYear, _viewMonth, 0).getDate();
+    const _firstWeekday = new Date(_viewYear, _viewMonth - 1, 1).getDay();
     const _ageYears = s
       ? Math.min(100, Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / (365.25 * 24 * 3600 * 1000))))
       : 0;
@@ -394,31 +402,48 @@ export function mk({
             className: "flex items-center gap-2",
             children: [
               jsxs("select", {
-                value: dD,
-                onChange: g => _updateDob(dY, dM, g.target.value),
+                value: _viewM,
+                onChange: g => _updateDob(dY || _viewY, g.target.value, dD),
                 className: _selStyle,
-                children: [
-                  jsx("option", { value: "", children: "Day" }, "d0"),
-                  Array.from({ length: _daysInMonth }, (_, ii) => ii + 1).map(dd => jsx("option", { value: String(dd).padStart(2, "0"), children: String(dd) }, dd))
-                ]
+                children: _months.map((mname, ii) => jsx("option", { value: String(ii + 1).padStart(2, "0"), children: mname }, ii + 1))
               }),
               jsxs("select", {
-                value: dM,
-                onChange: g => _updateDob(dY, g.target.value, dD),
+                value: _viewY,
+                onChange: g => _updateDob(g.target.value, dM || _viewM, dD),
                 className: _selStyle,
-                children: [
-                  jsx("option", { value: "", children: "Month" }, "m0"),
-                  ..._months.map((mname, ii) => jsx("option", { value: String(ii + 1).padStart(2, "0"), children: mname }, ii + 1))
-                ]
-              }),
-              jsxs("select", {
-                value: dY,
-                onChange: g => _updateDob(g.target.value, dM, dD),
-                className: _selStyle,
-                children: [
-                  jsx("option", { value: "", children: "Year" }, "y0"),
-                  ...Array.from({ length: _maxYear - _minYear + 1 }, (_, ii) => _maxYear - ii).map(yy => jsx("option", { value: String(yy), children: String(yy) }, yy))
-                ]
+                children: Array.from({ length: _maxYear - _minYear + 1 }, (_, ii) => _maxYear - ii).map(yy => jsx("option", { value: String(yy), children: String(yy) }, yy))
+              })
+            ]
+          }),
+          /* Calendar: weekday header + day grid. Tapping a day sets the DOB
+             in one gesture (replaces the old Day/Month/Year triple — the day
+             dropdown was the awkward one). Future dates are disabled. */
+          jsx("div", {
+            className: "grid grid-cols-7 gap-1 mt-3",
+            children: ["S", "M", "T", "W", "T", "F", "S"].map((dn, ii) =>
+              jsx("span", { className: "text-center text-[10px] font-black text-gray-400 py-1", children: dn }, "wd" + ii)
+            )
+          }),
+          jsx("div", {
+            className: "grid grid-cols-7 gap-1",
+            children: [
+              ...Array.from({ length: _firstWeekday }, (_, ii) => jsx("span", { key: "pad" + ii })),
+              ...Array.from({ length: _daysInMonth }, (_, ii) => {
+                const dd = ii + 1;
+                const dd2 = String(dd).padStart(2, "0");
+                const isSel = dD === dd2 && Number(dM) === _viewMonth && Number(dY) === _viewYear;
+                const isFuture = new Date(_viewYear, _viewMonth - 1, dd).getTime() > _now.getTime();
+                return jsx("button", {
+                  type: "button",
+                  disabled: isFuture,
+                  onClick: () => _updateDob(_viewY, _viewM, dd2),
+                  className: isSel
+                    ? "h-9 rounded-full bg-[#157347] text-white text-[13px] font-black shadow-[0_4px_10px_rgba(21,115,71,.35)]"
+                    : isFuture
+                      ? "h-9 rounded-full text-gray-300 text-[13px] font-bold cursor-default"
+                      : "h-9 rounded-full text-gray-800 text-[13px] font-bold hover:bg-black/5 active:bg-black/10 transition",
+                  children: String(dd)
+                }, "day" + dd);
               })
             ]
           })

@@ -549,42 +549,15 @@ export function ak({ profile }) {
     if (peekRef.current) peekRef.current.style.transform = 'translateX(' + (x + (x > 0 ? -w : w)) + 'px)';
   };
 
-  /* UI editor state */
-  const [editorOn, setEditorOn] = useState(false);
-  const [resetFlash, setResetFlash] = useState(false);
-
+  /* ── UI layout editor: REMOVED ────────────────────────────────────────
+     The hold-and-drop swap never worked reliably (drops landed in the
+     wrong slot, boxes flashed before swapping), and the decision was to
+     drop the editor entirely rather than ship a half-broken drag mode.
+     Any layout the user already saved on this device keeps being applied
+     by applyUiLayout below — only the editing affordance is gone. */
   useEffect(() => {
-    /* The editor only makes sense on the three editable tabs. Opening it
-       from Settings / Life Hub jumps straight to Timer so the user never
-       lands in the editor with nothing to edit. */
-    const onOpen = () => {
-      setEditorOn(true);
-      /* The app is hash-routed (#/settings), so location.pathname is always
-         "/" — read the hash instead, or the jump never fires. Delay a tick so
-         it lands after whatever screen is opening the editor (e.g. Settings'
-         own handler) and isn't immediately overridden. */
-      try {
-        const h = (window.location.hash || '').replace(/^#/, '') || '/';
-        if (h === '/timeline' || h === '/settings' ||
-            h.indexOf('/timeline') === 0 || h.indexOf('/settings') === 0) {
-          setTimeout(() => { try { navigate('/'); } catch (err) {} }, 0);
-        }
-      } catch (err) {}
-    };
-    const onDone = () => setEditorOn(false);
-    window.addEventListener('lt-ui-editor-open', onOpen);
-    window.addEventListener('lt-ui-editor-done', onDone);
-    return () => {
-      window.removeEventListener('lt-ui-editor-open', onOpen);
-      window.removeEventListener('lt-ui-editor-done', onDone);
-    };
-  }, [navigate]);
-
-  useEffect(() => {
-    document.body.classList.toggle('lt-ui-editing', editorOn);
-    uiEditorBind();
     applyUiLayout();
-    const iv = setInterval(applyUiLayout, editorOn ? 600 : 1600);
+    const iv = setInterval(applyUiLayout, 1600);
     const onRoute = () => setTimeout(applyUiLayout, 0);
     window.addEventListener('lt-route-change', onRoute);
     return () => {
@@ -592,7 +565,7 @@ export function ak({ profile }) {
       window.removeEventListener('lt-route-change', onRoute);
       document.body.classList.remove('lt-ui-editing');
     };
-  }, [editorOn]);
+  }, []);
 
   const glideTRef = useRef(null);
   const glideTargetRef = useRef(null);
@@ -629,7 +602,22 @@ export function ak({ profile }) {
   };
 
   const onTouchStart = (e) => {
-    if (editorOn) return;
+    /* Tab-swipe is a BOTTOM-NAV-ONLY gesture: the finger must start on the
+       floating nav pill ([data-lt-bottomnav]). A touch anywhere else —
+       page content, sheets, modals — must never slide the whole page;
+       those areas keep plain vertical scrolling. */
+    try {
+      if (!(e.target && e.target.closest &&
+            e.target.closest('[data-lt-bottomnav]'))) {
+        gRef.current.active = false;
+        gRef.current.locked = null;
+        return;
+      }
+    } catch (err) {
+      gRef.current.active = false;
+      gRef.current.locked = null;
+      return;
+    }
     /* A new gesture finishes any in-flight commit right away so the stale
        timer can never stomp this gesture's dragX. */
     if (glideTRef.current) finishCommit();
@@ -721,23 +709,6 @@ export function ak({ profile }) {
     }
   };
 
-  const scrollMain = (dir) => (e) => {
-    e.preventDefault();
-    const m = document.querySelector('#root main') || document.querySelector('main');
-    if (m) m.scrollBy({ top: dir * m.clientHeight * 0.7, behavior: 'smooth' });
-  };
-
-  const resetLayout = (e) => {
-    e.preventDefault();
-    try {
-      localStorage.removeItem(UI_ORDER_KEY);
-      localStorage.removeItem(UI_LAYOUT_KEY);
-    } catch (err) {}
-    applyUiLayout();
-    setResetFlash(true);
-    setTimeout(() => setResetFlash(false), 1400);
-  };
-
   const paneW = gRef.current.width || 0;
 
   return jsxs('div', {
@@ -793,51 +764,7 @@ export function ak({ profile }) {
           }) : null
         ]
       }),
-      jsx(ck, {}),
-      editorOn ? jsxs('div', {
-        className: 'fixed left-1/2 -translate-x-1/2 z-[70] w-[min(344px,calc(100vw-20px))] rounded-2xl bg-[#04091e]/95 backdrop-blur-md border border-white/10 shadow-[0_18px_50px_rgba(4,9,30,.55)] px-3.5 py-3',
-        style: { bottom: 'calc(74px + env(safe-area-inset-bottom, 0px))' },
-        children: [
-          jsxs('div', {
-            className: 'flex items-start gap-2 pb-2.5',
-            children: [
-              jsx('span', { className: 'text-accent text-[13px] leading-none mt-[1px]', children: '\u2725' }),
-              jsx('span', { className: 'text-[11.5px] leading-snug font-semibold text-white/75', children: 'Hold a box, then drop it on another to swap \u2014 same size, same line.' })
-            ]
-          }),
-          jsxs('div', {
-            className: 'flex items-center justify-between gap-2',
-            children: [
-              jsxs('div', { className: 'flex items-center gap-1.5', children: [
-                jsx('button', {
-                  className: 'w-8 h-8 rounded-xl bg-white/10 text-white/85 text-[11px] font-black active:bg-white/20 transition',
-                  onPointerDown: scrollMain(-1),
-                  'aria-label': 'Scroll up',
-                  children: '\u25B2'
-                }),
-                jsx('button', {
-                  className: 'w-8 h-8 rounded-xl bg-white/10 text-white/85 text-[11px] font-black active:bg-white/20 transition',
-                  onPointerDown: scrollMain(1),
-                  'aria-label': 'Scroll down',
-                  children: '\u25BC'
-                })
-              ]}),
-              jsxs('div', { className: 'flex items-center gap-1.5', children: [
-                jsx('button', {
-                  className: 'h-9 min-w-[74px] px-4 rounded-full border border-white/15 text-white/85 text-[11px] font-bold active:bg-white/10 transition',
-                  onPointerDown: resetLayout,
-                  children: resetFlash ? 'Reset \u2713' : 'Reset'
-                }),
-                jsx('button', {
-                  className: 'h-9 px-6 rounded-full bg-accent text-black text-[11px] font-black tracking-wide active:opacity-80 transition shadow-[0_6px_18px_rgba(0,194,168,.35)]',
-                  onPointerDown: (e) => { e.preventDefault(); setEditorOn(false); try { window.dispatchEvent(new CustomEvent('lt-ui-editor-done')); } catch (err) {} },
-                  children: 'Done'
-                })
-              ]})
-            ]
-          })
-        ]
-      }) : null
+      jsx(ck, {})
     ]
   });
 }
@@ -884,26 +811,8 @@ const uk = [{
     button: Timer, Activity, Life Hub, Journal, Settings. */
 export function ck() {
   const { pathname: e } = useLocation();
-  /* While the UI editor is open, only the three editable tabs (Timer,
-     Activity, Journal) stay reachable — Life Hub + Settings are hidden so
-     the editor can't touch them. Reacts to the same events the shell uses. */
-  const [editing, setEditing] = useState(
-    () => typeof document !== 'undefined' && document.body.classList.contains('lt-ui-editing')
-  );
-  useEffect(() => {
-    const on = () => setEditing(true);
-    const off = () => setEditing(false);
-    window.addEventListener('lt-ui-editor-open', on);
-    window.addEventListener('lt-ui-editor-done', off);
-    return () => {
-      window.removeEventListener('lt-ui-editor-open', on);
-      window.removeEventListener('lt-ui-editor-done', off);
-    };
-  }, []);
-  const items = editing
-    ? uk.filter((it) => it.href !== '/timeline' && it.href !== '/settings')
-    : uk;
-
+  /* Marked as the swipe surface: the shell only starts a tab-slide gesture
+     when the finger lands inside this nav pill. */
   return jsx("div", {
     className: "fixed inset-x-0 z-50 px-3",
     style: {
@@ -911,9 +820,10 @@ export function ck() {
       pointerEvents: "none"
     },
     children: jsx("nav", {
+      'data-lt-bottomnav': '',
       className: "pointer-events-auto mx-auto w-full max-w-[406px] bg-white rounded-full border border-border px-2 py-1.5 flex items-center",
       style: { boxShadow: "0 10px 30px rgba(4, 9, 30, 0.18)" },
-      children: items.map(({ href: t, icon: n, label: r }) => {
+      children: uk.map(({ href: t, icon: n, label: r }) => {
         const o = t === "/" ? e === "/" : e.startsWith(t);
         return jsxs(Link, {
           to: t,

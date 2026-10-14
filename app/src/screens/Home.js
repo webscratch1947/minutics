@@ -911,7 +911,7 @@ function TimePicker({ label, value, onChange, labelClass }) {
       jsxs('button', {
         type: 'button',
         onClick: () => setOpen(true),
-        className: 'w-full flex items-center justify-center gap-2.5 border border-black/[.08] bg-white text-foreground font-bold text-lg px-2 py-3 rounded-xl outline-none focus:border-black/40 cursor-pointer transition-colors active:bg-black/[.04]',
+        className: 'w-full flex items-center justify-center gap-2.5 border border-black/[.22] bg-white text-foreground font-bold text-lg px-2 py-3 rounded-xl outline-none focus:border-black/40 cursor-pointer transition-colors active:bg-black/[.04]',
         children: [
           clockFaceSvgIcon(),
           jsx('span', { children: display })
@@ -1159,7 +1159,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
   const isValid = durationMinutes !== null && durationMinutes > 0;
   const spansDays = fromDate !== toDate || wrapsNextDay;
 
-  const dateInputClass = 'border border-black/[.08] bg-white text-foreground font-semibold text-sm px-3.5 py-3 rounded-xl outline-none focus:border-black/40 w-full';
+  const dateInputClass = 'border border-black/[.22] bg-white text-foreground font-semibold text-sm px-3.5 py-3 rounded-xl outline-none focus:border-black/40 w-full';
 
   // When "From" date changes, ensure "To" date doesn't go before it
   const handleFromDateChange = (e) => {
@@ -1250,7 +1250,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
             children: [
               // From date
               jsxs('div', {
-                className: 'rounded-2xl border border-black/[.08] bg-black/[.03] p-3.5',
+                className: 'rounded-2xl border border-black/[.22] bg-black/[.03] p-3.5',
                 children: [
                   jsx('label', {
                     className: 'block text-[10px] font-black text-foreground/45 uppercase tracking-[.14em] mb-2',
@@ -1266,7 +1266,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // From time
               jsxs('div', {
-                className: 'rounded-2xl border border-black/[.08] bg-black/[.03] p-3.5',
+                className: 'rounded-2xl border border-black/[.22] bg-black/[.03] p-3.5',
                 children: [
                   jsx(TimePicker, {
                     label: 'From',
@@ -1289,7 +1289,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // To date with "Ends next day" badge — same neutral tint as the rest
               jsxs('div', {
-                className: 'rounded-2xl border border-black/[.08] bg-black/[.03] p-3.5',
+                className: 'rounded-2xl border border-black/[.22] bg-black/[.03] p-3.5',
                 children: [
                   jsxs('label', {
                     className: 'flex items-center justify-between text-[10px] font-black text-foreground/45 uppercase tracking-[.14em] mb-2',
@@ -1312,7 +1312,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
               }),
               // To time
               jsxs('div', {
-                className: 'rounded-2xl border border-black/[.08] bg-black/[.03] p-3.5',
+                className: 'rounded-2xl border border-black/[.22] bg-black/[.03] p-3.5',
                 children: [
                   jsx(TimePicker, {
                     label: 'To',
@@ -1325,7 +1325,7 @@ function LogTimeBlockModal({ activity, onClose, onSave }) {
           }),
           // Sticky footer: duration + actions (compact so it never crowds the form)
           jsxs('div', {
-            className: 'shrink-0 bg-white border-t border-black/[.07] pb-[env(safe-area-inset-bottom)] rounded-b-[28px]',
+            className: 'shrink-0 bg-white border-t border-black/[.18] pb-[env(safe-area-inset-bottom)] rounded-b-[28px]',
             children: [
               // Duration preview
               durationMinutes !== null && durationMinutes > 0 && jsx('div', {
@@ -1510,13 +1510,13 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
                     type: 'datetime-local',
                     value: startValue,
                     onChange: (e) => setStartValue(e.target.value),
-                    className: 'w-full border border-black/[.08] bg-black/[.035] px-3.5 py-3 rounded-xl text-sm font-semibold outline-none focus:border-black/40 text-foreground'
+                    className: 'w-full border border-black/[.22] bg-black/[.035] px-3.5 py-3 rounded-xl text-sm font-semibold outline-none focus:border-black/40 text-foreground'
                   })
                 ]
               }),
               // "Keep timer running" checkbox
               jsxs('label', {
-                className: 'flex items-center gap-3 cursor-pointer select-none rounded-xl border border-black/[.07] bg-[#Fdfbf7] px-3.5 py-3',
+                className: 'flex items-center gap-3 cursor-pointer select-none rounded-xl border border-black/[.2] bg-[#Fdfbf7] px-3.5 py-3',
                 children: [
                   jsx('input', {
                     type: 'checkbox',
@@ -1541,7 +1541,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
                     type: 'datetime-local',
                     value: endValue,
                     onChange: (e) => setEndValue(e.target.value),
-                    className: 'w-full border border-black/[.08] bg-black/[.035] px-3.5 py-3 rounded-xl text-sm font-semibold outline-none focus:border-black/40 text-foreground'
+                    className: 'w-full border border-black/[.22] bg-black/[.035] px-3.5 py-3 rounded-xl text-sm font-semibold outline-none focus:border-black/40 text-foreground'
                   })
                 ]
               })
@@ -1549,7 +1549,7 @@ function EditTimeBlockModal({ block, activity, onClose, onSave }) {
           }),
           // Cancel / Save buttons
           jsxs('div', {
-            className: 'flex gap-2.5 px-4 py-3.5 border-t border-black/[.07] shrink-0 rounded-b-[28px]',
+            className: 'flex gap-2.5 px-4 py-3.5 border-t border-black/[.18] shrink-0 rounded-b-[28px]',
             children: [
               jsx('button', {
                 onClick: requestClose,

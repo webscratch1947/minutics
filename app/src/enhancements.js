@@ -173,6 +173,7 @@
   var budgetPayment   = "";
   var gramCurrentId   = null;   /* which infographic's comments are open */
   var routineEditingId = null;  /* which routine item the sheet is editing, null = adding new */
+  var routineEditingEmoji = ""; /* pending emoji picked in the edit sheet (kept until Save) */
   var _routineMidnightTimer = null; /* re-renders the tool if the date rolls over while it's open */
   var catModalRoot     = null;  /* category-selection popup element */
   var catModalMinutes  = 0;
@@ -642,6 +643,23 @@
     var cur = getCurrency();
     var num = (Number(v) || 0).toLocaleString(cur.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return cur.symbol + num;
+  }
+
+  /* ── Calculator "Recent" history: 10-minute auto-expiry ───────────────────
+     Every calculation stores a history row with an ISO savedAt stamp. These
+     are RECENTS, not permanent records — after ~10 minutes they must drop
+     out of the Recent list and stop prefilling the form (the user saw stale
+     EMI / Item Time Cost results lingering forever). Filtered on every read
+     AND on every write, so old rows are also pruned from storage. */
+  var HISTORY_TTL_MS = 10 * 60 * 1000;
+  function ltFreshHistory(list) {
+    if (!Array.isArray(list)) return [];
+    var now = Date.now();
+    return list.filter(function (it) {
+      var t = it && it.savedAt ? Date.parse(it.savedAt) : NaN;
+      if (!isFinite(t)) return false; /* no stamp = old-format row: expires too */
+      return (now - t) < HISTORY_TTL_MS;
+    });
   }
 
   /* Save an image (data:URL) to the device in ONE place. Every "save image"
@@ -1380,8 +1398,26 @@
       ".lt-routine-poll-edit{flex-shrink:0;font-size:11px;color:#6b8f5c;font-weight:700;-webkit-tap-highlight-color:transparent}",
       ".lt-routine-draftlist{display:flex;flex-direction:column;gap:14px;max-height:48vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:6px;padding:2px 2px 4px}",
       ".lt-routine-draftrow{border:1px solid hsl(var(--border));border-radius:18px;padding:16px 16px 15px;position:relative;background:hsl(var(--card));box-shadow:0 2px 10px rgba(0,0,0,.05)}",
-      ".lt-routine-draftrow-remove{position:absolute;top:10px;right:10px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:hsl(var(--muted));border:none;border-radius:50%;color:hsl(var(--muted-foreground));font-size:12px;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}",
+      ".lt-routine-draftrow-remove{position:absolute;top:9px;right:9px;width:26px;height:26px;z-index:3;display:flex;align-items:center;justify-content:center;background:hsl(var(--muted));border:1px solid hsl(var(--border));border-radius:50%;color:hsl(var(--muted-foreground));font-size:12px;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}",
       ".lt-routine-draftrow-remove:active{opacity:.65}",
+      /* Name row: emoji slot + input. The input reserves room for the ✕
+         button (top-right) so the cross never sits on top of the text. */
+      ".lt-routine-namewrap{display:flex;align-items:center;gap:9px;margin-bottom:12px}",
+      ".lt-routine-namewrap .lt-routine-name-input{flex:1;min-width:0;margin-bottom:0}",
+      ".lt-routine-draftrow .lt-routine-name-input{padding-right:44px}",
+      ".lt-routine-emoji{flex-shrink:0;width:46px;height:46px;border-radius:14px;border:1.5px dashed hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--muted-foreground));font-size:19px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;padding:0;-webkit-tap-highlight-color:transparent;transition:transform .1s ease,background .15s ease}",
+      ".lt-routine-emoji:active{transform:scale(.93);background:hsl(var(--border))}",
+      ".lt-sheet-head-icon-btn{cursor:pointer;font-family:inherit;padding:0;appearance:none;-webkit-appearance:none;-webkit-tap-highlight-color:transparent;transition:transform .1s ease}",
+      ".lt-sheet-head-icon-btn:active{transform:scale(.93)}",
+      /* Emoji picker dialog */
+      ".lt-emoji-pop-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:24px;animation:lt-emoji-pop-in .16s ease}",
+      ".lt-emoji-pop{width:min(330px,100%);background:hsl(var(--card));border-radius:22px;padding:18px 16px 16px;box-shadow:0 20px 50px rgba(0,0,0,.35);box-sizing:border-box}",
+      ".lt-emoji-pop-title{font-size:13px;font-weight:800;text-align:center;color:hsl(var(--muted-foreground));margin:0 0 12px}",
+      ".lt-emoji-pop-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}",
+      ".lt-emoji-pop-grid button{font-size:21px;padding:7px 0;border:none;border-radius:11px;background:hsl(var(--muted));cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .08s ease}",
+      ".lt-emoji-pop-grid button:active{transform:scale(.88);background:hsl(var(--border))}",
+      ".lt-emoji-pop-remove{margin-top:12px;width:100%;padding:10px;border-radius:11px;border:1px solid hsl(var(--border));background:transparent;color:hsl(var(--muted-foreground));font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}",
+      ".lt-emoji-pop-remove:active{opacity:.7}",
       "#lt-routine-sheet .lt-tasks-sheet-title{font-size:18px;letter-spacing:0;text-transform:none;font-weight:800;color:hsl(var(--foreground));margin-bottom:16px}",
       ".lt-routine-name-input{font-size:16px;width:100%;border:1.5px solid hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--foreground));font-family:inherit;font-weight:700;padding:13px 14px;border-radius:14px;outline:none;caret-color:hsl(var(--primary));margin-bottom:12px;box-sizing:border-box;transition:border-color .15s}",
       ".lt-routine-name-input:focus{border-color:#111114}",
@@ -1392,10 +1428,14 @@
       ".lt-routine-addanother{width:100%;display:flex;align-items:center;justify-content:center;gap:6px;background:hsl(var(--muted));border:1.5px dashed hsl(var(--border));color:#0369A1;border-radius:14px;padding:12px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;margin:4px 0 14px;-webkit-tap-highlight-color:transparent;transition:opacity .15s}",
       ".lt-routine-addanother:active{opacity:.65}",
       ".lt-routine-sheet-done{width:100%;background:transparent;color:hsl(var(--muted-foreground));border:none;padding:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}",
-      ".lt-clock-field{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;border:1px solid rgba(17,17,20,.14);background:#fff;color:#111114;font:inherit;font-size:15px;font-weight:700;padding:11px 10px;border-radius:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:center;box-sizing:border-box;transition:opacity .15s}",
+      ".lt-clock-field{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;flex-wrap:nowrap;border:1px solid rgba(17,17,20,.14);background:#fff;color:#111114;font:inherit;font-size:14.5px;font-weight:700;padding:11px 9px;border-radius:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:center;box-sizing:border-box;transition:opacity .15s;white-space:nowrap;overflow:hidden}",
       ".lt-clock-field:active{opacity:.7}",
-      ".lt-clock-field .lt-clock-icon{display:flex;align-items:center;color:#111114}",
+      ".lt-clock-field .lt-clock-icon{display:flex;align-items:center;color:#111114;flex-shrink:0}",
+      ".lt-clock-field .lt-clock-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
       ".lt-clock-field .lt-clock-caret{font-size:9px;color:hsl(var(--muted-foreground));margin-left:2px}",
+      ".lt-clock-field .lt-clock-steppers{display:flex;flex-direction:column;gap:2px;margin-left:3px;flex-shrink:0}",
+      ".lt-clock-step{display:flex;align-items:center;justify-content:center;width:21px;height:13px;font-size:7.5px;line-height:1;color:hsl(var(--muted-foreground));background:hsl(var(--muted));border:1px solid hsl(var(--border));border-radius:5px;-webkit-tap-highlight-color:transparent;user-select:none}",
+      ".lt-clock-step:active{background:#111114;border-color:#111114;color:#fff}",
       ".lt-clock-field.lt-clock-empty{background:hsl(var(--muted));border-color:hsl(var(--border));color:hsl(var(--muted-foreground))}",
       ".lt-clock-field.lt-clock-empty .lt-clock-caret{color:hsl(var(--muted-foreground))}",
       ".lt-tasks-sheet-row:has(.lt-clock-field){border-top:none;padding:0;gap:8px}",
@@ -1424,9 +1464,13 @@
       ".lt-clockpicker-ampm{display:flex;justify-content:center;gap:8px;margin-top:14px}",
       ".lt-clockpicker-ampm button{min-width:66px;padding:8px 14px;border-radius:999px;border:1px solid hsl(var(--border));background:hsl(var(--card));color:hsl(var(--muted-foreground));font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}",
       ".lt-clockpicker-ampm button.on{background:#111114;color:#fff;border-color:#111114}",
-      ".lt-clockpicker-actions{display:flex;justify-content:space-between;gap:14px}",
-      ".lt-clockpicker-actions button{background:none;border:none;color:#111114;font-size:13.5px;font-weight:800;cursor:pointer;padding:8px 6px;font-family:inherit;-webkit-tap-highlight-color:transparent}",
-      ".lt-clockpicker-actions button.lt-cancel{color:#DC2626}",
+      ".lt-clockpicker-actions{display:flex;justify-content:space-between;gap:14px;margin-top:16px}",
+      /* Cancel / OK must read as BUTTONS, not bare text: pill shapes with
+         clear fill/border, matching the app's other confirm dialogs. */
+      ".lt-clockpicker-actions button{flex:1;background:#fff;border:1.5px solid #DC2626;color:#DC2626;font-size:13.5px;font-weight:800;cursor:pointer;padding:11px 10px;border-radius:999px;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:transform .1s ease,opacity .12s ease}",
+      ".lt-clockpicker-actions button:active{transform:scale(.97);opacity:.85}",
+      ".lt-clockpicker-actions button:not(.lt-cancel){background:#111114;border-color:#111114;color:#fff}",
+      ".lt-clockpicker-actions button.lt-cancel{color:#DC2626;border-color:#DC2626!important}",
       ".lt-clockpicker-face{touch-action:none}",
     ].join("");
     document.head.appendChild(s);
@@ -1588,11 +1632,11 @@
       ".lt-cat-chip{border:1.5px solid rgba(17,17,17,.3);background:#Fdfbf7;color:#0f172a;border-radius:14px;padding:12px 8px;font-size:12.5px;font-weight:800;text-align:center;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}",
       ".lt-cat-chip:hover{border-color:rgba(17,17,17,.55);transform:translateY(-1px)}",
       ".lt-cat-chip.lt-cat-selected{background:#000;border-color:#000;color:#fff;box-shadow:0 10px 22px rgba(0,0,0,.28)}",
-      ".lt-cat-reason{width:100%;min-height:70px;resize:vertical;border:1.5px solid rgba(15,23,42,.08);background:#Fdfbf7;color:hsl(var(--foreground));border-radius:14px;padding:11px 12px;font:inherit;font-size:13px;box-sizing:border-box;outline:none}",
-      ".lt-cat-reason:focus{border-color:rgba(15,23,42,.4)}",
+      ".lt-cat-reason{width:100%;min-height:70px;resize:vertical;border:1.5px solid rgba(15,23,42,.38);background:#Fdfbf7;color:hsl(var(--foreground));border-radius:14px;padding:11px 12px;font:inherit;font-size:13px;box-sizing:border-box;outline:none}",
+      ".lt-cat-reason:focus{border-color:rgba(15,23,42,.62)}",
       ".lt-cat-field-row{display:flex;gap:10px;margin-bottom:10px}",
       ".lt-cat-field-row .lt-field{flex:1}",
-      ".lt-cat-modal-actions{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px calc(16px + env(safe-area-inset-bottom, 0px));background:#fff;border-top:1px solid rgba(15,23,42,.07);flex:0 0 auto}",
+      ".lt-cat-modal-actions{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px calc(16px + env(safe-area-inset-bottom, 0px));background:#fff;border-top:1.5px solid rgba(15,23,42,.22);flex:0 0 auto}",
       ".lt-cat-modal-actions #lt-cat-save{background:#000!important;border-color:#000!important;color:#fff!important;border-radius:999px!important;font-weight:900!important;letter-spacing:.01em;padding:12px 26px!important;box-shadow:0 12px 26px rgba(0,0,0,.3)}",
       ".lt-cat-modal-actions #lt-cat-save:hover{opacity:.88}",
       /* Keep user-selected activity emoji in the platform's color emoji
@@ -1641,6 +1685,15 @@
       "#lt-fv-save-btn{background:#fff;color:#3730A3;border:1.5px solid rgba(55,48,163,.30)}",
       ".lt-fv-hint{width:calc(100% - 32px);max-width:480px;color:rgba(55,48,163,.55);font-size:11.5px;text-align:center;margin-top:10px;line-height:1.4;box-sizing:border-box}",
       ".lt-fv-loading{color:rgba(55,48,163,.6);font-size:13px;padding:40px 0}",
+      /* Full-view loading skeleton — mirrors the real report layout so the
+         overlay never shows a bare cream page on open. */
+      "#lt-fv-report-body .lt-fv-skel{width:100%;display:flex;flex-direction:column;align-items:center;gap:22px;padding-top:30px;animation:lt-fv-skel-pulse 1.15s ease-in-out infinite}",
+      "@keyframes lt-fv-skel-pulse{0%,100%{opacity:.9}50%{opacity:.5}}",
+      ".lt-fv-skel-donut{width:136px;height:136px;border-radius:50%;box-sizing:border-box;border:17px solid #ECEEF3;border-top-color:#E2E6EE;border-right-color:#E7EAF1}",
+      ".lt-fv-skel-bars{width:86%;display:flex;flex-direction:column;gap:13px}",
+      ".lt-fv-skel-bars span{display:block;height:13px;border-radius:999px;background:#ECEEF3}",
+      ".lt-fv-skel-cards{width:86%;display:grid;grid-template-columns:1fr 1fr;gap:12px}",
+      ".lt-fv-skel-cards div{height:58px;border-radius:16px;background:#F0F1F5}",
       /* Report tab (stage 1) */
       ".lt-fv-report-card{width:calc(100% - 32px);max-width:480px;background:#fff;border:1.4px solid rgba(55,48,163,.22);border-radius:18px;padding:16px;box-sizing:border-box;margin:0 0 12px;box-shadow:0 6px 20px rgba(55,48,163,.07)}",
       "#lt-fv-report-body{width:100%;display:flex;flex-direction:column;align-items:center}",
@@ -3034,7 +3087,7 @@
       e.preventDefault();
       function val(n) { return ((form.querySelector('[name="' + n + '"]') || {}).value || "").trim(); }
       var name = val("name");
-      if (!name) return;
+      if (!name) { ltToolActionFail(); return; }
       var entry = {
         id: budgetEditingId || String(Date.now()),
         name: name,
@@ -3062,7 +3115,7 @@
   /* ── EMI Calculator ────────────────────────────────────────────────────── */
 
   function renderEmi() {
-    var saved = readJson(EMI_KEY, []);
+    var saved = ltFreshHistory(readJson(EMI_KEY, []));
     var d = saved[0] || { principal: "", rate: "", months: "" };
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
@@ -3086,12 +3139,12 @@
       e.preventDefault();
       function val(n) { return Number((form.querySelector('[name="' + n + '"]') || {}).value) || 0; }
       var principal = val("principal"), annual = val("rate"), months = val("months");
-      if (!principal || !months) { result.textContent = "Please enter loan amount and tenure."; return; }
+      if (!principal || !months) { ltToolActionFail(); result.textContent = "Please enter loan amount and tenure."; return; }
       var r = annual / 1200;
       var emi = r ? principal * r * Math.pow(1 + r, months) / (Math.pow(1 + r, months) - 1) : principal / months;
       var total = emi * months, interest = total - principal;
       saved.unshift({ principal: principal, rate: annual, months: months, emi: emi, total: total, interest: interest, savedAt: new Date().toISOString() });
-      writeJson(EMI_KEY, saved.slice(0, 10));
+      writeJson(EMI_KEY, ltFreshHistory(saved).slice(0, 10));
       result.className = "lt-tool-card";
       result.innerHTML =
         '<div class="lt-calc-result">' +
@@ -3108,7 +3161,7 @@
   /* ── Compound Interest ─────────────────────────────────────────────────── */
 
   function renderCompound() {
-    var saved = readJson(COMPOUND_KEY, []);
+    var saved = ltFreshHistory(readJson(COMPOUND_KEY, []));
     var d = saved[0] || { principal: "", contribution: "", rate: "", years: "", frequency: "12" };
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
@@ -3141,7 +3194,7 @@
       var principal = val("principal"), contribution = val("contribution"),
           annual = val("rate"), years = val("years"),
           frequency = Number((form.querySelector('[name="frequency"]') || {}).value) || 12;
-      if (!years) { result.textContent = "Please enter the number of years."; return; }
+      if (!years) { ltToolActionFail(); result.textContent = "Please enter the number of years."; return; }
       var periods = years * frequency, r = annual / 100 / frequency;
       var fp = principal * Math.pow(1 + r, periods);
       var fc = r ? (contribution * 12 / frequency) * ((Math.pow(1 + r, periods) - 1) / r) : contribution * 12 * years;
@@ -3149,7 +3202,7 @@
       var invested = principal + contribution * 12 * years;
       var growth = future - invested;
       saved.unshift({ principal: principal, contribution: contribution, rate: annual, years: years, frequency: frequency, future: future, invested: invested, growth: growth, savedAt: new Date().toISOString() });
-      writeJson(COMPOUND_KEY, saved.slice(0, 10));
+      writeJson(COMPOUND_KEY, ltFreshHistory(saved).slice(0, 10));
       result.className = "lt-tool-card";
       result.innerHTML =
         '<div class="lt-calc-result">' +
@@ -3334,6 +3387,7 @@
 
     var calcBtn = document.getElementById("lt-lv-calc");
     if (calcBtn) calcBtn.addEventListener("click", function () {
+      if (isRunning) ltToolActionFail(); /* blocked while a timer runs — nothing was calculated */
       lifeValueShowCalc = isRunning ? "blocked" : true;
       renderLifeValue();
     });
@@ -3528,10 +3582,27 @@
     var old = document.getElementById("lt-share-sheet-overlay");
     if (old) old.remove();
 
-    var isAndroid = !!(window.AndroidShareBridge &&
-      (typeof window.AndroidShareBridge.shareImageTo === "function" ||
-       typeof window.AndroidShareBridge.shareImagePng === "function"));
-    var hasShareImageTo = !!(window.AndroidShareBridge && typeof window.AndroidShareBridge.shareImageTo === "function");
+    /* Detection must cover BOTH bridge names: the legacy AndroidShareBridge
+       (never actually injected by current builds) and the REAL injected
+       AndroidBridge — whose native shareImage() opens the system share
+       sheet. Checking only the legacy name made Share a silent no-op in the
+       Android app (no navigator.share in a WebView either). */
+    var legacyBridge = window.AndroidShareBridge;
+    var nativeBridge = window.AndroidBridge;
+    var hasShareImageTo = !!(legacyBridge && typeof legacyBridge.shareImageTo === "function");
+    var hasSharePng = !!(legacyBridge && typeof legacyBridge.shareImagePng === "function");
+    var hasNativeShare = !!(nativeBridge && typeof nativeBridge.shareImage === "function");
+    var isAndroid = hasShareImageTo || hasSharePng || hasNativeShare;
+
+    /* One native entry point: legacy bridge first, then AndroidBridge. */
+    function nativeShareImage(pkg) {
+      try {
+        if (hasShareImageTo) { legacyBridge.shareImageTo(dataUrl, pkg || ""); return true; }
+        if (hasSharePng) { legacyBridge.shareImagePng(dataUrl); return true; }
+        if (hasNativeShare) { nativeBridge.shareImage(dataUrl, "minutics-share.png", pkg || ""); return true; }
+      } catch (e) {}
+      return false;
+    }
 
     var apps = [
       { id: "whatsapp",  name: "WhatsApp",  pkg: "com.whatsapp",            color: "#25D366", icon: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.627.616l4.584-1.202A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.086 0-4.033-.625-5.655-1.694l-.405-.268-2.694.707.718-2.627-.293-.467A9.965 9.965 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>' },
@@ -3596,10 +3667,8 @@
 
         if (appId === "more") {
           /* System share sheet */
-          if (hasShareImageTo) {
-            window.AndroidShareBridge.shareImageTo(dataUrl, "");
-          } else if (isAndroid) {
-            window.AndroidShareBridge.shareImagePng(dataUrl);
+          if (nativeShareImage("")) {
+            /* Native system chooser is open — nothing else to do. */
           } else if (navigator.share) {
             blobToFile(dataUrl, "minutics-share.png", function (file) {
               if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -3613,10 +3682,9 @@
         }
 
         /* Specific app */
-        if (hasShareImageTo) {
-          window.AndroidShareBridge.shareImageTo(dataUrl, pkg);
-        } else if (isAndroid) {
-          window.AndroidShareBridge.shareImagePng(dataUrl);
+        if (nativeShareImage(pkg)) {
+          /* Native direct-to-app share (AndroidBridge.shareImage routes to
+             the package when given one, else opens the chooser). */
         } else {
           /* Web fallback — try system share */
           if (navigator.share) {
@@ -4016,7 +4084,7 @@
     var dv = value || "";
     return (
       '<button type="button" id="' + id + '" class="lt-clock-field' + (value ? '' : ' lt-clock-empty') + '" data-value="' + escapeHtml(dv) + '">' +
-        '<span>' + escapeHtml(label) + '</span><span class="lt-clock-caret">\u25BC</span>' +
+        '<span class="lt-clock-label">' + escapeHtml(label) + '</span><span class="lt-clock-caret">\u25BC</span>' +
       '</button>'
     );
   }
@@ -4026,8 +4094,35 @@
     if (!el) return;
     el.setAttribute("data-value", value || "");
     el.classList.toggle("lt-clock-empty", !value);
-    var span = el.querySelector("span");
+    /* Target the LABEL span specifically. clockButtonHtml's first span is the
+       clock-icon SVG — writing into it (the old `querySelector("span")`)
+       destroyed the icon and left the real label untouched, which is why
+       tapping Clear in the Tasks deadline showed "Select time Select time". */
+    var span = el.querySelector(".lt-clock-label") || el.querySelector("span");
     if (span) span.textContent = value ? formatRoutineTime(value) : "Select time";
+  }
+
+  /* ▲/▼ steppers on a clock field: nudge the value by 15 minutes without
+     opening the picker, so Start/End can be corrected quickly and the field
+     stays a single compact line. Empty field starts from the current time. */
+  function clockFieldStep(el, dir) {
+    if (!el) return;
+    var cur = el.getAttribute("data-value") || "";
+    var h, m;
+    if (cur && cur.indexOf(":") !== -1) {
+      var p = cur.split(":");
+      h = parseInt(p[0], 10) || 0;
+      m = parseInt(p[1], 10) || 0;
+    } else {
+      var now = new Date();
+      h = now.getHours();
+      m = Math.round(now.getMinutes() / 15) * 15;
+      if (m === 60) { m = 0; h = (h + 1) % 24; }
+    }
+    m += dir * 15;
+    while (m >= 60) { m -= 60; h = (h + 1) % 24; }
+    while (m < 0) { m += 60; h = (h + 23) % 24; }
+    clockFieldSetValue(el.id, pad2(h) + ":" + pad2(m));
   }
 
   function clockFieldValue(id) {
@@ -4311,7 +4406,11 @@
     return (
       '<button type="button" id="' + id + '" class="lt-clock-field' + (value ? '' : ' lt-clock-empty') + '" data-value="' + escapeHtml(dv) + '">' +
         '<span class="lt-clock-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 2"></path></svg></span>' +
-        '<span>' + escapeHtml(label) + '</span><span class="lt-clock-caret">\u25BC</span>' +
+        '<span class="lt-clock-label">' + escapeHtml(label) + '</span>' +
+        '<span class="lt-clock-steppers">' +
+          '<span class="lt-clock-step" data-clock-step="1" aria-label="Add 15 minutes">\u25B2</span>' +
+          '<span class="lt-clock-step" data-clock-step="-1" aria-label="Subtract 15 minutes">\u25BC</span>' +
+        '</span>' +
       '</button>'
     );
   }
@@ -4322,7 +4421,7 @@
      row to the same sheet so several time slots can be created in one go. */
   var routineDraftRows = null;
 
-  function newRoutineDraftRow() { return { uid: genId(), name: "", time: "", endTime: "" }; }
+  function newRoutineDraftRow() { return { uid: genId(), name: "", time: "", endTime: "", emoji: "" }; }
 
   function syncRoutineDraftFromDom() {
     if (!routineDraftRows) return;
@@ -4340,7 +4439,10 @@
     return (
       '<div class="lt-routine-draftrow" data-draft-uid="' + row.uid + '">' +
         (showRemove ? '<button type="button" class="lt-routine-draftrow-remove" data-draft-remove="' + row.uid + '">\u2715</button>' : '') +
-        '<input id="lt-rdraft-name-' + row.uid + '" class="lt-routine-name-input" type="text" placeholder="Routine name\u2026" value="' + escapeHtml(row.name || "") + '">' +
+        '<div class="lt-routine-namewrap">' +
+          '<button type="button" class="lt-routine-emoji" data-emoji-target="draft" data-emoji-uid="' + row.uid + '" aria-label="Pick an emoji">' + (row.emoji || '+') + '</button>' +
+          '<input id="lt-rdraft-name-' + row.uid + '" class="lt-routine-name-input" type="text" placeholder="Routine name\u2026" value="' + escapeHtml(row.name || "") + '">' +
+        '</div>' +
         '<div class="lt-routine-sheet-timerow">' +
           '<div class="lt-routine-timefield"><span class="lt-routine-timefield-label">Start</span>' + clockButtonHtml("lt-rdraft-time-" + row.uid, row.time) + '</div>' +
           '<div class="lt-routine-timefield"><span class="lt-routine-timefield-label">End</span>' + clockButtonHtml("lt-rdraft-endtime-" + row.uid, row.endTime) + '</div>' +
@@ -4349,19 +4451,65 @@
     );
   }
 
+  /* ── Routine emoji picker ────────────────────────────────────────────────
+     Every routine row (and the sheet header) gets a tappable emoji slot.
+     Picking writes into the draft row / pending edit and refreshes ONLY the
+     sheet, so the list behind stays mounted. */
+  var ROUTINE_EMOJIS = [
+    "\u23F0","\u{1F3CB}\uFE0F","\u{1F4DA}","\u{1F9D8}","\u{1F4BC}","\u{1F373}",
+    "\u{1F6B6}","\u{1F6CF}\uFE0F","\u{1F4C5}","\u{1F4DD}","\u{1F3AF}","\u{1F4AA}",
+    "\u{1F9E0}","\u{1F3B8}","\u{1FAB4}","\u{1F9F9}","\u{1F6D2}","\u{1F4DE}",
+    "\u{1F3C3}","\u{1F34E}","\u{1F52C}","\u{1F680}","\u{1F31F}","\u{1F514}",
+    "\u{1F4F7}","\u{1F3AC}","\u{1F6BF}","\u{1F91D}","\u{1F9E2}","\u{1F4A1}",
+    "\u{1F6A8}","\u{1F30D}"
+  ];
+
+  function openRoutineEmojiPicker(onPick) {
+    var old = document.getElementById("lt-emoji-pop-overlay");
+    if (old) old.remove();
+    var overlay = document.createElement("div");
+    overlay.id = "lt-emoji-pop-overlay";
+    overlay.className = "lt-emoji-pop-overlay";
+    overlay.innerHTML =
+      '<style>@keyframes lt-emoji-pop-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}</style>' +
+      '<div class="lt-emoji-pop" role="dialog" aria-label="Pick an emoji">' +
+        '<p class="lt-emoji-pop-title">Pick an emoji for this routine</p>' +
+        '<div class="lt-emoji-pop-grid">' +
+          ROUTINE_EMOJIS.map(function (em) {
+            return '<button type="button" data-emoji-pick="' + em + '">' + em + '</button>';
+          }).join("") +
+        '</div>' +
+        '<button type="button" class="lt-emoji-pop-remove" data-emoji-pick="">Remove emoji</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) { overlay.remove(); return; }
+      var pick = e.target.closest("[data-emoji-pick]");
+      if (pick) {
+        var em = pick.getAttribute("data-emoji-pick") || "";
+        overlay.remove();
+        if (onPick) onPick(em);
+      }
+    });
+  }
+
   /* Just the sheet's inner content (header + form). Built separately from the
      whole tool so opening/editing a routine refreshes ONLY the sheet — the
      list and shell stay mounted and nothing visually "reloads". */
   function routineSheetHtml() {
     var editing = routineEditingId ? routineItems().find(function (i) { return i.id === routineEditingId; }) : null;
     if (editing) {
+      var pendingEmoji = routineEditingEmoji || editing.emoji || "";
       return (
         '<div class="lt-sheet-head">' +
-          '<div class="lt-sheet-head-icon">\uD83D\uDD52</div>' +
+          '<div class="lt-sheet-head-icon">' + (pendingEmoji || "\uD83D\uDD52") + '</div>' +
           '<div><p class="lt-sheet-head-title">Edit Routine</p>' +
           '<p class="lt-sheet-head-sub">Adjust the time slot or remove it</p></div>' +
         '</div>' +
-        '<input id="lt-routine-name" class="lt-routine-name-input" type="text" placeholder="Routine name\u2026" value="' + escapeHtml(editing.name) + '">' +
+        '<div class="lt-routine-namewrap">' +
+          '<button type="button" class="lt-routine-emoji" data-emoji-target="edit" aria-label="Pick an emoji">' + (pendingEmoji || '+') + '</button>' +
+          '<input id="lt-routine-name" class="lt-routine-name-input" type="text" placeholder="Routine name\u2026" value="' + escapeHtml(editing.name) + '">' +
+        '</div>' +
         '<div class="lt-routine-sheet-timerow">' +
           '<div class="lt-routine-timefield"><span class="lt-routine-timefield-label">Start</span>' + clockButtonHtml("lt-routine-time", editing.time || "") + '</div>' +
           '<div class="lt-routine-timefield"><span class="lt-routine-timefield-label">End</span>' + clockButtonHtml("lt-routine-endtime", editing.endTime || "") + '</div>' +
@@ -4377,7 +4525,9 @@
     var multi = routineDraftRows.length > 1;
     return (
       '<div class="lt-sheet-head">' +
-        '<div class="lt-sheet-head-icon">\u2795</div>' +
+        '<button type="button" class="lt-sheet-head-icon lt-sheet-head-icon-btn" data-emoji-target="head" aria-label="Pick an emoji">' +
+          ((routineDraftRows[0].emoji) || "\u2795") +
+        '</button>' +
         '<div><p class="lt-sheet-head-title">New Routine' + (multi ? 's' : '') + '</p>' +
         '<p class="lt-sheet-head-sub">Add one or more time slots for today</p></div>' +
       '</div>' +
@@ -4440,7 +4590,7 @@
               '<div class="lt-routine-poll-row">' +
                 '<button class="lt-routine-poll-tick' + (done ? ' done' : '') + (locked ? ' locked' : '') + '" data-routine-toggle="' + item.id + '">\u2713</button>' +
                 '<div class="lt-routine-poll-body" data-routine-edit="' + item.id + '">' +
-                  '<p class="lt-routine-poll-name' + (done ? ' done' : '') + '">' + escapeHtml(item.name) + '</p>' +
+                  '<p class="lt-routine-poll-name' + (done ? ' done' : '') + '">' + (item.emoji ? item.emoji + ' ' : '') + escapeHtml(item.name) + '</p>' +
                   '<p class="lt-routine-poll-time">' + formatRoutineRange(item.time, item.endTime) + '</p>' +
                 '</div>' +
                 '<span class="lt-routine-poll-edit" data-routine-edit="' + item.id + '">Edit</span>' +
@@ -4493,6 +4643,37 @@
     if (overlay.dataset.routineWired) return;
     overlay.dataset.routineWired = "1";
     overlay.addEventListener("click", function (e) {
+      /* ▲/▼ steppers inside a clock field nudge the value by 15 min —
+         checked BEFORE the field itself, or the picker would open instead. */
+      var stepEl = e.target.closest("[data-clock-step]");
+      if (stepEl) {
+        clockFieldStep(stepEl.closest(".lt-clock-field"), Number(stepEl.getAttribute("data-clock-step")) || 0);
+        return;
+      }
+      /* Emoji slot: header ➕, per-row slot, or the edit sheet's slot. */
+      var emojiBtn = e.target.closest("[data-emoji-target]");
+      if (emojiBtn) {
+        syncRoutineDraftFromDom();
+        var emKind = emojiBtn.getAttribute("data-emoji-target");
+        if (emKind === "edit" || (emKind === "head" && routineEditingId)) {
+          openRoutineEmojiPicker(function (em) {
+            routineEditingEmoji = em;
+            refreshRoutineSheet();
+          });
+        } else {
+          var emUid = emojiBtn.getAttribute("data-emoji-uid") ||
+            (routineDraftRows && routineDraftRows[0] && routineDraftRows[0].uid);
+          var emRow = (routineDraftRows || []).find(function (r) { return r.uid === emUid; });
+          if (emRow) {
+            openRoutineEmojiPicker(function (em) {
+              syncRoutineDraftFromDom();
+              emRow.emoji = em;
+              refreshRoutineSheet();
+            });
+          }
+        }
+        return;
+      }
       /* Clock-face field (used by both the single edit form and every
          draft row) — open the picker, write the chosen "HH:MM" straight
          into that field's data-value/label without a full re-render. */
@@ -4530,6 +4711,7 @@
       var editBody = e.target.closest("[data-routine-edit]");
       if (editBody) {
         routineEditingId = editBody.getAttribute("data-routine-edit");
+        routineEditingEmoji = "";
         routineDraftRows = null;
         refreshRoutineSheet();
         ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
@@ -4538,6 +4720,7 @@
       if (e.target.id === "lt-routine-fab") {
         if (Date.now() - Number(overlay.dataset.openedAt || 0) < 400) return;
         routineEditingId = null;
+        routineEditingEmoji = "";
         routineDraftRows = [newRoutineDraftRow()];
         /* Refresh ONLY the sheet — re-rendering the whole tool replayed the
            shell slide-in, which read as "it refreshes" on every + tap. */
@@ -4583,9 +4766,11 @@
             name: name,
             time: timeVal,
             endTime: endTimeVal,
+            emoji: routineEditingEmoji || editingNow.emoji || "",
             createdAt: editingNow.createdAt || new Date().toISOString()
           });
           routineEditingId = null;
+          routineEditingEmoji = "";
           renderRoutine();
           return;
         }
@@ -4615,6 +4800,7 @@
             name: (row.name || "").trim(),
             time: row.time || "",
             endTime: row.endTime || "",
+            emoji: row.emoji || "",
             createdAt: new Date().toISOString()
           });
         });
@@ -4755,6 +4941,13 @@
     if (overlay.dataset.tasksWired) return;
     overlay.dataset.tasksWired = "1";
     overlay.addEventListener("click", function (e) {
+      /* ▲/▼ steppers inside the Time field nudge by 15 min (before the
+         field itself, so tapping an arrow doesn't open the picker). */
+      var stepEl = e.target.closest("[data-clock-step]");
+      if (stepEl) {
+        clockFieldStep(stepEl.closest(".lt-clock-field"), Number(stepEl.getAttribute("data-clock-step")) || 0);
+        return;
+      }
       /* Clock-face time picker for the Task sheet's Time field */
       var taskClockBtn = e.target.closest(".lt-clock-field");
       if (taskClockBtn) {
@@ -5859,6 +6052,24 @@
 
   /* Stage 1: the report tab — donut + per-activity bars + summary, with a
      "Share" button that leads to the shareable visiting-card image. */
+  /* Skeleton shown while the report is scraped: shapes that mirror the real
+     layout (donut ring, bars, summary cards) instead of a bare cream page
+     with a line of text. The old "Building your report…" screen read as a
+     split-second glitch flash on open; a pulsing skeleton reads as the
+     report loading, and disappears the moment fill() runs. */
+  var FV_SKELETON_HTML =
+    '<div class="lt-fv-skel" aria-hidden="true">' +
+      '<div class="lt-fv-skel-donut"></div>' +
+      '<div class="lt-fv-skel-bars">' +
+        '<span style="width:82%"></span>' +
+        '<span style="width:64%"></span>' +
+        '<span style="width:73%"></span>' +
+      '</div>' +
+      '<div class="lt-fv-skel-cards">' +
+        '<div></div><div></div>' +
+      '</div>' +
+    '</div>';
+
   /* Opens the report overlay IMMEDIATELY in a loading state and returns a
      fill(activities) function. The journal day row is expanded, scraped
      and restored only AFTER the overlay covers the screen, so tapping
@@ -5873,7 +6084,7 @@
         '<div><h3>Full view</h3><p>' + escapeHtml(dateText) + '</p></div>' +
       '</div>' +
       '<div id="lt-fv-report-body">' +
-        (pendingActivities !== null ? '' : '<p class="lt-fv-loading">Building your report\u2026</p>') +
+        (pendingActivities !== null ? '' : FV_SKELETON_HTML) +
       '</div>';
     document.body.appendChild(overlay);
 
@@ -6351,7 +6562,7 @@
   ══════════════════════════════════════════════════════════════════════════ */
 
   function renderOpportunity() {
-    var saved = readJson(OPP_KEY, []);
+    var saved = ltFreshHistory(readJson(OPP_KEY, []));
     var d = saved[0] || { hrs: "1", rate: "12", target: "10000000" };
     var tv = readJson(TIMEVALUE_KEY, null);
 
@@ -6392,10 +6603,11 @@
       var years  = months / 12;
 
       saved.unshift({ hrs: hrs, rate: rate * 100, target: target, monthlyInvest: monthlyInvest, years: years, savedAt: new Date().toISOString() });
-      writeJson(OPP_KEY, saved.slice(0, 10));
+      writeJson(OPP_KEY, ltFreshHistory(saved).slice(0, 10));
 
       result.className = "lt-tool-card";
       if (!isFinite(years) || years <= 0) {
+        ltToolActionFail();
         result.innerHTML =
           '<div class="lt-calc-result">' +
             '<small>Time to freedom</small>' +
@@ -6429,7 +6641,7 @@
   ══════════════════════════════════════════════════════════════════════════ */
 
   function renderItemCost() {
-    var saved = readJson(ITEMCOST_KEY, []);
+    var saved = ltFreshHistory(readJson(ITEMCOST_KEY, []));
     var tv = readJson(TIMEVALUE_KEY, null);
     var d = saved[0] || { name: "", price: "" };
 
@@ -6467,7 +6679,9 @@
     function renderHistory() {
       var wrap = activeOverlay.querySelector("[data-lt-itemcost-history]");
       if (!wrap) return;
-      wrap.innerHTML = saved.slice(0, 5).map(function (row) {
+      /* Filter at render time too, so rows that crossed the 10-minute TTL
+         while the tool stayed open disappear on the next refresh. */
+      wrap.innerHTML = ltFreshHistory(saved).slice(0, 5).map(function (row) {
         return '<div class="lt-history-row"><span>' + escapeHtml(row.name || "Item") + ' \u00b7 ' + escapeHtml(money(row.price)) + '</span><strong>' + escapeHtml(fmtHrsMins(row.mins)) + '</strong></div>';
       }).join("");
     }
@@ -6492,6 +6706,7 @@
       var price = Math.max(0, Number(form.querySelector('[name="price"]').value) || 0);
 
       if (price <= 0) {
+        ltToolActionFail();
         result.className = "lt-tool-card lt-empty";
         result.innerHTML = "Enter a valid price above.";
         return;
@@ -6499,7 +6714,7 @@
 
       var mins = price / perMin;
       saved.unshift({ name: name, price: price, mins: mins, savedAt: new Date().toISOString() });
-      writeJson(ITEMCOST_KEY, saved.slice(0, 10));
+      writeJson(ITEMCOST_KEY, ltFreshHistory(saved).slice(0, 10));
 
       result.className = "lt-tool-card";
       result.innerHTML =
@@ -6927,35 +7142,74 @@
     setTimeout(check, 4000);
   })();
 
-  /* ── Save buttons turn green for ~3.5s after a successful save ──
-     Tool forms save synchronously to localStorage, so a submit is always a
-     success. The flash starts one tick later because most tools re-render
-     their innerHTML on save (the button node is replaced by then). */
-  document.addEventListener("submit", function (e) {
+  /* ── Primary tool actions turn green for ~3.5s after they succeed ──
+     Tools save synchronously to localStorage, so a successful action is
+     always confirmed. Covers EVERY confirmation-style label — Save,
+     Save & Calculate, Calculate, Calculate Freedom, Show Time Cost,
+     Add expense, Save Budget … (the old version only matched labels
+     containing "save", so Calculate buttons gave no feedback at all and
+     felt like the tool just refreshed). Most tools re-render their
+     innerHTML on action, so the flash starts one tick later and re-finds
+     the new button by id first, then by its original label. */
+  /* Tools call this when an action FAILS validation (nothing was saved) so
+     the green confirmation flash below is suppressed for that tap. */
+  function ltToolActionFail() {
+    try { window.__ltToolFailStamp = Date.now(); } catch (e) {}
+  }
+
+  document.addEventListener("click", function (e) {
     try {
-      var form = e.target;
-      if (!form || !form.querySelector) return;
-      var probe = form.querySelector("button.lt-tool-primary");
-      if (!probe || probe.disabled) return;
-      if (!/save/i.test((probe.textContent || "").trim())) return;
+      var btn = e.target && e.target.closest && e.target.closest("button.lt-tool-primary");
+      if (!btn || btn.disabled) return;
+      if (!btn.closest("#lt-overlay-root")) return;
+      if (btn.getAttribute("data-lt-flashing")) return;
+      var label = (btn.textContent || "").trim();
+      if (!label || !/save|calculat|show|project|add|apply/i.test(label)) return;
+      btn.setAttribute("data-lt-flashing", "1");
+      var btnId = btn.id;
+      var t0 = Date.now();
       setTimeout(function () {
+        /* A validation failure in the tool's handler (they run right after
+           this capture listener) means nothing was saved — no green flash. */
+        var failAt = 0;
+        try { failAt = Number(window.__ltToolFailStamp) || 0; } catch (err) {}
+        if (failAt >= t0) {
+          if (btn.isConnected) btn.removeAttribute("data-lt-flashing");
+          return;
+        }
         var overlay = document.getElementById("lt-overlay-root");
-        var btn = (overlay && overlay.querySelector("button.lt-tool-primary")) || probe;
-        var label = btn.textContent;
-        var prevBg = btn.style.background;
-        var prevColor = btn.style.color;
-        btn.style.background = "#16A34A";
-        btn.style.color = "#fff";
-        btn.style.boxShadow = "0 6px 18px rgba(22,163,74,.35)";
-        if (/save/i.test(label)) btn.textContent = "Saved \u2713";
+        var next = null;
+        if (btnId) {
+          var byId = document.getElementById(btnId);
+          if (byId && byId.classList.contains("lt-tool-primary") && byId.closest("#lt-overlay-root")) next = byId;
+        }
+        if (!next && overlay) {
+          var cands = overlay.querySelectorAll("button.lt-tool-primary");
+          for (var i = 0; i < cands.length; i++) {
+            if ((cands[i].textContent || "").trim().indexOf(label) === 0) { next = cands[i]; break; }
+          }
+          if (!next && cands.length === 1) next = cands[0];
+        }
+        if (!next) {
+          if (btn.isConnected) btn.removeAttribute("data-lt-flashing");
+          return;
+        }
+        var prevBg = next.style.background, prevColor = next.style.color, prevShadow = next.style.boxShadow;
+        next.setAttribute("data-lt-flashing", "1");
+        next.style.background = "#16A34A";
+        next.style.color = "#fff";
+        next.style.boxShadow = "0 6px 18px rgba(22,163,74,.35)";
+        if (/save/i.test(label)) next.textContent = "Saved \u2713";
+        else next.textContent = label + " \u2713";
         setTimeout(function () {
-          btn.style.background = prevBg;
-          btn.style.color = prevColor;
-          btn.style.boxShadow = "";
-          if (btn.textContent === "Saved \u2713") btn.textContent = label;
+          next.style.background = prevBg;
+          next.style.color = prevColor;
+          next.style.boxShadow = prevShadow;
+          next.textContent = label;
+          next.removeAttribute("data-lt-flashing");
         }, 3500);
       }, 150);
-    } catch (e) {}
+    } catch (e2) {}
   }, true);
 
   function renderStreaksBadges() {

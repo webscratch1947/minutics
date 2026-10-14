@@ -248,17 +248,9 @@ export function SettingsScreen() {
   var setTgTestLoading = _tgTestLoadingState[1];
 
   /* ── handlers ── */
-  /* UI layout editor: hand control back to the shell overlay, which tracks
-     long-press + drop on any [data-lt-move] box and swaps their order. */
-  var openUiEditor = function () {
-    try { window.dispatchEvent(new CustomEvent("lt-ui-editor-open")); } catch (e) {}
-    /* The editor only owns Timer / Activity / Journal — opening it from
-       Settings (or Life Hub) must land the user on the Timer tab. The shell
-       also navigates on the event, but Settings' own handler runs after it
-       and used to snap the route straight back to /settings, so the jump
-       never appeared to happen. Routing here too makes it authoritative. */
-    try { location.hash = "#/"; } catch (e) {}
-  };
+  /* The UI layout editor has been removed entirely (the hold-to-swap drag
+     never worked reliably). Reset below still clears any layout that was
+     saved before the removal so users can go back to the default order. */
   var _layoutResetState = useState(false);
   var layoutReset = _layoutResetState[0];
   var setLayoutReset = _layoutResetState[1];
@@ -471,15 +463,40 @@ export function SettingsScreen() {
   }
 
   /* ── data download / load ── */
+  /* UTF-8 → base64 without deprecated unescape: needed to hand JSON to the
+     native Android bridge (JavascriptInterface only accepts simple types). */
+  function utf8ToBase64(str) {
+    var bytes = new TextEncoder().encode(str);
+    var bin = "";
+    var CHUNK = 0x8000;
+    for (var i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(bin);
+  }
+
   function handleDownloadData() {
     if (!isPro) { alert("This feature is only available for the 1 Year Plan."); return; }
     try {
       var backup = buildBackup();
-      var blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+      var json = JSON.stringify(backup);
+      var fname = "minutics-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+      /* Android WebView ignores <a download> entirely (the file never
+         reaches the device). Hand the payload to the native bridge, which
+         writes it straight into the Downloads folder. */
+      try {
+        var bridge = window.AndroidBridge;
+        if (bridge && typeof bridge.downloadFile === "function") {
+          bridge.downloadFile("data:application/json;base64," + utf8ToBase64(json), "application/json", fname);
+          alert("Backup saved to your Downloads folder as:\n" + fname);
+          return;
+        }
+      } catch (eb) {}
+      var blob = new Blob([json], { type: "application/json" });
       var url = URL.createObjectURL(blob);
       var a = document.createElement("a");
       a.href = url;
-      a.download = "minutics-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.download = fname;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -711,7 +728,7 @@ export function SettingsScreen() {
       }),
 
       /* ─── Goal Type ─── */
-      /* ── UI Layout Editor ── */
+      /* ── Saved layout reset (editor removed) ── */
       jsxs("div", {
         className: "mx-4",
         children: [
@@ -726,23 +743,18 @@ export function SettingsScreen() {
                     children: "\uD83C\uDFA1"
                   }),
                   jsxs("div", { className: "min-w-0 flex-1", children: [
-                    jsx("p", { className: "text-sm font-bold text-foreground", children: "UI Layout Editor" }),
+                    jsx("p", { className: "text-sm font-bold text-foreground", children: "Layout" }),
                     jsx("p", {
                       className: "mt-1 text-xs leading-relaxed text-muted-foreground",
-                      children: "Hold a box, drop it on another to swap \u2014 same size, same line. Timer, Activity and Journal tabs only; saved on this device."
+                      children: "A layout you arranged earlier is still applied on this device. Reset returns every screen to the default order."
                     })
                   ]})
                 ]}),
                 jsxs("div", { className: "mt-3.5 flex items-center gap-2", children: [
                   jsx("button", {
-                    onClick: openUiEditor,
-                    className: "h-10 flex-1 rounded-full bg-primary text-primary-foreground text-xs font-black tracking-wide transition active:scale-[.97]",
-                    children: "Open editor"
-                  }),
-                  jsx("button", {
                     onClick: resetUiLayout,
-                    className: "h-10 min-w-[78px] rounded-full border border-border bg-background px-4 text-xs font-bold text-muted-foreground transition active:scale-[.97]",
-                    children: layoutReset ? "Reset \u2713" : "Reset"
+                    className: "h-10 flex-1 rounded-full border border-border bg-background px-4 text-xs font-bold text-muted-foreground transition active:scale-[.97]",
+                    children: layoutReset ? "Reset \u2713" : "Reset layout"
                   })
                 ]})
               ]
