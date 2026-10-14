@@ -1607,11 +1607,7 @@
       ".lt-fv-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid hsl(var(--primary));color:#fff;background:hsl(var(--primary));border-radius:999px;padding:5px 11px;font-size:11px;font-weight:800;letter-spacing:.02em;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;flex-shrink:0;box-shadow:0 1px 3px rgba(17,17,20,.18)}",
       ".lt-fv-btn:active{opacity:.75;transform:scale(.97)}",
       "#lt-fv-modal-overlay,#lt-fv-report-overlay,#lt-fv-share-overlay{position:fixed;inset:0;z-index:2147483200;background:#FDFBF7;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:0 0 40px;-webkit-overflow-scrolling:touch}",
-      "#lt-fv-modal-overlay,#lt-fv-share-overlay{animation:lt-tool-in .3s cubic-bezier(.22,.61,.36,1)}",
-      /* The report opens instantly (no slide) so the day-row expand/collapse
-         that happens behind it during the scrape can never flash through a
-         transparent, animating-in overlay. */
-      "#lt-fv-report-overlay{opacity:1}",
+      "#lt-fv-modal-overlay,#lt-fv-share-overlay,#lt-fv-report-overlay{animation:lt-tool-in .3s cubic-bezier(.22,.61,.36,1)}",
       "#lt-fv-modal-overlay.lt-fv-out,#lt-fv-report-overlay.lt-fv-out,#lt-fv-share-overlay.lt-fv-out{animation:lt-tool-out .24s ease-in forwards;pointer-events:none}",
       ".lt-fv-modal-head{position:sticky;top:0;z-index:2;width:100%;max-width:480px;display:flex;align-items:center;gap:10px;padding:14px 16px 10px;background:#FDFBF7;box-sizing:border-box}",
       ".lt-fv-back{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid rgba(55,48,163,.18);background:#fff;color:#3730A3;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(55,48,163,.08);-webkit-tap-highlight-color:transparent}",
@@ -2806,10 +2802,16 @@
     } catch (e) {}
   }
 
-  function toolHeader(title, description) {
+  function toolHeader(title, description, backId) {
+    /* backId: optional. Sub-pages (e.g. 6 Jars → Monthly Salary / Jar
+       Settings) pass an id here so their ← Back steps back ONE level instead
+       of the default data-lt-action="close" which tears down the whole tool. */
+    var backAttrs = backId
+      ? 'id="' + backId + '"'
+      : 'data-lt-action="close"';
     return (
       '<div class="lt-tool-top">' +
-        '<button class="lt-tool-close" data-lt-action="close">\u2190 Back</button>' +
+        '<button class="lt-tool-close" ' + backAttrs + '>\u2190 Back</button>' +
         '<div>' +
           '<p class="lt-tool-kicker">Life Hub</p>' +
           '<h1 class="lt-tool-heading">' + escapeHtml(title) + '</h1>' +
@@ -5870,7 +5872,13 @@
 
   function injectJournalFullView() {
     var pathCheck = location.pathname + location.hash;
-    if (pathCheck.indexOf("journal") === -1) return;
+    if (pathCheck.indexOf("journal") === -1) {
+      /* Also allow a live peek copy of the Journal (hold-slide preview). */
+      try {
+        var _pv = document.querySelector("[data-lt-peek]");
+        if (!_pv || (_pv.getAttribute("data-lt-peek") || "").indexOf("journal") === -1) return;
+      } catch (e) { return; }
+    }
     var rows = fvFindDateRows();
     var limit = isPro() ? proJournalDays() : FREE_JOURNAL_DAYS;
     rows.forEach(function (row, idx) {
@@ -8058,7 +8066,7 @@
     var current = getJarsSalary();
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
-        toolHeader("Monthly Salary", "Used only for 6 Jars \u2014 separate from the Time Value Calculator.") +
+        toolHeader("Monthly Salary", "Used only for 6 Jars \u2014 separate from the Time Value Calculator.", "lt-jars-salary-back") +
         '<div class="lt-tool-card">' +
           '<label class="lt-form-label" for="lt-jars-salary-input">Monthly salary</label>' +
           '<input id="lt-jars-salary-input" class="lt-form-input" type="number" inputmode="decimal" min="0" step="1" placeholder="e.g. 50000" value="' + (current ? current : "") + '"/>' +
@@ -8072,6 +8080,9 @@
     var input = document.getElementById("lt-jars-salary-input");
     var saveBtn = document.getElementById("lt-jars-salary-save");
     var cancelBtn = document.getElementById("lt-jars-salary-cancel");
+    var backBtn = document.getElementById("lt-jars-salary-back");
+    /* ← Back steps back into 6 Jars instead of closing the whole tool. */
+    if (backBtn) backBtn.addEventListener("click", renderSixJars);
     if (input) setTimeout(function () { input.focus(); }, 50);
     if (cancelBtn) cancelBtn.addEventListener("click", renderSixJars);
     if (saveBtn) saveBtn.addEventListener("click", function () {
@@ -8283,6 +8294,16 @@
     var onTimerOrActivity = onHome || onActivity || location.pathname === "/";
     var onLifeHub = p.indexOf("/life-hub") !== -1 || p.indexOf("/timeline") !== -1;
     var onJournal = p.indexOf("/journal") !== -1;
+    /* During a hold-slide swipe, a peek copy of the target page is mounted
+       before the route commits. If that peek is the Journal, treat it as the
+       journal page so its Full view buttons inject into the live preview too
+       (otherwise the peeked Journal was missing its Full view pill). */
+    if (!onJournal) {
+      try {
+        var _peekPane = document.querySelector("[data-lt-peek]");
+        if (_peekPane && (_peekPane.getAttribute("data-lt-peek") || "").indexOf("journal") !== -1) onJournal = true;
+      } catch (e) {}
+    }
     /* One-time setup — always run */
     safeRun(migrateOldProPlan);
     safeRun(checkPlanExpiry);

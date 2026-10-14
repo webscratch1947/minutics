@@ -298,9 +298,13 @@ function uiSwapBoxes(a, b) {
   st = uiOrderNormalize(st);
   const ea = uiOrderEff(a, st);
   const eb = uiOrderEff(b, st);
-  store[a.getAttribute('data-lt-move')] = eb;
-  store[b.getAttribute('data-lt-move')] = ea;
-  uiOrderWrite(store);
+  /* BUG FIX: these used to write to `store`, which is not in scope here —
+     the normalized copy lives in `st`. That ReferenceError was swallowed by
+     the drop handler's try/catch, so the swap silently did nothing (the
+     "swap doesn't work at all" report). Write to `st` and persist it. */
+  st[a.getAttribute('data-lt-move')] = eb;
+  st[b.getAttribute('data-lt-move')] = ea;
+  uiOrderWrite(st);
 }
 
 function uiEditorBind() {
@@ -710,6 +714,11 @@ export function ak({ profile }) {
           peek ? jsx('div', {
             key: 'peek-' + peek,
             ref: peekRef,
+            /* Mark the peeked route so enhancements (e.g. Journal Full view
+               buttons) know a copy of that page is live even before the route
+               actually commits — otherwise the peeked Journal looked incomplete
+               (no Full view pill) during the hold-slide. */
+            'data-lt-peek': peek,
             className: 'absolute inset-0 pointer-events-none overflow-hidden',
             style: {
               transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
