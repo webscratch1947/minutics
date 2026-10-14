@@ -163,8 +163,10 @@ function AppRoutes({ profile, location }) {
 const UI_ORDER_KEY = 'lt_ui_order_v1';
 const UI_LAYOUT_KEY = 'lt_ui_layout_v1'; // legacy absolute-position store
 /* One-time cleanup: anyone who used the old free-position editor gets a
-   clean default layout back. */
+   clean default layout back. The ORDER store goes with it — no editor
+   exists anymore, so a remembered order is a trap (nobody can fix it). */
 try { localStorage.removeItem(UI_LAYOUT_KEY); } catch (e) {}
+try { localStorage.removeItem(UI_ORDER_KEY); } catch (e) {}
 
 function uiOrderRead() {
   try {
@@ -549,23 +551,12 @@ export function ak({ profile }) {
     if (peekRef.current) peekRef.current.style.transform = 'translateX(' + (x + (x > 0 ? -w : w)) + 'px)';
   };
 
-  /* ── UI layout editor: REMOVED ────────────────────────────────────────
+  /* ── UI layout editor: REMOVED (fully) ──────────────────────────────────
      The hold-and-drop swap never worked reliably (drops landed in the
-     wrong slot, boxes flashed before swapping), and the decision was to
-     drop the editor entirely rather than ship a half-broken drag mode.
-     Any layout the user already saved on this device keeps being applied
-     by applyUiLayout below — only the editing affordance is gone. */
-  useEffect(() => {
-    applyUiLayout();
-    const iv = setInterval(applyUiLayout, 1600);
-    const onRoute = () => setTimeout(applyUiLayout, 0);
-    window.addEventListener('lt-route-change', onRoute);
-    return () => {
-      clearInterval(iv);
-      window.removeEventListener('lt-route-change', onRoute);
-      document.body.classList.remove('lt-ui-editing');
-    };
-  }, []);
+     wrong slot, boxes flashed before swapping), so the editor was dropped
+     entirely — and with no editor there is nothing to keep applying or
+     reset: applyUiLayout's interval/route loop is gone and the saved
+     order store is wiped once at startup (UI_ORDER_KEY below). */
 
   const glideTRef = useRef(null);
   const glideTargetRef = useRef(null);

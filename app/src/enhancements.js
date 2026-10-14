@@ -1,4 +1,9 @@
-﻿(function () {
+﻿/* The app's DEFAULT emoji data (Home.js LTEmojiPicker) — the routine/task
+   emoji bar must be this same full set with the same categories/recents,
+   never a short hand-picked list. */
+import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.js";
+
+(function () {
   "use strict";
 
   /* ── Startup loading screen ────────────────────────────────────────────
@@ -174,6 +179,7 @@
   var gramCurrentId   = null;   /* which infographic's comments are open */
   var routineEditingId = null;  /* which routine item the sheet is editing, null = adding new */
   var routineEditingEmoji = ""; /* pending emoji picked in the edit sheet (kept until Save) */
+  var taskDraftEmoji = ""; /* emoji chosen in the New Task sheet (kept until Add) */
   var _routineMidnightTimer = null; /* re-renders the tool if the date rolls over while it's open */
   var catModalRoot     = null;  /* category-selection popup element */
   var catModalMinutes  = 0;
@@ -1404,25 +1410,39 @@
          button (top-right) so the cross never sits on top of the text. */
       ".lt-routine-namewrap{display:flex;align-items:center;gap:9px;margin-bottom:12px}",
       ".lt-routine-namewrap .lt-routine-name-input{flex:1;min-width:0;margin-bottom:0}",
+      ".lt-routine-namewrap .lt-tasks-sheet-main{flex:1;min-width:0;margin-bottom:0}",
       ".lt-routine-draftrow .lt-routine-name-input{padding-right:44px}",
       ".lt-routine-emoji{flex-shrink:0;width:46px;height:46px;border-radius:14px;border:1.5px dashed hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--muted-foreground));font-size:19px;font-weight:800;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:inherit;padding:0;-webkit-tap-highlight-color:transparent;transition:transform .1s ease,background .15s ease}",
       ".lt-routine-emoji:active{transform:scale(.93);background:hsl(var(--border))}",
       ".lt-sheet-head-icon-btn{cursor:pointer;font-family:inherit;padding:0;appearance:none;-webkit-appearance:none;-webkit-tap-highlight-color:transparent;transition:transform .1s ease}",
       ".lt-sheet-head-icon-btn:active{transform:scale(.93)}",
       /* Emoji picker dialog */
-      ".lt-emoji-pop-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:24px;animation:lt-emoji-pop-in .16s ease}",
-      ".lt-emoji-pop{width:min(330px,100%);background:hsl(var(--card));border-radius:22px;padding:18px 16px 16px;box-shadow:0 20px 50px rgba(0,0,0,.35);box-sizing:border-box}",
-      ".lt-emoji-pop-title{font-size:13px;font-weight:800;text-align:center;color:hsl(var(--muted-foreground));margin:0 0 12px}",
-      ".lt-emoji-pop-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}",
-      ".lt-emoji-pop-grid button{font-size:21px;padding:7px 0;border:none;border-radius:11px;background:hsl(var(--muted));cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .08s ease}",
+      /* The DEFAULT emoji bar (mirrors Home.js LTEmojiPicker: bottom sheet,
+         search, category tab bar with recents, 8-col grid) — fed by the same
+         LT_EMOJIS data and the same lt_recent_emojis recents store. */
+      ".lt-emoji-pop-overlay{position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;padding:0;animation:lt-emoji-pop-in .16s ease}",
+      "@keyframes lt-emoji-pop-in{from{opacity:0}to{opacity:1}}",
+      ".lt-emoji-pop{width:min(480px,100%);max-height:80vh;background:hsl(var(--card));border-radius:26px 26px 0 0;padding:8px 0 calc(14px + env(safe-area-inset-bottom, 0px));box-shadow:0 -8px 34px rgba(0,0,0,.25);box-sizing:border-box;display:flex;flex-direction:column}",
+      ".lt-emoji-pop-handle{width:42px;height:5px;background:rgba(17,17,20,.16);border-radius:3px;margin:0 auto 10px;flex-shrink:0}",
+      ".lt-emoji-pop-search{flex-shrink:0;width:calc(100% - 32px);margin:0 16px 8px;box-sizing:border-box;background:hsl(var(--muted));border:none;border-radius:999px;padding:10px 16px;font:inherit;font-size:14px;font-weight:600;outline:none;color:hsl(var(--foreground));caret-color:hsl(var(--primary))}",
+      ".lt-emoji-pop-search::placeholder{color:hsl(var(--muted-foreground));font-weight:500}",
+      ".lt-emoji-pop-tabs{flex-shrink:0;display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid hsl(var(--border));padding:0 8px;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}",
+      ".lt-emoji-pop-tabs::-webkit-scrollbar{display:none}",
+      ".lt-emoji-pop-tab{flex:0 0 auto;width:42px;height:40px;font-size:18px;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;transition:border-color .12s ease}",
+      ".lt-emoji-pop-tab.active{border-bottom-color:hsl(var(--primary))}",
+      ".lt-emoji-pop-gridwrap{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 10px 6px;max-height:54vh}",
+      ".lt-emoji-pop-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}",
+      ".lt-emoji-pop-grid button{font-size:20px;height:36px;border:none;border-radius:9px;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent;font-family:inherit;padding:0;transition:transform .08s ease}",
+      ".lt-emoji-pop-grid button.active{background:hsl(var(--muted))}",
       ".lt-emoji-pop-grid button:active{transform:scale(.88);background:hsl(var(--border))}",
-      ".lt-emoji-pop-remove{margin-top:12px;width:100%;padding:10px;border-radius:11px;border:1px solid hsl(var(--border));background:transparent;color:hsl(var(--muted-foreground));font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}",
-      ".lt-emoji-pop-remove:active{opacity:.7}",
+      ".lt-emoji-pop-empty{text-align:center;font-size:13px;color:hsl(var(--muted-foreground));margin:0;padding:20px 0;font-weight:600}",
       "#lt-routine-sheet .lt-tasks-sheet-title{font-size:18px;letter-spacing:0;text-transform:none;font-weight:800;color:hsl(var(--foreground));margin-bottom:16px}",
       ".lt-routine-name-input{font-size:16px;width:100%;border:1.5px solid hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--foreground));font-family:inherit;font-weight:700;padding:13px 14px;border-radius:14px;outline:none;caret-color:hsl(var(--primary));margin-bottom:12px;box-sizing:border-box;transition:border-color .15s}",
       ".lt-routine-name-input:focus{border-color:#111114}",
       ".lt-routine-name-input::placeholder{color:hsl(var(--muted-foreground));font-weight:600}",
-      ".lt-routine-sheet-timerow{display:flex;align-items:flex-end;gap:10px;margin:0}",
+      /* Start/End STACKED (up/down, full width) — side-by-side squeezed the
+         time label into a truncating half-width box ("5:00 …"). */
+      ".lt-routine-sheet-timerow{display:flex;flex-direction:column;align-items:stretch;gap:12px;margin:0}",
       ".lt-routine-timefield{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}",
       ".lt-routine-timefield-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:hsl(var(--muted-foreground));padding-left:3px}",
       ".lt-routine-addanother{width:100%;display:flex;align-items:center;justify-content:center;gap:6px;background:hsl(var(--muted));border:1.5px dashed hsl(var(--border));color:#0369A1;border-radius:14px;padding:12px;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;margin:4px 0 14px;-webkit-tap-highlight-color:transparent;transition:opacity .15s}",
@@ -4047,7 +4067,7 @@
       '<div class="lt-task-item' + (overdue ? ' lt-task-overdue' : '') + '">' +
         '<button class="lt-task-check' + (t.completed ? ' lt-task-checked' : '') + (overdue ? ' lt-task-check-overdue' : '') + '" data-task-toggle="' + t.id + '">' + checkIcon + '</button>' +
         '<div class="lt-task-body" data-task-expand="' + t.id + '">' +
-          '<span class="lt-task-title' + (t.completed ? ' lt-task-done' : '') + '">' + escapeHtml(t.title) + '</span>' +
+          '<span class="lt-task-title' + (t.completed ? ' lt-task-done' : '') + '">' + (t.emoji ? escapeHtml(t.emoji) + ' ' : '') + escapeHtml(t.title) + '</span>' +
           (dl ? '<span class="lt-task-date' + (overdue ? ' lt-overdue' : '') + '">' + dl + '</span>' : '') +
           queuedBadge +
           (t.notes ? '<span class="lt-task-notes">' + escapeHtml(t.notes) + '</span>' : '') +
@@ -4451,42 +4471,93 @@
     );
   }
 
-  /* ── Routine emoji picker ────────────────────────────────────────────────
-     Every routine row (and the sheet header) gets a tappable emoji slot.
-     Picking writes into the draft row / pending edit and refreshes ONLY the
-     sheet, so the list behind stays mounted. */
-  var ROUTINE_EMOJIS = [
-    "\u23F0","\u{1F3CB}\uFE0F","\u{1F4DA}","\u{1F9D8}","\u{1F4BC}","\u{1F373}",
-    "\u{1F6B6}","\u{1F6CF}\uFE0F","\u{1F4C5}","\u{1F4DD}","\u{1F3AF}","\u{1F4AA}",
-    "\u{1F9E0}","\u{1F3B8}","\u{1FAB4}","\u{1F9F9}","\u{1F6D2}","\u{1F4DE}",
-    "\u{1F3C3}","\u{1F34E}","\u{1F52C}","\u{1F680}","\u{1F31F}","\u{1F514}",
-    "\u{1F4F7}","\u{1F3AC}","\u{1F6BF}","\u{1F91D}","\u{1F9E2}","\u{1F4A1}",
-    "\u{1F6A8}","\u{1F30D}"
-  ];
-
-  function openRoutineEmojiPicker(onPick) {
+  /* ── The app's DEFAULT emoji bar ─────────────────────────────────────────
+     Same data as Home.js's LTEmojiPicker (LT_EMOJIS + EMOJI_CATEGORIES +
+     keyword search + the shared lt_recent_emojis recents), same bottom-sheet
+     chrome — so routine/task emoji picking is THE picker users already know,
+     with the full emoji set instead of a short custom list. */
+  function openRoutineEmojiPicker(onPick, current) {
     var old = document.getElementById("lt-emoji-pop-overlay");
     if (old) old.remove();
+    var recents = [];
+    try { recents = JSON.parse(localStorage.getItem("lt_recent_emojis") || "[]"); } catch (e) { recents = []; }
+    if (!Array.isArray(recents)) recents = [];
+    /* Land on Smileys when there's no history yet — an empty Recents tab as
+       the first view reads as "the emoji bar is broken". */
+    var activeCat = recents.length ? 0 : 1;
+    var query = "";
+
     var overlay = document.createElement("div");
     overlay.id = "lt-emoji-pop-overlay";
     overlay.className = "lt-emoji-pop-overlay";
     overlay.innerHTML =
-      '<style>@keyframes lt-emoji-pop-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}</style>' +
       '<div class="lt-emoji-pop" role="dialog" aria-label="Pick an emoji">' +
-        '<p class="lt-emoji-pop-title">Pick an emoji for this routine</p>' +
-        '<div class="lt-emoji-pop-grid">' +
-          ROUTINE_EMOJIS.map(function (em) {
-            return '<button type="button" data-emoji-pick="' + em + '">' + em + '</button>';
-          }).join("") +
+        '<div class="lt-emoji-pop-handle"></div>' +
+        '<input class="lt-emoji-pop-search" type="text" placeholder="Search emoji" aria-label="Search emoji">' +
+        '<div class="lt-emoji-pop-tabs"></div>' +
+        '<div class="lt-emoji-pop-gridwrap">' +
+          '<div class="lt-emoji-pop-grid"></div>' +
+          '<p class="lt-emoji-pop-empty" style="display:none"></p>' +
         '</div>' +
-        '<button type="button" class="lt-emoji-pop-remove" data-emoji-pick="">Remove emoji</button>' +
       '</div>';
     document.body.appendChild(overlay);
+
+    var searchEl = overlay.querySelector(".lt-emoji-pop-search");
+    var tabsEl = overlay.querySelector(".lt-emoji-pop-tabs");
+    var gridEl = overlay.querySelector(".lt-emoji-pop-grid");
+    var emptyEl = overlay.querySelector(".lt-emoji-pop-empty");
+
+    function catList(idx) {
+      if (idx === 0) return recents; /* Recent tab — same store as LTEmojiPicker */
+      var cat = EMOJI_CATEGORIES[idx];
+      return (cat && cat.emojis) || [];
+    }
+    function renderTabs() {
+      tabsEl.innerHTML = EMOJI_CATEGORIES.map(function (cat, idx) {
+        return '<button type="button" class="lt-emoji-pop-tab' + (idx === activeCat ? " active" : "") +
+          '" data-cat="' + idx + '" aria-label="' + escapeHtml(cat.name) + '">' + cat.icon + "</button>";
+      }).join("");
+    }
+    function renderGrid() {
+      var list;
+      var q = query.trim().toLowerCase();
+      if (q) {
+        list = LT_EMOJIS.filter(function (em) {
+          return em.indexOf(query.trim()) !== -1 || (LT_EMOJI_KEYWORDS[em] || "").indexOf(q) !== -1;
+        });
+      } else {
+        list = catList(activeCat);
+      }
+      if (!list.length) {
+        gridEl.innerHTML = "";
+        emptyEl.textContent = q ? "No results" : "No recent emoji";
+        emptyEl.style.display = "";
+        return;
+      }
+      emptyEl.style.display = "none";
+      gridEl.innerHTML = list.map(function (em) {
+        return '<button type="button" class="lt-emoji-pop-cell' + (em === current ? " active" : "") +
+          '" data-emoji-pick="' + em + '">' + em + "</button>";
+      }).join("");
+    }
+    renderTabs();
+    renderGrid();
+
+    searchEl.addEventListener("input", function () { query = searchEl.value; renderGrid(); });
     overlay.addEventListener("click", function (e) {
       if (e.target === overlay) { overlay.remove(); return; }
+      var tab = e.target.closest("[data-cat]");
+      if (tab) {
+        activeCat = Number(tab.getAttribute("data-cat")) || 0;
+        query = ""; searchEl.value = "";
+        renderTabs(); renderGrid();
+        return;
+      }
       var pick = e.target.closest("[data-emoji-pick]");
       if (pick) {
         var em = pick.getAttribute("data-emoji-pick") || "";
+        recents = [em].concat(recents.filter(function (x) { return x !== em; })).slice(0, 24);
+        try { localStorage.setItem("lt_recent_emojis", JSON.stringify(recents)); } catch (e2) {}
         overlay.remove();
         if (onPick) onPick(em);
       }
@@ -4525,9 +4596,8 @@
     var multi = routineDraftRows.length > 1;
     return (
       '<div class="lt-sheet-head">' +
-        '<button type="button" class="lt-sheet-head-icon lt-sheet-head-icon-btn" data-emoji-target="head" aria-label="Pick an emoji">' +
-          ((routineDraftRows[0].emoji) || "\u2795") +
-        '</button>' +
+        /* Plain icon (NOT a second emoji entry — one emoji slot per row only) */
+        '<div class="lt-sheet-head-icon">' + (routineDraftRows[0].emoji || "\uD83D\uDD52") + '</div>' +
         '<div><p class="lt-sheet-head-title">New Routine' + (multi ? 's' : '') + '</p>' +
         '<p class="lt-sheet-head-sub">Add one or more time slots for today</p></div>' +
       '</div>' +
@@ -4650,16 +4720,22 @@
         clockFieldStep(stepEl.closest(".lt-clock-field"), Number(stepEl.getAttribute("data-clock-step")) || 0);
         return;
       }
-      /* Emoji slot: header ➕, per-row slot, or the edit sheet's slot. */
+      /* Emoji slot: the per-row slot (draft) or the edit sheet's slot. */
       var emojiBtn = e.target.closest("[data-emoji-target]");
       if (emojiBtn) {
         syncRoutineDraftFromDom();
         var emKind = emojiBtn.getAttribute("data-emoji-target");
-        if (emKind === "edit" || (emKind === "head" && routineEditingId)) {
+        if (emKind === "edit") {
+          var emEditing = routineEditingId
+            ? (routineItems().find(function (i) { return i.id === routineEditingId; }) || {}).emoji
+            : "";
           openRoutineEmojiPicker(function (em) {
             routineEditingEmoji = em;
+            /* Update the tapped slot IMMEDIATELY — the picked emoji must be
+               visible in the sheet the moment it's chosen, not after close. */
+            emojiBtn.textContent = em || "+";
             refreshRoutineSheet();
-          });
+          }, routineEditingEmoji || emEditing || "");
         } else {
           var emUid = emojiBtn.getAttribute("data-emoji-uid") ||
             (routineDraftRows && routineDraftRows[0] && routineDraftRows[0].uid);
@@ -4668,8 +4744,9 @@
             openRoutineEmojiPicker(function (em) {
               syncRoutineDraftFromDom();
               emRow.emoji = em;
+              emojiBtn.textContent = em || "+";
               refreshRoutineSheet();
-            });
+            }, emRow.emoji || "");
           }
         }
         return;
@@ -4910,7 +4987,10 @@
           '<div><p class="lt-sheet-head-title">New Task</p>' +
           '<p class="lt-sheet-head-sub">Name it and set an optional deadline</p></div>' +
         '</div>' +
-        '<input id="lt-task-name" class="lt-tasks-sheet-main" type="text" placeholder="Task name\u2026">' +
+        '<div class="lt-routine-namewrap" style="margin-bottom:14px">' +
+          '<button type="button" class="lt-routine-emoji" id="lt-task-emoji-btn" aria-label="Pick an emoji">\u2795</button>' +
+          '<input id="lt-task-name" class="lt-tasks-sheet-main" type="text" placeholder="Task name\u2026">' +
+        '</div>' +
         '<div class="lt-sheet-group" id="lt-task-deadline-group">' +
           '<div class="lt-sheet-group-title"><span>Deadline</span><button type="button" class="lt-sheet-group-clear" id="lt-task-deadline-clear">Clear</button></div>' +
           '<div class="lt-tasks-sheet-row">' +
@@ -4946,6 +5026,16 @@
       var stepEl = e.target.closest("[data-clock-step]");
       if (stepEl) {
         clockFieldStep(stepEl.closest(".lt-clock-field"), Number(stepEl.getAttribute("data-clock-step")) || 0);
+        return;
+      }
+      /* Emoji slot → the app's DEFAULT emoji bar (same one routines use) */
+      var taskEmojiBtn = e.target.closest("#lt-task-emoji-btn");
+      if (taskEmojiBtn) {
+        openRoutineEmojiPicker(function (em) {
+          taskDraftEmoji = em || "";
+          var b = document.getElementById("lt-task-emoji-btn");
+          if (b) b.textContent = taskDraftEmoji || "\u2795";
+        }, taskDraftEmoji);
         return;
       }
       /* Clock-face time picker for the Task sheet's Time field */
@@ -5036,12 +5126,14 @@
         var notesEl = document.getElementById("lt-task-notes");
         upsertTask({
           id: genId(), title: title,
+          emoji: taskDraftEmoji || "",
           date:  (dateEl && dateEl.value) ? dateEl.value : null,
           time:  taskTimeVal || null,
           notes: (notesEl && notesEl.value.trim()) || "",
           completed: false,
           createdAt: new Date().toISOString()
         });
+        taskDraftEmoji = "";
         renderTasks(); /* re-renders with new task and closes sheet */
         return;
       }
@@ -6076,6 +6168,11 @@
      Full view never visibly opens the day's dropdown. */
   function fvOpenReportModal(dateText, activities) {
     var pendingActivities = Array.isArray(activities) ? activities : null;
+    /* A previous report may still be in the DOM mid-close-animation — two
+       overlays would share the fill target's id and the VISIBLE one would
+       never fill (stuck skeleton). Never stack reports. */
+    var staleReport = document.getElementById("lt-fv-report-overlay");
+    if (staleReport && staleReport.parentNode) staleReport.parentNode.removeChild(staleReport);
     var overlay = document.createElement("div");
     overlay.id = "lt-fv-report-overlay";
     overlay.innerHTML =
@@ -6119,7 +6216,9 @@
             );
           }).join("")
         : '<div class="lt-empty">No activity tagged on this day yet.</div>';
-      var body = document.getElementById("lt-fv-report-body");
+      /* Scoped to THIS overlay — a global getElementById could hand back a
+         different (closing) report's body and fill would land off-screen. */
+      var body = overlay.querySelector("#lt-fv-report-body");
       if (!body) return;
       body.innerHTML =
         '<div class="lt-fv-report-card">' +
@@ -6138,8 +6237,21 @@
           '<button id="lt-fv-report-share-btn">Share</button>' +
         '</div>';
     };
-    if (pendingActivities !== null) fill(pendingActivities);
-    return fill;
+    /* Fill exactly once, and never let the skeleton outlive it: whatever
+       happens to the scrape behind the overlay (row detached, React error,
+       slow expansion), a watchdog fills a safe empty report within 3.5s. */
+    var didFill = false;
+    var fillOnce = function (raw) {
+      if (didFill) return;
+      didFill = true;
+      try { fill(raw); } catch (e) {
+        var fb = overlay.querySelector("#lt-fv-report-body");
+        if (fb) fb.innerHTML = '<div class="lt-empty">Couldn\u2019t load this report \u2014 go back and try again.</div>';
+      }
+    };
+    setTimeout(function () { if (!didFill) fillOnce([]); }, 3500);
+    if (pendingActivities !== null) fillOnce(pendingActivities);
+    return fillOnce;
   }
 
   /* Stage 2: builds the visiting-card-shaped image and offers Share/Save
@@ -6233,10 +6345,12 @@
            on screen meanwhile. */
         var fill = fvOpenReportModal(dateText, null);
         setTimeout(function () {
-          fvScrapeJournalDay(row.button, function (activities) {
-            activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
-            fill(activities);
-          });
+          try {
+            fvScrapeJournalDay(row.button, function (activities) {
+              activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
+              fill(activities);
+            });
+          } catch (err) { fill([]); } /* scrape must never strand the skeleton */
         }, 340);
       });
       if (rightGroup && rightGroup.lastElementChild) host.insertBefore(btn, rightGroup.lastElementChild);

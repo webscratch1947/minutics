@@ -248,20 +248,9 @@ export function SettingsScreen() {
   var setTgTestLoading = _tgTestLoadingState[1];
 
   /* ── handlers ── */
-  /* The UI layout editor has been removed entirely (the hold-to-swap drag
-     never worked reliably). Reset below still clears any layout that was
-     saved before the removal so users can go back to the default order. */
-  var _layoutResetState = useState(false);
-  var layoutReset = _layoutResetState[0];
-  var setLayoutReset = _layoutResetState[1];
-  var resetUiLayout = function () {
-    try {
-      localStorage.removeItem("lt_ui_order_v1");
-      localStorage.removeItem("lt_ui_layout_v1");
-    } catch (e) {}
-    setLayoutReset(true);
-    setTimeout(function () { setLayoutReset(false); }, 1500);
-  };
+  /* The layout editor AND its Settings entry (Layout card / Reset button)
+     are both gone — no editor means nothing to reset. Stale saved layouts
+     are cleared once at startup in _slice_shell.js. */
 
   function handleCurrencyChange(code) {
     setSelectedCurrencyCode(code);
@@ -728,41 +717,6 @@ export function SettingsScreen() {
       }),
 
       /* ─── Goal Type ─── */
-      /* ── Saved layout reset (editor removed) ── */
-      jsxs("div", {
-        className: "mx-4",
-        children: [
-          jsx(SectionHeader, { children: "Layout" }),
-          jsx(Card, {
-            children: jsxs("div", {
-              className: "p-4",
-              children: [
-                jsxs("div", { className: "flex items-start gap-3", children: [
-                  jsx("span", {
-                    className: "flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg",
-                    children: "\uD83C\uDFA1"
-                  }),
-                  jsxs("div", { className: "min-w-0 flex-1", children: [
-                    jsx("p", { className: "text-sm font-bold text-foreground", children: "Layout" }),
-                    jsx("p", {
-                      className: "mt-1 text-xs leading-relaxed text-muted-foreground",
-                      children: "A layout you arranged earlier is still applied on this device. Reset returns every screen to the default order."
-                    })
-                  ]})
-                ]}),
-                jsxs("div", { className: "mt-3.5 flex items-center gap-2", children: [
-                  jsx("button", {
-                    onClick: resetUiLayout,
-                    className: "h-10 flex-1 rounded-full border border-border bg-background px-4 text-xs font-bold text-muted-foreground transition active:scale-[.97]",
-                    children: layoutReset ? "Reset \u2713" : "Reset layout"
-                  })
-                ]})
-              ]
-            })
-          })
-        ]
-      }),
-
       jsxs("div", {
         className: "mx-4",
         children: [

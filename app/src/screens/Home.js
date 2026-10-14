@@ -98,7 +98,9 @@ function LTDailyValueBar() {
 // Stores recent emojis in localStorage "lt_recent_emojis" (max 24).
 
 // Complete list of 198 emojis with correct Unicode
-const LT_EMOJIS = [
+// (exported so enhancements.js reuses THIS default set for the routine/task
+//  emoji bar instead of shipping its own short custom list)
+export const LT_EMOJIS = [
   // Smileys (indices 0-47)
   '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
   '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩',
@@ -137,7 +139,7 @@ const LT_EMOJIS = [
 ];
 
 // Keyword mapping for emoji search — correct emoji keys
-const LT_EMOJI_KEYWORDS = {
+export const LT_EMOJI_KEYWORDS = {
   '😀': 'grinning happy',
   '😃': 'grinning happy joy',
   '😄': 'smile happy joy',
@@ -338,7 +340,7 @@ const LT_EMOJI_KEYWORDS = {
 };
 
 // Category definitions for the emoji picker
-const EMOJI_CATEGORIES = [
+export const EMOJI_CATEGORIES = [
   { name: 'Recent',  icon: '🕒', list: null }, // populated from state
   { name: 'Smileys', icon: '😀', emojis: LT_EMOJIS.slice(0, 48) },
   { name: 'Gestures', icon: '👍', emojis: LT_EMOJIS.slice(48, 63) },
