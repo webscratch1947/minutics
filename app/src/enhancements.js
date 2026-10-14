@@ -1308,33 +1308,39 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       ".lt-tasks-empty-sub{font-size:13px;margin:0}",
       /* FAB */
       ".lt-tasks-fab{position:fixed;bottom:calc(100px + env(safe-area-inset-bottom, 0px));right:20px;width:56px;height:56px;border-radius:50%;background:#111114;color:white;font-size:30px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:2147483000;-webkit-tap-highlight-color:transparent;line-height:1}",
-      ".lt-routine-lib-fab{position:fixed;bottom:calc(28px + env(safe-area-inset-bottom, 0px));right:20px;width:56px;height:56px;border-radius:50%;background:linear-gradient(160deg,#241e3c,#12101d);color:#FCD34D;font-size:24px;border:1px solid rgba(245,158,11,.4);cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.4),0 0 0 4px rgba(245,158,11,.07);display:flex;align-items:center;justify-content:center;z-index:2147483000;-webkit-tap-highlight-color:transparent;transition:transform .1s ease}",
+      ".lt-routine-lib-fab{position:fixed;bottom:calc(28px + env(safe-area-inset-bottom, 0px));right:20px;width:56px;height:56px;border-radius:50%;background:#111114;color:#FCD34D;font-size:24px;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:2147483000;-webkit-tap-highlight-color:transparent;transition:transform .1s ease}",
       ".lt-routine-lib-fab:active{transform:scale(.92)}",
       /* ── Routine Library (premium preset page) ─────────────────────────────
-         Full-screen sub-page inside the tool. Slides UP on open and DOWN on
-         close — both directions animated (the closing class swaps the
-         animation and JS removes the node on animationend). */
-      ".lt-rlib{position:fixed;inset:0;z-index:2147483300;display:flex;flex-direction:column;background:linear-gradient(165deg,#1d1833 0%,#100e1d 55%,#0b0a13 100%);animation:lt-rlib-in .34s cubic-bezier(.22,.61,.36,1);overscroll-behavior:contain}",
+         Full-screen sub-page inside the tool, themed like the rest of the
+         app (light cream). Slides UP on open and DOWN on close — both
+         directions animated (the closing class swaps the animation and JS
+         removes the node on animationend). */
+      ".lt-rlib{position:fixed;inset:0;z-index:2147483300;display:flex;flex-direction:column;background:linear-gradient(170deg,#fdfbf7 0%,#f7f2e8 55%,#f0e9db 100%);animation:lt-rlib-in .34s cubic-bezier(.22,.61,.36,1);overscroll-behavior:contain}",
       "@keyframes lt-rlib-in{from{transform:translateY(100%);opacity:.3}to{transform:translateY(0);opacity:1}}",
       ".lt-rlib.lt-rlib-closing{animation:lt-rlib-out .26s ease-in forwards}",
       "@keyframes lt-rlib-out{to{transform:translateY(100%);opacity:0}}",
-      ".lt-rlib-head{display:flex;align-items:center;gap:12px;padding:calc(18px + env(safe-area-inset-top, 0px)) 18px 14px;border-bottom:1px solid rgba(255,255,255,.08)}",
-      ".lt-rlib-back{flex-shrink:0;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;font:inherit;font-size:12px;font-weight:800;padding:9px 14px;border-radius:999px;cursor:pointer;-webkit-tap-highlight-color:transparent}",
-      ".lt-rlib-back:active{background:rgba(255,255,255,.16)}",
+      ".lt-rlib-head{display:flex;align-items:center;gap:12px;padding:calc(18px + env(safe-area-inset-top, 0px)) 18px 14px;border-bottom:1px solid hsl(var(--border))}",
+      ".lt-rlib-back{flex-shrink:0;display:flex;align-items:center;gap:6px;background:hsl(var(--card));border:1px solid hsl(var(--border));color:hsl(var(--foreground));font:inherit;font-size:12px;font-weight:800;padding:9px 14px;border-radius:999px;cursor:pointer;-webkit-tap-highlight-color:transparent}",
+      ".lt-rlib-back:active{background:hsl(var(--muted))}",
       ".lt-rlib-headmeta{flex:1;min-width:0}",
-      ".lt-rlib-title{margin:0;font-size:16px;font-weight:900;color:#fff;letter-spacing:.01em}",
-      ".lt-rlib-sub{margin:2px 0 0;font-size:11px;color:rgba(255,255,255,.55);font-weight:600}",
+      ".lt-rlib-title{margin:0;font-size:16px;font-weight:900;color:hsl(var(--foreground));letter-spacing:.01em}",
+      ".lt-rlib-sub{margin:2px 0 0;font-size:11px;color:hsl(var(--muted-foreground));font-weight:600}",
       ".lt-rlib-badge{flex-shrink:0;font-size:9px;font-weight:900;letter-spacing:.14em;color:#78350F;background:linear-gradient(135deg,#FCD34D,#F59E0B);padding:5px 10px;border-radius:999px}",
       ".lt-rlib-grid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;padding:14px 14px calc(20px + env(safe-area-inset-bottom, 0px));display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;align-content:start}",
-      ".lt-rlib-box{display:flex;flex-direction:column;background:rgba(255,255,255,.055);border:1px solid rgba(245,158,11,.16);border-radius:18px;padding:14px 14px 13px;box-shadow:0 10px 26px rgba(0,0,0,.28)}",
+      ".lt-rlib-box{display:flex;flex-direction:column;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:18px;padding:14px 14px 13px;box-shadow:0 6px 18px rgba(17,17,20,.06)}",
+      ".lt-rlib-box.applied{border-color:rgba(245,158,11,.6);box-shadow:0 0 0 3px rgba(245,158,11,.14),0 6px 18px rgba(17,17,20,.08)}",
       ".lt-rlib-top{display:flex;align-items:flex-start;gap:10px}",
-      ".lt-rlib-emoji{flex-shrink:0;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;background:linear-gradient(135deg,rgba(252,211,77,.24),rgba(245,158,11,.12));border:1px solid rgba(252,211,77,.3)}",
+      ".lt-rlib-emoji{flex-shrink:0;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;background:linear-gradient(135deg,rgba(252,211,77,.42),rgba(245,158,11,.22));border:1px solid rgba(245,158,11,.4)}",
       ".lt-rlib-meta{flex:1;min-width:0}",
-      ".lt-rlib-name{margin:0;font-size:14px;font-weight:800;color:#fff}",
-      ".lt-rlib-desc{margin:3px 0 0;font-size:11px;line-height:1.45;color:rgba(255,255,255,.62);font-weight:500}",
-      ".lt-rlib-slots{margin:11px 0 10px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#FCD34D;text-transform:uppercase}",
-      ".lt-rlib-apply{margin-top:auto;border:none;border-radius:999px;padding:11px 18px;font:inherit;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:#78350F;background:linear-gradient(135deg,#FCD34D,#F59E0B);cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 20px -8px rgba(245,158,11,.55);transition:transform .08s ease}",
+      ".lt-rlib-name{margin:0;font-size:14px;font-weight:800;color:hsl(var(--foreground))}",
+      ".lt-rlib-desc{margin:3px 0 0;font-size:11px;line-height:1.45;color:hsl(var(--muted-foreground));font-weight:500}",
+      ".lt-rlib-slots{margin:11px 0 10px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#b45309;text-transform:uppercase}",
+      ".lt-rlib-apply{margin-top:auto;border:none;border-radius:999px;padding:11px 18px;font:inherit;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:#78350F;background:linear-gradient(135deg,#FCD34D,#F59E0B);cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 20px -8px rgba(245,158,11,.55);transition:transform .08s ease,background .15s ease}",
       ".lt-rlib-apply:active{transform:scale(.96)}",
+      ".lt-rlib-apply.applied{background:hsl(var(--muted));color:hsl(var(--muted-foreground));box-shadow:none;cursor:default}",
+      /* Toast (library apply confirmation) */
+      ".lt-toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top, 0px));transform:translate(-50%,-16px);background:#111114;color:#fff;font-size:13px;font-weight:700;padding:11px 18px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.28);opacity:0;transition:opacity .25s ease,transform .25s ease;z-index:2147483647;pointer-events:none;max-width:88vw;text-align:center}",
+      ".lt-toast.show{opacity:1;transform:translate(-50%,0)}",
       ".lt-tasks-fab:active{opacity:.85;transform:scale(.96)}",
       /* Add-task bottom sheet — styled like the Activity edit bottom sheet:
          soft grabber, icon+title header, rounded inputs, Cancel/Save pills. */
@@ -4480,6 +4486,145 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
 
   function newRoutineDraftRow() { return { uid: genId(), name: "", time: "", endTime: "", emoji: "" }; }
 
+  /* ── Routine Library ────────────────────────────────────────────────────
+     Premium preset page: 10 profession-based day plans. Apply REPLACES
+     the current routine set with the preset (one tap — the old routines
+     are removed first so a second preset can never collide with the first
+     and there is never an overlap error). The active preset is remembered
+     and its box shows an "✓ Applied" state. */
+  var ROUTINE_PRESETS = [
+    { id: "businessman", name: "Businessman", emoji: "💼", desc: "Board meetings, client lunches and evening strategy — a classic corporate day.",
+      slots: [["Morning workout","06:00","06:45","🏋️"],["Office & meetings","09:00","13:00","💼"],["Lunch break","13:00","14:00","🍽️"],["Deep work & planning","15:00","18:00","📊"],["Family time","20:00","21:30","👨‍👩‍👧"]] },
+    { id: "realestate", name: "Real Estate Agent", emoji: "🏠", desc: "Site visits, client showings and same-day follow-ups keep the pipeline moving.",
+      slots: [["Property research","08:00","09:00","🔍"],["Site visits","09:00","12:00","🏗️"],["Client showings","13:00","16:00","🏠"],["Calls & follow-ups","16:00","17:30","📞"],["Listing updates","17:30","18:30","📋"]] },
+    { id: "swe", name: "Software Engineer", emoji: "💻", desc: "Standup, deep coding blocks, review and an evening side-project slot.",
+      slots: [["Morning standup","09:30","10:00","☕"],["Deep coding block","10:00","13:00","💻"],["Lunch & reset","13:00","14:00","🍽️"],["Code review & meetings","14:00","16:00","🧑‍💻"],["Evening side project","20:00","22:00","🚀"]] },
+    { id: "ca", name: "Chartered Accountant", emoji: "📊", desc: "Client filings, audit work and return prep — deadline days, organised.",
+      slots: [["Client filings","09:00","12:00","📋"],["Audit work","12:30","15:30","🔍"],["Return prep","16:00","18:30","📊"],["Study & updates","20:00","21:30","📚"]] },
+    { id: "doctor", name: "Doctor", emoji: "⚕️", desc: "Morning rounds, OPD sessions and evening duty — the hospital rhythm.",
+      slots: [["Hospital rounds","07:00","09:00","🏥"],["OPD consultations","09:30","13:00","⚕️"],["Lunch break","13:00","13:45","🍽️"],["Evening OPD","17:00","20:00","💊"]] },
+    { id: "teacher", name: "Teacher", emoji: "📚", desc: "Back-to-back classes with lesson prep and grading in the evening.",
+      slots: [["Classes","08:00","13:00","🏫"],["Lesson prep","14:00","15:30","✏️"],["Grading","16:00","17:30","📋"],["Planning & study","20:00","21:00","📚"]] },
+    { id: "student", name: "Student", emoji: "🎓", desc: "Lectures, library study sprints and a night revision block.",
+      slots: [["College lectures","09:00","13:00","🎓"],["Lunch break","13:00","14:00","🍽️"],["Study sprint","15:00","17:30","📚"],["Night revision","19:30","21:00","🕯️"]] },
+    { id: "freelancer", name: "Freelancer", emoji: "🚀", desc: "Client project blocks, proposals, skill-building and an admin hour.",
+      slots: [["Client project work","09:00","12:30","💻"],["Proposals & emails","13:30","15:00","📧"],["Skill building","16:00","17:30","📚"],["Admin & invoicing","18:00","19:00","💰"]] },
+    { id: "creator", name: "Content Creator", emoji: "🎬", desc: "Ideate, shoot, edit, publish — with an engagement window after.",
+      slots: [["Scripting & ideas","09:00","10:30","💡"],["Shooting","11:00","13:00","🎬"],["Editing","15:00","17:30","🎞️"],["Publish & engage","19:00","20:00","📱"]] },
+    { id: "sales", name: "Sales Executive", emoji: "📞", desc: "Cold-call blocks, demos, follow-ups and research to feed the pipeline.",
+      slots: [["Cold call block","09:30","11:30","📞"],["Product demos","12:00","13:30","📊"],["Pipeline follow-up","15:00","16:30","🔨"],["Prospect research","17:00","18:00","🔍"]] }
+  ];
+
+  function ltToast(msg) {
+    var old = document.getElementById("lt-toast");
+    if (old) old.remove();
+    var t = document.createElement("div");
+    t.id = "lt-toast";
+    t.className = "lt-toast";
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function () { t.classList.add("show"); }, 16);
+    setTimeout(function () {
+      t.classList.remove("show");
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 320);
+    }, 2200);
+  }
+
+  function openRoutineLibrary() {
+    /* Clear any stale/closing instance first so a fresh open can never
+       be blocked by a leftover element. */
+    var oldLib = document.getElementById("lt-routine-library");
+    if (oldLib && oldLib.parentNode) oldLib.parentNode.removeChild(oldLib);
+    if (!activeOverlay) return;
+    var appliedId = null;
+    try { appliedId = localStorage.getItem("lt_applied_routine_preset"); } catch (e) { appliedId = null; }
+    var el = document.createElement("div");
+    el.id = "lt-routine-library";
+    el.className = "lt-rlib";
+    el.innerHTML =
+      '<div class="lt-rlib-head">' +
+        '<button type="button" class="lt-rlib-back" data-rlib-back aria-label="Back">← Back</button>' +
+        '<div class="lt-rlib-headmeta"><p class="lt-rlib-title">Routine Library</p>' +
+        '<p class="lt-rlib-sub">Profession-based day presets — tap Apply to make one your day</p></div>' +
+        '<span class="lt-rlib-badge">PRO</span>' +
+      '</div>' +
+      '<div class="lt-rlib-grid">' +
+        ROUTINE_PRESETS.map(function (p) {
+          var isApplied = p.id === appliedId;
+          return (
+            '<div class="lt-rlib-box' + (isApplied ? ' applied' : '') + '" data-preset="' + p.id + '">' +
+              '<div class="lt-rlib-top"><span class="lt-rlib-emoji">' + p.emoji + '</span>' +
+                '<div class="lt-rlib-meta"><p class="lt-rlib-name">' + escapeHtml(p.name) + '</p>' +
+                '<p class="lt-rlib-desc">' + escapeHtml(p.desc) + '</p></div></div>' +
+              '<div class="lt-rlib-slots">' + p.slots.length + ' slots · ' + p.slots[0][1] + '–' + p.slots[p.slots.length - 1][2] + '</div>' +
+              '<button type="button" class="lt-rlib-apply' + (isApplied ? ' applied' : '') + '" data-rlib-apply="' + p.id + '">' + (isApplied ? '✓ Applied' : 'Apply routine') + '</button>' +
+            '</div>'
+          );
+        }).join("") +
+      '</div>';
+    activeOverlay.appendChild(el);
+  }
+
+  function closeRoutineLibrary(then) {
+    var lib = document.getElementById("lt-routine-library");
+    if (!lib) { if (then) then(); return; }
+    lib.classList.add("lt-rlib-closing");
+    var done = false;
+    var finish = function () {
+      if (done) return;
+      done = true;
+      if (lib.parentNode) lib.parentNode.removeChild(lib);
+      if (then) then();
+    };
+    lib.addEventListener("animationend", finish, { once: true });
+    setTimeout(finish, 360); /* safety if animationend never fires */
+  }
+
+  function applyRoutinePreset(preset) {
+    closeRoutineLibrary(function () {
+      /* Replace, don't append: wipe the current routine set first so a
+         second preset can never collide with the first (the old flow threw
+         "overlaps with ..." on save). */
+      routineItems().forEach(function (r) { removeRoutine(r.id); });
+      preset.slots.forEach(function (s) {
+        upsertRoutine({ id: genId(), name: s[0], time: s[1], endTime: s[2], emoji: s[3], createdAt: new Date().toISOString() });
+      });
+      try { localStorage.setItem("lt_applied_routine_preset", preset.id); } catch (e) {}
+      routineDraftRows = null;
+      routineEditingId = null;
+      routineEditingEmoji = "";
+      renderRoutine();
+      ltToast("“" + preset.name + "” routine applied");
+    });
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target;
+    if (!t || !t.closest) return; /* document-target events have no closest */
+    var libBtn = t.closest("#lt-routine-lib-fab");
+    if (libBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      openRoutineLibrary();
+      return;
+    }
+    if (t.closest("[data-rlib-back]")) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeRoutineLibrary();
+      return;
+    }
+    var applyBtn = t.closest("[data-rlib-apply]");
+    if (applyBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      var id = applyBtn.getAttribute("data-rlib-apply");
+      for (var i = 0; i < ROUTINE_PRESETS.length; i++) {
+        if (ROUTINE_PRESETS[i].id === id) { applyRoutinePreset(ROUTINE_PRESETS[i]); break; }
+      }
+    }
+  }, true);
+
   function syncRoutineDraftFromDom() {
     if (!routineDraftRows) return;
     routineDraftRows.forEach(function (row) {
@@ -4853,119 +4998,6 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
         return;
       }
 
-      /* ── Routine Library ────────────────────────────────────────────────────
-         Premium preset page: 10 profession-based day plans. Apply fills the
-         New Routine draft sheet with that profession's slots (review, then
-         Add Routine) — it never overwrites saved routines silently. */
-      var ROUTINE_PRESETS = [
-        { id: "businessman", name: "Businessman", emoji: "\uD83D\uDCBC", desc: "Board meetings, client lunches and evening strategy — a classic corporate day.",
-          slots: [["Morning workout","06:00","06:45","\uD83C\uDFCB\uFE0F"],["Office & meetings","09:00","13:00","\uD83D\uDCBC"],["Lunch break","13:00","14:00","\uD83C\uDF7D\uFE0F"],["Deep work & planning","15:00","18:00","\uD83D\uDCCA"],["Family time","20:00","21:30","\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"]] },
-        { id: "realestate", name: "Real Estate Agent", emoji: "\uD83C\uDFE0", desc: "Site visits, client showings and same-day follow-ups keep the pipeline moving.",
-          slots: [["Property research","08:00","09:00","\uD83D\uDD0D"],["Site visits","09:00","12:00","\uD83C\uDFD7\uFE0F"],["Client showings","13:00","16:00","\uD83C\uDFE0"],["Calls & follow-ups","16:00","17:30","\uD83D\uDCDE"],["Listing updates","17:30","18:30","\uD83D\uDCCB"]] },
-        { id: "swe", name: "Software Engineer", emoji: "\uD83D\uDCBB", desc: "Standup, deep coding blocks, review and an evening side-project slot.",
-          slots: [["Morning standup","09:30","10:00","\u2615"],["Deep coding block","10:00","13:00","\uD83D\uDCBB"],["Lunch & reset","13:00","14:00","\uD83C\uDF7D\uFE0F"],["Code review & meetings","14:00","16:00","\uD83E\uDDD1\u200D\uD83D\uDCBB"],["Evening side project","20:00","22:00","\uD83D\uDE80"]] },
-        { id: "ca", name: "Chartered Accountant", emoji: "\uD83D\uDCCA", desc: "Client filings, audit work and return prep — deadline days, organised.",
-          slots: [["Client filings","09:00","12:00","\uD83D\uDCCB"],["Audit work","12:30","15:30","\uD83D\uDD0D"],["Return prep","16:00","18:30","\uD83D\uDCCA"],["Study & updates","20:00","21:30","\uD83D\uDCDA"]] },
-        { id: "doctor", name: "Doctor", emoji: "\u2695\uFE0F", desc: "Morning rounds, OPD sessions and evening duty — the hospital rhythm.",
-          slots: [["Hospital rounds","07:00","09:00","\uD83C\uDFE5"],["OPD consultations","09:30","13:00","\u2695\uFE0F"],["Lunch break","13:00","13:45","\uD83C\uDF7D\uFE0F"],["Evening OPD","17:00","20:00","\uD83D\uDC8A"]] },
-        { id: "teacher", name: "Teacher", emoji: "\uD83D\uDCDA", desc: "Back-to-back classes with lesson prep and grading in the evening.",
-          slots: [["Classes","08:00","13:00","\uD83C\uDFEB"],["Lesson prep","14:00","15:30","\u270F\uFE0F"],["Grading","16:00","17:30","\uD83D\uDCCB"],["Planning & study","20:00","21:00","\uD83D\uDCDA"]] },
-        { id: "student", name: "Student", emoji: "\uD83C\uDF93", desc: "Lectures, library study sprints and a night revision block.",
-          slots: [["College lectures","09:00","13:00","\uD83C\uDF93"],["Lunch break","13:00","14:00","\uD83C\uDF7D\uFE0F"],["Study sprint","15:00","17:30","\uD83D\uDCDA"],["Night revision","19:30","21:00","\uD83D\uDD6F\uFE0F"]] },
-        { id: "freelancer", name: "Freelancer", emoji: "\uD83D\uDE80", desc: "Client project blocks, proposals, skill-building and an admin hour.",
-          slots: [["Client project work","09:00","12:30","\uD83D\uDCBB"],["Proposals & emails","13:30","15:00","\uD83D\uDCE7"],["Skill building","16:00","17:30","\uD83D\uDCDA"],["Admin & invoicing","18:00","19:00","\uD83D\uDCB0"]] },
-        { id: "creator", name: "Content Creator", emoji: "\uD83C\uDFAC", desc: "Ideate, shoot, edit, publish — with an engagement window after.",
-          slots: [["Scripting & ideas","09:00","10:30","\uD83D\uDCA1"],["Shooting","11:00","13:00","\uD83C\uDFAC"],["Editing","15:00","17:30","\uD83C\uDF9E\uFE0F"],["Publish & engage","19:00","20:00","\uD83D\uDCF1"]] },
-        { id: "sales", name: "Sales Executive", emoji: "\uD83D\uDCDE", desc: "Cold-call blocks, demos, follow-ups and research to feed the pipeline.",
-          slots: [["Cold call block","09:30","11:30","\uD83D\uDCDE"],["Product demos","12:00","13:30","\uD83D\uDCCA"],["Pipeline follow-up","15:00","16:30","\uD83D\uDD28"],["Prospect research","17:00","18:00","\uD83D\uDD0D"]] }
-      ];
-
-      function openRoutineLibrary() {
-        if (document.getElementById("lt-routine-library")) return;
-        if (!activeOverlay) return;
-        var el = document.createElement("div");
-        el.id = "lt-routine-library";
-        el.className = "lt-rlib";
-        el.innerHTML =
-          '<div class="lt-rlib-head">' +
-            '<button type="button" class="lt-rlib-back" data-rlib-back aria-label="Back">\u2190 Back</button>' +
-            '<div class="lt-rlib-headmeta"><p class="lt-rlib-title">Routine Library</p>' +
-            '<p class="lt-rlib-sub">Profession-based day presets \u2014 review the slots, then tap Add Routine</p></div>' +
-            '<span class="lt-rlib-badge">PRO</span>' +
-          '</div>' +
-          '<div class="lt-rlib-grid">' +
-            ROUTINE_PRESETS.map(function (p) {
-              return (
-                '<div class="lt-rlib-box" data-preset="' + p.id + '">' +
-                  '<div class="lt-rlib-top"><span class="lt-rlib-emoji">' + p.emoji + '</span>' +
-                    '<div class="lt-rlib-meta"><p class="lt-rlib-name">' + escapeHtml(p.name) + '</p>' +
-                    '<p class="lt-rlib-desc">' + escapeHtml(p.desc) + '</p></div></div>' +
-                  '<div class="lt-rlib-slots">' + p.slots.length + ' slots \u00b7 ' + p.slots[0][1] + '\u2013' + p.slots[p.slots.length - 1][2] + '</div>' +
-                  '<button type="button" class="lt-rlib-apply" data-rlib-apply="' + p.id + '">Apply routine</button>' +
-                '</div>'
-              );
-            }).join("") +
-          '</div>';
-        activeOverlay.appendChild(el);
-      }
-
-      function closeRoutineLibrary(then) {
-        var lib = document.getElementById("lt-routine-library");
-        if (!lib) { if (then) then(); return; }
-        lib.classList.add("lt-rlib-closing");
-        var done = false;
-        var finish = function () {
-          if (done) return;
-          done = true;
-          if (lib.parentNode) lib.parentNode.removeChild(lib);
-          if (then) then();
-        };
-        lib.addEventListener("animationend", finish, { once: true });
-        setTimeout(finish, 360); /* safety if animationend never fires */
-      }
-
-      function applyRoutinePreset(preset) {
-        closeRoutineLibrary(function () {
-          routineEditingId = null;
-          routineEditingEmoji = "";
-          routineDraftRows = preset.slots.map(function (s) {
-            return { uid: genId(), name: s[0], time: s[1], endTime: s[2], emoji: s[3] };
-          });
-          refreshRoutineSheet();
-          ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
-          setTimeout(function () {
-            var n = document.getElementById("lt-rdraft-name-" + routineDraftRows[0].uid);
-            if (n) n.focus();
-          }, 120);
-        });
-      }
-
-      document.addEventListener("click", function (e) {
-        var t = e.target;
-        if (!t || !t.closest) return; /* document-target events have no closest */
-        var libBtn = t.closest("#lt-routine-lib-fab");
-        if (libBtn) {
-          e.preventDefault();
-          e.stopPropagation();
-          openRoutineLibrary();
-          return;
-        }
-        if (t.closest("[data-rlib-back]")) {
-          e.preventDefault();
-          e.stopPropagation();
-          closeRoutineLibrary();
-          return;
-        }
-        var applyBtn = t.closest("[data-rlib-apply]");
-        if (applyBtn) {
-          e.preventDefault();
-          e.stopPropagation();
-          var id = applyBtn.getAttribute("data-rlib-apply");
-          for (var i = 0; i < ROUTINE_PRESETS.length; i++) {
-            if (ROUTINE_PRESETS[i].id === id) { applyRoutinePreset(ROUTINE_PRESETS[i]); break; }
-          }
-        }
-      }, true);
       if (e.target.id === "lt-routine-addanother") {
         syncRoutineDraftFromDom();
         routineDraftRows.push(newRoutineDraftRow());
@@ -5008,6 +5040,7 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
           });
           routineEditingId = null;
           routineEditingEmoji = "";
+          try { localStorage.removeItem("lt_applied_routine_preset"); } catch (e2) {}
           renderRoutine();
           return;
         }
@@ -5042,12 +5075,14 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
           });
         });
         routineDraftRows = null;
+        try { localStorage.removeItem("lt_applied_routine_preset"); } catch (e2) {}
         renderRoutine();
         return;
       }
       if (e.target.id === "lt-routine-delete") {
         if (routineEditingId) removeRoutine(routineEditingId);
         routineEditingId = null;
+        try { localStorage.removeItem("lt_applied_routine_preset"); } catch (e2) {}
         renderRoutine();
         return;
       }
