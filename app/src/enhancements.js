@@ -1123,6 +1123,14 @@
          each render because the shell node is rebuilt every time. */
       "@keyframes lt-shell-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}",
       ".lt-tool-shell{animation:lt-shell-in .26s cubic-bezier(.22,.61,.36,1) both}",
+      /* Re-renders (ticking a routine, adding a task) rebuild the shell and
+         replayed the slide-in every time — the "tapping + refreshes the
+         whole tool" feel. Only the FIRST render per overlay open animates. */
+      "#lt-overlay-root[data-rendered] .lt-tool-shell{animation:none}",
+      /* The FAB must live OUTSIDE .lt-tool-shell: the shell's `both` fill
+         keeps transform:translateY(0) on it, and a transformed ancestor
+         becomes the containing block for position:fixed — pinning the +
+         to the bottom of the scrolling CONTENT instead of the screen. */
       /* Closing mirror: tools and their shells slide out together. */
       "#lt-overlay-root[data-lt-closing] .lt-tool-shell{animation:lt-shell-out .2s ease-in forwards}",
       "@keyframes lt-shell-out{to{opacity:0;transform:translateY(10px)}}",
@@ -1278,9 +1286,17 @@
       /* FAB */
       ".lt-tasks-fab{position:fixed;bottom:calc(28px + env(safe-area-inset-bottom, 0px));right:20px;width:56px;height:56px;border-radius:50%;background:#111114;color:white;font-size:30px;font-weight:300;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:2147483000;-webkit-tap-highlight-color:transparent;line-height:1}",
       ".lt-tasks-fab:active{opacity:.85;transform:scale(.96)}",
-      /* Add-task bottom sheet */
-      ".lt-tasks-sheet{position:fixed;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:22px 22px 0 0;padding:14px 18px calc(24px + env(safe-area-inset-bottom, 0px));box-shadow:0 -4px 28px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:2147483100;box-sizing:border-box;max-width:480px;margin:0 auto}",
-      ".lt-tasks-sheet-handle{width:36px;height:4px;background:hsl(var(--border));border-radius:2px;margin:0 auto 14px;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}",
+      /* Add-task bottom sheet — styled like the Activity edit bottom sheet:
+         soft grabber, icon+title header, rounded inputs, Cancel/Save pills. */
+      ".lt-tasks-sheet{position:fixed;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:26px 26px 0 0;padding:12px 20px calc(22px + env(safe-area-inset-bottom, 0px));box-shadow:0 -8px 34px rgba(0,0,0,.16);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:2147483100;box-sizing:border-box;max-width:480px;margin:0 auto}",
+      ".lt-tasks-sheet-handle{width:42px;height:5px;background:rgba(17,17,20,.16);border-radius:3px;margin:0 auto 14px;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}",
+      ".lt-sheet-head{display:flex;align-items:center;gap:12px;padding:2px 2px 16px}",
+      ".lt-sheet-head-icon{width:46px;height:46px;border-radius:50%;background:hsl(var(--secondary));border:1px solid hsl(var(--border));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}",
+      ".lt-sheet-head-title{font-size:16px;font-weight:800;color:hsl(var(--foreground));margin:0;line-height:1.3}",
+      ".lt-sheet-head-sub{font-size:12px;color:hsl(var(--muted-foreground));margin:2px 0 0}",
+      ".lt-sheet-actions{display:flex;gap:10px;margin-top:16px}",
+      ".lt-sheet-cancel{flex:1;background:hsl(var(--card));color:#DC2626;border:1px solid #FECACA;border-radius:999px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:background .15s}",
+      ".lt-sheet-cancel:active{background:#FEF2F2}",
       ".lt-tasks-sheet-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:hsl(var(--muted-foreground));margin:0 0 12px}",
       ".lt-tasks-sheet-main{font-size:16px;width:100%;border:1.5px solid hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--foreground));font-family:inherit;font-weight:600;padding:13px 14px;border-radius:14px;outline:none;caret-color:hsl(var(--primary));margin-bottom:14px;box-sizing:border-box;transition:border-color .15s}",
       ".lt-tasks-sheet-main:focus{border-color:#111114}",
@@ -1299,6 +1315,7 @@
       ".lt-tasks-sheet-notes{font-size:14px;width:100%;border:1.5px solid hsl(var(--border));background:hsl(var(--muted));color:hsl(var(--foreground));font-family:inherit;font-weight:500;padding:12px 14px;border-radius:14px;outline:none;caret-color:hsl(var(--primary));box-sizing:border-box}",
       ".lt-tasks-sheet-notes::placeholder{color:hsl(var(--muted-foreground))}",
       ".lt-tasks-sheet-submit{margin-top:14px;width:100%;background:#111114;color:white;border:none;border-radius:999px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;box-shadow:0 6px 16px rgba(0,0,0,.15)}",
+      ".lt-sheet-actions .lt-tasks-sheet-submit{flex:1;width:auto;margin-top:0}",
       ".lt-tasks-sheet-submit:active{opacity:.85;transform:scale(.99)}",
       ".lt-tasks-sheet-dismiss{position:absolute;top:0;left:0;right:0;bottom:0;z-index:29;background:rgba(0,0,0,.25)}",
 
@@ -4332,6 +4349,59 @@
     );
   }
 
+  /* Just the sheet's inner content (header + form). Built separately from the
+     whole tool so opening/editing a routine refreshes ONLY the sheet — the
+     list and shell stay mounted and nothing visually "reloads". */
+  function routineSheetHtml() {
+    var editing = routineEditingId ? routineItems().find(function (i) { return i.id === routineEditingId; }) : null;
+    if (editing) {
+      return (
+        '<div class="lt-sheet-head">' +
+          '<div class="lt-sheet-head-icon">\uD83D\uDD52</div>' +
+          '<div><p class="lt-sheet-head-title">Edit Routine</p>' +
+          '<p class="lt-sheet-head-sub">Adjust the time slot or remove it</p></div>' +
+        '</div>' +
+        '<input id="lt-routine-name" class="lt-routine-name-input" type="text" placeholder="Routine name\u2026" value="' + escapeHtml(editing.name) + '">' +
+        '<div class="lt-routine-sheet-timerow">' +
+          '<div class="lt-routine-timefield"><span class="lt-routine-timefield-label">Start</span>' + clockButtonHtml("lt-routine-time", editing.time || "") + '</div>' +
+          '<div class="lt-routine-timefield"><span class="lt-routine-timefield-label">End</span>' + clockButtonHtml("lt-routine-endtime", editing.endTime || "") + '</div>' +
+        '</div>' +
+        '<div class="lt-sheet-actions">' +
+          '<button type="button" class="lt-sheet-cancel" id="lt-routine-cancel">Cancel</button>' +
+          '<button class="lt-tasks-sheet-submit" id="lt-routine-submit">Save Changes</button>' +
+        '</div>' +
+        '<button class="lt-routine-sheet-delete" id="lt-routine-delete">Delete Routine</button>'
+      );
+    }
+    if (!routineDraftRows || !routineDraftRows.length) routineDraftRows = [newRoutineDraftRow()];
+    var multi = routineDraftRows.length > 1;
+    return (
+      '<div class="lt-sheet-head">' +
+        '<div class="lt-sheet-head-icon">\u2795</div>' +
+        '<div><p class="lt-sheet-head-title">New Routine' + (multi ? 's' : '') + '</p>' +
+        '<p class="lt-sheet-head-sub">Add one or more time slots for today</p></div>' +
+      '</div>' +
+      '<div class="lt-routine-draftlist">' +
+        routineDraftRows.map(function (row) { return draftRowHtml(row, multi); }).join("") +
+      '</div>' +
+      '<button type="button" class="lt-routine-addanother" id="lt-routine-addanother">+ Add another routine</button>' +
+      '<div class="lt-sheet-actions">' +
+        '<button type="button" class="lt-sheet-cancel" id="lt-routine-cancel">Cancel</button>' +
+        '<button class="lt-tasks-sheet-submit" id="lt-routine-submit">' + (multi ? ('Create ' + routineDraftRows.length + ' Routines') : 'Add Routine') + '</button>' +
+      '</div>'
+    );
+  }
+
+  /* Swap ONLY the open routine sheet's contents for a freshly built one.
+     Used by the FAB / Edit / add-another / remove-row paths so the tool list
+     behind stays mounted (no full innerHTML rebuild, no replayed entrance
+     animation = no "refresh" feel). Keeps the sheet open. */
+  function refreshRoutineSheet() {
+    var sheet = document.getElementById("lt-routine-sheet");
+    if (!sheet) { renderRoutine(); return; }
+    sheet.innerHTML = '<div class="lt-tasks-sheet-handle"></div>' + routineSheetHtml();
+  }
+
   function renderRoutine() {
     activeOverlay.classList.remove("lt-gram-mode");
     activeOverlay.style.overflow = "";
@@ -4379,31 +4449,7 @@
           }).join("") +
         '</div>';
 
-    var sheetInner;
-    if (editing) {
-      sheetInner = (
-        '<p class="lt-tasks-sheet-title">Edit Routine</p>' +
-        '<input id="lt-routine-name" class="lt-routine-name-input" type="text" placeholder="Routine name\u2026" value="' + escapeHtml(editing.name) + '">' +
-        '<div class="lt-routine-sheet-timerow">' +
-          '<div class="lt-routine-timefield"><span class="lt-routine-timefield-label">Start</span>' + clockButtonHtml("lt-routine-time", editing.time || "") + '</div>' +
-          '<div class="lt-routine-timefield"><span class="lt-routine-timefield-label">End</span>' + clockButtonHtml("lt-routine-endtime", editing.endTime || "") + '</div>' +
-        '</div>' +
-        '<button class="lt-tasks-sheet-submit" id="lt-routine-submit">Save Changes</button>' +
-        '<button class="lt-routine-sheet-delete" id="lt-routine-delete">Delete Routine</button>'
-      );
-    } else {
-      if (!routineDraftRows || !routineDraftRows.length) routineDraftRows = [newRoutineDraftRow()];
-      var multi = routineDraftRows.length > 1;
-      sheetInner = (
-        '<p class="lt-tasks-sheet-title">New Routine' + (multi ? 's' : '') + '</p>' +
-        '<div class="lt-routine-draftlist">' +
-          routineDraftRows.map(function (row) { return draftRowHtml(row, multi); }).join("") +
-        '</div>' +
-        '<button type="button" class="lt-routine-addanother" id="lt-routine-addanother">+ Add another routine</button>' +
-        '<button class="lt-tasks-sheet-submit" id="lt-routine-submit">' + (multi ? ('Create ' + routineDraftRows.length + ' Routines') : 'Add Routine') + '</button>' +
-        '<button type="button" class="lt-routine-sheet-done" id="lt-routine-sheetdone">Done</button>'
-      );
-    }
+    var sheetInner = routineSheetHtml();
 
     activeOverlay.innerHTML = (
       '<div class="lt-tool-shell" style="padding-bottom:110px">' +
@@ -4417,14 +4463,21 @@
         '</div>' +
         '<p class="lt-routine-resetnote">Ticks reset automatically every day at 12:00 AM \u2014 tick any slot independently, no need to finish the whole table.</p>' +
         listHtml +
-        '<button class="lt-tasks-fab" id="lt-routine-fab">+</button>' +
       '</div>' +
+
+      /* FAB lives OUTSIDE the shell — a transformed shell (its entrance
+         animation has fill:both) would capture position:fixed and pin the +
+         to the content bottom instead of the screen. */
+      '<button class="lt-tasks-fab" id="lt-routine-fab">+</button>' +
 
       '<div class="lt-tasks-sheet" id="lt-routine-sheet">' +
         '<div class="lt-tasks-sheet-handle"></div>' +
         sheetInner +
       '</div>'
     );
+    /* First paint of this overlay: let the shell entrance animation play.
+       Later re-renders mark the root so CSS keeps it static. */
+    if (!activeOverlay.dataset.rendered) activeOverlay.dataset.rendered = "1";
 
     var overlay = activeOverlay;
 
@@ -4478,7 +4531,7 @@
       if (editBody) {
         routineEditingId = editBody.getAttribute("data-routine-edit");
         routineDraftRows = null;
-        renderRoutine();
+        refreshRoutineSheet();
         ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
         return;
       }
@@ -4486,7 +4539,9 @@
         if (Date.now() - Number(overlay.dataset.openedAt || 0) < 400) return;
         routineEditingId = null;
         routineDraftRows = [newRoutineDraftRow()];
-        renderRoutine();
+        /* Refresh ONLY the sheet — re-rendering the whole tool replayed the
+           shell slide-in, which read as "it refreshes" on every + tap. */
+        refreshRoutineSheet();
         ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
         setTimeout(function () { var n = document.getElementById("lt-rdraft-name-" + routineDraftRows[0].uid); if (n) n.focus(); }, 100);
         return;
@@ -4494,8 +4549,7 @@
       if (e.target.id === "lt-routine-addanother") {
         syncRoutineDraftFromDom();
         routineDraftRows.push(newRoutineDraftRow());
-        renderRoutine();
-        ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
+        refreshRoutineSheet();
         var lastRow = routineDraftRows[routineDraftRows.length - 1];
         setTimeout(function () { var n = document.getElementById("lt-rdraft-name-" + lastRow.uid); if (n) n.focus(); }, 50);
         return;
@@ -4506,8 +4560,7 @@
         var rmUid = removeBtn.getAttribute("data-draft-remove");
         routineDraftRows = routineDraftRows.filter(function (r) { return r.uid !== rmUid; });
         if (!routineDraftRows.length) routineDraftRows = [newRoutineDraftRow()];
-        renderRoutine();
-        ltOpenSheetPanel(document.getElementById("lt-routine-sheet"));
+        refreshRoutineSheet();
         return;
       }
       if (e.target.id === "lt-routine-submit") {
@@ -4575,7 +4628,7 @@
         renderRoutine();
         return;
       }
-      if (e.target.id === "lt-routine-sheetdone") {
+      if (e.target.id === "lt-routine-sheetdone" || e.target.id === "lt-routine-cancel") {
         routineDraftRows = null;
         routineEditingId = null;
         var sDone = document.getElementById("lt-routine-sheet");
@@ -4657,15 +4710,20 @@
         makeSection("UPCOMING",  "#ff9500", buckets.upcoming) +
         makeSection("NO DATE",   "#8e8e93", buckets.nodate) +
         doneHtml +
-
-        /* FAB */
-        '<button class="lt-tasks-fab" id="lt-tasks-fab">+</button>' +
       '</div>' +
+
+      /* FAB OUTSIDE the shell (transformed shell would capture the
+         position:fixed and misplace the +). */
+      '<button class="lt-tasks-fab" id="lt-tasks-fab">+</button>' +
 
       /* Add-task bottom sheet (slides up over the list) */
       '<div class="lt-tasks-sheet" id="lt-tasks-sheet">' +
         '<div class="lt-tasks-sheet-handle"></div>' +
-        '<p class="lt-tasks-sheet-title">New Task</p>' +
+        '<div class="lt-sheet-head">' +
+          '<div class="lt-sheet-head-icon">\u270F\uFE0F</div>' +
+          '<div><p class="lt-sheet-head-title">New Task</p>' +
+          '<p class="lt-sheet-head-sub">Name it and set an optional deadline</p></div>' +
+        '</div>' +
         '<input id="lt-task-name" class="lt-tasks-sheet-main" type="text" placeholder="Task name\u2026">' +
         '<div class="lt-sheet-group" id="lt-task-deadline-group">' +
           '<div class="lt-sheet-group-title"><span>Deadline</span><button type="button" class="lt-sheet-group-clear" id="lt-task-deadline-clear">Clear</button></div>' +
@@ -4682,9 +4740,13 @@
         '<div class="lt-tasks-sheet-row" style="border-top:none;padding-top:0">' +
           '<input id="lt-task-notes" class="lt-tasks-sheet-notes" type="text" placeholder="Optional notes\u2026">' +
         '</div>' +
-        '<button class="lt-tasks-sheet-submit" id="lt-task-submit">Add Task</button>' +
+        '<div class="lt-sheet-actions">' +
+          '<button type="button" class="lt-sheet-cancel" id="lt-tasks-sheet-cancel">Cancel</button>' +
+          '<button class="lt-tasks-sheet-submit" id="lt-task-submit">Add Task</button>' +
+        '</div>' +
       '</div>'
     );
+    if (!activeOverlay.dataset.rendered) activeOverlay.dataset.rendered = "1";
 
     /* Wire overlay events — attach ONCE per overlay open, not on every
        re-render, or clicks stack up (a tap toggles twice = looks like
@@ -4762,6 +4824,12 @@
         if (Date.now() - Number(overlay.dataset.openedAt || 0) < 400) return;
         ltOpenSheetPanel(document.getElementById("lt-tasks-sheet"));
         setTimeout(function () { var n = document.getElementById("lt-task-name"); if (n) n.focus(); }, 100);
+        return;
+      }
+      /* Cancel — slide the sheet away without adding anything */
+      if (e.target.id === "lt-tasks-sheet-cancel") {
+        var csheet = document.getElementById("lt-tasks-sheet");
+        if (csheet) csheet.style.transform = "translateY(110%)";
         return;
       }
       /* Submit */
@@ -5946,13 +6014,19 @@
         e.stopPropagation();
         var dateText = row.dateText;
         /* Open the report FIRST (loading state), then expand/scrape/restore
-           the day row BEHIND it — tapping Full view never visibly opens
-           the date's dropdown. */
+           the day row BEHIND it. The overlay SLIDES in over 300ms
+           (lt-tool-in), so firing the expand click immediately let the date
+           dropdown pop open on the still-visible Journal before the overlay
+           covered it — "tapping Full view opens the dropdown too". Wait for
+           the slide to finish before touching the row; the loading state is
+           on screen meanwhile. */
         var fill = fvOpenReportModal(dateText, null);
-        fvScrapeJournalDay(row.button, function (activities) {
-          activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
-          fill(activities);
-        });
+        setTimeout(function () {
+          fvScrapeJournalDay(row.button, function (activities) {
+            activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
+            fill(activities);
+          });
+        }, 340);
       });
       if (rightGroup && rightGroup.lastElementChild) host.insertBefore(btn, rightGroup.lastElementChild);
       else if (dateSpan && dateSpan.nextSibling) host.insertBefore(btn, dateSpan.nextSibling);

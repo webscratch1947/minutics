@@ -398,7 +398,7 @@ export function JournalScreen() {
               jsxs("button", {
                 type: "button",
                 onClick: function() { setExpandedDay(isOpen ? -1 : idx); },
-                className: "w-full flex items-center justify-between px-3 py-4 bg-white transition-colors active:bg-black/[.04] [-webkit-tap-highlight-color:transparent]",
+                className: "w-full flex items-center justify-between px-3 py-4 bg-white [-webkit-tap-highlight-color:transparent]",
                 children: [
                   jsxs("div", {
                     className: "flex items-center gap-2.5",

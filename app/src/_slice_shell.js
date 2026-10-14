@@ -233,26 +233,33 @@ function uiSwapFindTarget(x, y) {
   if (!_dragEl) return null;
   const parent = _dragEl.parentElement;
   if (!parent) return null;
-  /* Resolve the drop target by GEOMETRY over the parent's direct marked
-     children, not by document.elementFromPoint. elementFromPoint returns
-     whatever is topmost at the point — including floating overlays that have
-     nothing to do with the layout (the editor's own fixed hint panel, idle
-     nudges, toasts). Those overlays sit over a valid drop box and made the
-     old ancestor-walk escape to <body>, so the drop silently did nothing —
-     and only in one direction (whichever box happened to sit under the
-     overlay), which is exactly the "asymmetric swap" report. A bounding-box
-     test against the sibling boxes themselves ignores any overlay on top. */
-  const kids = Array.prototype.filter.call(parent.children, function (c) {
-    return c !== _dragEl && c.hasAttribute && c.hasAttribute('data-lt-move');
-  });
+  /* Resolve the drop target by GEOMETRY over the marked boxes, not by
+     document.elementFromPoint. elementFromPoint returns whatever is topmost
+     at the point — including floating overlays (the editor's own fixed hint
+     panel, idle nudges, toasts). Those overlays sit over a valid drop box and
+     made the old ancestor-walk escape to <body>, so the drop silently did
+     nothing — and only in one direction, which is exactly the "asymmetric
+     swap" report. A bounding-box test ignores any overlay on top.
+     SCOPE: previously only SIBLINGS (same parent) were candidates, so a small
+     box in one container could never swap with a bigger box in another — the
+     "hold a small box, drop on a big one, nothing happens" bug. Any marked box
+     on screen is now a valid target; the swap persists an order value and a
+     box in a different parent simply reorders within its own container while
+     the dragged one reorders within its own. */
+  const nodes = document.querySelectorAll('[data-lt-move]');
   let best = null, bestArea = Infinity;
-  for (let i = 0; i < kids.length; i++) {
-    const r = kids[i].getBoundingClientRect();
+  for (let i = 0; i < nodes.length; i++) {
+    const c = nodes[i];
+    if (c === _dragEl) continue;
+    if (c.classList && c.classList.contains('lt-dragging')) continue;
+    if (c.contains && c.contains(_dragEl)) continue;   // a container of the dragged box
+    const r = c.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
     if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
-    /* Overlapping siblings (nested marked boxes) → prefer the smallest so an
-       inner card wins over the big card containing it. */
+    /* Overlapping boxes (a card containing a marked sub-box) → prefer the
+       smallest so the inner card wins over the big card around it. */
     const area = r.width * r.height;
-    if (area < bestArea) { best = kids[i]; bestArea = area; }
+    if (area < bestArea) { best = c; bestArea = area; }
   }
   return best;
 }
@@ -300,17 +307,46 @@ function uiOrderNormalize(store) {
   return store;
 }
 function uiSwapBoxes(a, b) {
-  let st = uiOrderRead();
-  st = uiOrderNormalize(st);
-  const ea = uiOrderEff(a, st);
-  const eb = uiOrderEff(b, st);
-  /* BUG FIX: these used to write to `store`, which is not in scope here —
-     the normalized copy lives in `st`. That ReferenceError was swallowed by
-     the drop handler's try/catch, so the swap silently did nothing (the
-     "swap doesn't work at all" report). Write to `st` and persist it. */
-  st[a.getAttribute('data-lt-move')] = eb;
-  st[b.getAttribute('data-lt-move')] = ea;
-  uiOrderWrite(st);
+  const pa = a.parentElement, pb = b.parentElement;
+  const ka = a.getAttribute('data-lt-move'), kb = b.getAttribute('data-lt-move');
+  if (!ka || !kb) return;
+  /* Same parent: a plain order exchange — the clean, preferred case. */
+  if (pa && pa === pb) {
+    let st = uiOrderRead();
+    st = uiOrderNormalize(st);
+    const ea = uiOrderEff(a, st), eb = uiOrderEff(b, st);
+    st[ka] = eb; st[kb] = ea;
+    uiOrderWrite(st);
+    return;
+  }
+  /* Different parents (a small box dropped on a bigger box in another
+     container): CSS `order` is scoped to one parent, so a number swap can't
+     move a box across containers. Exchange the two nodes in the DOM instead,
+     each taking the other's anchor (previous sibling) so both land in the
+     exact slot the other vacated. React re-renders from its own state on the
+     next update, so re-home the store keys to the new parents to keep the
+     persisted layout matching what's on screen until then. */
+  const anchorA = a.previousSibling, anchorB = b.previousSibling;
+  if (pa && pb) {
+    pa.insertBefore(b, anchorA ? anchorA.nextSibling : pa.firstChild);
+    pb.insertBefore(a, anchorB ? anchorB.nextSibling : pb.firstChild);
+    /* Renumber BOTH parents from their new DOM order. The moved boxes carry
+       style.order from their OLD parent and uiOrderNormalize prefers stale
+       style.order over DOM index — without this pass the swapped box would
+       render in the wrong slot inside its new container. */
+    let st = uiOrderRead();
+    [pa, pb].forEach(function (p) {
+      const kids = Array.prototype.filter.call(p.children, function (c) {
+        return c.hasAttribute && c.hasAttribute('data-lt-move');
+      });
+      kids.forEach(function (c, j) {
+        c.style.order = String(j + 1);
+        const k = c.getAttribute('data-lt-move');
+        if (k) st[k] = j + 1;
+      });
+    });
+    uiOrderWrite(st);
+  }
 }
 
 function uiEditorBind() {
@@ -439,6 +475,9 @@ function uiEditorBind() {
 /* Global styles: tab-slide keyframes + editor affordances. Rendered once
    by the shell (always mounted), also used by enhancements overlays. */
 const SHELL_CSS = [
+  /* Rainbow backdrop for the swipe viewport — mirrors body.lt-authed's fixed
+     gradient so the slide never reveals flat cream behind the panes. */
+  '.lt-swipe-bg{background-color:#fff;background-image:radial-gradient(620px 440px at -4% -2%, rgba(134,239,190,.42), transparent 60%),radial-gradient(560px 520px at 104% 10%, rgba(255,197,138,.4), transparent 58%),radial-gradient(600px 500px at -6% 104%, rgba(147,197,253,.38), transparent 60%),radial-gradient(520px 440px at 104% 102%, rgba(253,224,71,.3), transparent 58%);background-attachment:fixed}',
   '@keyframes lt-page-in-r{from{transform:translateX(100%)}to{transform:translateX(0)}}',
   '@keyframes lt-page-in-l{from{transform:translateX(-100%)}to{transform:translateX(0)}}',
   '.lt-page-in-r{animation:lt-page-in-r .3s cubic-bezier(.22,.61,.36,1)}',
@@ -715,7 +754,13 @@ export function ak({ profile }) {
       jsx(LTTopNav, {}),
       jsx('div', {
         ref: undefined,
-        className: 'relative flex-1 min-h-0 overflow-hidden',
+        /* Paint the authed body's fixed rainbow ON this slide viewport.
+           The panes translate off-screen during a swipe, and the shell/page
+           underneath are transparent, so without this the swipe revealed the
+           flat cream body colour instead of the rainbow the user sees at rest.
+           background-attachment:fixed matches the body so the gradient lines
+           up exactly before, during and after the slide. */
+        className: 'relative flex-1 min-h-0 overflow-hidden lt-swipe-bg',
         children: [
           jsx('div', {
             key: pathname,
@@ -735,12 +780,11 @@ export function ak({ profile }) {
                actually commits — otherwise the peeked Journal looked incomplete
                (no Full view pill) during the hold-slide. */
             'data-lt-peek': peek,
-            /* Opaque: the peek pane is the INCOMING page and slides over the
-               outgoing one. It used to be transparent, so during a fast swipe
-               you saw through it to the body's dark backdrop between the two
-               panes — the "lag flash". Painting it the page colour keeps the
-               slide solid the whole way across. */
-            className: 'absolute inset-0 pointer-events-none overflow-hidden bg-[hsl(var(--background))]',
+            /* Transparent — the rainbow backdrop now lives on the slide
+               viewport (lt-swipe-bg) behind BOTH panes, so the peek shows the
+               same fixed gradient as the page it slides in over. A flat colour
+               here made the swipe lose the rainbow. */
+            className: 'absolute inset-0 pointer-events-none overflow-hidden',
             style: {
               transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
               transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'
