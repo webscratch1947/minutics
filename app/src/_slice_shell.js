@@ -710,7 +710,7 @@ export function ak({ profile }) {
           peek ? jsx('div', {
             key: 'peek-' + peek,
             ref: peekRef,
-            className: 'absolute inset-0 bg-background pointer-events-none overflow-hidden',
+            className: 'absolute inset-0 pointer-events-none overflow-hidden',
             style: {
               transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
               transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'
