@@ -1110,6 +1110,13 @@
          recreated on every open, so the animation re-runs each time). */
       "@keyframes lt-tool-in{from{transform:translateX(100%)}to{transform:translateX(0)}}",
       "@keyframes lt-tool-out{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:.7}}",
+      /* Shared bottom-sheet / modal motion so EVERY sheet rises and fades in
+         the same way instead of popping. The dim backdrop fades, the panel
+         slides up from the bottom edge. */
+      "@keyframes lt-bd-in{from{opacity:0}to{opacity:1}}",
+      "@keyframes lt-bd-out{to{opacity:0}}",
+      "@keyframes lt-rise{from{transform:translateY(100%)}to{transform:translateY(0)}}",
+      "@keyframes lt-pop{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}",
       /* Every in-tool page/panel is drawn into a .lt-tool-shell. Animating it
          here means every tool, sub-page, form and list transition slides up
          and fades in the same way, instead of popping instantly. This runs on
@@ -1548,8 +1555,8 @@
       ".lt-prod-toast-msg{font-size:13px;line-height:1.35;margin:0;color:#fff}",
       ".lt-prod-toast-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0;-webkit-tap-highlight-color:transparent}",
       /* Category selection modal */
-      "#lt-cat-modal-overlay{position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center}",
-      ".lt-cat-modal{width:100%;max-width:480px;background:#fff;color:hsl(var(--foreground));border-radius:28px 28px 0 0;box-sizing:border-box;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -24px 64px rgba(15,23,42,.28);position:relative}",
+      "#lt-cat-modal-overlay{position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center;animation:lt-bd-in .2s ease}",
+      ".lt-cat-modal{width:100%;max-width:480px;background:#fff;color:hsl(var(--foreground));border-radius:28px 28px 0 0;box-sizing:border-box;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -24px 64px rgba(15,23,42,.28);position:relative;animation:lt-rise .28s cubic-bezier(.22,.61,.36,1)}",
       ".lt-sheet-grip{display:flex;align-items:center;justify-content:center;flex:0 0 auto;padding:10px 0 6px;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}",
       ".lt-sheet-grip:active{cursor:grabbing}",
       ".lt-sheet-grip::before{content:'';display:block;width:40px;height:5px;border-radius:99px;background:rgba(15,23,42,.15)}",
@@ -1883,9 +1890,9 @@
 
     var sheet = document.createElement("div");
     sheet.id = "lt-date-sheet";
-    sheet.style.cssText = "position:fixed;inset:0;z-index:999997;background:rgba(20,24,45,.55);display:flex;align-items:flex-end;justify-content:center;font-family:'Inter',sans-serif;";
+    sheet.style.cssText = "position:fixed;inset:0;z-index:999997;background:rgba(20,24,45,.55);display:flex;align-items:flex-end;justify-content:center;font-family:'Inter',sans-serif;animation:lt-bd-in .2s ease";
     sheet.innerHTML =
-      '<div style="width:100%;max-width:420px;background:#fff;padding:20px;box-sizing:border-box">' +
+      '<div style="width:100%;max-width:420px;background:#fff;padding:20px;box-sizing:border-box;animation:lt-rise .28s cubic-bezier(.22,.61,.36,1)">' +
         '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 14px">Select date</p>' +
         '<div style="display:flex;gap:8px;margin-bottom:16px">' +
           '<select id="lt-date-day" style="flex:1;padding:12px 8px;border:1px solid hsl(220 13% 85%);background:hsl(220 15% 97%);color:hsl(230 40% 16%);font-size:15px;font-family:inherit"></select>' +
