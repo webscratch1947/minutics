@@ -6428,15 +6428,10 @@ import { getStore } from "./lib/storage.js";
   function injectJournalFullView() {
     var pathCheck = location.pathname + location.hash;
     if (pathCheck.indexOf("journal") === -1) {
-      /* Also allow a live peek copy of the Journal (hold-slide preview), and
-         an outgoing Journal ghost (tap-switch: the old page stays painted
-         under the incoming slide — pills must not blink out of it). */
+      /* Also allow a live peek copy of the Journal (hold-slide preview). */
       try {
         var _pv = document.querySelector("[data-lt-peek]");
-        var _gv = document.querySelector("[data-lt-ghost]");
-        var _peekIsJournal = _pv && (_pv.getAttribute("data-lt-peek") || "").indexOf("journal") !== -1;
-        var _ghostIsJournal = _gv && (_gv.getAttribute("data-lt-ghost") || "").indexOf("journal") !== -1;
-        if (!_peekIsJournal && !_ghostIsJournal) return;
+        if (!_pv || (_pv.getAttribute("data-lt-peek") || "").indexOf("journal") === -1) return;
       } catch (e) { return; }
     }
     var rows = fvFindDateRows();
@@ -8996,13 +8991,6 @@ import { getStore } from "./lib/storage.js";
       try {
         var _peekPane = document.querySelector("[data-lt-peek]");
         if (_peekPane && (_peekPane.getAttribute("data-lt-peek") || "").indexOf("journal") !== -1) onJournal = true;
-        /* Same for the outgoing-page ghost: tapping AWAY from the Journal
-           leaves the old Journal painted under the incoming slide for ~300ms
-           — its Full view pills must stay injected or they blink out at t=0. */
-        if (!onJournal) {
-          var _ghostPane = document.querySelector("[data-lt-ghost]");
-          if (_ghostPane && (_ghostPane.getAttribute("data-lt-ghost") || "").indexOf("journal") !== -1) onJournal = true;
-        }
       } catch (e) {}
     }
     /* One-time setup — always run */
