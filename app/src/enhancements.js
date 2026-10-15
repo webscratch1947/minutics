@@ -2,6 +2,7 @@
    emoji bar must be this same full set with the same categories/recents,
    never a short hand-picked list. (Tasks deliberately have no emoji.) */
 import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.js";
+import { getStore } from "./lib/storage.js";
 
 (function () {
   "use strict";
@@ -24,12 +25,13 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
 
     /* Static logo — painted before (and behind) the video, so the very
-       first frame is already branded. Pulses gently while it waits. */
+       first frame is already branded while the video fetches its first
+       frames. Deliberately STATIC (no pulse/scale animation, same size and
+       position as the inline boot-splash logo): the screen must read as
+       ONE splash — logo → video → app — never as a second, separate
+       "logo animation" in front of the user's own splash video. */
     var kf = document.createElement("style");
-    kf.textContent =
-      "@keyframes lt-splash-pulse{0%,100%{transform:scale(1);opacity:.94}50%{transform:scale(1.045);opacity:1}}" +
-      "#lt-startup-splash-logo{width:min(34vw,150px);height:auto;" +
-      "animation:lt-splash-pulse 1.6s ease-in-out infinite}";
+    kf.textContent = "#lt-startup-splash-logo{width:min(34vw,150px);height:auto;display:block}";
     document.head.appendChild(kf);
     var logo = document.createElement("img");
     logo.id = "lt-startup-splash-logo";
@@ -5998,15 +6000,6 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
 
   var FV_DATE_RE = /^\d{2}\/\d{2}\/\d{4}$/;
 
-  function fvParseDurationText(t) {
-    t = (t || "").trim();
-    var h = 0, m = 0, s = 0, mh, mm, ms;
-    mh = t.match(/(\d+)\s*h/); if (mh) h = parseInt(mh[1], 10);
-    mm = t.match(/(\d+)\s*m/); if (mm) m = parseInt(mm[1], 10);
-    ms = t.match(/(\d+)\s*s/); if (ms) s = parseInt(ms[1], 10);
-    return h * 60 + m + (s / 60);
-  }
-
   function fvGetProfile() {
     try {
       var raw = localStorage.getItem("lifetime_profile");
@@ -6041,90 +6034,54 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
     } catch (e) { return ""; }
   }
 
-  /* Reads the already-expanded (or about-to-expand) day's per-activity
-     breakdown straight from the DOM, matching the app's own journal
-     markup: each activity group's header div carries a
-     "border-left: 4px solid <color>" inline style with the name + total
-     duration inside it. */
-  function fvScrapeExpandedDetail(rowButton) {
-    var container = rowButton.parentElement;
-    if (!container) return null;
-    var detail = container.querySelector(":scope > div:not(:first-child)");
-    if (!detail) return null;
-    if (/no time logged/i.test(detail.textContent || "")) return [];
-    var acts = [];
-    var groups = detail.children;
-    for (var i = 0; i < groups.length; i++) {
-      var header = groups[i].firstElementChild;
-      if (!header) continue;
-      var style = header.getAttribute("style") || "";
-      if (!/border-?left/i.test(style)) continue;
-      var spans = header.querySelectorAll("span");
-      if (!spans.length) continue;
-      var name = spans[0].textContent.trim();
-      var durText = spans[1] ? spans[1].textContent.trim() : "0m";
-      var colorMatch = style.match(/solid\s*([^;]+)/i);
-      var color = colorMatch ? colorMatch[1].trim() : "#7c8cff";
-      acts.push({ name: name, color: color, minutes: fvParseDurationText(durText), emoji: fvEmojiFor(name) });
-    }
-    return acts;
-  }
-
-  /* True when the day's detail block is rendered (the container has more
-     than just the row button) — independent of the scrape selector, so the
-     restore can never be skipped. */
-  function fvRowOpen(rowButton) {
-    var cont = rowButton.parentElement;
-    return !!(cont && cont.children.length > 1);
-  }
-
-  function fvScrapeJournalDay(rowButton, callback) {
-    if (fvScrapeExpandedDetail(rowButton) !== null) {
-      callback(fvScrapeExpandedDetail(rowButton));
-      return;
-    }
-    /* If the day is ALREADY open, just read it — never click, or the restore
-       click would close the dropdown the user deliberately left open. */
-    if (fvRowOpen(rowButton)) {
-      callback(fvScrapeExpandedDetail(rowButton) || []);
-      return;
-    }
-    /* Not expanded yet — trigger the app's own row click to expand it,
-       then wait for React to render before reading it. The caller opens
-       the report overlay FIRST and delays this call until its slide has
-       covered the screen, so this expand/scrape cycle (and the restore
-       click below) is never visible. */
-    var opened = false;
-    rowButton.click();
-    var attempts = 14;
-    (function poll() {
-      var data = fvScrapeExpandedDetail(rowButton);
-      if (data !== null) opened = true;
-      if (data !== null || attempts <= 0) {
-        /* ALWAYS restore what we opened (or what is open per the DOM) —
-           tapping Full view must never leave the day's dropdown open.
-           The expand/collapse is animated by the Journal, so the restore
-           click was still VISIBLE for ~250ms after the report closed: the
-           day dropdown slid open then shut on its own, which read as "I
-           tapped Full view but the date dropdown opened instead". Freeze
-           the row's transition for the instant restore only (never the
-           user's own taps) so the round-trip is invisible. */
-        if (opened || fvRowOpen(rowButton)) {
-          var _st = rowButton.style;
-          var _prevT = _st.transition;
-          _st.transition = "none";
-          rowButton.click();
-          /* Two frames: one to force the now-instant collapse to apply. */
-          requestAnimationFrame(function () {
-            requestAnimationFrame(function () { _st.transition = _prevT; });
-          });
+  /* ── Full view data — read from the STORE, never scraped from the DOM ───
+     The old path clicked the journal row open behind the overlay, polled the
+     expanded markup for per-activity headers, then restored the row. That
+     chain had many ways to silently produce NOTHING — the report then sat on
+     the empty state ("No activity tagged on this day yet" / 0 min) no
+     matter what the day actually contained. The journal renders from this
+     same store, so the report now computes the day's totals from it
+     directly: instant (fills on the same frame the overlay opens — no
+     empty-state flash, no 340ms scrape delay, no row expand/restore round
+     trip) and immune to markup changes. */
+  function fvActivitiesForDate(dateText) {
+    try {
+      var m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*$/.exec(String(dateText || ""));
+      if (!m) return [];
+      var dayStart = new Date(+m[3], +m[2] - 1, +m[1], 0, 0, 0, 0).getTime();
+      var dayEnd = new Date(+m[3], +m[2] - 1, +m[1], 23, 59, 59, 999).getTime();
+      var store = getStore();
+      var acts = store.activities || [];
+      var byId = {};
+      var order = [];
+      (store.blocks || []).forEach(function (b) {
+        if (!b || !b.startTime || !b.activityId) return;
+        var s = new Date(b.startTime).getTime();
+        if (!s || s < dayStart || s > dayEnd) return; /* journal groups by START day */
+        var e = b.endTime ? new Date(b.endTime).getTime() : Date.now();
+        if (!(e > s)) return;
+        if (!byId[b.activityId]) {
+          var a = null;
+          for (var i = 0; i < acts.length; i++) {
+            if (acts[i] && acts[i].id === b.activityId) { a = acts[i]; break; }
+          }
+          byId[b.activityId] = {
+            name: (a && a.name) || "Activity",
+            color: (a && a.color) || "#7c8cff",
+            minutes: 0,
+            emoji: fvEmojiFor((a && a.name) || "")
+          };
+          order.push(b.activityId);
         }
-        callback(data || []);
-        return;
-      }
-      attempts--;
-      setTimeout(poll, 100);
-    })();
+        byId[b.activityId].minutes += Math.round((e - s) / 60000);
+      });
+      return order
+        .map(function (id) { return byId[id]; })
+        .filter(function (a) { return a.minutes > 0; })
+        .sort(function (x, y) { return y.minutes - x.minutes; });
+    } catch (e) {
+      return [];
+    }
   }
 
   /* ── Drawing the shareable "visiting card" sized donut graphic ──────────── */
@@ -6514,23 +6471,13 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
         e.preventDefault();
         e.stopPropagation();
         var dateText = row.dateText;
-        /* Open the report INSTANTLY (empty-state layout, no skeleton), then
-           expand/scrape/restore the day row BEHIND the opaque overlay once
-           its 300ms slide has fully covered the screen. Scraping FIRST — as
-           a previous "no delay" attempt did — made the user stare at the
-           Journal for the whole poll window before the overlay appeared
-           ("3 second delay") and popped the day dropdown out in the open.
-           With the overlay covering from frame one, the expand/restore
-           round-trip behind it is invisible and the open feels instant. */
-        var fill = fvOpenReportModal(dateText, null);
-        setTimeout(function () {
-          try {
-            fvScrapeJournalDay(row.button, function (activities) {
-              activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
-              fill(activities);
-            });
-          } catch (err) { fill([]); } /* scrape must never strand the report */
-        }, 340);
+        /* The day's activities come straight from the data store (see
+           fvActivitiesForDate) — no DOM scrape, no delayed fill: the report
+           opens FULLY POPULATED on the same frame. The old expand/scrape/
+           restore round-trip behind the overlay was fragile: when its poll
+           found nothing it silently reported "No activity tagged on this
+           day yet" / 0 min even though the day had hours of data. */
+        fvOpenReportModal(dateText, fvActivitiesForDate(dateText));
       });
       if (rightGroup && rightGroup.lastElementChild) host.insertBefore(btn, rightGroup.lastElementChild);
       else if (dateSpan && dateSpan.nextSibling) host.insertBefore(btn, dateSpan.nextSibling);

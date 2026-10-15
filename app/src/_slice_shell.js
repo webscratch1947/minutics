@@ -542,6 +542,18 @@ export function ak({ profile }) {
       peekHoldTRef.current = null;
     }
   };
+  /* Invalidates a hold's pending release when a newer gesture (or commit)
+     takes over, so a stale frame callback can never drop the NEW peek. */
+  const holdGenRef = useRef(0);
+  /* Active transitionend waiter for the in-flight glide. */
+  const glideWaitRef = useRef(null);
+  const stopGlideWait = () => {
+    const w = glideWaitRef.current;
+    if (w) {
+      try { w.el.removeEventListener('transitionend', w.onEnd); } catch (e) {}
+      glideWaitRef.current = null;
+    }
+  };
   /* The peek pane is React-rendered mid-swipe, but the enhancement pass that
      injects Journal "Full view" buttons is throttled (1 run / 500ms) and only
      fires on DOM mutations — during a fast finger-drag it often didn't run
@@ -600,6 +612,7 @@ export function ak({ profile }) {
     if (!glideTRef.current) return;
     clearTimeout(glideTRef.current);
     glideTRef.current = null;
+    stopGlideWait();
     clearPeekHold();
     suppressAnimRef.current = true;
     const target = glideTargetRef.current;
@@ -607,14 +620,56 @@ export function ak({ profile }) {
     setDragX(0);
     /* Keep the painted peek pane covering the viewport (pinned at 0) while
        the new route's wrapper paints, THEN drop it — same content, so the
-       handoff is seamless and the backdrop never flashes through. */
+       handoff is seamless and the backdrop never flashes through.
+       The release waits for TWO PAINTED FRAMES after the swap rather than a
+       fixed220ms: the fixed delay added dead time after every swipe (the
+       switch felt like it "stopped animating") while a slow device could
+       still be unpainted when it fired (the cream flash it existed for).
+       A capped timeout covers windows that never produce frames. */
     setHoldPeek(true);
-    peekHoldTRef.current = setTimeout(() => {
-      peekHoldTRef.current = null;
+    holdGenRef.current += 1;
+    const gen = holdGenRef.current;
+    const release = () => {
+      if (holdGenRef.current !== gen) return;
+      clearPeekHold();
       setPeek(null);
       setHoldPeek(false);
-    }, 220);
+    };
+    requestAnimationFrame(() => { requestAnimationFrame(release); });
+    peekHoldTRef.current = setTimeout(release, 360);
     navigate(target);
+  };
+
+  /* Commit is finished when the glide transition ACTUALLY ends — never by a
+     fixed timer racing it. The old setTimeout(250) vs the240ms transition
+     lost whenever a frame was late (busy main thread = the lag felt during
+     swipes): the hold then snapped a half-slid strip straight to the edge —
+     a visible pop that made the slide look deleted. */
+  const armGlide = (target) => {
+    const wrapEl = wrapRef.current;
+    glideTargetRef.current = target;
+    if (wrapEl) {
+      const onEnd = (ev) => {
+        if (ev.target !== wrapEl || ev.propertyName !== 'transform') return;
+        finishCommit();
+      };
+      glideWaitRef.current = { el: wrapEl, onEnd };
+      wrapEl.addEventListener('transitionend', onEnd);
+      /* Hard fallback: if no frame ever runs (hidden window), transitionend
+         never fires — commit anyway instead of leaving the panes stuck. */
+      glideTRef.current = setTimeout(finishCommit, 640);
+      /* Transition disabled (reduced motion / zero duration): commit on the
+         next frame rather than waiting in vain for an event that can't
+         come. Runs after the glide styles have been committed. */
+      requestAnimationFrame(() => {
+        if (!glideTRef.current) return; /* already committed */
+        let dur = 0;
+        try { dur = parseFloat(getComputedStyle(wrapEl).transitionDuration) || 0; } catch (e) {}
+        if (!(dur > 0)) finishCommit();
+      });
+    } else {
+      glideTRef.current = setTimeout(finishCommit, 260);
+    }
   };
 
   const onTouchStart = (e) => {
@@ -642,6 +697,7 @@ export function ak({ profile }) {
     if (glideTRef.current) finishCommit();
     if (peekHoldTRef.current || holdPeek) {
       clearPeekHold();
+      holdGenRef.current += 1; /* any pending release must not drop this gesture's peek */
       setHoldPeek(false);
       setPeek(null);
     }
@@ -725,8 +781,7 @@ export function ak({ profile }) {
          one batch, with the enter animation suppressed. The result is one
          continuous slide, no teleport, no re-entry animation. */
       setDragX(x > 0 ? w : -w);
-      glideTargetRef.current = target;
-      glideTRef.current = setTimeout(finishCommit, 250);
+      armGlide(target);
     } else {
       setDragX(0);
       setPeek(null);
