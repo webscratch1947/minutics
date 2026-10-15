@@ -501,13 +501,15 @@ export function mk({
       children: [
         img,
         jsx("div", { className: "mt-2", children: jsxs("div", {
-          className: "bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]",
+          /* Compact card (user: "the box of the salary is too big"): tighter
+             padding + a lighter input — the card takes ~1/3 less height. */
+          className: "bg-white border border-black/[.08] rounded-2xl px-3.5 py-3 shadow-[0_6px_20px_rgba(15,23,42,0.07)]",
           children: [
             label("Your monthly salary"),
             jsxs("div", {
               className: "flex items-center gap-2",
               children: [
-                jsx("span", { className: "text-xl font-black text-gray-400 shrink-0", children: sym }),
+                jsx("span", { className: "text-base font-black text-gray-400 shrink-0", children: sym }),
                 jsx("input", {
                   type: "number",
                   inputMode: "decimal",
@@ -516,12 +518,12 @@ export function mk({
                   onChange: g => setSal(g.target.value),
                   placeholder: "e.g. 50,000",
                   autoFocus: true,
-                  className: "w-full bg-[#F5F6F8] border border-black/10 rounded-xl px-3.5 py-3 text-gray-900 text-lg font-semibold outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className: "w-full bg-[#F5F6F8] border border-black/10 rounded-xl px-3 py-2.5 text-gray-900 text-[15px] font-semibold outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 })
               ]
             }),
             jsx("p", {
-              className: "text-xs text-gray-400 mt-2 leading-relaxed",
+              className: "text-[11px] text-gray-400 mt-1.5 leading-relaxed",
               children: "Powers your Time Value Calculator \u2014 the value of every minute. You can change this later in Life Hub."
             })
           ]

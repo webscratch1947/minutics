@@ -1909,6 +1909,12 @@ function LifeProgressCard({ profile }) {
     const dot = s.indexOf('.');
     tvSplit = [s.slice(0, dot), s.slice(dot + 1)];
   }
+  /* Digit ladder (user: "money timers glitch with many digits"): the big
+     remaining-money number was a FIXED 42px — once the integer part got
+     long (grouped digits), it overflowed the card and clipped mid-glyph.
+     Step the type size down by integer-part length so every value fits. */
+  const tvBigCls = !tvSplit ? '' : tvSplit[0].length <= 7 ? 'text-[42px]' : tvSplit[0].length <= 10 ? 'text-[30px]' : tvSplit[0].length <= 13 ? 'text-[22px]' : 'text-[17px]';
+  const tvFracCls = !tvSplit ? '' : tvSplit[0].length <= 7 ? 'text-[21px]' : tvSplit[0].length <= 10 ? 'text-[16px]' : 'text-[13px]';
 
   const tvMoney = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const tvTile = (o) => jsxs('div', {
@@ -2044,10 +2050,13 @@ function LifeProgressCard({ profile }) {
             className: 'flex items-center justify-between',
             children: [
               jsxs('span', {
-                className: 'flex items-center gap-1.5 text-[9.5px] font-extrabold uppercase tracking-[0.14em] text-foreground/55 whitespace-nowrap',
+                /* min-w-0 + truncate on the label text: a long rate chip can
+                   never push the header row past the card edge (the label
+                   ellipsizes instead — nothing overflows or wraps). */
+                className: 'flex items-center gap-1.5 min-w-0 text-[9.5px] font-extrabold uppercase tracking-[0.14em] text-foreground/55',
                 children: [
                   jsx('span', { className: 'inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse shrink-0' }),
-                  'Today\u2019s Money Timer'
+                  jsx('span', { className: 'truncate', children: 'Today\u2019s Money Timer' })
                 ]
               }),
               jsxs('div', {
@@ -2086,8 +2095,8 @@ function LifeProgressCard({ profile }) {
               jsxs('span', {
                 className: 'relative flex items-baseline min-w-0',
                 children: [
-                  jsx('span', { className: 'text-[42px] font-black leading-none tracking-tight tabular-nums text-foreground', children: tvSplit[0] }),
-                  jsx('span', { className: 'text-[21px] font-black leading-none tabular-nums text-foreground/55 ml-0.5', children: '.' + tvSplit[1] })
+                  jsx('span', { className: tvBigCls + ' font-black leading-none tracking-tight tabular-nums text-foreground', children: tvSplit[0] }),
+                  jsx('span', { className: tvFracCls + ' font-black leading-none tabular-nums text-foreground/55 ml-0.5', children: '.' + tvSplit[1] })
                 ]
               })
             ]

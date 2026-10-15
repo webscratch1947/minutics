@@ -1,5 +1,5 @@
 import { jsx, jsxs } from 'react/jsx-runtime';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen, LayoutGrid, ListTodo, Settings, Timer } from 'lucide-react';
 import { cn } from './lib/cn.js';
@@ -126,6 +126,11 @@ function LTTopNav() {
    pass immediately. The MutationObserver path is throttled to one run per
    500ms, so a fast tab switch right after another one dropped the new
    screen's pass and painted the previous screen's injected UI. */
+/* Set by the shell when it ALREADY ran this pass pre-paint (tap-switch path:
+   the ghost + incoming wrapper get enhanced before their first frame, so
+   nothing pops in mid-slide). RouteWatcher then skips its duplicate — one
+   full DOM pass per navigation, not two. */
+let gEnhPassPath = null;
 function RouteWatcher() {
   const { pathname } = useLocation();
   useEffect(() => {
@@ -134,6 +139,7 @@ function RouteWatcher() {
     const main = document.querySelector('#root main') || document.querySelector('main');
     if (main) main.scrollTop = 0;
     try { window.scrollTo(0, 0); } catch (e) {}
+    if (gEnhPassPath === pathname) { gEnhPassPath = null; return; }
     try { window.dispatchEvent(new CustomEvent('lt-route-change', { detail: pathname })); } catch (e) {}
   }, [pathname]);
   return null;
@@ -515,7 +521,14 @@ export function ak({ profile }) {
      gliding from that offset instead of re-sliding in from the edge. */
   const animRef = useRef({ prev: pathname, dir: 0 });
   const suppressAnimRef = useRef(false);
+  /* OUTGOING-PAGE GHOST: the screen the user is leaving, kept painted
+     underneath while the new one slides in. Without it the old page
+     unmounts at t=0 and the slide starts over a bare gradient band —
+     the flicker seen on tab switches. Swipe commits don't use it (the
+     pinned peek cover owns those); it lives only for the enter slide. */
+  const [ghost, setGhost] = useState(null);
   if (animRef.current.prev !== pathname) {
+    const fromPath = animRef.current.prev;
     const pi = tabIndex(animRef.current.prev);
     const ni = tabIndex(pathname);
     const suppress = suppressAnimRef.current;
@@ -524,6 +537,9 @@ export function ak({ profile }) {
       prev: pathname,
       dir: suppress ? 0 : ((pi >= 0 && ni >= 0 && pi !== ni) ? (ni > pi ? 1 : -1) : 1)
     };
+    /* Render-phase state update: re-runs this render before commit so the
+       ghost mounts in the SAME commit as the incoming wrapper. */
+    setGhost(!suppress && fromPath !== pathname ? fromPath : null);
   }
   const enterDir = animRef.current.dir;
 
@@ -563,22 +579,45 @@ export function ak({ profile }) {
      injects Journal "Full view" buttons is throttled (1 run / 500ms) and only
      fires on DOM mutations — during a fast finger-drag it often didn't run
      until AFTER release, so the peeked Journal showed no Full view button.
-     Fire the unthrottled immediate pass the moment the peek target changes —
-     but IDLE-scheduled: running a full DOM scan + React writes synchronously
-     at the moment the finger locks dropped frames at the START of every
-     swipe (the "laggy slide switch"). Hard200ms cap: the peek is complete
-     long before any release. */
+     Idle-scheduled (hard 200ms cap) while the finger is down — but always
+     CANCELLED and flushed SYNCHRONOUSLY at release, BEFORE the glide starts:
+     an enhancement pass landing mid-slide re-rasters the promoted panes and
+     pops content into a moving page (the "shitty flicker when we use the
+     slide switcher"). Content is final before anything moves. */
+  const peekEnhRef = useRef(null);
+  const cancelPeekEnh = () => {
+    const p = peekEnhRef.current;
+    if (!p) return;
+    if (p.kind === 'idle') { try { window.cancelIdleCallback(p.id); } catch (e) {} }
+    else clearTimeout(p.id);
+    peekEnhRef.current = null;
+  };
+  const flushPeekEnhance = () => {
+    cancelPeekEnh();
+    try { window.dispatchEvent(new CustomEvent('lt-route-change')); } catch (e) {}
+  };
   useEffect(() => {
     if (!peek) return;
-    const run = () => { try { window.dispatchEvent(new CustomEvent('lt-route-change')); } catch (e) {} };
-    let id;
-    if (window.requestIdleCallback) id = window.requestIdleCallback(run, { timeout: 200 });
-    else id = setTimeout(run, 100);
-    return () => {
-      if (window.requestIdleCallback) window.cancelIdleCallback(id);
-      else clearTimeout(id);
+    const run = () => {
+      peekEnhRef.current = null;
+      try { window.dispatchEvent(new CustomEvent('lt-route-change')); } catch (e) {}
     };
+    if (window.requestIdleCallback) peekEnhRef.current = { kind: 'idle', id: window.requestIdleCallback(run, { timeout: 200 }) };
+    else peekEnhRef.current = { kind: 't', id: setTimeout(run, 100) };
+    return cancelPeekEnh;
   }, [peek]);
+  /* Gesture-busy flag (body[data-lt-swipe]): enhancement AUTO-paths — the
+     MutationObserver throttle, the 3s sweep and the cold-start poll — must
+     not mutate the DOM while a swipe is tracking or gliding. Any write
+     re-rasters the composited panes and can pop content into a moving page.
+     The MANUAL lt-route-change dispatches are not gated: they run at
+     controlled moments with the panes frozen. */
+  const setSwipeBusy = (on) => {
+    try {
+      if (on) document.body.dataset.ltSwipe = '1';
+      else delete document.body.dataset.ltSwipe;
+    } catch (e) {}
+  };
   /* Imperative style targets. pointermove fires up to ~120×/s — pushing
      dragX through React re-rendered the whole page tree on EVERY event,
      which made the slide feel heavy and then suddenly "detach". During the
@@ -618,6 +657,29 @@ export function ak({ profile }) {
     location: { pathname: peek, search: '', hash: '', state: null, key: 'peek' }
   }) : null), [peek, profile]);
 
+  const ghostEl = useMemo(() => (ghost ? jsx(AppRoutes, {
+    profile,
+    location: { pathname: ghost, search: '', hash: '', state: null, key: 'ghost' }
+  }) : null), [ghost, profile]);
+
+  /* LAYOUT effect — runs after the commit that mounts ghost + incoming
+     wrapper, BEFORE their first painted frame: one immediate enhancement
+     pass leaves BOTH complete at t=0 (the passive RouteWatcher pass would
+     land post-paint and pop pills/strips in mid-slide). RouteWatcher sees
+     the flag and skips its duplicate dispatch. */
+  useLayoutEffect(() => {
+    if (!ghost) return;
+    gEnhPassPath = pathname;
+    try { window.dispatchEvent(new CustomEvent('lt-route-change', { detail: pathname })); } catch (e) {}
+  }, [ghost, pathname]);
+  /* The ghost outlives the slide only long enough to stay covered: the
+     enter animation's end, or a hard cap for lost animationend events. */
+  useEffect(() => {
+    if (!ghost) return;
+    const t = setTimeout(() => setGhost(null), 450);
+    return () => clearTimeout(t);
+  }, [ghost]);
+
   /* Completes an in-flight swipe commit: the target page (the peek pane,
      which has been gliding to rest) is swapped for the real current route
      in one batch — both render identical content at the same offset, so the
@@ -629,6 +691,7 @@ export function ak({ profile }) {
     glideTRef.current = null;
     stopGlideWait();
     clearPeekHold();
+    setSwipeBusy(false); /* glide over — enhancement auto-paths may run again */
     suppressAnimRef.current = true;
     const target = glideTargetRef.current;
     glideTargetRef.current = null;
@@ -688,6 +751,9 @@ export function ak({ profile }) {
   };
 
   const onTouchStart = (e) => {
+    /* Any new touch resets the busy flag — a stale flag would mute the
+       enhancement auto-paths for the rest of the session. */
+    setSwipeBusy(false);
     /* Tab-swipe starts from anywhere on the main app (inside #root): the
        bottom nav pill, page content, all of it — so switching tabs never
        needs a nav tap. Enhancement sheets/modals are appended OUTSIDE
@@ -713,6 +779,10 @@ export function ak({ profile }) {
     if (peekHoldTRef.current || holdPeek) {
       clearPeekHold();
       holdGenRef.current += 1; /* any pending release must not drop this gesture's peek */
+      /* Expose the committed page FULLY enhanced before dropping the pinned
+         cover — a clean (un-enhanced) frame here pops pills/strips out and
+         back in. Cancels any pending peek pass too (the old pane is going). */
+      flushPeekEnhance();
       setHoldPeek(false);
       setPeek(null);
     }
@@ -751,6 +821,12 @@ export function ak({ profile }) {
         if (x0 < -w0) x0 = -w0;
         g.x = x0;
         g.sign = dx > 0 ? 1 : -1;
+        /* Busy from the lock: the peek's mount is a huge childList mutation
+           that would otherwise schedule an auto-enhancement run right into
+           the glide. Also drop any lingering ghost — it would otherwise be
+           revealed as a stale frozen page in the band the slide uncovers. */
+        setSwipeBusy(true);
+        setGhost(null);
         setTracking(true);
         setDragX(x0); /* one render — styles are correct from the start */
         setPeek(has0 ? TABS[next0] : null);
@@ -795,9 +871,16 @@ export function ak({ profile }) {
          where the finger left off) and then swap it for the real route in
          one batch, with the enter animation suppressed. The result is one
          continuous slide, no teleport, no re-entry animation. */
+      /* Complete the peek's enhancement pass NOW — synchronously, panes
+         still frozen — so the glide and the hold-release show final
+         content. Nothing is ever injected into a MOVING pane (mid-slide
+         DOM writes re-raster the promoted layers = the flicker). */
+      flushPeekEnhance();
+      setSwipeBusy(true); /* stays set through the glide; finishCommit clears */
       setDragX(x > 0 ? w : -w);
       armGlide(target);
     } else {
+      setSwipeBusy(false);
       setDragX(0);
       setPeek(null);
     }
@@ -827,6 +910,16 @@ export function ak({ profile }) {
            up exactly before, during and after the slide. */
         className: 'relative flex-1 min-h-0 overflow-hidden lt-swipe-bg',
         children: [
+          /* Outgoing-page ghost (see animRef): painted FIRST so the keyed
+             wrapper — always stacking-contexted (transform/animation/
+             will-change) and later in tree order — paints above it. */
+          ghost ? jsx('div', {
+            key: 'ghost-' + ghost,
+            'data-lt-ghost': ghost,
+            className: 'absolute inset-0 overflow-hidden pointer-events-none',
+            style: { transform: 'translateX(0px)' },
+            children: ghostEl
+          }) : null,
           jsx('div', {
             key: pathname,
             ref: wrapRef,
@@ -834,6 +927,12 @@ export function ak({ profile }) {
             style: {
               transform: dragX ? 'translateX(' + dragX + 'px)' : undefined,
               transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'
+            },
+            /* Enter slide done → the ghost has been fully covered; drop it
+               (the 450ms effect timeout backstops a lost animationend). */
+            onAnimationEnd: (ev) => {
+              if (ev.target === ev.currentTarget && ev.animationName &&
+                  ev.animationName.indexOf('lt-page-in') === 0) setGhost(null);
             },
             children: pageEl
           }),

@@ -6428,10 +6428,15 @@ import { getStore } from "./lib/storage.js";
   function injectJournalFullView() {
     var pathCheck = location.pathname + location.hash;
     if (pathCheck.indexOf("journal") === -1) {
-      /* Also allow a live peek copy of the Journal (hold-slide preview). */
+      /* Also allow a live peek copy of the Journal (hold-slide preview), and
+         an outgoing Journal ghost (tap-switch: the old page stays painted
+         under the incoming slide — pills must not blink out of it). */
       try {
         var _pv = document.querySelector("[data-lt-peek]");
-        if (!_pv || (_pv.getAttribute("data-lt-peek") || "").indexOf("journal") === -1) return;
+        var _gv = document.querySelector("[data-lt-ghost]");
+        var _peekIsJournal = _pv && (_pv.getAttribute("data-lt-peek") || "").indexOf("journal") !== -1;
+        var _ghostIsJournal = _gv && (_gv.getAttribute("data-lt-ghost") || "").indexOf("journal") !== -1;
+        if (!_peekIsJournal && !_ghostIsJournal) return;
       } catch (e) { return; }
     }
     var rows = fvFindDateRows();
@@ -8991,6 +8996,13 @@ import { getStore } from "./lib/storage.js";
       try {
         var _peekPane = document.querySelector("[data-lt-peek]");
         if (_peekPane && (_peekPane.getAttribute("data-lt-peek") || "").indexOf("journal") !== -1) onJournal = true;
+        /* Same for the outgoing-page ghost: tapping AWAY from the Journal
+           leaves the old Journal painted under the incoming slide for ~300ms
+           — its Full view pills must stay injected or they blink out at t=0. */
+        if (!onJournal) {
+          var _ghostPane = document.querySelector("[data-lt-ghost]");
+          if (_ghostPane && (_ghostPane.getAttribute("data-lt-ghost") || "").indexOf("journal") !== -1) onJournal = true;
+        }
       } catch (e) {}
     }
     /* One-time setup — always run */
@@ -9035,6 +9047,11 @@ import { getStore } from "./lib/storage.js";
     _enhanceScheduled = true;
     window.requestAnimationFrame(function () {
       _enhanceScheduled = false;
+      /* Swipe tracking/glide in progress: mutating the DOM now re-rasters
+         the composited panes and can pop content into a moving page (the
+         slide-switch flicker). The swipe runs its own manual pass at
+         release/commit, so dropping this tick loses nothing. */
+      if (document.body && document.body.dataset && document.body.dataset.ltSwipe) return;
       var now = Date.now();
       if (now - _lastEnhanceRun < 500) return;
       _lastEnhanceRun = now;
@@ -9208,6 +9225,8 @@ import { getStore } from "./lib/storage.js";
        React paints in stages; slow poll is a safety net for edge cases. */
     var observer = new MutationObserver(function (mutations) {
       if (activeOverlay) return;
+      /* Mid-gesture mutations wait: no auto pass while a swipe owns the DOM. */
+      if (document.body && document.body.dataset && document.body.dataset.ltSwipe) return;
       var relevant = mutations.some(function (m) {
         return !m.target.closest || !m.target.closest("[data-lt-enhancement],[data-lt-tile-injected]");
       });
@@ -9219,10 +9238,17 @@ import { getStore } from "./lib/storage.js";
     var fastPolls = 0;
     var fastTimer = setInterval(function () {
       fastPolls++;
-      if (!activeOverlay) runEnhancements();
+      if (!document.body.dataset.ltSwipe && !activeOverlay) runEnhancements();
       if (fastPolls >= 8) clearInterval(fastTimer); /* ~1.6s at 200ms */
     }, 200);
-    setInterval(function () { sweepStuckUi(); if (!activeOverlay) runEnhancements(); }, 3000);
+    setInterval(function () {
+      /* Skip the tick while a swipe is mid-flight — a background full pass
+         during the glide would re-raster the panes (flicker). The next
+         3s tick, or the route-change pass, catches anything it missed. */
+      if (document.body.dataset.ltSwipe) return;
+      sweepStuckUi();
+      if (!activeOverlay) runEnhancements();
+    }, 3000);
   });
 
   /* ══════════════════════════════════════════════════════════════════════
