@@ -9313,7 +9313,7 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       overlay.id = "lt-privacy-shutter";
       overlay.setAttribute("aria-hidden", "true");
       overlay.style.cssText =
-        "position:fixed;inset:0;background:#000;z-index:2147483000;" +
+        "position:fixed;inset:0;background:#000;z-index:2147483647;" +
         "opacity:0;pointer-events:none;transition:opacity .12s ease;" +
         "display:flex;align-items:flex-end;justify-content:center;padding-bottom:26px;";
       peekBtn = document.createElement("button");
@@ -9343,6 +9343,14 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
     function apply() {
       if (!overlay) return;
       var show = engaged && !peeking;
+      if (show) {
+        /* Re-attach as the LAST element of <html> whenever it engages: the
+           shutter shares the max z-index with other top overlays (emoji
+           picker, Full View, toasts) and among ties the last node in tree
+           order paints on top — so an overlay opened earlier can never show
+           through the privacy screen. */
+        try { document.documentElement.appendChild(overlay); } catch (e) {}
+      }
       overlay.style.opacity = show ? "1" : "0";
       overlay.style.pointerEvents = show ? "auto" : "none";
     }
