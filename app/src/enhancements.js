@@ -9072,6 +9072,34 @@ import { getStore } from "./lib/storage.js";
     if (!activeOverlay) runEnhancements();
   }
 
+  /* ── Non-blocking navigation pass ────────────────────────────────────────
+     runEnhancements is a full-DOM scan + writes (normalizeMinuteUnits walks
+     EVERY text node). Run synchronously on every route change it froze the
+     app for 1.5–2s after each navigation — tap a tab and the page looked
+     dead ("Life Hub doesn't open"), swipe-commit and nothing could be
+     scrolled. Idle-scheduled (hard 250ms cap) the page paints and responds
+     instantly; the pass fills in as soon as the main thread breathes.
+     One pending run max: fast tab switches coalesce instead of stacking.
+     If a swipe owns the DOM (body[data-lt-swipe]) the run backs off 200ms
+     per try (so it can't rapid-burn idle callbacks and land mid-drag) and
+     gives up after 15 tries — never an infinite loop. */
+  var _navPassPending = null;
+  function _scheduleNavPass(tries) {
+    if (_navPassPending) return;
+    var t = tries || 0;
+    var attempt = function () {
+      _navPassPending = null;
+      if (document.body && document.body.dataset && document.body.dataset.ltSwipe && t < 15) {
+        _scheduleNavPass(t + 1);
+        return;
+      }
+      runEnhancementsImmediate();
+    };
+    if (t > 0) _navPassPending = setTimeout(attempt, 200);
+    else if (window.requestIdleCallback) _navPassPending = window.requestIdleCallback(attempt, { timeout: 250 });
+    else _navPassPending = setTimeout(attempt, 150);
+  }
+
   /* P3+P4+P5 REMOVED: Nav mask system, installOverlayNavGuard, history patches
      The nav mask covered the screen during route transitions to hide
      unstyled React content. With React owning all UI, this is no longer
@@ -9200,7 +9228,9 @@ import { getStore } from "./lib/storage.js";
       if (activeOverlay) closeOverlay();
       if (catModalRoot) { catModalPushedHistory = false; closeCategoryModal("popstate"); }
       if (document.getElementById("lt-clockpicker-overlay")) closeClockPicker();
-      runEnhancementsImmediate();
+      /* Heavy pass runs IDLE (see _scheduleNavPass) — never on the
+         navigation's critical path. */
+      _scheduleNavPass();
     });
     setTimeout(maybeShowOverlayPermissionModal, 1200);
     /* Guard against a feedback loop: runEnhancements() itself writes to the

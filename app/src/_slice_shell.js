@@ -488,11 +488,13 @@ const SHELL_CSS = [
   '@keyframes lt-fade-in{from{opacity:0}to{opacity:1}}',
   '.lt-sheet-in{animation:lt-sheet-up .26s cubic-bezier(.22,.61,.36,1)}',
   '.lt-fade-in{animation:lt-fade-in .2s ease}',
-  /* Swipe panes on their own compositor layers: without this the browser
-     re-rasterizes the whole (heavy) page every frame a transform changes —
-     the jank felt as a "laggy slide switch". With it, moving the strip is
-     pure GPU compositing. */
-  '.lt-swipe-bg > div{will-change:transform;backface-visibility:hidden}',
+  /* NOTE: NO permanent will-change/transform hint on the panes. A resting
+     will-change:transform makes each pane a stacking context, which CAPS
+     every z-index inside the page (sheets z-60, modals z-80) below the
+     bottom nav's z-50 — sheets then render BEHIND the nav. The layer hint
+     is applied via inline style only while a gesture owns the panes
+     (wrap/peek style objects below), so at rest in-page overlays rank
+     correctly again. */
   'body.lt-ui-editing [data-lt-move]{outline:1px dashed rgba(0,194,168,.55);outline-offset:-2px;touch-action:none;cursor:grab;transition:order .28s cubic-bezier(.22,.61,.36,1),outline .15s,box-shadow .15s}',
   'body.lt-ui-editing [data-lt-move].lt-dragging{outline:2px solid #00C2A8;cursor:grabbing;box-shadow:0 14px 34px rgba(4,9,30,.35);opacity:.96;pointer-events:none;z-index:60!important;transition:none;will-change:transform}',
   'body.lt-ui-editing [data-lt-move].lt-swap-target{outline:2px solid #FFB020;outline-offset:-2px;box-shadow:0 0 0 5px rgba(255,176,32,.25)}'
@@ -871,7 +873,23 @@ export function ak({ profile }) {
             className: cn('h-full', enterDir === 1 ? 'lt-page-in-r' : enterDir === -1 ? 'lt-page-in-l' : ''),
             style: {
               transform: dragX ? 'translateX(' + dragX + 'px)' : undefined,
-              transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'
+              transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)',
+              /* Compositor layer ONLY while the pane moves (tracking or
+                 gliding): keeps the slide smooth without a resting stacking
+                 context that would bury in-page sheets under the nav. */
+              willChange: (tracking || dragX) ? 'transform' : undefined
+            },
+            /* Strip the enter-animation class the moment it finishes: the
+               animation (transform != none) is itself a stacking context —
+               while it exists every in-page z-index (sheets z-60, modals
+               z-80) is capped under the bottom nav's z-50. Finished +
+               fill:none reverts on its own, but the class lingering forever
+               left a promoted layer in some engines. */
+            onAnimationEnd: (e) => {
+              const n = e.animationName;
+              if (n === 'lt-page-in-r' || n === 'lt-page-in-l') {
+                e.currentTarget.classList.remove('lt-page-in-r', 'lt-page-in-l');
+              }
             },
             children: pageEl
           }),
@@ -889,10 +907,11 @@ export function ak({ profile }) {
                here made the swipe lose the rainbow. */
             className: 'absolute inset-0 pointer-events-none overflow-hidden',
             style: holdPeek
-              ? { transform: 'translateX(0px)', transition: 'none' }
+              ? { transform: 'translateX(0px)', transition: 'none', willChange: 'transform' }
               : {
                   transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
-                  transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'
+                  transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)',
+                  willChange: 'transform'
                 },
             children: peekEl
           }) : null
