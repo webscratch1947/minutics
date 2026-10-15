@@ -3,6 +3,8 @@
    never a short hand-picked list. (Tasks deliberately have no emoji.) */
 import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.js";
 import { getStore } from "./lib/storage.js";
+import { getMessaging, getToken } from "firebase/messaging";
+import { getApps } from "firebase/app";
 
 (function () {
   "use strict";
@@ -6641,16 +6643,19 @@ import { getStore } from "./lib/storage.js";
     }
   }
 
-  /* ── Android: keep the native reminder checker fed ───────────────────────
+  /* ── Notification state sync — native alarm (Android) + service-worker
+        mirror (web/desktop) ──────────────────────────────────────────────
      The WebView suspends JS timers while the app is backgrounded, so the
      10-minute idle nudge and the Time Waste budget alert also run NATIVELY
-     on a 10-minute alarm (NotificationCheckReceiver). This pushes the
-     snapshot that alarm needs; the getters below read back what native
-     already sent so web + native never double-notify the same event. */
+     on a 10-minute alarm (NotificationCheckReceiver). On the WEB nothing
+     can run while the app is closed EXCEPT the service worker — and a
+     service worker cannot read localStorage — so the same snapshot is
+     mirrored into IndexedDB on every sync; firebase-messaging-sw.js
+     consumes it when the GitHub cron pings the FCM topic every 10 minutes.
+     The getters below read back what native/SW already sent so page,
+     native and SW never double-notify the same event. */
   var _lastNotifSyncAt = 0;
   function syncNotifStateBridge(force) {
-    var b = typeof window !== "undefined" && window.AndroidBridge;
-    if (!b || typeof b.syncNotificationState !== "function") return;
     var now = Date.now();
     if (!force && now - _lastNotifSyncAt < 5000) return;
     _lastNotifSyncAt = now;
@@ -6659,7 +6664,7 @@ import { getStore } from "./lib/storage.js";
       try { profile = !!localStorage.getItem("lifetime_profile"); } catch (e) {}
       var nudgeData = readJson(NUDGE_KEY, {});
       var wasteCfg = readJson(WASTE_BUDGET_KEY, { minutes: 45 });
-      b.syncNotificationState(JSON.stringify({
+      var snap = {
         profile: profile,
         running: !!getNativeRunningBlock(),
         idleSince: nudgeData.noActivitySince || 0,
@@ -6667,10 +6672,149 @@ import { getStore } from "./lib/storage.js";
         wasteMins: computeWasteMinutesToday(),
         wasteLimit: wasteCfg && wasteCfg.minutes > 0 ? wasteCfg.minutes : 0,
         wasteDay: localDayKey(),
-        /* Day the WEB side already alerted for — native keeps the newer of
+        /* Day the WEB side already alerted for — native/SW keep the newer of
            the two so the budget alert fires exactly once per day. */
         wasteNotifiedDay: (typeof _wasteNotifiedDay === "string" ? _wasteNotifiedDay : "") || ""
-      }));
+      };
+
+      /* Android: feed the native 10-min alarm chain. */
+      try {
+        var b = window.AndroidBridge;
+        if (b && typeof b.syncNotificationState === "function") {
+          b.syncNotificationState(JSON.stringify(snap));
+        }
+      } catch (e) {}
+
+      /* Web/desktop: mirror for the service worker (closed-app checks),
+         adopt anything the SW fired while we were away, and keep this
+         device on the FCM check topic. Adopt FIRST and write after: the
+         snapshot record doubles as the SW's writeback channel, so writing
+         first would clobber the very lastNudge / wasteNotifiedDay values
+         we are about to adopt. */
+      try {
+        var pendingCat = readJson(PENDING_TIMER_CAT_KEY, null);
+        var runStart = Number(readJson(RUNNING_TIMER_KEY, 0));
+        var wasteRunning = !!(pendingCat && pendingCat.category &&
+          WASTE_CATEGORIES.indexOf(pendingCat.category) !== -1 && runStart > 0);
+        adoptBgSnapshot(function () {
+          var n2 = readJson(NUDGE_KEY, {});
+          writeBgSnapshot({
+            profile: snap.profile,
+            running: snap.running,
+            idleSince: n2.noActivitySince || snap.idleSince,
+            lastNudge: n2.lastNudge || snap.lastNudge,
+            wasteMins: snap.wasteMins,
+            wasteLimit: snap.wasteLimit,
+            wasteDay: snap.wasteDay,
+            wasteNotifiedDay: (typeof _wasteNotifiedDay === "string" ? _wasteNotifiedDay : "") || snap.wasteNotifiedDay,
+            runningWasteSince: wasteRunning ? runStart : 0,
+            wasteCheckedAt: now,
+            updatedAt: now
+          });
+        });
+        ensureFcmSubscription();
+      } catch (e) {}
+    } catch (e) {}
+  }
+
+  /* ── Desktop/web closed-app checks: IndexedDB state mirror ──────────────
+     Service workers cannot see localStorage, so every state sync also
+     mirrors the snapshot here — SAME database the SW opens
+     (lt_bg_state / kv / snapshot). The SW writes back what IT fired
+     (lastNudge, wasteNotifiedDay); adoptBgSnapshot pulls those into
+     localStorage so the page never repeats an alert the SW already showed. */
+  var _bgIdbRef = null;
+  function _bgOpenDb(cb) {
+    try {
+      if (_bgIdbRef) { cb(_bgIdbRef); return; }
+      var rq = indexedDB.open("lt_bg_state", 1);
+      rq.onupgradeneeded = function () { try { rq.result.createObjectStore("kv"); } catch (e) {} };
+      rq.onsuccess = function () { _bgIdbRef = rq.result; cb(_bgIdbRef); };
+      rq.onerror = function () { cb(null); };
+    } catch (e) { cb(null); }
+  }
+  function writeBgSnapshot(snap) {
+    _bgOpenDb(function (db) {
+      if (!db) return;
+      try { db.transaction("kv", "readwrite").objectStore("kv").put(snap, "snapshot"); } catch (e) {}
+    });
+  }
+  function readBgSnapshot(cb) {
+    _bgOpenDb(function (db) {
+      if (!db) { cb(null); return; }
+      try {
+        var rq = db.transaction("kv", "readonly").objectStore("kv").get("snapshot");
+        rq.onsuccess = function () { cb(rq.result || null); };
+        rq.onerror = function () { cb(null); };
+      } catch (e) { cb(null); }
+    });
+  }
+  function adoptBgSnapshot(cb) {
+    readBgSnapshot(function (s) {
+      try {
+        if (s && Number(s.lastNudge) > 0) {
+          var nd = readJson(NUDGE_KEY, {});
+          if (Number(s.lastNudge) > (nd.lastNudge || 0)) {
+            nd.lastNudge = Number(s.lastNudge);
+            writeJson(NUDGE_KEY, nd);
+          }
+        }
+      } catch (e) {}
+      try {
+        if (s && s.wasteNotifiedDay) {
+          var day = localDayKey();
+          if (s.wasteNotifiedDay !== _wasteNotifiedDay && s.wasteNotifiedDay >= day) {
+            _wasteNotifiedDay = s.wasteNotifiedDay;
+            writeJson(WASTE_NOTIFIED_DAY_KEY, s.wasteNotifiedDay);
+          }
+        }
+      } catch (e) {}
+      if (cb) { try { cb(); } catch (e) {} }
+    });
+  }
+
+  /* ── FCM check-topic subscription (web only) ─────────────────────────────
+     One silent getToken + subscribe per token/day keeps this device on the
+     minutics-check topic the 10-min cron pings. Android never gets here (the
+     native alarm chain owns closed-app alerts there), and a token is only
+     requested when permission is ALREADY granted — no surprise prompts. */
+  var _LT_VAPID = "BKLC0IM70THg6XTfAm6HBEJXmptMaFaEy4WHVhl_L6MwFFEhOVleExlXV9mrvEwurnFPgXFkYHr2fp6iOeeFf0U";
+  var _fcmEnsuredAt = 0;
+  function ensureFcmSubscription() {
+    try {
+      if (window.AndroidBridge) return;
+      if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+      if (!navigator.serviceWorker) return;
+      if (!getApps().length) return;
+      var now = Date.now();
+      if (now - _fcmEnsuredAt < 60 * 60 * 1000) return; /* probe at most hourly */
+      _fcmEnsuredAt = now;
+      navigator.serviceWorker.ready.then(function (reg) {
+        if (!reg) return;
+        return getToken(getMessaging(getApps()[0]), {
+          vapidKey: _LT_VAPID,
+          serviceWorkerRegistration: reg
+        }).then(function (tok) {
+          if (!tok) return null;
+          var lastTok = "";
+          var subAt = 0;
+          try {
+            lastTok = localStorage.getItem("lt_fcm_token") || "";
+            subAt = Number(localStorage.getItem("lt_fcm_topic_at")) || 0;
+            localStorage.setItem("lt_fcm_token", tok);
+          } catch (e) {}
+          if (tok === lastTok && now - subAt < 24 * 60 * 60 * 1000) return null;
+          return fetch("/api/fcm-send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fcmToken: tok, action: "subscribe" })
+          }).then(function (r) { return r && r.ok ? r.json() : null; }).then(function (d) {
+            if (d && d.ok) {
+              try { localStorage.setItem("lt_fcm_topic_at", String(Date.now())); } catch (e) {}
+            }
+          }).catch(function () {});
+        }).catch(function () {});
+      }).catch(function () {});
     } catch (e) {}
   }
 

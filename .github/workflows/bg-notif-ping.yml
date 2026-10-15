@@ -1,0 +1,30 @@
+# Closed-app notification heartbeat (web/desktop).
+#
+# A website cannot run code after it is closed, so the Minutics page cannot
+# alert you on its own once the window is gone. This workflow is the missing
+# clock: every 10 minutes it pings the silent FCM topic "minutics-check"
+# through the existing /api/fcm-send endpoint (server-side payload only).
+# Each device's service worker (app/public/firebase-messaging-sw.js) wakes on
+# the push, reads its own state mirror (IndexedDB, written by the page's 60s
+# heartbeat), and shows the idle-nudge / Time Waste budget notification only
+# when one is actually due — silently ignored otherwise.
+#
+# No secrets required: the endpoint carries the Firebase credentials.
+name: bg-notif-ping
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping background checks
+        run: |
+          curl -sS --max-time 30 -X POST "https://app.minutics.com/api/fcm-send" \
+            -H "Content-Type: application/json" \
+            -d '{"topic":"minutics-check"}' \
+            -w "\nhttp:%{http_code}\n"
