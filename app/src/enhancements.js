@@ -24,24 +24,15 @@ import { getStore } from "./lib/storage.js";
       "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
       "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
 
-    /* Static logo — painted before (and behind) the video, so the very
-       first frame is already branded while the video fetches its first
-       frames. Deliberately STATIC (no pulse/scale animation, same size and
-       position as the inline boot-splash logo): the screen must read as
-       ONE splash — logo → video → app — never as a second, separate
-       "logo animation" in front of the user's own splash video. */
-    var kf = document.createElement("style");
-    kf.textContent = "#lt-startup-splash-logo{width:min(34vw,150px);height:auto;display:block}";
-    document.head.appendChild(kf);
-    var logo = document.createElement("img");
-    logo.id = "lt-startup-splash-logo";
-    logo.src = "assets/icons/logo-512.png?v=1"; /* bump ?v=N when replacing (immutable cache) */
-    logo.alt = "Minutics";
-    splash.appendChild(logo);
-
+    /* NO logo, NO added animation — the splash is ONLY the user's own
+       video (a static logo standing in front of it was reported as
+       "another splash animation"). Cream shows until the video's first
+       frame; the timeouts below guarantee it never lingers. */
     var video = document.createElement("video");
     video.id = "lt-startup-splash-video";
-    video.src = "assets/lt/minutics_splash.mp4?v=1"; /* bump ?v=N when replacing the file (immutable 1y cache) */
+    /* ?v=2: the bump forces a fresh download past any stale/partial cached
+       copy — a bad cached file is why the video "sometimes doesn't play". */
+    video.src = "assets/lt/minutics_splash.mp4?v=2"; /* bump ?v=N when replacing the file (immutable 1y cache) */
     video.autoplay = true;
     video.muted = true;
     video.setAttribute("playsinline", "");
@@ -68,8 +59,8 @@ import { getStore } from "./lib/storage.js";
     video.addEventListener("ended", function () {
       setTimeout(dismiss, 200);
     });
-    /* Video broken/missing: give the branded fallback a beat of animation,
-       then release — never a dead colour screen, never a stuck splash. */
+    /* Video broken/missing: release quickly — never a dead colour screen,
+       never a stuck splash. */
     video.addEventListener("error", function () { setTimeout(dismiss, 1200); });
 
     /* ALWAYS muted — decision: no splash audio, ever. Autoplay-with-sound
@@ -79,9 +70,9 @@ import { getStore } from "./lib/storage.js";
     video.muted = true;
     video.play().catch(function () {});
 
-    /* Static fallback alone is released by MAX_MS; a video that actually
-       started plays through to its natural end (ended → dismiss above),
-       with HARD_MS as the absolute escape hatch. */
+    /* Cream alone is released by MAX_MS; a video that actually started
+       plays through to its natural end (ended → dismiss above), with
+       HARD_MS as the absolute escape hatch. */
     setTimeout(function () { if (!videoStarted) dismiss(); }, MAX_MS);
     setTimeout(dismiss, HARD_MS);
   })();

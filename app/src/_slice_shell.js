@@ -488,6 +488,11 @@ const SHELL_CSS = [
   '@keyframes lt-fade-in{from{opacity:0}to{opacity:1}}',
   '.lt-sheet-in{animation:lt-sheet-up .26s cubic-bezier(.22,.61,.36,1)}',
   '.lt-fade-in{animation:lt-fade-in .2s ease}',
+  /* Swipe panes on their own compositor layers: without this the browser
+     re-rasterizes the whole (heavy) page every frame a transform changes —
+     the jank felt as a "laggy slide switch". With it, moving the strip is
+     pure GPU compositing. */
+  '.lt-swipe-bg > div{will-change:transform;backface-visibility:hidden}',
   'body.lt-ui-editing [data-lt-move]{outline:1px dashed rgba(0,194,168,.55);outline-offset:-2px;touch-action:none;cursor:grab;transition:order .28s cubic-bezier(.22,.61,.36,1),outline .15s,box-shadow .15s}',
   'body.lt-ui-editing [data-lt-move].lt-dragging{outline:2px solid #00C2A8;cursor:grabbing;box-shadow:0 14px 34px rgba(4,9,30,.35);opacity:.96;pointer-events:none;z-index:60!important;transition:none;will-change:transform}',
   'body.lt-ui-editing [data-lt-move].lt-swap-target{outline:2px solid #FFB020;outline-offset:-2px;box-shadow:0 0 0 5px rgba(255,176,32,.25)}'
@@ -558,11 +563,21 @@ export function ak({ profile }) {
      injects Journal "Full view" buttons is throttled (1 run / 500ms) and only
      fires on DOM mutations — during a fast finger-drag it often didn't run
      until AFTER release, so the peeked Journal showed no Full view button.
-     Fire the unthrottled immediate pass the moment the peek target changes so
-     the peek paints complete while the finger is still down. */
+     Fire the unthrottled immediate pass the moment the peek target changes —
+     but IDLE-scheduled: running a full DOM scan + React writes synchronously
+     at the moment the finger locks dropped frames at the START of every
+     swipe (the "laggy slide switch"). Hard200ms cap: the peek is complete
+     long before any release. */
   useEffect(() => {
     if (!peek) return;
-    try { window.dispatchEvent(new CustomEvent('lt-route-change')); } catch (e) {}
+    const run = () => { try { window.dispatchEvent(new CustomEvent('lt-route-change')); } catch (e) {} };
+    let id;
+    if (window.requestIdleCallback) id = window.requestIdleCallback(run, { timeout: 200 });
+    else id = setTimeout(run, 100);
+    return () => {
+      if (window.requestIdleCallback) window.cancelIdleCallback(id);
+      else clearTimeout(id);
+    };
   }, [peek]);
   /* Imperative style targets. pointermove fires up to ~120×/s — pushing
      dragX through React re-rendered the whole page tree on EVERY event,
