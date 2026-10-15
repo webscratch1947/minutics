@@ -6618,12 +6618,12 @@ import { getStore } from "./lib/storage.js";
   setInterval(maybeNotifyRunningActivity, 15000);
 
   /* ══════════════════════════════════════════════════════════════════════════
-     FEATURE 2 — Idle Nudge: fires after 15min with no activity running.
+     FEATURE 2 — Idle Nudge: fires after 10min with no activity running.
      The previous implementation watched a running Waste timer, which meant
      the app could nudge users while they were already tracking something.
   ══════════════════════════════════════════════════════════════════════════ */
 
-  var NUDGE_THRESHOLD_MS = 15 * 60 * 1000; /* 15 minutes */
+  var NUDGE_THRESHOLD_MS = 10 * 60 * 1000; /* 10 minutes */
   var _idleSystemNotification = null;
 
   function closeIdleSystemNotification() {
@@ -6635,8 +6635,8 @@ import { getStore } from "./lib/storage.js";
 
   /* ── Android: keep the native reminder checker fed ───────────────────────
      The WebView suspends JS timers while the app is backgrounded, so the
-     15-minute idle nudge and the Time Waste budget alert also run NATIVELY
-     on a 15-minute alarm (NotificationCheckReceiver). This pushes the
+     10-minute idle nudge and the Time Waste budget alert also run NATIVELY
+     on a 10-minute alarm (NotificationCheckReceiver). This pushes the
      snapshot that alarm needs; the getters below read back what native
      already sent so web + native never double-notify the same event. */
   var _lastNotifSyncAt = 0;
@@ -6724,7 +6724,7 @@ import { getStore } from "./lib/storage.js";
     }
 
     var now = Date.now();
-    /* If the NATIVE 15-min alarm nudged while the WebView was suspended,
+    /* If the NATIVE 10-min alarm nudged while the WebView was suspended,
        adopt its timestamp so the web side never double-fires. */
     var nativeNudge = nativeLastNudgeAt();
     if (nativeNudge > (nudgeData.lastNudge || 0)) {
