@@ -8,10 +8,11 @@
       .fixed.bottom-0 { padding-bottom: env(safe-area-inset-bottom, 0px) !important; }
       #root { display: none; background: #Fdfbf7; }
       body.lt-authed #root { display: block; }
-      /* Neutral grey at the very first paint — no white flash, no branding
-         while the bundle loads. Fades via hideBootSplash() when a real screen
-         is ready; the CSS animation is an independent failsafe (never stuck). */
-      #lt-boot-splash { position: fixed; inset: 0; z-index: 2147483646; background: #FDFBF7; pointer-events: none; opacity: 1; transition: opacity .45s ease; animation: lt-boot-failsafe .45s ease 5s forwards; }
+      /* Branded at the very first paint: cream + centred logo while the
+         bundle loads (a bare cream screen for seconds read as "the splash
+         didn't play"). Fades via hideBootSplash() when a real screen is
+         ready; the CSS animation is an independent failsafe (never stuck). */
+      #lt-boot-splash { position: fixed; inset: 0; z-index: 2147483646; background: #FDFBF7 url('./assets/icons/logo-512.png?v=1') center / min(34vw,150px) auto no-repeat; pointer-events: none; opacity: 1; transition: opacity .45s ease; animation: lt-boot-failsafe .45s ease 5s forwards; }
       @keyframes lt-boot-failsafe { to { opacity: 0; visibility: hidden; } }
     </style>
     <title>Minutics</title>

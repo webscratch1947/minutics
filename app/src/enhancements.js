@@ -7,10 +7,12 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
   "use strict";
 
   /* ── Startup loading screen ────────────────────────────────────────────
-     Neutral grey while assets load (matches the inline #lt-boot-splash),
-     then the branded logo video plays once (no loop) and dismisses right
-     after it ends — a video that never starts is released by MAX_MS so
-     the grey can never linger. */
+     Branded from the FIRST frame: the static logo shows immediately while
+     the logo video buffers/decodes (the video starts at opacity:0 and used
+     to leave a blank cream screen for seconds — "sometimes the splash
+     animation didn't play"). The video fades in over the logo once it
+     actually plays; if it never does, the logo still carries the screen
+     until MAX_MS releases it — never a bare colour, never a stuck splash. */
   (function showStartupSplash() {
     var MAX_MS = 3000;   /* grey alone: release by 3s — never a lingering empty screen */
     var HARD_MS = 7000;  /* absolute escape hatch, even if a playing video runs to its full ~4s */
@@ -20,6 +22,20 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       "position:fixed;inset:0;z-index:2147483647;background:#FDFBF7;" +
       "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
       "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
+
+    /* Static logo — painted before (and behind) the video, so the very
+       first frame is already branded. Pulses gently while it waits. */
+    var kf = document.createElement("style");
+    kf.textContent =
+      "@keyframes lt-splash-pulse{0%,100%{transform:scale(1);opacity:.94}50%{transform:scale(1.045);opacity:1}}" +
+      "#lt-startup-splash-logo{width:min(34vw,150px);height:auto;" +
+      "animation:lt-splash-pulse 1.6s ease-in-out infinite}";
+    document.head.appendChild(kf);
+    var logo = document.createElement("img");
+    logo.id = "lt-startup-splash-logo";
+    logo.src = "assets/icons/logo-512.png?v=1"; /* bump ?v=N when replacing (immutable cache) */
+    logo.alt = "Minutics";
+    splash.appendChild(logo);
 
     var video = document.createElement("video");
     video.id = "lt-startup-splash-video";
@@ -6067,10 +6083,6 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       callback(fvScrapeExpandedDetail(rowButton));
       return;
     }
-    /* Not expanded yet — trigger the app's own row click to expand it,
-       then wait for React to render before reading it. The caller has
-       already covered the screen with the report overlay, so this
-       expand/scrape cycle is never visible. */
     /* If the day is ALREADY open, just read it — never click, or the restore
        click would close the dropdown the user deliberately left open. */
     if (fvRowOpen(rowButton)) {
@@ -6078,19 +6090,11 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       return;
     }
     /* Not expanded yet — trigger the app's own row click to expand it,
-       then wait for React to render before reading it. The caller has
-       already covered the screen with the report overlay, so this
-       expand/scrape cycle is never visible. */
+       then wait for React to render before reading it. The caller opens
+       the report overlay FIRST and delays this call until its slide has
+       covered the screen, so this expand/scrape cycle (and the restore
+       click below) is never visible. */
     var opened = false;
-    /* Programmatic click to expand the row — suppress it from the React
-       dropdown handler by intercepting at the capture phase. */
-    var suppressHandler = function (e) {
-      if (e.target === rowButton) {
-        e.stopImmediatePropagation();
-        rowButton.removeEventListener('click', suppressHandler, true);
-      }
-    };
-    rowButton.addEventListener('click', suppressHandler, true);
     rowButton.click();
     var attempts = 14;
     (function poll() {
@@ -6326,9 +6330,10 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
      "Share" button that leads to the shareable visiting-card image. */
   
 
-  /* Opens the report overlay IMMEDIATELY with real/empty content — no skeleton,
-     no artificial delay. Scraping starts BEFORE the modal opens; fill() swaps
-     in real data instantly. */
+  /* Opens the report overlay INSTANTLY (empty-state layout — no skeleton)
+     and returns a fillOnce(activities) function. The caller scrapes the
+     journal day BEHIND the overlay after its slide has covered the screen,
+     then fills — the open is always immediate, data lands a beat later. */
   function fvOpenReportModal(dateText, activities) {
     var pendingActivities = Array.isArray(activities) ? activities : null;
     /* A previous report may still be in the DOM mid-close-animation — two
@@ -6509,11 +6514,23 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
         e.preventDefault();
         e.stopPropagation();
         var dateText = row.dateText;
-        /* Scrape FIRST, then open with real data — no skeleton, no delay. */
-        fvScrapeJournalDay(row.button, function (activities) {
-          activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
-          fvOpenReportModal(dateText, activities);
-        });
+        /* Open the report INSTANTLY (empty-state layout, no skeleton), then
+           expand/scrape/restore the day row BEHIND the opaque overlay once
+           its 300ms slide has fully covered the screen. Scraping FIRST — as
+           a previous "no delay" attempt did — made the user stare at the
+           Journal for the whole poll window before the overlay appeared
+           ("3 second delay") and popped the day dropdown out in the open.
+           With the overlay covering from frame one, the expand/restore
+           round-trip behind it is invisible and the open feels instant. */
+        var fill = fvOpenReportModal(dateText, null);
+        setTimeout(function () {
+          try {
+            fvScrapeJournalDay(row.button, function (activities) {
+              activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
+              fill(activities);
+            });
+          } catch (err) { fill([]); } /* scrape must never strand the report */
+        }, 340);
       });
       if (rightGroup && rightGroup.lastElementChild) host.insertBefore(btn, rightGroup.lastElementChild);
       else if (dateSpan && dateSpan.nextSibling) host.insertBefore(btn, dateSpan.nextSibling);

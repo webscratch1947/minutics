@@ -527,6 +527,21 @@ export function ak({ profile }) {
   const [dragX, setDragX] = useState(0);
   const [peek, setPeek] = useState(null);
   const [tracking, setTracking] = useState(false);
+  /* COMMIT HOLD: when the glide finishes, the painted peek pane is kept
+     pinned at 0 for a beat while the freshly keyed route wrapper paints.
+     Removing it in the same React commit that mounts the new wrapper left
+     a 1–3 frame hole where only the cream backdrop showed — the "flash of
+     cream background like a refresh" during a slide switch. The held pane
+     renders IDENTICAL content to the wrapper beneath, so the hold (and its
+     removal) is invisible; a new touch cancels it immediately. */
+  const [holdPeek, setHoldPeek] = useState(false);
+  const peekHoldTRef = useRef(null);
+  const clearPeekHold = () => {
+    if (peekHoldTRef.current) {
+      clearTimeout(peekHoldTRef.current);
+      peekHoldTRef.current = null;
+    }
+  };
   /* The peek pane is React-rendered mid-swipe, but the enhancement pass that
      injects Journal "Full view" buttons is throttled (1 run / 500ms) and only
      fires on DOM mutations — during a fast finger-drag it often didn't run
@@ -585,11 +600,21 @@ export function ak({ profile }) {
     if (!glideTRef.current) return;
     clearTimeout(glideTRef.current);
     glideTRef.current = null;
+    clearPeekHold();
     suppressAnimRef.current = true;
-    navigate(glideTargetRef.current);
+    const target = glideTargetRef.current;
     glideTargetRef.current = null;
     setDragX(0);
-    setPeek(null);
+    /* Keep the painted peek pane covering the viewport (pinned at 0) while
+       the new route's wrapper paints, THEN drop it — same content, so the
+       handoff is seamless and the backdrop never flashes through. */
+    setHoldPeek(true);
+    peekHoldTRef.current = setTimeout(() => {
+      peekHoldTRef.current = null;
+      setPeek(null);
+      setHoldPeek(false);
+    }, 220);
+    navigate(target);
   };
 
   const onTouchStart = (e) => {
@@ -612,8 +637,14 @@ export function ak({ profile }) {
       return;
     }
     /* A new gesture finishes any in-flight commit right away so the stale
-       timer can never stomp this gesture's dragX. */
+       timer can never stomp this gesture's dragX. Also cancel any commit
+       HOLD: the pinned peek must be released so this gesture owns it. */
     if (glideTRef.current) finishCommit();
+    if (peekHoldTRef.current || holdPeek) {
+      clearPeekHold();
+      setHoldPeek(false);
+      setPeek(null);
+    }
     if (!e.touches || e.touches.length !== 1) {
       gRef.current.locked = 'v';
       return;
@@ -749,10 +780,12 @@ export function ak({ profile }) {
                same fixed gradient as the page it slides in over. A flat colour
                here made the swipe lose the rainbow. */
             className: 'absolute inset-0 pointer-events-none overflow-hidden',
-            style: {
-              transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
-              transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'
-            },
+            style: holdPeek
+              ? { transform: 'translateX(0px)', transition: 'none' }
+              : {
+                  transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
+                  transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)'
+                },
             children: peekEl
           }) : null
         ]
