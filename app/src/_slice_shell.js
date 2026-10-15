@@ -479,7 +479,7 @@ function uiEditorBind() {
 const SHELL_CSS = [
   /* Rainbow backdrop for the swipe viewport — mirrors body.lt-authed's fixed
      gradient so the slide never reveals flat cream behind the panes. */
-  '.lt-swipe-bg{background-color:#fff;background-image:radial-gradient(620px 440px at -4% -2%, rgba(134,239,190,.42), transparent 60%),radial-gradient(560px 520px at 104% 10%, rgba(255,197,138,.4), transparent 58%),radial-gradient(600px 500px at -6% 104%, rgba(147,197,253,.38), transparent 60%),radial-gradient(520px 440px at 104% 102%, rgba(253,224,71,.3), transparent 58%);background-attachment:fixed}',
+  '.lt-swipe-bg{background-color:#FDFBF7;background-image:radial-gradient(620px 440px at -4% -2%, rgba(134,239,190,.42), transparent 60%),radial-gradient(560px 520px at 104% 10%, rgba(255,197,138,.4), transparent 58%),radial-gradient(600px 500px at -6% 104%, rgba(147,197,253,.38), transparent 60%),radial-gradient(520px 440px at 104% 102%, rgba(253,224,71,.3), transparent 58%);background-attachment:fixed}',
   '@keyframes lt-page-in-r{from{transform:translateX(100%)}to{transform:translateX(0)}}',
   '@keyframes lt-page-in-l{from{transform:translateX(-100%)}to{transform:translateX(0)}}',
   '.lt-page-in-r{animation:lt-page-in-r .3s cubic-bezier(.22,.61,.36,1)}',

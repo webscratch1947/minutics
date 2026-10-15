@@ -1741,15 +1741,6 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
       "#lt-fv-save-btn{background:#fff;color:#3730A3;border:1.5px solid rgba(55,48,163,.30)}",
       ".lt-fv-hint{width:calc(100% - 32px);max-width:480px;color:rgba(55,48,163,.55);font-size:11.5px;text-align:center;margin-top:10px;line-height:1.4;box-sizing:border-box}",
       ".lt-fv-loading{color:rgba(55,48,163,.6);font-size:13px;padding:40px 0}",
-      /* Full-view loading skeleton — mirrors the real report layout so the
-         overlay never shows a bare cream page on open. */
-      "#lt-fv-report-body .lt-fv-skel{width:100%;display:flex;flex-direction:column;align-items:center;gap:22px;padding-top:30px;animation:lt-fv-skel-pulse 1.15s ease-in-out infinite}",
-      "@keyframes lt-fv-skel-pulse{0%,100%{opacity:.9}50%{opacity:.5}}",
-      ".lt-fv-skel-donut{width:136px;height:136px;border-radius:50%;box-sizing:border-box;border:17px solid #ECEEF3;border-top-color:#E2E6EE;border-right-color:#E7EAF1}",
-      ".lt-fv-skel-bars{width:86%;display:flex;flex-direction:column;gap:13px}",
-      ".lt-fv-skel-bars span{display:block;height:13px;border-radius:999px;background:#ECEEF3}",
-      ".lt-fv-skel-cards{width:86%;display:grid;grid-template-columns:1fr 1fr;gap:12px}",
-      ".lt-fv-skel-cards div{height:58px;border-radius:16px;background:#F0F1F5}",
       /* Report tab (stage 1) */
       ".lt-fv-report-card{width:calc(100% - 32px);max-width:480px;background:#fff;border:1.4px solid rgba(55,48,163,.22);border-radius:18px;padding:16px;box-sizing:border-box;margin:0 0 12px;box-shadow:0 6px 20px rgba(55,48,163,.07)}",
       "#lt-fv-report-body{width:100%;display:flex;flex-direction:column;align-items:center}",
@@ -6324,50 +6315,43 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
 
   /* Stage 1: the report tab — donut + per-activity bars + summary, with a
      "Share" button that leads to the shareable visiting-card image. */
-  /* Skeleton shown while the report is scraped: shapes that mirror the real
-     layout (donut ring, bars, summary cards) instead of a bare cream page
-     with a line of text. The old "Building your report…" screen read as a
-     split-second glitch flash on open; a pulsing skeleton reads as the
-     report loading, and disappears the moment fill() runs. */
-  var FV_SKELETON_HTML =
-    '<div class="lt-fv-skel" aria-hidden="true">' +
-      '<div class="lt-fv-skel-donut"></div>' +
-      '<div class="lt-fv-skel-bars">' +
-        '<span style="width:82%"></span>' +
-        '<span style="width:64%"></span>' +
-        '<span style="width:73%"></span>' +
-      '</div>' +
-      '<div class="lt-fv-skel-cards">' +
-        '<div></div><div></div>' +
-      '</div>' +
-    '</div>';
+  
 
-  /* Opens the report overlay IMMEDIATELY in a loading state and returns a
-     fill(activities) function. The journal day row is expanded, scraped
-     and restored only AFTER the overlay covers the screen, so tapping
-     Full view never visibly opens the day's dropdown. */
+  /* Opens the report overlay IMMEDIATELY with real/empty content — no skeleton,
+     no artificial delay. Scraping starts BEFORE the modal opens; fill() swaps
+     in real data instantly. */
   function fvOpenReportModal(dateText, activities) {
     var pendingActivities = Array.isArray(activities) ? activities : null;
     /* A previous report may still be in the DOM mid-close-animation — two
        overlays would share the fill target's id and the VISIBLE one would
-       never fill (stuck skeleton). Never stack reports. */
+       never fill. Never stack reports. */
     var staleReport = document.getElementById("lt-fv-report-overlay");
     if (staleReport && staleReport.parentNode) staleReport.parentNode.removeChild(staleReport);
     var overlay = document.createElement("div");
     overlay.id = "lt-fv-report-overlay";
+    var emptyHtml =
+      '<div class="lt-fv-report-card">' +
+        '<div class="lt-fv-donut" style="background:conic-gradient(#e5e7eb 0%, #e5e7eb 100%)">' +
+          '<div class="lt-fv-donut-hole"><strong>0 min</strong><span>TRACKED</span></div>' +
+        '</div>' +
+        '<div class="lt-empty">No activity tagged on this day yet.</div>' +
+      '</div>' +
+      '<div class="lt-fv-report-card">' +
+        '<p class="lt-fv-sec-title">Summary</p>' +
+        '<div class="lt-fv-row" style="margin-bottom:10px"><span class="lt-fv-row-left">Total tracked</span><span class="lt-fv-pill">0 min</span></div>' +
+        '<div class="lt-fv-row"><span class="lt-fv-row-left">Categories used</span><span class="lt-fv-pill">0</span></div>' +
+      '</div>';
     overlay.innerHTML =
       '<div class="lt-fv-modal-head">' +
         '<button class="lt-fv-back" id="lt-fv-report-close" aria-label="Back">\u2190</button>' +
         '<div><h3>Full view</h3><p>' + escapeHtml(dateText) + '</p></div>' +
       '</div>' +
       '<div id="lt-fv-report-body">' +
-        (pendingActivities !== null ? '' : FV_SKELETON_HTML) +
+        (pendingActivities !== null ? '' : emptyHtml) +
       '</div>';
     document.body.appendChild(overlay);
 
     overlay.addEventListener("click", function (e) {
-      /* ONLY the back button closes the report — tapping anywhere in the
-         content must never kick the user back. */
       if (e.target.id === "lt-fv-report-close") { fvCloseOverlay(overlay); return; }
       if (e.target.id === "lt-fv-report-share-btn" && pendingActivities) {
         fvOpenShareCard(dateText, pendingActivities);
@@ -6516,22 +6500,11 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
         e.preventDefault();
         e.stopPropagation();
         var dateText = row.dateText;
-        /* Open the report FIRST (loading state), then expand/scrape/restore
-           the day row BEHIND it. The overlay SLIDES in over 300ms
-           (lt-tool-in), so firing the expand click immediately let the date
-           dropdown pop open on the still-visible Journal before the overlay
-           covered it — "tapping Full view opens the dropdown too". Wait for
-           the slide to finish before touching the row; the loading state is
-           on screen meanwhile. */
-        var fill = fvOpenReportModal(dateText, null);
-        setTimeout(function () {
-          try {
-            fvScrapeJournalDay(row.button, function (activities) {
-              activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
-              fill(activities);
-            });
-          } catch (err) { fill([]); } /* scrape must never strand the skeleton */
-        }, 340);
+        /* Scrape FIRST, then open with real data — no skeleton, no delay. */
+        fvScrapeJournalDay(row.button, function (activities) {
+          activities = (activities || []).slice().sort(function (a, b) { return b.minutes - a.minutes; });
+          fvOpenReportModal(dateText, activities);
+        });
       });
       if (rightGroup && rightGroup.lastElementChild) host.insertBefore(btn, rightGroup.lastElementChild);
       else if (dateSpan && dateSpan.nextSibling) host.insertBefore(btn, dateSpan.nextSibling);
