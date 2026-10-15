@@ -2902,6 +2902,15 @@ import { getStore } from "./lib/storage.js";
     root.dataset.openedAt = String(Date.now());
     document.body.style.overflow = "hidden";
     activeOverlay = root;
+    /* First render plays the entrance (.lt-tool-shell slide/fade). Every
+       tool then re-renders by wiping activeOverlay.innerHTML — which used
+       to REPLAY that entrance on EVERY button click (Focus Mode play/
+       start/stop, Routine tabs, 6 Jars…): the whole panel faded and slid
+       in again, reading as "the page refreshed". The CSS guard
+       #lt-overlay-root[data-rendered] .lt-tool-shell{animation:none}
+       existed for exactly this but was never switched on — set it right
+       after the first render so later rebuilds are silent. */
+    root.removeAttribute("data-rendered");
     root.addEventListener("click", function (e) {
       var action = e.target.closest("[data-lt-action]");
       if (!action) return;
@@ -2919,6 +2928,7 @@ import { getStore } from "./lib/storage.js";
       if (name === "compound-again") { renderCompound(); }
     });
     renderer();
+    root.dataset.rendered = "1";
   }
 
   /* ── Shared helpers ────────────────────────────────────────────────────── */
