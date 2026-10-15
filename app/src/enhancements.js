@@ -6082,6 +6082,15 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
        already covered the screen with the report overlay, so this
        expand/scrape cycle is never visible. */
     var opened = false;
+    /* Programmatic click to expand the row — suppress it from the React
+       dropdown handler by intercepting at the capture phase. */
+    var suppressHandler = function (e) {
+      if (e.target === rowButton) {
+        e.stopImmediatePropagation();
+        rowButton.removeEventListener('click', suppressHandler, true);
+      }
+    };
+    rowButton.addEventListener('click', suppressHandler, true);
     rowButton.click();
     var attempts = 14;
     (function poll() {
