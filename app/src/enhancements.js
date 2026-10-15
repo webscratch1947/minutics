@@ -2395,6 +2395,14 @@ import { getStore } from "./lib/storage.js";
     };
 
     root.addEventListener("click", function (e) {
+      /* Tapping the dimmed backdrop dismisses — before this, a tap OUTSIDE
+         the sheet did NOTHING at all (no close, no feedback), which reads
+         as the whole screen being frozen: the backdrop covers the bottom
+         nav and every page control while it sits there. */
+      if (e.target === root) {
+        closeCategoryModal("cancel");
+        return;
+      }
       if (e.target.id === "lt-cat-close") {
         closeCategoryModal("cancel");
         return;
@@ -6812,6 +6820,13 @@ import { getStore } from "./lib/storage.js";
   document.addEventListener("visibilitychange", function () {
     checkIdleNudge();
   });
+  /* Steady heartbeat — without it the idle nudge only evaluated on tab
+     switches, so an app left open and idle could sit for hours with no
+     "Still there?" at all (the waste-budget watch below already had this).
+     60s cadence; the 10-minute spacing itself lives in NUDGE_THRESHOLD_MS
+     via lastNudge, so this can never double-fire. */
+  setInterval(function () { checkIdleNudge(); }, 60000);
+  setTimeout(function () { checkIdleNudge(); }, 5000);
 
   /* ══════════════════════════════════════════════════════════════════════════
      FEATURE 3 — Streaks & Time Master badge

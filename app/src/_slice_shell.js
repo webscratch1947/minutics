@@ -927,6 +927,64 @@ function onTouchTouchEndGuard(fn) {
   return (e) => { try { fn(e); } catch (err) {} };
 }
 
+/* ── Tap restoration ──────────────────────────────────────────────────────
+   Chromium kills a tap's click the moment the finger drifts past its
+   touch-slop (~10–16px) — a few pixels of normal human jitter is enough.
+   Those lost clicks are what "the bottom nav doesn't work", "the X button
+   does nothing" and "taps feel dead" really are: the browser never
+   dispatches the click and no amount of app logic runs. This listener
+   sequence watches every touch: if it barely travelled (≤16px, and not a
+   long-press), finished quickly, and NO click arrived, the click is
+   re-dispatched on the element the finger went down on. Real gestures are
+   untouched — a swipe moves far past this gate, vertical scrolls pass the
+   movement check only when tiny (where the browser still clicks anyway),
+   and inputs/textareas are never hijacked. A one-shot swallower for the
+   same element covers the only race left: a real click arriving after the
+   restore (both would fire — now only the first does). */
+let _ltTapEl = null, _ltTapAt = 0, _ltTapX = 0, _ltTapY = 0, _ltLastClickAt = -9999;
+if (typeof window !== 'undefined') {
+  window.addEventListener('click', function () { _ltLastClickAt = Date.now(); }, true);
+  window.addEventListener('touchstart', function (e) {
+    if (!e.touches || e.touches.length !== 1) { _ltTapEl = null; return; }
+    _ltTapEl = e.target;
+    _ltTapAt = Date.now();
+    _ltTapX = e.touches[0].clientX;
+    _ltTapY = e.touches[0].clientY;
+  }, true);
+  window.addEventListener('touchend', function (e) {
+    const el = _ltTapEl;
+    _ltTapEl = null;
+    if (!el || !e.changedTouches || !e.changedTouches.length) return;
+    const t = e.changedTouches[0];
+    const moved = Math.max(Math.abs(t.clientX - _ltTapX), Math.abs(t.clientY - _ltTapY));
+    if (moved > 16) return;                          /* a real gesture — never restore */
+    if (Date.now() - _ltTapAt > 700) return;         /* long-press — context menu owns it */
+    if (Date.now() - _ltLastClickAt < 250) return;   /* the browser's click survived */
+    setTimeout(function () {
+      if (Date.now() - _ltLastClickAt < 400) return; /* a late real click won after all */
+      try {
+        if (!el.closest || !document.contains(el)) return;
+        const hit = el.closest('a[href], button, [role="button"], label, [onclick]');
+        if (!hit) return;
+        if (hit.closest('input, textarea, select')) return; /* fields keep native carets */
+        hit.click();
+        /* If the browser's own click for this touch lands late, swallow it —
+           two activations of one tap (e.g. start timer twice) would be worse
+           than the dead tap we just fixed. */
+        const swallower = function (ev) {
+          const tg = ev.target;
+          if (tg === hit || (tg && hit.contains && hit.contains(tg))) {
+            try { ev.stopPropagation(); ev.preventDefault(); } catch (err) {}
+            window.removeEventListener('click', swallower, true);
+          }
+        };
+        window.addEventListener('click', swallower, true);
+        setTimeout(function () { window.removeEventListener('click', swallower, true); }, 250);
+      } catch (err) {}
+    }, 70);
+  }, true);
+}
+
 /* Tab order — must match the bottom nav (ck). */
 const TABS = ['/', '/activity', '/timeline', '/journal', '/settings'];
 
