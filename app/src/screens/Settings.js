@@ -190,6 +190,13 @@ export function SettingsScreen() {
   var nudgesEnabled = _nudgesState[0];
   var setNudgesEnabled = _nudgesState[1];
 
+  /* ── digital privacy screen (tilt-to-black, no physical shutter) ── */
+  var _privacyState = useState(function () {
+    try { return localStorage.getItem("lt_privacy_screen_v1") === "1"; } catch (e) { return false; }
+  });
+  var privacyEnabled = _privacyState[0];
+  var setPrivacyEnabled = _privacyState[1];
+
   /* ── alert notification permission (browser or Android bridge) ── */
   var _notifPermState = useState(getAlertPermission());
   var notifPermission = _notifPermState[0];
@@ -276,6 +283,24 @@ export function SettingsScreen() {
     if (next && typeof Notification !== "undefined" && Notification.permission === "default") {
       Notification.requestPermission().then(function (perm) { setNotifPermission(perm); });
     }
+  }
+
+  function handlePrivacyToggle() {
+    var next = !privacyEnabled;
+    setPrivacyEnabled(next);
+    try {
+      if (next) localStorage.setItem("lt_privacy_screen_v1", "1");
+      else localStorage.removeItem("lt_privacy_screen_v1");
+    } catch (e) { /* ignore */ }
+    /* iOS 13+ gates motion sensors behind an explicit permission that must
+       be requested from the user gesture that flips this switch. */
+    try {
+      if (next && typeof DeviceOrientationEvent !== "undefined" &&
+          typeof DeviceOrientationEvent.requestPermission === "function") {
+        DeviceOrientationEvent.requestPermission().catch(function () {});
+      }
+    } catch (e) { /* ignore */ }
+    try { window.dispatchEvent(new Event("lt-privacy-changed")); } catch (e) { /* ignore */ }
   }
 
   function handleEnableNotifications() {
@@ -834,6 +859,15 @@ export function SettingsScreen() {
                   })
                 ]
               })
+            })
+          }),
+          jsx(Card, {
+            children: jsx(CardRow, {
+              label: "Privacy screen",
+              desc: privacyEnabled
+                ? "On — the screen turns black when the phone is tilted sideways, so onlookers beside you see a dark screen (hold the peek button to reveal)"
+                : "Digital privacy shutter — black the screen when the phone tilts sideways so side viewers see nothing",
+              children: jsx(Toggle, { enabled: privacyEnabled, onToggle: handlePrivacyToggle })
             })
           })
         ]

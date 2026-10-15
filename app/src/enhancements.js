@@ -6685,7 +6685,70 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
     }
   }
 
+  /* ── Android: keep the native reminder checker fed ───────────────────────
+     The WebView suspends JS timers while the app is backgrounded, so the
+     15-minute idle nudge and the Time Waste budget alert also run NATIVELY
+     on a 15-minute alarm (NotificationCheckReceiver). This pushes the
+     snapshot that alarm needs; the getters below read back what native
+     already sent so web + native never double-notify the same event. */
+  var _lastNotifSyncAt = 0;
+  function syncNotifStateBridge(force) {
+    var b = typeof window !== "undefined" && window.AndroidBridge;
+    if (!b || typeof b.syncNotificationState !== "function") return;
+    var now = Date.now();
+    if (!force && now - _lastNotifSyncAt < 5000) return;
+    _lastNotifSyncAt = now;
+    try {
+      var profile = false;
+      try { profile = !!localStorage.getItem("lifetime_profile"); } catch (e) {}
+      var nudgeData = readJson(NUDGE_KEY, {});
+      var wasteCfg = readJson(WASTE_BUDGET_KEY, { minutes: 45 });
+      b.syncNotificationState(JSON.stringify({
+        profile: profile,
+        running: !!getNativeRunningBlock(),
+        idleSince: nudgeData.noActivitySince || 0,
+        lastNudge: nudgeData.lastNudge || 0,
+        wasteMins: computeWasteMinutesToday(),
+        wasteLimit: wasteCfg && wasteCfg.minutes > 0 ? wasteCfg.minutes : 0,
+        wasteDay: localDayKey(),
+        /* Day the WEB side already alerted for — native keeps the newer of
+           the two so the budget alert fires exactly once per day. */
+        wasteNotifiedDay: (typeof _wasteNotifiedDay === "string" ? _wasteNotifiedDay : "") || ""
+      }));
+    } catch (e) {}
+  }
+
+  function nativeLastNudgeAt() {
+    try {
+      var b = window.AndroidBridge;
+      if (b && typeof b.getNotificationLastNudge === "function") {
+        return +b.getNotificationLastNudge() || 0;
+      }
+    } catch (e) {}
+    return 0;
+  }
+
+  function nativeWasteNotifiedDay() {
+    try {
+      var b = window.AndroidBridge;
+      if (b && typeof b.getNotificationLastWasteDay === "function") {
+        return b.getNotificationLastWasteDay() || "";
+      }
+    } catch (e) {}
+    return "";
+  }
+
+  /* Steady 60s heartbeat so native has fresh state no matter which tab is
+     open, plus a forced push the moment the page is backgrounded (home
+     button / tab switch — exactly when JS timers may be about to stop). */
+  setInterval(function () { syncNotifStateBridge(false); }, 60000);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") syncNotifStateBridge(true);
+  });
+  window.addEventListener("pagehide", function () { syncNotifStateBridge(true); });
+
   function checkIdleNudge() {
+    syncNotifStateBridge(false);
     var hasProfileNow = false;
     try { hasProfileNow = !!localStorage.getItem("lifetime_profile"); } catch (e) {}
     if (!hasProfileNow || !document.body.classList.contains("lt-authed")) return;
@@ -6713,6 +6776,13 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
     }
 
     var now = Date.now();
+    /* If the NATIVE 15-min alarm nudged while the WebView was suspended,
+       adopt its timestamp so the web side never double-fires. */
+    var nativeNudge = nativeLastNudgeAt();
+    if (nativeNudge > (nudgeData.lastNudge || 0)) {
+      nudgeData.lastNudge = nativeNudge;
+      writeJson(NUDGE_KEY, nudgeData);
+    }
     if (now - nudgeData.noActivitySince < NUDGE_THRESHOLD_MS) return;
     if (nudgeData.lastNudge && (now - nudgeData.lastNudge) < NUDGE_THRESHOLD_MS) return;
 
@@ -6728,6 +6798,20 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
 
     nudgeData.lastNudge = now;
     writeJson(NUDGE_KEY, nudgeData);
+    syncNotifStateBridge(true);
+
+    /* Android WebView implements no web Notifications — when the tab is in
+       the background there, push the nudge through the native bridge so it
+       shows as a real system notification. */
+    if (document.visibilityState !== "visible" &&
+        typeof window !== "undefined" && window.AndroidBridge &&
+        typeof window.AndroidBridge.showNotification === "function") {
+      try {
+        window.AndroidBridge.showNotification("Still there?",
+          "You haven't started an activity in a while — track what you're doing right now.");
+        return;
+      } catch (e) {}
+    }
 
     /* On the web, use a system notification only when the tab is hidden;
        otherwise the visible toast is enough and avoids a duplicate alert. */
@@ -7423,10 +7507,18 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
         if (!cfg || !(cfg.minutes > 0)) return;
         var day = localDayKey();
         var mins = computeWasteMinutesToday();
+        /* The NATIVE 15-min alarm may have alerted for today while the app
+           was backgrounded — adopt its day so web doesn't duplicate it. */
+        var nativeDay = nativeWasteNotifiedDay();
+        if (nativeDay && nativeDay !== _wasteNotifiedDay && nativeDay >= day) {
+          _wasteNotifiedDay = nativeDay;
+          writeJson(WASTE_NOTIFIED_DAY_KEY, nativeDay);
+        }
         if (mins > cfg.minutes && _wasteNotifiedDay !== day) {
           _wasteNotifiedDay = day;
           writeJson(WASTE_NOTIFIED_DAY_KEY, day);
           notifyWasteOver(mins, cfg.minutes);
+          syncNotifStateBridge(true);
         }
       } catch (e) {}
     };
@@ -9194,4 +9286,104 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
     }, 200);
     setInterval(function () { sweepStuckUi(); if (!activeOverlay) runEnhancements(); }, 3000);
   });
+
+  /* ══════════════════════════════════════════════════════════════════════
+     DIGITAL PRIVACY SCREEN (user request)
+     A software stand-in for a physical privacy shutter: when the setting is
+     on in Settings, tilting the phone sideways (|gamma| past ~45°) or laying
+     it nearly flat (beta < 10°, screen facing up) covers the screen with
+     black so someone looking from the side sees a dark panel. Straightening
+     the phone reveals it again (6° of hysteresis so the edge never strobes).
+     A hold-to-peek button lets the owner reveal the screen without untipping
+     the phone. Motion sensors don't exist on desktop browsers — there the
+     toggle simply stays idle (and iOS 13+ grants access from the toggle's
+     own user gesture in Settings).
+  ══════════════════════════════════════════════════════════════════════ */
+  (function initPrivacyScreen() {
+    var KEY = "lt_privacy_screen_v1";
+    var overlay = null, peekBtn = null, listening = false, engaged = false, peeking = false;
+
+    function enabled() {
+      try { return localStorage.getItem(KEY) === "1"; } catch (e) { return false; }
+    }
+
+    function ensureOverlay() {
+      if (overlay && overlay.isConnected) return;
+      overlay = document.createElement("div");
+      overlay.id = "lt-privacy-shutter";
+      overlay.setAttribute("aria-hidden", "true");
+      overlay.style.cssText =
+        "position:fixed;inset:0;background:#000;z-index:2147483000;" +
+        "opacity:0;pointer-events:none;transition:opacity .12s ease;" +
+        "display:flex;align-items:flex-end;justify-content:center;padding-bottom:26px;";
+      peekBtn = document.createElement("button");
+      peekBtn.type = "button";
+      peekBtn.textContent = "Hold to peek";
+      peekBtn.style.cssText =
+        "pointer-events:auto;background:rgba(255,255,255,.14);color:rgba(255,255,255,.8);" +
+        "border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:8px 16px;" +
+        "font:600 12px/1 system-ui,sans-serif;letter-spacing:.04em;cursor:pointer;" +
+        "-webkit-user-select:none;user-select:none;touch-action:none;opacity:.9;";
+      var holdStart = function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        peeking = true; apply();
+        try { peekBtn.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        window.addEventListener("pointerup", holdEnd, { once: true });
+        window.addEventListener("pointercancel", holdEnd, { once: true });
+      };
+      var holdEnd = function () {
+        if (peeking) { peeking = false; apply(); }
+      };
+      peekBtn.addEventListener("pointerdown", holdStart);
+      peekBtn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+      overlay.appendChild(peekBtn);
+      (document.documentElement || document.body).appendChild(overlay);
+    }
+
+    function apply() {
+      if (!overlay) return;
+      var show = engaged && !peeking;
+      overlay.style.opacity = show ? "1" : "0";
+      overlay.style.pointerEvents = show ? "auto" : "none";
+    }
+
+    function evaluate(gamma, beta) {
+      if (typeof gamma !== "number" || typeof beta !== "number" ||
+          isNaN(gamma) || isNaN(beta)) return;
+      var tilt = Math.abs(gamma);
+      if (!engaged) {
+        /* Engage: turned sideways, or laid nearly flat (screen up). */
+        if (tilt > 45 || beta < 10) { engaged = true; apply(); }
+      } else {
+        /* Release with ~6° of hysteresis so the edge never strobes. */
+        if (tilt < 39 && beta > 16) { engaged = false; peeking = false; apply(); }
+      }
+    }
+
+    function onOrientation(e) { evaluate(e.gamma, e.beta); }
+
+    function start() {
+      if (listening || !enabled()) return;
+      if (typeof DeviceOrientationEvent === "undefined") return;
+      ensureOverlay();
+      window.addEventListener("deviceorientation", onOrientation, true);
+      listening = true;
+    }
+
+    function stop() {
+      if (!listening) return;
+      window.removeEventListener("deviceorientation", onOrientation, true);
+      listening = false;
+      engaged = false; peeking = false;
+      apply();
+    }
+
+    function sync() { if (enabled()) start(); else stop(); }
+
+    window.addEventListener("lt-privacy-changed", sync);
+    window.addEventListener("storage", function (e) { if (e.key === KEY) sync(); });
+    /* Test hook: __ltPrivacyTest(50, 30) simulates a sideways tilt. */
+    window.__ltPrivacyTest = function (gamma, beta) { ensureOverlay(); evaluate(gamma, beta); };
+    sync();
+  })();
 })();

@@ -1791,6 +1791,8 @@ function formatTime(isoString) {
 
 function LifeProgressCard({ profile }) {
   const [now, setNow] = useState(Date.now());
+  const [timerMin, toggleTimerMin] = useDashMin('timer');
+  const [moneyMin, toggleMoneyMin] = useDashMin('money');
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -1931,8 +1933,16 @@ function LifeProgressCard({ profile }) {
     'data-lt-move': 'timer.block',
     className: 'mx-4 mt-3 flex flex-col gap-3',
     children: [
-      // Countdown hero — reference-style light card with dotted-arc hero number
-      jsxs('div', {
+      // Countdown hero — reference-style light card with dotted-arc hero number.
+      // Minimized → slim strip at the top (queue position 1).
+      timerMin
+        ? jsx(LtMinStrip, {
+            move: 'timer.hero',
+            label: 'Lifetime Timer',
+            detail: breakdown.years + 'y ' + months + 'm ' + remDays + 'd left',
+            onExpand: toggleTimerMin
+          })
+        : jsxs('div', {
         'data-lt-move': 'timer.hero',
         className: 'relative bg-white rounded-3xl px-4 pt-4 pb-3.5 border border-black/[.16] shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
         children: [
@@ -1950,6 +1960,11 @@ function LifeProgressCard({ profile }) {
                 children: ['\u2605 ' + planLabel]
               })
             ]
+          }),
+          /* Minimize — collapses the whole timer into the top strip. */
+          jsx('div', {
+            className: 'absolute right-3 top-3',
+            children: jsx(LtMinBtn, { onMinimize: toggleTimerMin })
           }),
           jsx('div', {
             className: 'mt-1 mb-0.5',
@@ -2012,7 +2027,15 @@ function LifeProgressCard({ profile }) {
       }),
       // Money timer — reference-style card: header, remaining row, big
       // number, area chart, segmented bar + three stat tiles.
-      tvData && jsxs('div', {
+      // Minimized → slim strip queued right under the timer (or its strip).
+      tvData && (moneyMin
+        ? jsx(LtMinStrip, {
+            move: 'timer.money',
+            label: 'Money Timer',
+            detail: 'Rs.' + tvSplit[0] + '.' + tvSplit[1] + ' left',
+            onExpand: toggleMoneyMin
+          })
+        : jsxs('div', {
         'data-lt-move': 'timer.money',
         className: 'relative bg-white border border-black/[.16] rounded-2xl px-4 py-3.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
         style: { backgroundImage: 'radial-gradient(120% 90% at 100% 0%, rgba(0,194,168,0.08), rgba(0,194,168,0) 55%)' },
@@ -2027,11 +2050,17 @@ function LifeProgressCard({ profile }) {
                   'Today\u2019s Money Timer'
                 ]
               }),
-              jsxs('span', {
-                className: 'inline-flex items-baseline gap-1 bg-black/[.04] border border-black/[.14] rounded-full px-2.5 py-1 shrink-0',
+              jsxs('div', {
+                className: 'flex items-center gap-1.5 shrink-0',
                 children: [
-                  jsx('span', { className: 'text-[12px] font-black tabular-nums leading-none text-foreground', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
-                  jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/45', children: '/h' })
+                  jsxs('span', {
+                    className: 'inline-flex items-baseline gap-1 bg-black/[.04] border border-black/[.14] rounded-full px-2.5 py-1 shrink-0',
+                    children: [
+                      jsx('span', { className: 'text-[12px] font-black tabular-nums leading-none text-foreground', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
+                      jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/45', children: '/h' })
+                    ]
+                  }),
+                  jsx(LtMinBtn, { onMinimize: toggleMoneyMin })
                 ]
               })
             ]
@@ -2064,8 +2093,84 @@ function LifeProgressCard({ profile }) {
             ]
           })
         ]
+      }))
+    ]
+  });
+}
+
+// ─── Dashboard minimize (user request) ───────────────────────────────────────
+// Each dashboard card (Lifetime Timer, Money Timer, Today at a Glance,
+// Eat the Frog) can collapse into a thin one-line strip sized like the
+// "No activity running" status bar. Minimized cards keep their natural
+// queue order: the Timer strip sits at the top, the Money strip right
+// under it, then Glance, then Frog — tap a strip to expand it again.
+
+const LT_DASH_MIN_KEY = 'lt_dash_min_v1';
+const _dashMinListeners = [];
+
+function ltDashMinRead() {
+  try {
+    const v = JSON.parse(localStorage.getItem(LT_DASH_MIN_KEY));
+    return v && typeof v === 'object' ? v : {};
+  } catch { return {}; }
+}
+
+function ltDashMinToggle(id) {
+  const cur = ltDashMinRead();
+  cur[id] = !cur[id];
+  try { localStorage.setItem(LT_DASH_MIN_KEY, JSON.stringify(cur)); } catch {}
+  _dashMinListeners.forEach(fn => { try { fn(); } catch {} });
+}
+
+function useDashMin(id) {
+  const [min, setMin] = useState(() => !!ltDashMinRead()[id]);
+  useEffect(() => {
+    const fn = () => setMin(!!ltDashMinRead()[id]);
+    _dashMinListeners.push(fn);
+    return () => {
+      const i = _dashMinListeners.indexOf(fn);
+      if (i >= 0) _dashMinListeners.splice(i, 1);
+    };
+  }, [id]);
+  return [min, () => ltDashMinToggle(id)];
+}
+
+/* Collapsed strip — same slim single-line footprint as the shell's
+   "No activity running" bar, but in the app's light card theme. */
+function LtMinStrip({ label, detail, onExpand, move, className }) {
+  return jsxs('button', {
+    type: 'button',
+    onClick: onExpand,
+    'data-lt-move': move,
+    title: 'Expand',
+    className: 'flex items-center gap-2 px-4 py-2 bg-white border-2 border-accent/70 rounded-2xl text-left shadow-[0_10px_34px_rgba(15,23,42,0.05)] active:scale-[.995] transition-transform cursor-pointer' + (className ? ' ' + className : ''),
+    children: [
+      jsx('span', { className: 'w-2.5 h-2.5 rounded-full bg-accent shrink-0' }),
+      jsx('span', { className: 'flex-1 truncate text-[11.5px] font-bold text-foreground/70', children: label }),
+      detail
+        ? jsx('span', { className: 'shrink-0 max-w-[45%] truncate text-[10.5px] font-extrabold tabular-nums text-foreground/45', children: detail })
+        : null,
+      jsx('svg', {
+        width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none',
+        className: 'shrink-0 text-foreground/40',
+        children: jsx('path', { d: 'M2.5 7.5 L6 4 L9.5 7.5', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' })
       })
     ]
+  });
+}
+
+/* Round minus button in each card header. */
+function LtMinBtn({ onMinimize }) {
+  return jsx('button', {
+    type: 'button',
+    onClick: (e) => { e.stopPropagation(); onMinimize(); },
+    title: 'Minimize',
+    'aria-label': 'Minimize card',
+    className: 'shrink-0 w-6 h-6 rounded-full bg-foreground/[0.06] border border-foreground/10 flex items-center justify-center text-foreground/50 hover:bg-foreground/10 active:scale-95 transition cursor-pointer',
+    children: jsx('svg', {
+      width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none',
+      children: jsx('path', { d: 'M2.5 6h7', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' })
+    })
   });
 }
 
@@ -2075,6 +2180,7 @@ function LifeProgressCard({ profile }) {
 
 function TodayGlance({ activities, blocks }) {
   const [now, setNow] = useState(Date.now());
+  const [glanceMin, toggleGlanceMin] = useDashMin('glance');
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 60000);
@@ -2134,6 +2240,18 @@ function TodayGlance({ activities, blocks }) {
     return rem > 0 ? h + 'h ' + rem + 'min' : h + 'h';
   };
 
+  /* Minimized → slim strip in place (keeps its queue slot under the
+     timer / money strips). */
+  if (glanceMin) {
+    return jsx(LtMinStrip, {
+      move: 'timer.glance',
+      className: 'mx-4 mt-3',
+      label: 'Today at a Glance',
+      detail: formatMins(totalMinutes) + ' tracked',
+      onExpand: toggleGlanceMin
+    });
+  }
+
   return jsxs('div', {
     'data-lt-move': 'timer.glance',
     className: 'mx-4 mt-3 bg-white border border-black/[.16] rounded-3xl px-3.5 pt-3.5 pb-2.5 shadow-[0_10px_34px_rgba(15,23,42,0.07)]',
@@ -2145,11 +2263,17 @@ function TodayGlance({ activities, blocks }) {
             className: 'text-[16px] font-black text-foreground',
             children: 'Today at a Glance'
           }),
-          jsxs('span', {
-            className: 'inline-flex items-center gap-1 bg-foreground/[0.05] rounded-full px-2.5 py-1 text-[10.5px] font-extrabold text-foreground/55 tabular-nums',
+          jsxs('div', {
+            className: 'flex items-center gap-1.5 shrink-0',
             children: [
-              jsx(Zb, { className: 'w-3 h-3 text-foreground/40' }),
-              formatMins(totalMinutes) + ' tracked'
+              jsxs('span', {
+                className: 'inline-flex items-center gap-1 bg-foreground/[0.05] rounded-full px-2.5 py-1 text-[10.5px] font-extrabold text-foreground/55 tabular-nums',
+                children: [
+                  jsx(Zb, { className: 'w-3 h-3 text-foreground/40' }),
+                  formatMins(totalMinutes) + ' tracked'
+                ]
+              }),
+              jsx(LtMinBtn, { onMinimize: toggleGlanceMin })
             ]
           })
         ]
@@ -2223,6 +2347,7 @@ function EatTheFrog() {
     } catch { return []; }
   });
   const [, setTick] = useState(0);
+  const [frogMin, toggleFrogMin] = useDashMin('frog');
 
   const saveTasks = (newTasks) => {
     localStorage.setItem(TASKS_KEY_RT, JSON.stringify(newTasks));
@@ -2283,6 +2408,17 @@ function EatTheFrog() {
     return newTask.id;
   };
 
+  /* Minimized → slim strip in place, after the glance strip. */
+  if (frogMin) {
+    return jsx(LtMinStrip, {
+      move: 'timer.frog',
+      className: 'mx-4 mt-3',
+      label: 'Eat the Frog',
+      detail: doneCount + '/' + progMax + ' done',
+      onExpand: toggleFrogMin
+    });
+  }
+
   return jsxs('div', {
     'data-lt-move': 'timer.frog',
     className: 'mx-4 mt-3 rounded-3xl border border-black/[.16] bg-white shadow-[0_10px_34px_rgba(15,23,42,0.07)] overflow-hidden',
@@ -2299,7 +2435,10 @@ function EatTheFrog() {
             jsx('p', { className: 'text-[19px] font-black text-foreground mt-1 leading-tight', children: activeCount > 0 ? 'Beat your ' + activeCount + ' top task' + (activeCount !== 1 ? 's' : '') : 'Add your top tasks' }),
             jsx('p', { className: 'text-[11.5px] text-foreground/55 mt-0.5', children: 'Finish what matters before anything else' })
           ]}),
-          jsx('img', { src: './assets/eat-the-frog.png', alt: '', className: 'w-[74px] h-[74px] object-contain -mt-1 -mr-1 shrink-0' })
+          jsxs('div', { className: 'flex items-center gap-2 shrink-0', children: [
+            jsx('img', { src: './assets/eat-the-frog.png', alt: '', className: 'w-[74px] h-[74px] object-contain -mt-1 -mr-1 shrink-0' }),
+            jsx(LtMinBtn, { onMinimize: toggleFrogMin })
+          ]})
         ]
       }),
       jsxs('div', {
