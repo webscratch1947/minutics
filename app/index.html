@@ -64,6 +64,15 @@
           v.setAttribute("style", "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s ease;");
           s.appendChild(v);
           document.body.appendChild(s);
+          /* Programmatic start WITH sound — the exact call the pre-adoption
+             splash used (relying on attribute-autoplay alone let a single
+             blocked/failed start latch into a MUTED fallback nothing ever
+             retried: "the splash audio stopped coming"). Android's WebView
+             allows it immediately (gesture requirement off) so the APK
+             sounds from the first frame; desktop browsers reject it until
+             a gesture and the enhancements module's own play() + first
+             tap/click take over exactly as before. */
+          try { var pr = v.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
         } catch (e) {}
       })();
     </script>

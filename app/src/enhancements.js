@@ -95,14 +95,42 @@ import { ltAlert } from "./ui_dialog.js";
        browsers HARD-BLOCK autoplay sound before any user gesture (Chrome /
        Firefox / Safari policy — no code can bypass it): there the video
        starts muted and the FIRST tap/click/key while the splash is on
-       screen restores the sound for the rest of the clip. */
-    video.defaultMuted = false;
-    video.muted = false;
-    video.play().catch(function () {
-      video.defaultMuted = true;
-      video.muted = true;
-      video.play().catch(function () {});
-    });
+       screen restores the sound for the rest of the clip.
+
+       The adopted element can arrive in a bad state (engine started it
+       muted for attribute-autoplay, or our first play() got rejected once
+       at load time) — a ONE-SHOT play() then latched into the muted
+       fallback with nothing ever retrying sound, which is how the splash
+       audio "stopped coming". ensureAudible() re-asserts audibility while
+       the splash is visible instead of giving up after one attempt. */
+    var splashAudioDead = false;
+    var ensureAudible = function () {
+      if (dismissed || video.ended || splashAudioDead) return;
+      if (video.muted) { video.defaultMuted = false; video.muted = false; }
+      if (video.paused) {
+        video.play().catch(function () {
+          /* Desktop policy rejection: run muted so the visuals still play;
+             the gesture listeners below restore sound on first tap.
+             splashAudioDead stops further un-mute retries (re-muting a
+             policy-blocked video must not oscillate). */
+          splashAudioDead = true;
+          video.defaultMuted = true;
+          video.muted = true;
+          video.play().catch(function () {});
+        });
+      }
+    };
+    ensureAudible();
+    /* Android WebView (the APK) — gesture requirement is OFF there, so
+       sound is guaranteed every launch: keep re-asserting every 250ms
+       until the splash ends. A single transient rejection during the
+       initial 2.3MB load can no longer freeze the splash in silence. */
+    if (/; wv\)/.test(navigator.userAgent)) {
+      var audibleTick = setInterval(function () {
+        if (dismissed || video.ended || splashAudioDead) { clearInterval(audibleTick); return; }
+        ensureAudible();
+      }, 250);
+    }
     try {
       var unmuteOnGesture = function () {
         if (!dismissed) { video.defaultMuted = false; video.muted = false; video.play().catch(function () {}); }
