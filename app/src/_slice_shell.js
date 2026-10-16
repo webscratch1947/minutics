@@ -577,10 +577,6 @@ export function ak({ profile }) {
       peekEnhRef.current = null;
     }
   };
-  const flushPeekEnhance = () => {
-    cancelPeekEnh();
-    try { window.dispatchEvent(new CustomEvent('lt-route-change')); } catch (e) {}
-  };
   useEffect(() => {
     if (!peek) return;
     peekEnhRef.current = setTimeout(() => {
@@ -624,6 +620,14 @@ export function ak({ profile }) {
 
   const glideTRef = useRef(null);
   const glideTargetRef = useRef(null);
+  /* A touch that lands while a commit is still settling (glide or the
+     pinned-cover hold, ≤~360ms) is parked here and re-enters as a live
+     gesture the moment the commit finishes — instead of force-finishing
+     the commit, which SNAP-JUMPED the half-slid panes to their end
+     positions ("teleporting" on fast successive swipes) and dropped the
+     cover before the swapped page had painted (the flash of the previous
+     page). The finger is still down, so the next move locks instantly. */
+  const pendingGestureRef = useRef(null);
 
   /* Page trees are memoized: drag-state changes (setDragX on a direction
      flip or neighbor change) used to re-render BOTH full route trees
@@ -672,6 +676,17 @@ export function ak({ profile }) {
       clearPeekHold();
       setPeek(null);
       setHoldPeek(false);
+      /* Commit settled — hand the screen back to any parked touch. */
+      const pg = pendingGestureRef.current;
+      pendingGestureRef.current = null;
+      if (pg) {
+        gRef.current = {
+          active: true, locked: null,
+          startX: pg.x, startY: pg.y,
+          width: shellRef.current ? shellRef.current.clientWidth : 0,
+          x: 0, sign: 0
+        };
+      }
     };
     requestAnimationFrame(() => { requestAnimationFrame(release); });
     peekHoldTRef.current = setTimeout(release, 360);
@@ -811,9 +826,13 @@ export function ak({ profile }) {
   };
 
   const onTouchStart = (e) => {
+    /* Commit still settling (glide or the pinned-cover hold): the busy
+       flag must STAY on (it protects the commit's final frames) and this
+       touch is parked, not served. */
+    const committing = !!(glideTRef.current || peekHoldTRef.current);
     /* Any new touch resets the busy flag — a stale flag would mute the
        enhancement auto-paths for the rest of the session. */
-    setSwipeBusy(false);
+    if (!committing) setSwipeBusy(false);
     /* Tab-swipe starts from anywhere on the main app (inside #root): the
        bottom nav pill, page content, all of it — so switching tabs never
        needs a nav tap. Enhancement sheets/modals are appended OUTSIDE
@@ -827,26 +846,30 @@ export function ak({ profile }) {
           ltModalOwnsScreen() || !ltPureTabRoute()) {
         gRef.current.active = false;
         gRef.current.locked = null;
+        pendingGestureRef.current = null;
         return;
       }
     } catch (err) {
       gRef.current.active = false;
       gRef.current.locked = null;
+      pendingGestureRef.current = null;
       return;
     }
-    /* A new gesture finishes any in-flight commit right away so the stale
-       timer can never stomp this gesture's dragX. Also cancel any commit
-       HOLD: the pinned peek must be released so this gesture owns it. */
-    if (glideTRef.current) finishCommit();
-    if (peekHoldTRef.current || holdPeek) {
-      clearPeekHold();
-      holdGenRef.current += 1; /* any pending release must not drop this gesture's peek */
-      /* Expose the committed page FULLY enhanced before dropping the pinned
-         cover — a clean (un-enhanced) frame here pops pills/strips out and
-         back in. Cancels any pending peek pass too (the old pane is going). */
-      flushPeekEnhance();
-      setHoldPeek(false);
-      setPeek(null);
+    if (committing) {
+      /* Park this gesture until the commit settles (typically ~270ms; the
+         360ms cap only covers frame-less windows). The old behaviour —
+         force-finish the commit on touch — SNAP-JUMPED the half-slid panes
+         to their end positions (the "teleport" when swiping super quickly)
+         and dropped the pinned cover before the swapped page had painted
+         (the flash of the previous page). release() re-enters the parked
+         touch as a live gesture; its finger is still down, so the next
+         move locks instantly and no swipe is lost. */
+      gRef.current.active = false;
+      gRef.current.locked = null;
+      pendingGestureRef.current = (e.touches && e.touches.length === 1)
+        ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        : null;
+      return;
     }
     if (!e.touches || e.touches.length !== 1) {
       gRef.current.locked = 'v';
@@ -920,7 +943,13 @@ export function ak({ profile }) {
   const onTouchEnd = () => {
     const g = gRef.current;
     g.active = false;
-    if (g.locked !== 'h') { g.locked = null; return; }
+    if (g.locked !== 'h') {
+      g.locked = null;
+      /* Never locked (or parked-and-lifted before its commit settled) —
+         the parked gesture dies with its touch. */
+      pendingGestureRef.current = null;
+      return;
+    }
     g.locked = null;
     setTracking(false);
     const w = g.width || 1;

@@ -9432,10 +9432,28 @@ import { getApps } from "firebase/app";
   var _navPassPending = null;
   var _sawPointer = false;
   var _inDown = false, _inMoved = 0, _inEnd = 0;
+  /* Trailing finger-position samples (last ~4×80ms) — "is the user LOOKING
+     at the peek (held / drifting slowly) or THROWING the page (flick)?"
+     Recency-of-move can't tell: a held finger on a touchscreen keeps firing
+     sub-pixel pointermove jitter, and a flick pauses for a frame. Velocity
+     can: a hold drifts ≤20px per 320ms; a flick moves hundreds. */
+  var _posT = [], _posX = [], _posY = [];
   function _inNow() { try { return performance.now(); } catch (e) { return Date.now(); } }
   try {
-    document.addEventListener('pointerdown', function () { _sawPointer = true; _inDown = true; }, true);
-    document.addEventListener('pointermove', function () { if (_inDown) _inMoved = _inNow(); }, true);
+    document.addEventListener('pointerdown', function () {
+      _sawPointer = true; _inDown = true;
+      _posT.length = 0; _posX.length = 0; _posY.length = 0;
+    }, true);
+    document.addEventListener('pointermove', function (ev) {
+      if (_inDown) _inMoved = _inNow();
+      try {
+        var mt = _inNow();
+        if (mt - (_posT.length ? _posT[_posT.length - 1] : 0) >= 80) {
+          _posT.push(mt); _posX.push(ev.clientX); _posY.push(ev.clientY);
+          while (_posT.length > 4) { _posT.shift(); _posX.shift(); _posY.shift(); }
+        }
+      } catch (e) {}
+    }, true);
     var _inUp = function () { _inDown = false; _inEnd = _inNow(); };
     document.addEventListener('pointerup', _inUp, true);
     document.addEventListener('pointercancel', _inUp, true);
@@ -9448,6 +9466,23 @@ import { getApps } from "firebase/app";
     if (!_inDown && n - _inEnd < 400) return true; /* just finished interacting */
     return false;
   }
+  /* Finger DOWN and effectively still (hold / slow look-drag): displacement
+     across the trailing ~320ms window ≤20px. Jitter (1–2px) counts as still;
+     a flick (hundreds of px) does not. */
+  function _fingerSettled() {
+    if (!_sawPointer || !_inDown) return false;
+    if (_posT.length < 2) return true; /* down, no meaningful movement sampled */
+    var maxd = 0;
+    for (var i = 0; i < _posX.length; i++) {
+      for (var j = i + 1; j < _posX.length; j++) {
+        var ax = _posX[i] - _posX[j]; if (ax < 0) ax = -ax;
+        var ay = _posY[i] - _posY[j]; if (ay < 0) ay = -ay;
+        if (ax > maxd) maxd = ax;
+        if (ay > maxd) maxd = ay;
+      }
+    }
+    return maxd <= 20;
+  }
   function _scheduleNavPass(tries) {
     if (_navPassPending) return;
     var t = tries || 0;
@@ -9455,15 +9490,17 @@ import { getApps } from "firebase/app";
       _navPassPending = null;
       var n = _inNow();
       var parked = _sawPointer && _inDown && n - _inMoved >= 260;
-      /* Peek preview live ([data-lt-peek] just mounted) → run NOW, no input
-         gate, no flag gate. This is the controlled moment the manual dispatch
-         was always meant for (see the peek-effect comment: "the pass completes
-         WHILE THE FINGER IS STILL DRAGGING"): the peek pane is the injection
-         target, the source page is already enhanced so the pass writes
-         essentially nothing into the moving pane (no re-raster, no flicker),
-         and waiting for a quiet moment meant the Full view pill only appeared
-         AFTER release — "I don't see the full view until I release". */
-      if (document.querySelector('[data-lt-peek]')) {
+      /* Peek preview live ([data-lt-peek] mounted): the peek pane is the
+         injection target, so the pass is allowed while the gesture owns the
+         screen — but ONLY when the user is actually LOOKING at it: the
+         finger is down and settled (hold, touch-jitter, or slow look-drag).
+         A fast FLICK keeps the finger flying → falls through to the normal
+         gates (a full DOM pass under a flick stuttered the slide and popped
+         content mid-flight: "teleporting / screen flashing"). Post-release,
+         the flag branch holds the pass until the glide commits. */
+      var peekLive = !!document.querySelector('[data-lt-peek]');
+      if (peekLive && (!_sawPointer || _fingerSettled())) {
+        try { window.__ltPassDebug = { path: 'navpeek', t: t, busy: _inputBusy(), down: _inDown, sinceMove: Math.round(n - _inMoved), saw: _sawPointer }; } catch (e) {}
         runEnhancementsImmediate();
         return;
       }
