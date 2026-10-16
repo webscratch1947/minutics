@@ -33,10 +33,10 @@ import { ltAlert } from "./ui_dialog.js";
        frame; the timeouts below guarantee it never lingers. */
     var video = document.createElement("video");
     video.id = "lt-startup-splash-video";
-    /* ?v=3: the bump forces a fresh download past any stale/partial cached
-       copy — an old cached file is why the video "sometimes doesn't play"
-       (and v3 is the copy WITH its audio track restored). */
-    video.src = "assets/lt/minutics_splash.mp4?v=3"; /* bump ?v=N when replacing the file (immutable 1y cache) */
+    /* ?v=4: version bumps force a fresh download past immutable 1y caches —
+       v4 is YOUR animation (1080×1920, 4s) with its original audio track
+       muxed back on (a past "11x smaller" re-encode had stripped it). */
+    video.src = "assets/lt/minutics_splash.mp4?v=4"; /* bump ?v=N when replacing the file (immutable 1y cache) */
     video.autoplay = true;
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
