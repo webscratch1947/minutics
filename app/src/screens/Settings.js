@@ -6,6 +6,7 @@ import { getCurrency, setCurrency } from '../lib/currency.js';
 import { saveGoalType, getGoalType, isPro as hasActivePaidPlan } from '../lib/settings.js';
 import { readJson, writeJson } from '../lib/settings.js';
 import { buildBackup, loadDataFile } from '../lib/dataTransfer.js';
+import { ltAlert, ltConfirmDanger } from '../ui_dialog.js';
 import { CircleCheckBig as eh } from 'lucide-react';
 import { getApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
@@ -380,20 +381,21 @@ export function SettingsScreen() {
     });
   }
 
-  function handleDeleteAccount() {
+  /* Real in-app popups — ltConfirmDanger/ltAlert (async, non-blocking). */
+  async function handleDeleteAccount() {
     /* Demo account: no Firebase user exists — "delete" means end the demo
        (full local wipe + back to welcome), same as its logout path. */
     var demoActive = !!(window.LTDemo && window.LTDemo.isActive && window.LTDemo.isActive());
     if (demoActive) {
-      if (!confirm("Delete this demo account permanently?\n\n• ALL demo data is erased from this device\n• You return to the welcome screen\n\nThis cannot be undone.")) return;
+      if (!await ltConfirmDanger("Delete this demo account permanently?\n\n• ALL demo data is erased from this device\n• You return to the welcome screen\n\nThis cannot be undone.", "Delete demo account?", { yes: "Delete" })) return;
       if (window.LTAuth && window.LTAuth.logout) window.LTAuth.logout();
-      alert("This demo account and all of its data have been deleted.");
+      ltAlert("This demo account and all of its data have been deleted.");
       return;
     }
     var u = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
-    if (!u || !u.uid) { alert("No account is signed in."); return; }
-    if (!confirm("Delete your account permanently?\n\n• Your account is deleted from Firebase — you can never log in with it again\n• ALL data for this account is erased from this device: activities, budget, tasks, profile AND your subscription plan\n\nThis cannot be undone.")) return;
-    if (!confirm("Last confirmation: delete this account and everything in it?")) return;
+    if (!u || !u.uid) { ltAlert("No account is signed in."); return; }
+    if (!await ltConfirmDanger("Delete your account permanently?\n\n• Your account is deleted from Firebase — you can never log in with it again\n• ALL data for this account is erased from this device: activities, budget, tasks, profile AND your subscription plan\n\nThis cannot be undone.", "Delete account?", { yes: "Delete" })) return;
+    if (!await ltConfirmDanger("Last confirmation: delete this account and everything in it?", "Last confirmation", { yes: "Delete" })) return;
 
     var origin = (window.LTAuth && window.LTAuth.apiOrigin) ? window.LTAuth.apiOrigin() : "";
     (window.LTAuth && window.LTAuth.getToken ? window.LTAuth.getToken(false) : Promise.resolve(null))
@@ -417,18 +419,19 @@ export function SettingsScreen() {
         /* Second pass while sign-out settles, in case an enhancement
            seeder or the SDK re-wrote a key during the async gap. */
         setTimeout(function () { wipeAccountStorage(u.uid); }, 800);
-        alert("Your account and all of its data have been deleted.");
-        if (!window.AndroidBridge) {
-          setTimeout(function () { window.location.reload(); }, 300);
-        }
+        ltAlert("Your account and all of its data have been deleted.").then(function () {
+          if (!window.AndroidBridge) {
+            setTimeout(function () { window.location.reload(); }, 300);
+          }
+        });
       })
       .catch(function (e) {
-        alert("Could not delete account: " + ((e && e.message) || e) + "\n\nNothing was removed from this device.");
+        ltAlert("Could not delete account: " + ((e && e.message) || e) + "\n\nNothing was removed from this device.");
       });
   }
 
   function handleSaveTelegram() {
-    if (!isPro) { alert("Telegram daily reports require an active paid plan."); return; }
+    if (!isPro) { ltAlert("Telegram daily reports require an active paid plan."); return; }
     setTgSaving(true);
     setTgTestResult(null);
     setTgTestMsg("");
@@ -489,8 +492,14 @@ export function SettingsScreen() {
     return btoa(bin);
   }
 
+  /* Debounce: a single tap can deliver its click twice (the browser's own
+     late click for a tap that also produced a synthesized one) — that was
+     the "Backup saved shows again after OK" popup. One save per 3s max. */
+  var _dlBusyAt = 0;
   function handleDownloadData() {
-    if (!isPro) { alert("This feature is only available for the 1 Year Plan."); return; }
+    if (Date.now() - _dlBusyAt < 3000) return;
+    _dlBusyAt = Date.now();
+    if (!isPro) { ltAlert("This feature is only available for the 1 Year Plan."); return; }
     try {
       var backup = buildBackup();
       var json = JSON.stringify(backup);
@@ -502,7 +511,7 @@ export function SettingsScreen() {
         var bridge = window.AndroidBridge;
         if (bridge && typeof bridge.downloadFile === "function") {
           bridge.downloadFile("data:application/json;base64," + utf8ToBase64(json), "application/json", fname);
-          alert("Backup saved to your Downloads folder as:\n" + fname);
+          ltAlert("Backup saved to your Downloads folder as:\n" + fname, "Backup saved");
           return;
         }
       } catch (eb) {}
@@ -515,13 +524,14 @@ export function SettingsScreen() {
       a.click();
       a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+      ltAlert("Backup downloaded as:\n" + fname, "Backup saved");
     } catch (e) {
-      alert("Could not download data: " + ((e && e.message) || e));
+      ltAlert("Could not download data: " + ((e && e.message) || e));
     }
   }
 
   function handleLoadData() {
-    if (!isPro) { alert("This feature is only available for the 1 Year Plan."); return; }
+    if (!isPro) { ltAlert("This feature is only available for the 1 Year Plan."); return; }
     var input = document.createElement("input");
     input.type = "file";
     input.accept = ".json,application/json";
@@ -529,7 +539,7 @@ export function SettingsScreen() {
       var f = input.files && input.files[0];
       if (!f) return;
       loadDataFile(f).then(function (res) {
-        alert(res.message);
+        ltAlert(res.message, res.ok ? "Backup loaded" : "Load failed");
         if (res.ok) {
           /* Full remount from fresh localStorage — works on web AND the
              Android WebView (location.reload() is broken there). */
@@ -630,7 +640,7 @@ export function SettingsScreen() {
                       if (typeof window !== "undefined" && window.LTPlan && window.LTPlan.showPlansScreen) {
                         window.LTPlan.showPlansScreen();
                       } else {
-                        alert("Plans screen is managed from the main app.");
+                        ltAlert("Plans screen is managed from the main app.");
                       }
                     },
                     className: [

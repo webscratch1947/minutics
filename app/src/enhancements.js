@@ -5,6 +5,7 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
 import { getStore } from "./lib/storage.js";
 import { getMessaging, getToken } from "firebase/messaging";
 import { getApps } from "firebase/app";
+import { ltAlert } from "./ui_dialog.js";
 
 (function () {
   "use strict";
@@ -32,11 +33,11 @@ import { getApps } from "firebase/app";
        frame; the timeouts below guarantee it never lingers. */
     var video = document.createElement("video");
     video.id = "lt-startup-splash-video";
-    /* ?v=2: the bump forces a fresh download past any stale/partial cached
-       copy — a bad cached file is why the video "sometimes doesn't play". */
-    video.src = "assets/lt/minutics_splash.mp4?v=2"; /* bump ?v=N when replacing the file (immutable 1y cache) */
+    /* ?v=3: the bump forces a fresh download past any stale/partial cached
+       copy — an old cached file is why the video "sometimes doesn't play"
+       (and v3 is the copy WITH its audio track restored). */
+    video.src = "assets/lt/minutics_splash.mp4?v=3"; /* bump ?v=N when replacing the file (immutable 1y cache) */
     video.autoplay = true;
-    video.muted = true;
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
     video.preload = "auto";
@@ -65,12 +66,25 @@ import { getApps } from "firebase/app";
        never a stuck splash. */
     video.addEventListener("error", function () { setTimeout(dismiss, 1200); });
 
-    /* ALWAYS muted — decision: no splash audio, ever. Autoplay-with-sound
-       is blocked without a user gesture, so audio used to play only after
-       a recent click / in some WebViews ("sometimes I hear it, sometimes
-       not"). One consistent behavior: silent. */
-    video.muted = true;
-    video.play().catch(function () {});
+    /* WITH SOUND — the splash video's own audio is part of the intro.
+       Android's WebView allows it (mediaPlaybackRequiresUserGesture is off
+       in MainActivity). Desktop browsers block autoplay-with-sound before a
+       user gesture, so there: start muted (video still plays), and the first
+       real tap/pointer restores the sound for the rest of the clip. */
+    video.muted = false;
+    video.play().catch(function () {
+      video.muted = true;
+      video.play().catch(function () {});
+    });
+    try {
+      var unmuteOnGesture = function () {
+        if (!dismissed) { video.muted = false; video.play().catch(function () {}); }
+        window.removeEventListener("pointerdown", unmuteOnGesture, true);
+        window.removeEventListener("keydown", unmuteOnGesture, true);
+      };
+      window.addEventListener("pointerdown", unmuteOnGesture, true);
+      window.addEventListener("keydown", unmuteOnGesture, true);
+    } catch (e) {}
 
     /* Cream alone is released by MAX_MS; a video that actually started
        plays through to its natural end (ended → dismiss above), with
@@ -3894,7 +3908,7 @@ import { getApps } from "firebase/app";
     gramSetBtnSaving(btn, true);
     gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
-      if (!dataUrl) { alert("Couldn't save this image. Please try again."); return; }
+      if (!dataUrl) { ltAlert("Couldn't save this image. Please try again."); return; }
       /* Single shared save helper — native bridge (Android) or a real blob
          download (web). */
       ltSaveImage(dataUrl, "minutics-" + id + ".jpg");
@@ -3905,7 +3919,7 @@ import { getApps } from "firebase/app";
     gramSetBtnSaving(btn, true);
     gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
-      if (!dataUrl) { alert("Couldn't load this image. Please try again."); return; }
+      if (!dataUrl) { ltAlert("Couldn't load this image. Please try again."); return; }
       /* Same pattern as Journal share — pass dataUrl directly to bridge */
       openShareSheet(dataUrl, GRAM_SHARE_CAPTION);
     });
@@ -5097,7 +5111,7 @@ import { getApps } from "firebase/app";
             _target.setHours(parseInt(_parts[0], 10), parseInt(_parts[1], 10) || 0, 0, 0);
             if (Date.now() < _target.getTime()) {
               var _label = _item.endTime ? ("ends at " + formatRoutineTime(_item.endTime)) : ("starts at " + formatRoutineTime(_item.time));
-              alert("You can't tick \"" + _item.name + "\" yet \u2014 it " + _label + ". Come back once that time arrives.");
+              ltAlert("You can't tick \"" + _item.name + "\" yet \u2014 it " + _label + ". Come back once that time arrives.");
               return;
             }
           }
@@ -5156,8 +5170,8 @@ import { getApps } from "firebase/app";
           var endTimeVal = clockFieldValue("lt-routine-endtime");
           var conflict = findRoutineTimeConflict(timeVal, endTimeVal, routineEditingId, null);
           if (conflict) {
-            if (conflict.reason === "order") { alert("End time must be after the start time."); }
-            else { alert('"' + name + '" overlaps with "' + conflict.item.name + '" (' + formatRoutineRange(conflict.item.time, conflict.item.endTime) + '). Two routines can\'t share the same time slot.'); }
+            if (conflict.reason === "order") { ltAlert("End time must be after the start time."); }
+            else { ltAlert('"' + name + '" overlaps with "' + conflict.item.name + '" (' + formatRoutineRange(conflict.item.time, conflict.item.endTime) + '). Two routines can\'t share the same time slot.'); }
             return;
           }
           upsertRoutine({
@@ -5185,12 +5199,12 @@ import { getApps } from "firebase/app";
         for (var i = 0; i < validRows.length; i++) {
           var row = validRows[i];
           var rname = (row.name || "").trim();
-          if (!rname) { alert("Please give every routine a name before saving (row " + (i + 1) + " is blank)."); return; }
+          if (!rname) { ltAlert("Please give every routine a name before saving (row " + (i + 1) + " is blank)."); return; }
           var others = validRows.slice(0, i).concat(validRows.slice(i + 1));
           var rowConflict = findRoutineTimeConflict(row.time, row.endTime, null, others);
           if (rowConflict) {
-            if (rowConflict.reason === "order") { alert('"' + rname + '": end time must be after the start time.'); }
-            else { alert('"' + rname + '" overlaps with "' + rowConflict.item.name + '" (' + formatRoutineRange(rowConflict.item.time, rowConflict.item.endTime) + '). Two routines can\'t share the same time slot.'); }
+            if (rowConflict.reason === "order") { ltAlert('"' + rname + '": end time must be after the start time.'); }
+            else { ltAlert('"' + rname + '" overlaps with "' + rowConflict.item.name + '" (' + formatRoutineRange(rowConflict.item.time, rowConflict.item.endTime) + '). Two routines can\'t share the same time slot.'); }
             return;
           }
         }
@@ -9154,7 +9168,7 @@ import { getApps } from "firebase/app";
         btn.addEventListener('click', function () {
           var idx = Number(btn.getAttribute('data-idx'));
           var cfg = getJarsConfig();
-          if (cfg.jars.length <= 1) { alert("You need at least one jar."); return; }
+          if (cfg.jars.length <= 1) { ltAlert("You need at least one jar."); return; }
           cfg.jars.splice(idx, 1);
           saveJarsConfig(cfg);
           refreshRows();
@@ -9202,7 +9216,7 @@ import { getApps } from "firebase/app";
       });
       var total = newJars.reduce(function (s, j) { return s + j.pct; }, 0);
       if (total <= 0 || total > 100) {
-        alert("Percentages must add up to 100% or less. Currently: " + total + "%");
+        ltAlert("Percentages must add up to 100% or less. Currently: " + total + "%");
         return;
       }
       saveJarsConfig({ jars: newJars, setupDate: cfg.setupDate || today() });
@@ -9739,7 +9753,11 @@ import { getApps } from "firebase/app";
       var holdStart = function (e) {
         if (e && e.preventDefault) e.preventDefault();
         peeking = true; apply();
-        try { peekBtn.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        /* NO pointer capture: while peeking the screen is revealed and the
+           owner must be able to TAP the app underneath. Capture routed every
+           pointer event to this button — "how can a person click while
+           holding the button, it won't work". The window-level pointerup
+           below still ends the peek from anywhere. */
         window.addEventListener("pointerup", holdEnd, { once: true });
         window.addEventListener("pointercancel", holdEnd, { once: true });
       };
@@ -9773,7 +9791,6 @@ import { getApps } from "firebase/app";
       lastEventAt = Date.now();
       var tilt = Math.abs(gamma);
       var sideWays = tilt > 45;
-      var flatUp = beta < 10;  /* screen lying face-up on a surface */
       if (!engaged) {
         /* Engage only after 3 CONSECUTIVE readings in the protected zone:
            phones fire single bogus all-zero readings while the sensors
@@ -9781,15 +9798,18 @@ import { getApps } from "firebase/app";
            with the phone perfectly upright ("can't see it from the front
            either"). Three agreeing readings in a row is under half a
            second — still instant to a side viewer, immune to glitches. */
-        if (sideWays || flatUp) {
+        if (sideWays) {
           tiltStreak += 1;
           if (tiltStreak >= 3) { engaged = true; tiltStreak = 0; apply(); startWatchdog(); }
         } else {
           tiltStreak = 0;
         }
       } else {
-        /* Release with ~6° of hysteresis so the edge never strobes. */
-        if (tilt < 39 && beta > 16) { engaged = false; peeking = false; tiltStreak = 0; apply(); stopWatchdog(); }
+        /* Release with ~6° of hysteresis so the edge never strobes. Only a
+           sideways tilt ever engages (the old "lying flat" trigger covered
+           the screen whenever the phone was on a desk — the owner could
+           never reach the Settings toggle to turn it off). */
+        if (tilt < 39) { engaged = false; peeking = false; tiltStreak = 0; apply(); stopWatchdog(); }
       }
     }
 

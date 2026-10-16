@@ -6,6 +6,7 @@
 ══════════════════════════════════════════════════════════════════════════ */
 
 import { initializeApp } from "firebase/app";
+import { ltAlert } from "./ui_dialog.js";
 import {
   initializeAuth,
   onAuthStateChanged,
@@ -158,7 +159,7 @@ function forceLogoutSingleSession() {
   _logoutInProgress = true;
   signOut(auth).then(function () {
     setTimeout(function () {
-      alert("This account is only allowed on one device. You were signed out here — log in again on this device to take over.");
+      ltAlert("This account is only allowed on one device. You were signed out here — log in again on this device to take over.");
     }, 400);
   }).catch(function () {});
 }

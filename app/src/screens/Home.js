@@ -18,6 +18,7 @@ import { useTodayStats } from '../hooks/useTodayStats.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '../lib/cn.js';
 import { isPro } from '../lib/settings.js';
+import { ltAsk } from '../ui_dialog.js';
 
 // Icons
 import { Timer as Ty, CalendarClock as Jb, Clock as Zb, Play as nk, Trash2 as lk, Square as rh, Plus as rk, Pencil as tk, IndianRupee as Ri, ChartColumn as Cc } from 'lucide-react';
@@ -519,7 +520,8 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
       });
       return;
     }
-    if (confirm(`Remove "${activity.name}"? It'll stop appearing in your activity list — your tracked time for it is kept.`)) doDelete();
+    ltAsk(`Remove "${activity.name}"? It'll stop appearing in your activity list — your tracked time for it is kept.`, 'Remove activity?')
+      .then(function (ok) { if (ok) doDelete(); });
   };
 
   // Open edit modal

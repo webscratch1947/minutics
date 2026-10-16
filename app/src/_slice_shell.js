@@ -502,114 +502,23 @@ const SHELL_CSS = [
 
 /* ── Shell ─────────────────────────────────────────────────────────────
    - demo countdown lives in the top bar (see demoClockText)
-   - horizontal swipe between tabs with a live peek of the neighbour tab
-   - smooth slide animation on every tab switch (tap or swipe)
-   - optional UI layout editor overlay                    */
+   - smooth slide animation on every tab switch (tap)                   */
 export function ak({ profile }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const shellRef = useRef(null);
 
   /* Enter-direction for the slide animation: computed synchronously during
-     render so the keyed page wrapper mounts with its class already set.
-     suppressAnimRef: a swipe COMMIT navigates while the target page is
-     already half-visible under the finger — the new page must continue
-     gliding from that offset instead of re-sliding in from the edge. */
+     render so the keyed page wrapper mounts with its class already set. */
   const animRef = useRef({ prev: pathname, dir: 0 });
-  const suppressAnimRef = useRef(false);
   if (animRef.current.prev !== pathname) {
     const pi = tabIndex(animRef.current.prev);
     const ni = tabIndex(pathname);
-    const suppress = suppressAnimRef.current;
-    suppressAnimRef.current = false;
     animRef.current = {
       prev: pathname,
-      dir: suppress ? 0 : ((pi >= 0 && ni >= 0 && pi !== ni) ? (ni > pi ? 1 : -1) : 1)
+      dir: (pi >= 0 && ni >= 0 && pi !== ni) ? (ni > pi ? 1 : -1) : 1
     };
   }
   const enterDir = animRef.current.dir;
-
-  /* Horizontal swipe state (x/sign track the finger during the gesture) */
-  const gRef = useRef({ active: false, locked: null, startX: 0, startY: 0, width: 0, x: 0, sign: 0 });
-  const [dragX, setDragX] = useState(0);
-  const [peek, setPeek] = useState(null);
-  const [tracking, setTracking] = useState(false);
-  /* COMMIT HOLD: when the glide finishes, the painted peek pane is kept
-     pinned at 0 for a beat while the freshly keyed route wrapper paints.
-     Removing it in the same React commit that mounts the new wrapper left
-     a 1–3 frame hole where only the cream backdrop showed — the "flash of
-     cream background like a refresh" during a slide switch. The held pane
-     renders IDENTICAL content to the wrapper beneath, so the hold (and its
-     removal) is invisible; a new touch cancels it immediately. */
-  const [holdPeek, setHoldPeek] = useState(false);
-  const peekHoldTRef = useRef(null);
-  const clearPeekHold = () => {
-    if (peekHoldTRef.current) {
-      clearTimeout(peekHoldTRef.current);
-      peekHoldTRef.current = null;
-    }
-  };
-  /* Invalidates a hold's pending release when a newer gesture (or commit)
-     takes over, so a stale frame callback can never drop the NEW peek. */
-  const holdGenRef = useRef(0);
-  /* Active transitionend waiter for the in-flight glide. */
-  const glideWaitRef = useRef(null);
-  const stopGlideWait = () => {
-    const w = glideWaitRef.current;
-    if (w) {
-      try { w.el.removeEventListener('transitionend', w.onEnd); } catch (e) {}
-      glideWaitRef.current = null;
-    }
-  };
-  /* The peek pane is React-rendered mid-swipe, but the enhancement pass that
-     injects Journal "Full view" buttons is throttled (1 run / 500ms) and only
-     fires on DOM mutations — during a fast finger-drag it often didn't run
-     until AFTER release, so the peeked Journal showed no Full view button.
-     Scheduled from the EFFECT (runs right after the peek commit) with a 0ms
-     timer: the pass completes WHILE THE FINGER IS STILL DRAGGING, long before
-     release — the glide never waits for it (zero added latency at release) and
-     no pass can land mid-slide (mid-slide DOM writes re-raster the promoted
-     panes = the flicker). */
-  const peekEnhRef = useRef(null);
-  const cancelPeekEnh = () => {
-    if (peekEnhRef.current) {
-      clearTimeout(peekEnhRef.current);
-      peekEnhRef.current = null;
-    }
-  };
-  useEffect(() => {
-    if (!peek) return;
-    peekEnhRef.current = setTimeout(() => {
-      peekEnhRef.current = null;
-      try { window.dispatchEvent(new CustomEvent('lt-route-change')); } catch (e) {}
-    }, 0);
-    return cancelPeekEnh;
-  }, [peek]);
-  /* Gesture-busy flag (body[data-lt-swipe]): enhancement AUTO-paths — the
-     MutationObserver throttle, the 3s sweep and the cold-start poll — must
-     not mutate the DOM while a swipe is tracking or gliding. Any write
-     re-rasters the composited panes and can pop content into a moving page.
-     The MANUAL lt-route-change dispatches are not gated: they run at
-     controlled moments with the panes frozen. */
-  const setSwipeBusy = (on) => {
-    try {
-      if (on) document.body.dataset.ltSwipe = '1';
-      else delete document.body.dataset.ltSwipe;
-    } catch (e) {}
-  };
-  /* Imperative style targets. pointermove fires up to ~120×/s — pushing
-     dragX through React re-rendered the whole page tree on EVERY event,
-     which made the slide feel heavy and then suddenly "detach". During the
-     gesture the transforms are written straight to the DOM; React only
-     writes these styles when dragX/peek/tracking actually change (lock,
-     direction flip, release), so the imperative values stick. */
-  const wrapRef = useRef(null);
-  const peekRef = useRef(null);
-  const applyDragStyles = (x) => {
-    const w = gRef.current.width || 1;
-    if (wrapRef.current) wrapRef.current.style.transform = x ? 'translateX(' + x + 'px)' : '';
-    if (peekRef.current) peekRef.current.style.transform = 'translateX(' + (x + (x > 0 ? -w : w)) + 'px)';
-  };
 
   /* ── UI layout editor: REMOVED (fully) ──────────────────────────────────
      The hold-and-drop swap never worked reliably (drops landed in the
@@ -618,508 +527,43 @@ export function ak({ profile }) {
      reset: applyUiLayout's interval/route loop is gone and the saved
      order store is wiped once at startup (UI_ORDER_KEY below). */
 
-  const glideTRef = useRef(null);
-  const glideTargetRef = useRef(null);
-  /* A touch that lands while a commit is still settling (glide or the
-     pinned-cover hold, ≤~360ms) is parked here and re-enters as a live
-     gesture the moment the commit finishes — instead of force-finishing
-     the commit, which SNAP-JUMPED the half-slid panes to their end
-     positions ("teleporting" on fast successive swipes) and dropped the
-     cover before the swapped page had painted (the flash of the previous
-     page). The finger is still down, so the next move locks instantly. */
-  const pendingGestureRef = useRef(null);
-
-  /* Page trees are memoized: drag-state changes (setDragX on a direction
-     flip or neighbor change) used to re-render BOTH full route trees
-     mid-gesture — that re-render storm was the swipe "flicker". Now only
-     the wrapper's style updates; the screens themselves are untouched
-     until the pathname actually changes. */
+  /* The page tree is memoized on the route: switching tabs re-mounts the
+     new screen once, with the enter slide animation. */
   const pageEl = useMemo(() => jsx('main', {
     className: 'relative h-full overflow-y-auto overscroll-contain pb-[calc(96px+env(safe-area-inset-bottom,0px))] no-scrollbar',
     children: jsx(AppRoutes, { profile })
   }), [pathname, profile]);
 
-  const peekEl = useMemo(() => (peek ? jsx(AppRoutes, {
-    profile,
-    location: { pathname: peek, search: '', hash: '', state: null, key: 'peek' }
-  }) : null), [peek, profile]);
-
-  /* Completes an in-flight swipe commit: the target page (the peek pane,
-     which has been gliding to rest) is swapped for the real current route
-     in one batch — both render identical content at the same offset, so the
-     swap is invisible. The enter animation is suppressed, so there is no
-     re-slide and no teleport. */
-  const finishCommit = () => {
-    if (!glideTRef.current) return;
-    clearTimeout(glideTRef.current);
-    glideTRef.current = null;
-    stopGlideWait();
-    clearPeekHold();
-    setSwipeBusy(false); /* glide over — enhancement auto-paths may run again */
-    suppressAnimRef.current = true;
-    const target = glideTargetRef.current;
-    glideTargetRef.current = null;
-    setDragX(0);
-    /* Keep the painted peek pane covering the viewport (pinned at 0) while
-       the new route's wrapper paints, THEN drop it — same content, so the
-       handoff is seamless and the backdrop never flashes through.
-       The release waits for TWO PAINTED FRAMES after the swap rather than a
-       fixed220ms: the fixed delay added dead time after every swipe (the
-       switch felt like it "stopped animating") while a slow device could
-       still be unpainted when it fired (the cream flash it existed for).
-       A capped timeout covers windows that never produce frames. */
-    setHoldPeek(true);
-    holdGenRef.current += 1;
-    const gen = holdGenRef.current;
-    const release = () => {
-      if (holdGenRef.current !== gen) return;
-      clearPeekHold();
-      setPeek(null);
-      setHoldPeek(false);
-      /* Commit settled — hand the screen back to any parked touch. */
-      const pg = pendingGestureRef.current;
-      pendingGestureRef.current = null;
-      if (pg) {
-        gRef.current = {
-          active: true, locked: null,
-          startX: pg.x, startY: pg.y,
-          width: shellRef.current ? shellRef.current.clientWidth : 0,
-          x: 0, sign: 0
-        };
-      }
-    };
-    requestAnimationFrame(() => { requestAnimationFrame(release); });
-    peekHoldTRef.current = setTimeout(release, 360);
-    navigate(target);
-  };
-
-  /* Commit is finished when the glide transition ACTUALLY ends — never by a
-     fixed timer racing it. The old setTimeout(250) vs the240ms transition
-     lost whenever a frame was late (busy main thread = the lag felt during
-     swipes): the hold then snapped a half-slid strip straight to the edge —
-     a visible pop that made the slide look deleted. */
-  const armGlide = (target) => {
-    const wrapEl = wrapRef.current;
-    glideTargetRef.current = target;
-    if (wrapEl) {
-      const onEnd = (ev) => {
-        if (ev.target !== wrapEl || ev.propertyName !== 'transform') return;
-        finishCommit();
-      };
-      glideWaitRef.current = { el: wrapEl, onEnd };
-      wrapEl.addEventListener('transitionend', onEnd);
-      /* Hard fallback: if no frame ever runs (hidden window), transitionend
-         never fires — commit anyway instead of leaving the panes stuck. */
-      glideTRef.current = setTimeout(finishCommit, 640);
-      /* Transition disabled (reduced motion / zero duration): commit on the
-         next frame rather than waiting in vain for an event that can't
-         come. Runs after the glide styles have been committed. */
-      requestAnimationFrame(() => {
-        if (!glideTRef.current) return; /* already committed */
-        let dur = 0;
-        try { dur = parseFloat(getComputedStyle(wrapEl).transitionDuration) || 0; } catch (e) {}
-        if (!(dur > 0)) finishCommit();
-      });
-    } else {
-      glideTRef.current = setTimeout(finishCommit, 260);
-    }
-  };
-
-  /* The tab-swipe belongs ONLY to the 5 pure bottom-nav pages, and it must
-     never move the page while a tool panel / modal / sheet owns the screen
-     (time block, category picker, date sheet, share, plans…): a swipe that
-     slid the page out from under an open tool looked exactly like the app
-     "refreshing" mid-use. Pure-page swiping is untouched. */
-  const LT_MODAL_SELECTOR =
-    '#lt-overlay-root:not([data-lt-closing]),' +
-    ' #lt-cat-modal-overlay:not([data-lt-closing]),' +
-    ' #lt-date-sheet, #lt-share-sheet-overlay, #lt-emoji-pop-overlay,' +
-    ' #lt-upgrade-modal, #lt-fv-report-overlay, #lt-fv-share-overlay,' +
-    ' #lt-badge-overlay, #lt-curr-sheet, #lt-plans-modal,' +
-    ' #lt-routine-library, #lt-cancel-subscription-dialog';
-  const ltModalOwnsScreen = () => {
-    try {
-      /* 1) the known vanilla ids (closing ones release the screen again) */
-      const known = document.querySelector(LT_MODAL_SELECTOR);
-      if (known && known.isConnected && known.getClientRects().length) return true;
-      /* 2) GENERIC layer sweep — every sheet/modal/overlay/drawer/picker in
-            the app (React ones like the "How do you want to track this?"
-            sheet included — that one slipped through a fixed list once) is
-            name-tagged and, when visible while covering real screen area,
-            owns the screen: the page underneath must not slide sideways. */
-      const layers = document.querySelectorAll(
-        '[class*="sheet"],[id*="sheet"],[class*="modal"],[id*="modal"],' +
-        '[class*="overlay"],[id*="overlay"],[class*="drawer"],[id*="drawer"],' +
-        '[class*="picker"],[role="dialog"],[role="sheet"]'
-      );
-      /* Screen = the APP SHELL, not the browser window: on desktop the
-         430px shell is centered in a much wider window, and every fixed
-         layer that renders INSIDE the shell (React sheets!) is clamped to
-         it — measuring against innerWidth made a sheet that fully covers
-         the visible app look like "only 52% of the screen". Window-level
-         layers (confirm dialog, enhancement overlays appended to body) are
-         larger than the shell, so they still pass. */
-      const _sh = document.querySelector('#root [style*="pan-y"]');
-      const _shr = _sh ? _sh.getBoundingClientRect() : null;
-      const vw = _shr && _shr.width > 50 ? _shr.width : window.innerWidth;
-      const vh = _shr && _shr.height > 50 ? _shr.height : window.innerHeight;
-      for (let i = 0; i < layers.length; i++) {
-        const el = layers[i];
-        if (!el.isConnected) continue;
-        const cs = getComputedStyle(el);
-        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-        /* opacity<0.05 = invisible leftover… unless an animation is still on
-           it (a dialog 0.18s into its fade-in is at opacity 0 for a moment
-           but very much owns the screen — and on frozen/hidden animation
-           clocks it would stay 0 forever). */
-        if (cs.opacity !== '' && parseFloat(cs.opacity) < 0.05 &&
-            !(el.getAnimations && el.getAnimations().length)) continue;
-        if (cs.position !== 'fixed' && cs.position !== 'absolute') continue;
-        const r = el.getBoundingClientRect();
-        /* Small chips/toasts/labels never count — a layer must span at least
-           half the viewport wide and a third tall to own the screen. */
-        if (r.width < vw * 0.5 || r.height < vh * 0.3) continue;
-        return true;
-      }
-      /* 3) NAMELESS full-screen layers — the React BottomSheet (track picker,
-            log block, emoji panel…) renders its root as the bare Tailwind
-            stack `fixed inset-0 z-[60] flex items-end` with NO sheet/modal/
-            overlay word anywhere, and its backdrop is `absolute inset-0
-            bg-black/55` — also nameless (the panel itself only carries
-            `lt-sheet-in` but is position:relative, so the sweep above skips
-            it). Name matching can never catch those, and a touch on the
-            backdrop slid the whole page away with the sheet still open.
-            Shape catches them: any VISIBLE fixed layer covering ~the entire
-            viewport is screen-owning by definition. Swipe panes are
-            `absolute` (never fixed) and page chrome (bottom nav, toasts) is
-            fixed but short, so they can't false-positive. */
-      const fixed = document.querySelectorAll(
-        '.fixed,[style*="position:fixed"],[style*="position: fixed"]'
-      );
-      for (let i = 0; i < fixed.length; i++) {
-        const el = fixed[i];
-        if (!el.isConnected) continue;
-        const cs = getComputedStyle(el);
-        if (cs.position !== 'fixed') continue;
-        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-        if (cs.opacity !== '' && parseFloat(cs.opacity) < 0.05 &&
-            !(el.getAnimations && el.getAnimations().length)) continue;
-        const r = el.getBoundingClientRect();
-        if (r.width >= vw * 0.9 && r.height >= vh * 0.9) return true;
-      }
-      return false;
-    } catch (e) { return false; }
-  };
-  const ltTouchInsideLayer = (target) => {
-    try {
-      return !!(target && target.closest &&
-        target.closest('[class*="sheet"],[id*="sheet"],[class*="modal"],[id*="modal"],' +
-          '[class*="overlay"],[id*="overlay"],[class*="drawer"],[id*="drawer"],' +
-          '[class*="picker"],[role="dialog"],[role="sheet"]'));
-    } catch (e) { return false; }
-  };
-  const ltPureTabRoute = () => {
-    try {
-      const h = (window.location.hash || '').replace(/^#/, '').split('?')[0];
-      return TABS.indexOf(h === '' ? '/' : h) !== -1;
-    } catch (e) { return true; }
-  };
-
-  const onTouchStart = (e) => {
-    /* Commit still settling (glide or the pinned-cover hold): the busy
-       flag must STAY on (it protects the commit's final frames) and this
-       touch is parked, not served. */
-    const committing = !!(glideTRef.current || peekHoldTRef.current);
-    /* Any new touch resets the busy flag — a stale flag would mute the
-       enhancement auto-paths for the rest of the session. */
-    if (!committing) setSwipeBusy(false);
-    /* Tab-swipe starts from anywhere on the main app (inside #root): the
-       bottom nav pill, page content, all of it — so switching tabs never
-       needs a nav tap. Enhancement sheets/modals are appended OUTSIDE
-       #root, so they (and their own grip-drag gestures) are untouched,
-       and form fields keep their text-selection/cursor gestures. */
-    try {
-      if (!(e.target && e.target.closest &&
-            e.target.closest('#root') &&
-            !e.target.closest('input, textarea, select, [data-lt-no-swipe]')) ||
-          ltTouchInsideLayer(e.target) ||
-          ltModalOwnsScreen() || !ltPureTabRoute()) {
-        gRef.current.active = false;
-        gRef.current.locked = null;
-        pendingGestureRef.current = null;
-        return;
-      }
-    } catch (err) {
-      gRef.current.active = false;
-      gRef.current.locked = null;
-      pendingGestureRef.current = null;
-      return;
-    }
-    if (committing) {
-      /* Park this gesture until the commit settles (typically ~270ms; the
-         360ms cap only covers frame-less windows). The old behaviour —
-         force-finish the commit on touch — SNAP-JUMPED the half-slid panes
-         to their end positions (the "teleport" when swiping super quickly)
-         and dropped the pinned cover before the swapped page had painted
-         (the flash of the previous page). release() re-enters the parked
-         touch as a live gesture; its finger is still down, so the next
-         move locks instantly and no swipe is lost. */
-      gRef.current.active = false;
-      gRef.current.locked = null;
-      pendingGestureRef.current = (e.touches && e.touches.length === 1)
-        ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
-        : null;
-      return;
-    }
-    if (!e.touches || e.touches.length !== 1) {
-      gRef.current.locked = 'v';
-      return;
-    }
-    const t = e.touches[0];
-    gRef.current = {
-      active: true, locked: null,
-      startX: t.clientX, startY: t.clientY,
-      width: shellRef.current ? shellRef.current.clientWidth : 0,
-      x: 0, sign: 0
-    };
-  };
-
-  const onTouchMove = (e) => {
-    const g = gRef.current;
-    if (!g.active || g.locked === 'v' || !e.touches || !e.touches.length) return;
-    const t = e.touches[0];
-    const dx = t.clientX - g.startX;
-    const dy = t.clientY - g.startY;
-    if (!g.locked) {
-      /* Lock fast (8px): the page attaches to the finger almost
-         immediately — the old 14px dead zone felt like resistance and then
-         a sudden release. The 1.15× direction ratio keeps vertical list
-         scrolling from ever starting a slide. */
-      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.15) {
-        g.locked = 'h';
-        const idx0 = tabIndex(pathname);
-        const next0 = dx > 0 ? idx0 - 1 : idx0 + 1;
-        const has0 = idx0 >= 0 && next0 >= 0 && next0 < TABS.length;
-        let x0 = has0 ? dx : dx * 0.22;
-        const w0 = g.width || 1;
-        if (x0 > w0) x0 = w0;
-        if (x0 < -w0) x0 = -w0;
-        g.x = x0;
-        g.sign = dx > 0 ? 1 : -1;
-        /* Busy from the lock: the peek's mount is a huge childList mutation
-           that would otherwise schedule an auto-enhancement run right into
-           the glide (mid-slide writes re-raster the panes = flicker). The
-           manual peek pass is scheduled separately at 0ms — pre-glide. */
-        setSwipeBusy(true);
-        setTracking(true);
-        setDragX(x0); /* one render — styles are correct from the start */
-        setPeek(has0 ? TABS[next0] : null);
-        return;
-      }
-      if (Math.abs(dy) > 14) { g.locked = 'v'; return; }
-      return;
-    }
-    if (g.locked !== 'h') return;
-    const idx = tabIndex(pathname);
-    const nextIdx = dx > 0 ? idx - 1 : idx + 1;
-    const has = idx >= 0 && nextIdx >= 0 && nextIdx < TABS.length;
-    let x = has ? dx : dx * 0.22;
-    const w = g.width || 1;
-    if (x > w) x = w;
-    if (x < -w) x = -w;
-    g.x = x;
-    const sign = x > 0 ? 1 : x < 0 ? -1 : g.sign;
-    if ((has ? TABS[nextIdx] : null) !== peek || sign !== g.sign) {
-      /* Neighbour or direction changed → one state sync (rare), then
-         straight back to imperative updates. */
-      g.sign = sign;
-      setDragX(x);
-      setPeek(has ? TABS[nextIdx] : null);
-      return;
-    }
-    applyDragStyles(x);
-  };
-
-  const onTouchEnd = () => {
-    const g = gRef.current;
-    g.active = false;
-    if (g.locked !== 'h') {
-      g.locked = null;
-      /* Never locked (or parked-and-lifted before its commit settled) —
-         the parked gesture dies with its touch. */
-      pendingGestureRef.current = null;
-      return;
-    }
-    g.locked = null;
-    setTracking(false);
-    const w = g.width || 1;
-    const x = g.x || 0;
-    const target = peek;
-    if (target && Math.abs(x) > w * 0.26) {
-      /* Commit WITHOUT a jump: glide the whole strip to the edge (the
-         target page — the peek pane — continues its slide from exactly
-         where the finger left off) and then swap it for the real route in
-         one batch, with the enter animation suppressed. The result is one
-         continuous slide, no teleport, no re-entry animation.
-         NO synchronous work here: the peek's enhancement pass already ran
-         while the finger was dragging (0ms timer at lock), so release is
-         instant — the slide starts in the same frame as always. */
-      setSwipeBusy(true); /* stays set through the glide; finishCommit clears */
-      setDragX(x > 0 ? w : -w);
-      armGlide(target);
-    } else {
-      setSwipeBusy(false);
-      setDragX(0);
-      setPeek(null);
-    }
-  };
-
-  const paneW = gRef.current.width || 0;
-
   return jsxs('div', {
-    ref: shellRef,
     className: 'relative mx-auto max-w-[430px] w-full h-[100dvh] overflow-hidden bg-transparent flex flex-col',
-    style: { touchAction: 'pan-y' },
-    onTouchStart: onTouchStart,
-    onTouchMove: onTouchMove,
-    onTouchEnd: onTouchTouchEndGuard(onTouchEnd),
     children: [
       jsx('style', { children: SHELL_CSS }),
       jsx(RouteWatcher, {}),
       jsx(HC, {}),
       jsx(LTTopNav, {}),
       jsx('div', {
-        ref: undefined,
-        /* Paint the authed body's fixed rainbow ON this slide viewport.
-           The panes translate off-screen during a swipe, and the shell/page
-           underneath are transparent, so without this the swipe revealed the
-           flat cream body colour instead of the rainbow the user sees at rest.
-           background-attachment:fixed matches the body so the gradient lines
-           up exactly before, during and after the slide. */
+        /* Slide viewport: paints the authed body's fixed rainbow so the
+           page sits on the same gradient as the rest of the app. */
         className: 'relative flex-1 min-h-0 overflow-hidden lt-swipe-bg',
-        children: [
-          jsx('div', {
-            key: pathname,
-            ref: wrapRef,
-            className: cn('h-full', enterDir === 1 ? 'lt-page-in-r' : enterDir === -1 ? 'lt-page-in-l' : ''),
-            style: {
-              transform: dragX ? 'translateX(' + dragX + 'px)' : undefined,
-              transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)',
-              /* Compositor layer ONLY while the pane moves (tracking or
-                 gliding): keeps the slide smooth without a resting stacking
-                 context that would bury in-page sheets under the nav. */
-              willChange: (tracking || dragX) ? 'transform' : undefined
-            },
-            /* Strip the enter-animation class the moment it finishes: the
-               animation (transform != none) is itself a stacking context —
-               while it exists every in-page z-index (sheets z-60, modals
-               z-80) is capped under the bottom nav's z-50. Finished +
-               fill:none reverts on its own, but the class lingering forever
-               left a promoted layer in some engines. */
-            onAnimationEnd: (e) => {
-              const n = e.animationName;
-              if (n === 'lt-page-in-r' || n === 'lt-page-in-l') {
-                e.currentTarget.classList.remove('lt-page-in-r', 'lt-page-in-l');
-              }
-            },
-            children: pageEl
-          }),
-          peek ? jsx('div', {
-            key: 'peek-' + peek,
-            ref: peekRef,
-            /* Mark the peeked route so enhancements (e.g. Journal Full view
-               buttons) know a copy of that page is live even before the route
-               actually commits — otherwise the peeked Journal looked incomplete
-               (no Full view pill) during the hold-slide. */
-            'data-lt-peek': peek,
-            /* Transparent — the rainbow backdrop now lives on the slide
-               viewport (lt-swipe-bg) behind BOTH panes, so the peek shows the
-               same fixed gradient as the page it slides in over. A flat colour
-               here made the swipe lose the rainbow. */
-            className: 'absolute inset-0 pointer-events-none overflow-hidden',
-            style: holdPeek
-              ? { transform: 'translateX(0px)', transition: 'none', willChange: 'transform' }
-              : {
-                  transform: 'translateX(' + (dragX + (dragX > 0 ? -paneW : paneW)) + 'px)',
-                  transition: tracking ? 'none' : 'transform 240ms cubic-bezier(.22,.61,.36,1)',
-                  willChange: 'transform'
-                },
-            children: peekEl
-          }) : null
-        ]
+        children: jsx('div', {
+          key: pathname,
+          className: cn('h-full', enterDir === 1 ? 'lt-page-in-r' : enterDir === -1 ? 'lt-page-in-l' : ''),
+          /* Strip the enter-animation class the moment it finishes: the
+             animation (transform != none) is itself a stacking context —
+             while it exists every in-page z-index (sheets z-60, modals
+             z-80) is capped under the bottom nav's z-50. */
+          onAnimationEnd: (e) => {
+            const n = e.animationName;
+            if (n === 'lt-page-in-r' || n === 'lt-page-in-l') {
+              e.currentTarget.classList.remove('lt-page-in-r', 'lt-page-in-l');
+            }
+          },
+          children: pageEl
+        })
       }),
       jsx(ck, {})
     ]
   });
-}
-
-/* Guard: tolerate touchend arriving after state resets. */
-function onTouchTouchEndGuard(fn) {
-  return (e) => { try { fn(e); } catch (err) {} };
-}
-
-/* ── Tap restoration ──────────────────────────────────────────────────────
-   Chromium kills a tap's click the moment the finger drifts past its
-   touch-slop (~10–16px) — a few pixels of normal human jitter is enough.
-   Those lost clicks are what "the bottom nav doesn't work", "the X button
-   does nothing" and "taps feel dead" really are: the browser never
-   dispatches the click and no amount of app logic runs. This listener
-   sequence watches every touch: if it barely travelled (≤16px, and not a
-   long-press), finished quickly, and NO click arrived, the click is
-   re-dispatched on the element the finger went down on. Real gestures are
-   untouched — a swipe moves far past this gate, vertical scrolls pass the
-   movement check only when tiny (where the browser still clicks anyway),
-   and inputs/textareas are never hijacked. A one-shot swallower for the
-   same element covers the only race left: a real click arriving after the
-   restore (both would fire — now only the first does). */
-let _ltTapEl = null, _ltTapAt = 0, _ltTapX = 0, _ltTapY = 0, _ltLastClickAt = -9999;
-if (typeof window !== 'undefined') {
-  window.addEventListener('click', function () { _ltLastClickAt = Date.now(); }, true);
-  window.addEventListener('touchstart', function (e) {
-    if (!e.touches || e.touches.length !== 1) { _ltTapEl = null; return; }
-    _ltTapEl = e.target;
-    _ltTapAt = Date.now();
-    _ltTapX = e.touches[0].clientX;
-    _ltTapY = e.touches[0].clientY;
-  }, true);
-  window.addEventListener('touchend', function (e) {
-    const el = _ltTapEl;
-    _ltTapEl = null;
-    if (!el || !e.changedTouches || !e.changedTouches.length) return;
-    const t = e.changedTouches[0];
-    const moved = Math.max(Math.abs(t.clientX - _ltTapX), Math.abs(t.clientY - _ltTapY));
-    if (moved > 16) return;                          /* a real gesture — never restore */
-    if (Date.now() - _ltTapAt > 700) return;         /* long-press — context menu owns it */
-    if (Date.now() - _ltLastClickAt < 250) return;   /* the browser's click survived */
-    setTimeout(function () {
-      if (Date.now() - _ltLastClickAt < 400) return; /* a late real click won after all */
-      try {
-        if (!el.closest || !document.contains(el)) return;
-        const hit = el.closest('a[href], button, [role="button"], label, [onclick]');
-        if (!hit) return;
-        if (hit.closest('input, textarea, select')) return; /* fields keep native carets */
-        hit.click();
-        /* If the browser's own click for this touch lands late, swallow it —
-           two activations of one tap (e.g. start timer twice) would be worse
-           than the dead tap we just fixed. */
-        const swallower = function (ev) {
-          const tg = ev.target;
-          if (tg === hit || (tg && hit.contains && hit.contains(tg))) {
-            try { ev.stopPropagation(); ev.preventDefault(); } catch (err) {}
-            window.removeEventListener('click', swallower, true);
-          }
-        };
-        window.addEventListener('click', swallower, true);
-        /* Long enough to cover a BLOCKING confirm()/dialog: while one is
-           open the late real click sits in the event queue and only
-           dispatches after the user dismisses it — typically well past
-           250ms, which is how "Cancel, and it pops right back up (twice)"
-           happened. One-shot (removes itself on swallow) so a deliberate
-           re-tap after the window still works. */
-        setTimeout(function () { window.removeEventListener('click', swallower, true); }, 900);
-      } catch (err) {}
-    }, 70);
-  }, true);
 }
 
 /* Tab order — must match the bottom nav (ck). */

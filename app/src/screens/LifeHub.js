@@ -6,6 +6,7 @@ import { calcRemainingTime } from '../lib/lifeCalc.js';
 import { getCurrency, getCurrencySymbol } from '../lib/currency.js';
 import { isPro } from '../lib/settings.js';
 import { cn } from '../lib/cn.js';
+import { ltAlert } from '../ui_dialog.js';
 import { Play as nk, Pencil as tk, Clock, Wallet, Calculator, TrendingUp, BookOpen, ListChecks, CalendarClock, Heart, Scale, ShoppingCart, BarChart3, Headphones, Hourglass, Trophy, Star, PiggyBank } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -515,7 +516,7 @@ export function LifeHubScreen({ profile }) {
                   "data-lt-category": t.category,
                   "data-lt-tile-injected": "1",
                   onClick: function () {
-                    alert("This is a Premium Feature. Upgrade to access it.");
+                    ltAlert("This is a Premium Feature. Upgrade to access it.");
                   },
                   className: "flex flex-col items-start text-left relative p-4 rounded-2xl bg-foreground text-background border border-white/15 gap-2 transition active:scale-[.98] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50 [-webkit-tap-highlight-color:transparent]",
                   children: [
