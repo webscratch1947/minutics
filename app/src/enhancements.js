@@ -9392,6 +9392,13 @@ import { ltAlert } from "./ui_dialog.js";
      variant below when a tab switch needs instant cleanup. */
   var _enhanceScheduled = false;
   var _lastEnhanceRun = 0;
+  /* Route the last pass ran on — the throttle only holds when the route is
+     UNCHANGED. The MutationObserver microtask fires BEFORE React's passive
+     effect (the lt-route-change dispatch), so the first post-navigation
+     mutation can arrive before _routeFreshUntil is set; comparing routes
+     directly closes that race ("Full view injected ~1s late on the first
+     switch"). */
+  var _lastRunRoute = null;
   var _enhanceBusyRetries = 0;
   var _enhanceInputRetries = 0;
   function scheduleEnhance() {
@@ -9436,7 +9443,8 @@ import { ltAlert } from "./ui_dialog.js";
       }
       _enhanceInputRetries = 0;
       var now = Date.now();
-      if (!freshNav && now - _lastEnhanceRun < 500) {
+      var routeNow = location.pathname + location.hash;
+      if (!freshNav && now - _lastEnhanceRun < 500 && routeNow === _lastRunRoute) {
         /* Throttled window: this used to DISCARD the pass forever. If React
            mounted the target DOM right after a just-finished pass (the exact
            post-swipe Journal case), that discarded mutation was the only
@@ -9450,6 +9458,7 @@ import { ltAlert } from "./ui_dialog.js";
         return;
       }
       _lastEnhanceRun = now;
+      _lastRunRoute = routeNow;
       window.__ltLastEnhanceRun = now;
       try { window.__ltPassDebug = { path: 'mutation', retries: _enhanceInputRetries }; } catch (e) {}
       if (!activeOverlay) runEnhancements();
@@ -9465,6 +9474,7 @@ import { ltAlert } from "./ui_dialog.js";
   function runEnhancementsImmediate() {
     _enhanceScheduled = false;
     _lastEnhanceRun = Date.now();
+    _lastRunRoute = location.pathname + location.hash;
     window.__ltLastEnhanceRun = _lastEnhanceRun;
     sweepStuckUi(); /* runs even while a (possibly stale) overlay is flagged —
                        the !activeOverlay gate below would otherwise never
@@ -9593,9 +9603,23 @@ import { ltAlert } from "./ui_dialog.js";
     /* rAF (post-commit, pre-paint) instead of requestIdleCallback's 250ms
        deadline: the new screen's DOM is already mounted when RouteWatcher
        dispatches, so the pass can inject right into it — the pill/tiles land
-       in the FIRST painted frames of the new tab. */
+       in the FIRST painted frames of the new tab. A 120ms timeout mirrors it
+       as a FALLBACK: rAF is frozen in hidden windows/background tabs (the
+       pass then waited forever and only the slow throttle chain injected the
+       pill — the residual "Full view takes over a second" on backgrounded
+       sessions). Whichever fires first wins; `runOnce` keeps it single-shot. */
     if (t > 0) _navPassPending = setTimeout(attempt, 250);
-    else _navPassPending = requestAnimationFrame(attempt);
+    else {
+      var _runOnce = false;
+      var _firstRun = function () {
+        if (_runOnce) return;
+        _runOnce = true;
+        _navPassPending = null;
+        attempt();
+      };
+      _navPassPending = requestAnimationFrame(_firstRun);
+      setTimeout(_firstRun, 120);
+    }
   }
 
   /* P3+P4+P5 REMOVED: Nav mask system, installOverlayNavGuard, history patches
