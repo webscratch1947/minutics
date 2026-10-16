@@ -737,19 +737,60 @@ export function ak({ profile }) {
         '[class*="overlay"],[id*="overlay"],[class*="drawer"],[id*="drawer"],' +
         '[class*="picker"],[role="dialog"],[role="sheet"]'
       );
-      const vw = window.innerWidth, vh = window.innerHeight;
+      /* Screen = the APP SHELL, not the browser window: on desktop the
+         430px shell is centered in a much wider window, and every fixed
+         layer that renders INSIDE the shell (React sheets!) is clamped to
+         it — measuring against innerWidth made a sheet that fully covers
+         the visible app look like "only 52% of the screen". Window-level
+         layers (confirm dialog, enhancement overlays appended to body) are
+         larger than the shell, so they still pass. */
+      const _sh = document.querySelector('#root [style*="pan-y"]');
+      const _shr = _sh ? _sh.getBoundingClientRect() : null;
+      const vw = _shr && _shr.width > 50 ? _shr.width : window.innerWidth;
+      const vh = _shr && _shr.height > 50 ? _shr.height : window.innerHeight;
       for (let i = 0; i < layers.length; i++) {
         const el = layers[i];
         if (!el.isConnected) continue;
         const cs = getComputedStyle(el);
-        if (cs.display === 'none' || cs.visibility === 'hidden' ||
-            (cs.opacity !== '' && parseFloat(cs.opacity) < 0.05)) continue;
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        /* opacity<0.05 = invisible leftover… unless an animation is still on
+           it (a dialog 0.18s into its fade-in is at opacity 0 for a moment
+           but very much owns the screen — and on frozen/hidden animation
+           clocks it would stay 0 forever). */
+        if (cs.opacity !== '' && parseFloat(cs.opacity) < 0.05 &&
+            !(el.getAnimations && el.getAnimations().length)) continue;
         if (cs.position !== 'fixed' && cs.position !== 'absolute') continue;
         const r = el.getBoundingClientRect();
         /* Small chips/toasts/labels never count — a layer must span at least
            half the viewport wide and a third tall to own the screen. */
         if (r.width < vw * 0.5 || r.height < vh * 0.3) continue;
         return true;
+      }
+      /* 3) NAMELESS full-screen layers — the React BottomSheet (track picker,
+            log block, emoji panel…) renders its root as the bare Tailwind
+            stack `fixed inset-0 z-[60] flex items-end` with NO sheet/modal/
+            overlay word anywhere, and its backdrop is `absolute inset-0
+            bg-black/55` — also nameless (the panel itself only carries
+            `lt-sheet-in` but is position:relative, so the sweep above skips
+            it). Name matching can never catch those, and a touch on the
+            backdrop slid the whole page away with the sheet still open.
+            Shape catches them: any VISIBLE fixed layer covering ~the entire
+            viewport is screen-owning by definition. Swipe panes are
+            `absolute` (never fixed) and page chrome (bottom nav, toasts) is
+            fixed but short, so they can't false-positive. */
+      const fixed = document.querySelectorAll(
+        '.fixed,[style*="position:fixed"],[style*="position: fixed"]'
+      );
+      for (let i = 0; i < fixed.length; i++) {
+        const el = fixed[i];
+        if (!el.isConnected) continue;
+        const cs = getComputedStyle(el);
+        if (cs.position !== 'fixed') continue;
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        if (cs.opacity !== '' && parseFloat(cs.opacity) < 0.05 &&
+            !(el.getAnimations && el.getAnimations().length)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width >= vw * 0.9 && r.height >= vh * 0.9) return true;
       }
       return false;
     } catch (e) { return false; }

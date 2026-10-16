@@ -4111,9 +4111,31 @@ import { getApps } from "firebase/app";
       return false;
     }
     task.starred = !task.starred;
+    if (task.starred) {
+      /* Star ORDER is the queue order. The most recently starred task must
+         be the one WAITING when the frog card is full (PRO), and the card
+         must list in the order the stars were given. Previously nothing
+         recorded star order here, so the tasks array's creation order
+         decided everything — you'd star a task LAST and some OLDER starred
+         task ended up queued instead ("instead of the last one i am
+         selecting being in the queue something else is being queue").
+         _frogOrder = max+1 across current starred (missing = 999, matching
+         _reorderTasksByFrogOrder) → the new star always lands at the end. */
+      var _ord = 0;
+      getAllTasks().forEach(function (x) {
+        if (!x.starred || x.id === task.id) return;
+        var v = typeof x._frogOrder === "number" ? x._frogOrder : 999;
+        if (v + 1 > _ord) _ord = v + 1;
+      });
+      task._frogOrder = _ord;
+    }
     upsertTask(task);
     /* After starring/unstarring, auto-promote the next queued task if a slot opened. */
     autoPromoteQueuedFrog();
+    /* Persist the star order into the array itself — the frog card and the
+       "Queued" badge both read raw array order, so without this the card
+       could show a different queued task than the badge. */
+    _reorderTasksByFrogOrder();
     return true;
   }
 
@@ -4199,7 +4221,17 @@ import { getApps } from "firebase/app";
     var queuedBadge = "";
     if (t.starred && isPro() && !t.completed) {
       var allStarred = getStarredTasks();
-      var idx = allStarred.findIndex(function (s) { return s.id === t.id; });
+      /* Same pool order the frog card uses (incomplete first, completed
+         starred sunk to the end — identical to incompleteStarred.concat
+         (doneStarred) in React). Indexing the raw array made the badge
+         mark a task "Queued" while the card was already SHOWING it in a
+         slot whenever a completed starred task was around — two different
+         answers to "what's queued". */
+      var ordered = allStarred.slice().sort(function (a, b) {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        return 0;
+      });
+      var idx = ordered.findIndex(function (s) { return s.id === t.id; });
       if (idx >= MAX_STARRED_TASKS) {
         queuedBadge = '<span class="lt-task-queued-badge" title="Queued for Eat the Frog — will appear when a slot opens">\u2b50 Queued</span>';
       }
@@ -9298,6 +9330,7 @@ import { getApps } from "firebase/app";
   var _enhanceScheduled = false;
   var _lastEnhanceRun = 0;
   var _enhanceBusyRetries = 0;
+  var _enhanceInputRetries = 0;
   function scheduleEnhance() {
     if (_enhanceScheduled) return;
     _enhanceScheduled = true;
@@ -9323,6 +9356,21 @@ import { getApps } from "firebase/app";
         return;
       }
       _enhanceBusyRetries = 0;
+      /* Input-wins (same rule as _scheduleNavPass): never START a heavy pass
+         while a finger is moving or an interaction is <400ms old — this is
+         the mutation path that stacked a second ~full-DOM pass right on top
+         of the nav pass after a tab switch ("must wait 1.5s before I can
+         scroll or click"). Wait for a quiet moment instead; 6s floor so a
+         non-stop interaction stream can't defer it forever. Automation
+         dispatches no pointer events (_sawPointer false) → runs immediately,
+         timing unchanged for tests. */
+      if (_sawPointer && _inputBusy() && _enhanceInputRetries < 24) {
+        _enhanceInputRetries++;
+        _enhanceScheduled = true;
+        setTimeout(function () { _enhanceScheduled = false; scheduleEnhance(); }, 250);
+        return;
+      }
+      _enhanceInputRetries = 0;
       var now = Date.now();
       if (now - _lastEnhanceRun < 500) {
         /* Throttled window: this used to DISCARD the pass forever. If React
@@ -9338,6 +9386,8 @@ import { getApps } from "firebase/app";
         return;
       }
       _lastEnhanceRun = now;
+      window.__ltLastEnhanceRun = now;
+      try { window.__ltPassDebug = { path: 'mutation', retries: _enhanceInputRetries }; } catch (e) {}
       if (!activeOverlay) runEnhancements();
     });
   }
@@ -9351,6 +9401,7 @@ import { getApps } from "firebase/app";
   function runEnhancementsImmediate() {
     _enhanceScheduled = false;
     _lastEnhanceRun = Date.now();
+    window.__ltLastEnhanceRun = _lastEnhanceRun;
     sweepStuckUi(); /* runs even while a (possibly stale) overlay is flagged —
                        the !activeOverlay gate below would otherwise never
                        let a stuck pass recover on navigation */
@@ -9358,29 +9409,63 @@ import { getApps } from "firebase/app";
   }
 
   /* ── Non-blocking navigation pass ────────────────────────────────────────
-     runEnhancements is a full-DOM scan + writes (normalizeMinuteUnits walks
-     EVERY text node). Run synchronously on every route change it froze the
-     app for 1.5–2s after each navigation — tap a tab and the page looked
-     dead ("Life Hub doesn't open"), swipe-commit and nothing could be
-     scrolled. Idle-scheduled (hard 250ms cap) the page paints and responds
-     instantly; the pass fills in as soon as the main thread breathes.
-     One pending run max: fast tab switches coalesce instead of stacking.
-     If a swipe owns the DOM (body[data-lt-swipe]) the run backs off 200ms
-     per try (so it can't rapid-burn idle callbacks and land mid-drag) and
-     gives up after 15 tries — never an infinite loop. */
+     runEnhancements is a full-DOM scan + writes. Two bugs lived in HOW this
+     was scheduled:
+       1) "switch tabs → 1.5s where nothing scrolls or clicks" — the rIC
+          250ms deadline force-started the heavy pass right on top of the
+          user's FIRST tap/scroll after a switch, freezing the page for the
+          pass's whole runtime (and mutation-driven re-runs stacked another
+          one ~500ms later).
+       2) "the Full view pill only teleports in AFTER I release the slide" —
+          while body[data-lt-swipe] was set the pass backed off 200ms ×15 and
+          gave up at 3s, so a normal 1–2.5s hold NEVER got its peek
+          injection; the pill appeared the instant the flag cleared.
+     Scheduling rules now (input ALWAYS wins):
+       • finger actively moving, or any interaction <400ms old → WAIT;
+       • finger PARKED holding the slide peek (panes frozen) → RUN NOW —
+         that's the safe controlled moment the manual pass always wanted;
+       • glide/other gesture ownership → wait, unless the finger is parked;
+       • 6s hard floor → run anyway so non-stop activity can't starve it;
+       • automation (.click() / dispatched TouchEvents) never produces
+         pointer events (_sawPointer stays false) → tests see an
+         always-quiet page and keep their original timing. */
   var _navPassPending = null;
+  var _sawPointer = false;
+  var _inDown = false, _inMoved = 0, _inEnd = 0;
+  function _inNow() { try { return performance.now(); } catch (e) { return Date.now(); } }
+  try {
+    document.addEventListener('pointerdown', function () { _sawPointer = true; _inDown = true; }, true);
+    document.addEventListener('pointermove', function () { if (_inDown) _inMoved = _inNow(); }, true);
+    var _inUp = function () { _inDown = false; _inEnd = _inNow(); };
+    document.addEventListener('pointerup', _inUp, true);
+    document.addEventListener('pointercancel', _inUp, true);
+    window.addEventListener('blur', _inUp);
+  } catch (e) {}
+  function _inputBusy() {
+    if (!_sawPointer) return false;
+    var n = _inNow();
+    if (_inDown && n - _inMoved < 260) return true; /* finger moving right now */
+    if (!_inDown && n - _inEnd < 400) return true; /* just finished interacting */
+    return false;
+  }
   function _scheduleNavPass(tries) {
     if (_navPassPending) return;
     var t = tries || 0;
     var attempt = function () {
       _navPassPending = null;
-      if (document.body && document.body.dataset && document.body.dataset.ltSwipe && t < 15) {
+      var n = _inNow();
+      var parked = _sawPointer && _inDown && n - _inMoved >= 260;
+      if (t >= 24) { try { window.__ltPassDebug = { path: 'navfloor', t: t, busy: _inputBusy(), down: _inDown, sinceMove: Math.round(n - _inMoved), saw: _sawPointer }; } catch (e) {} runEnhancementsImmediate(); return; } /* 6s floor */
+      if (_inputBusy() ||
+          (document.body && document.body.dataset && document.body.dataset.ltSwipe &&
+           !parked && _sawPointer)) {
         _scheduleNavPass(t + 1);
         return;
       }
+      try { window.__ltPassDebug = { path: 'nav', t: t, busy: _inputBusy(), down: _inDown, sinceMove: Math.round(n - _inMoved), saw: _sawPointer }; } catch (e) {}
       runEnhancementsImmediate();
     };
-    if (t > 0) _navPassPending = setTimeout(attempt, 200);
+    if (t > 0) _navPassPending = setTimeout(attempt, 250);
     else if (window.requestIdleCallback) _navPassPending = window.requestIdleCallback(attempt, { timeout: 250 });
     else _navPassPending = setTimeout(attempt, 150);
   }
