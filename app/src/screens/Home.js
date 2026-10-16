@@ -496,10 +496,12 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   };
 
-  // Delete activity handler
+  // Delete activity handler — shared in-app confirm popup (the grey native
+  // confirm() looked unfinished, and a blocking dialog let the tap-restore
+  // queue reopen it: cancel, then it appeared again — "click twice").
   const handleDelete = (e) => {
     e.stopPropagation();
-    if (confirm(`Remove "${activity.name}"? It'll stop appearing in your activity list — your tracked time for it is kept.`)) {
+    const doDelete = () => {
       deleteActivity.mutate({ id: activity.id }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: activitiesKey() }); // activities
@@ -507,7 +509,17 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
           queryClient.invalidateQueries({ queryKey: todayStatsKey() }); // today-stats
         }
       });
+    };
+    if (typeof window !== 'undefined' && typeof window.__ltConfirm === 'function') {
+      window.__ltConfirm({
+        title: 'Remove activity?',
+        message: `Remove "${activity.name}"? It'll stop appearing in your activity list — your tracked time for it is kept.`,
+        confirmLabel: 'Remove',
+        onConfirm: doDelete
+      });
+      return;
     }
+    if (confirm(`Remove "${activity.name}"? It'll stop appearing in your activity list — your tracked time for it is kept.`)) doDelete();
   };
 
   // Open edit modal
@@ -2412,9 +2424,15 @@ function EatTheFrog() {
       starred: true,
       createdAt: Date.now()
     };
+    /* Return WHERE the new task lands, not just its id. Slots are filled
+       incomplete-starred-first, so with any completed starred task present
+       the new one lands on an EARLIER slot than the one being typed in —
+       callers that don't know this kept their text locally while the task
+       rendered elsewhere ("typing in one field writes into another"). */
+    const landingIdx = incompleteStarred.length;
     saveTasks([...tasks, newTask]);
     setTick(n => n + 1);
-    return newTask.id;
+    return { id: newTask.id, idx: landingIdx };
   };
 
   /* Minimized → slim strip in place, after the glance strip. */
@@ -2476,7 +2494,11 @@ function EatTheFrog() {
             onUnstar: unstarTask,
             onUpdateTitle: updateTitle,
             onCreate: createFromSlot
-          }, i)
+          }, /* Identity key: index keys let slot REORDERS (completed
+                starred sinking down) hand one slot's input state to a
+                different task — the typed text then appeared in another
+                row. Key filled slots by task id, empties by position. */
+          task ? 't:' + task.id : 'e:' + i)
         )
       })
     ]
@@ -2495,11 +2517,27 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
   const handleInput = (e) => {
     const val = e.target.value;
     setLocalTitle(val);
-    if (slotTaskId) {
-      onUpdateTitle(slotTaskId, val);
-    } else if (val.trim()) {
-      const newId = onCreate(val);
-      if (newId) setSlotTaskId(newId);
+    /* Empty slots stay LOCAL while typing — creating mid-typing reorders
+       the slots (completed starred tasks sink), which shuffled this input
+       onto another task and mirrored the text across rows. Creation
+       happens on blur/Enter instead, once the typing session is over. */
+    if (slotTaskId) onUpdateTitle(slotTaskId, val);
+  };
+
+  /* Create the task once the user commits (blur / Enter). If the new task
+     lands in a DIFFERENT slot (completed-starred-first ordering), clear
+     this field — the text now lives in the slot where the task renders. */
+  const handleCommit = () => {
+    const val = localTitle;
+    if (slotTaskId || !val.trim()) return;
+    const res = onCreate(val);
+    if (res && res.id) {
+      if (res.idx === index && res.idx < 3) {
+        setSlotTaskId(res.id); /* lands here — the id-keyed instance takes over */
+      } else {
+        setLocalTitle('');
+        setSlotTaskId(null);
+      }
     }
   };
 
@@ -2531,6 +2569,10 @@ function FrogSlot({ task, index, onToggle, onUnstar, onUpdateTitle, onCreate }) 
         type: 'text',
         value: localTitle,
         onChange: handleInput,
+        onBlur: handleCommit,
+        onKeyDown: (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); handleCommit(); try { e.target.blur(); } catch (err) {} }
+        },
         onFocus: (e) => {
           /* Never let the on-screen keyboard or bottom nav hide the row
              being typed into — re-center it in the scroll viewport. */

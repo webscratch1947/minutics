@@ -2271,6 +2271,76 @@ import { getApps } from "firebase/app";
     setTimeout(dismiss, 6000);
   }
 
+  /* ── Shared in-app confirm dialog ──────────────────────────────────────
+     Replaces the grey native confirm() for destructive actions (it looked
+     like a grey text box, and because a blocking dialog freezes the tap-
+     restore queue, the cancelled tap's late click escaped the swallower and
+     REOPENED it — "click Cancel and it shows again, twice"). One instance
+     only: a second open-REQUEST while one is showing (double-fired taps)
+     is ignored, and a 700ms cooldown after close stops any queued re-open.
+     Appends into the active tool overlay when one is open so it stacks
+     above tool sheets. */
+  var _ltConfirmOpen = false;
+  var _ltConfirmClosedAt = 0;
+  window.__ltConfirm = function (opts) {
+    opts = opts || {};
+    if (_ltConfirmOpen) return;
+    if (Date.now() - _ltConfirmClosedAt < 700) return;
+    var old = document.getElementById("lt-confirm-dialog");
+    if (old) old.remove();
+    _ltConfirmOpen = true;
+    var danger = opts.danger !== false;
+    var root = document.createElement("div");
+    root.id = "lt-confirm-dialog";
+    root.className = "lt-confirm-modal";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:rgba(16,18,35,.55);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',system-ui,sans-serif;animation:ltCfIn .18s ease";
+    root.innerHTML =
+      '<style>' +
+        '@keyframes ltCfIn{from{opacity:0}to{opacity:1}}' +
+        '@keyframes ltCfPop{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}' +
+        '#lt-confirm-card{animation:ltCfPop .2s cubic-bezier(.2,.9,.3,1.1)}' +
+        '@media (prefers-reduced-motion:reduce){#lt-confirm-card{animation:none}}' +
+      '</style>' +
+      '<div id="lt-confirm-card" style="width:100%;max-width:330px;background:#fff;border-radius:26px;padding:24px 22px 18px;text-align:center;box-shadow:0 24px 60px rgba(8,10,25,.4)">' +
+        '<div style="width:56px;height:56px;margin:0 auto 13px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:' + (danger ? '#FEE2E2' : '#EEF2FF') + '">' +
+          '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="' + (danger ? '#DC2626' : '#4F46E5') + '" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6M19 6l-1 13.5A1.5 1.5 0 0 1 16.5 21h-9A1.5 1.5 0 0 1 6 19.5L5 6"/><path d="M10 11v5.5M14 11v5.5"/></svg>' +
+        '</div>' +
+        '<p style="color:#111;font-size:17px;font-weight:900;margin:0 0 7px">' + escapeHtml(opts.title || "Are you sure?") + '</p>' +
+        '<p style="color:#6E6A5E;font-size:13.5px;line-height:1.5;margin:0 auto 18px">' + escapeHtml(opts.message || "") + '</p>' +
+        '<button type="button" id="lt-confirm-yes" style="width:100%;background:' + (danger ? '#DC2626' : '#1F2937') + ';color:#fff;border:none;border-radius:999px;padding:13.5px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit">' + escapeHtml(opts.confirmLabel || "Delete") + '</button>' +
+        '<button type="button" id="lt-confirm-no" style="width:100%;background:transparent;color:#8A8578;border:none;padding:13px 0 2px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">' + escapeHtml(opts.cancelLabel || "Cancel") + '</button>' +
+      '</div>';
+    var host = (typeof activeOverlay !== "undefined" && activeOverlay && document.body.contains(activeOverlay))
+      ? activeOverlay
+      : document.body;
+    host.appendChild(root);
+    var openedAt = Date.now();
+    var keyHandler = function (e) {
+      if (e.key === "Escape") { e.stopPropagation(); close(false); }
+    };
+    function close(runConfirm) {
+      if (!root.parentNode) return;
+      document.removeEventListener("keydown", keyHandler, true);
+      root.remove();
+      _ltConfirmOpen = false;
+      _ltConfirmClosedAt = Date.now();
+      if (runConfirm && typeof opts.onConfirm === "function") opts.onConfirm();
+      if (typeof opts.onClose === "function") opts.onClose();
+    }
+    root.addEventListener("click", function (e) {
+      e.stopPropagation(); /* tool-overlay sheets/documents must not react to dialog taps */
+      /* 300ms post-open guard: a ghost/queued click landing right after open
+         can't cancel it or double-fire the confirm. */
+      if (Date.now() - openedAt < 300) return;
+      var t = e.target;
+      if (t === root || (t && t.id === "lt-confirm-no")) { close(false); return; }
+      if (t && t.id === "lt-confirm-yes") { close(true); }
+    });
+    document.addEventListener("keydown", keyHandler, true);
+  };
+
   /* Reads the name of the activity currently open in the "How do you want
      to track this?" picker sheet, so the category log can remember which
      activity it was for — even if the user never types anything into the
@@ -2929,9 +2999,17 @@ import { getApps } from "firebase/app";
       if (name === "budget-new")     { budgetEditingId = null; budgetAddingNew = true; renderBudget(); }
       if (name === "budget-edit")    { budgetEditingId = action.getAttribute("data-id"); budgetAddingNew = false; renderBudget(); }
       if (name === "budget-delete")  {
-        var items = readJson(BUDGET_KEY, []);
-        writeJson(BUDGET_KEY, items.filter(function (i) { return i.id !== action.getAttribute("data-id"); }));
-        renderBudget();
+        var delItemId = action.getAttribute("data-id");
+        window.__ltConfirm({
+          title: "Delete entry?",
+          message: "This budget entry will be removed permanently.",
+          confirmLabel: "Delete",
+          onConfirm: function () {
+            var items = readJson(BUDGET_KEY, []);
+            writeJson(BUDGET_KEY, items.filter(function (i) { return i.id !== delItemId; }));
+            renderBudget();
+          }
+        });
       }
       if (name === "budget-cancel")  { budgetEditingId = null; budgetAddingNew = false; renderBudget(); }
       if (name === "emi-again")      { renderEmi(); }
@@ -5100,10 +5178,23 @@ import { getApps } from "firebase/app";
         return;
       }
       if (e.target.id === "lt-routine-delete") {
-        if (routineEditingId) removeRoutine(routineEditingId);
-        routineEditingId = null;
-        try { localStorage.removeItem("lt_applied_routine_preset"); } catch (e2) {}
-        renderRoutine();
+        var rid = routineEditingId;
+        var routineName = "";
+        var ritems = readJson(ROUTINE_KEY, []);
+        (ritems || []).forEach(function (ri) { if (ri && ri.id === rid) routineName = ri.name || ri.title || ""; });
+        window.__ltConfirm({
+          title: "Delete routine?",
+          message: routineName
+            ? "\u201C" + routineName + "\u201D will be removed permanently — its past check-ins go too."
+            : "This routine will be removed permanently — its past check-ins go too.",
+          confirmLabel: "Delete Routine",
+          onConfirm: function () {
+            if (rid) removeRoutine(rid);
+            routineEditingId = null;
+            try { localStorage.removeItem("lt_applied_routine_preset"); } catch (e2) {}
+            renderRoutine();
+          }
+        });
         return;
       }
       if (e.target.id === "lt-routine-sheetdone" || e.target.id === "lt-routine-cancel") {
@@ -5293,12 +5384,19 @@ import { getApps } from "firebase/app";
         }
         return;
       }
-      /* Delete */
+      /* Delete — proper confirm popup (the grey native confirm()/silent
+         instant delete were both bad; one shared dialog, single-instance) */
       var delBtn = e.target.closest("[data-task-del]");
       if (delBtn) {
         if (e.target.closest("#lt-tasks-sheet")) return; /* don't trigger inside sheet */
-        removeTask(delBtn.getAttribute("data-task-del"));
-        renderTasks();
+        var delId = delBtn.getAttribute("data-task-del");
+        var delTask = getAllTasks().find(function (t) { return t.id === delId; });
+        window.__ltConfirm({
+          title: "Delete task?",
+          message: delTask && delTask.title ? "\u201C" + delTask.title + "\u201D will be removed permanently." : "This task will be removed permanently.",
+          confirmLabel: "Delete",
+          onConfirm: function () { removeTask(delId); renderTasks(); }
+        });
         return;
       }
       /* FAB */
@@ -9199,6 +9297,7 @@ import { getApps } from "firebase/app";
      variant below when a tab switch needs instant cleanup. */
   var _enhanceScheduled = false;
   var _lastEnhanceRun = 0;
+  var _enhanceBusyRetries = 0;
   function scheduleEnhance() {
     if (_enhanceScheduled) return;
     _enhanceScheduled = true;
@@ -9206,11 +9305,38 @@ import { getApps } from "firebase/app";
       _enhanceScheduled = false;
       /* Swipe tracking/glide in progress: mutating the DOM now re-rasters
          the composited panes and can pop content into a moving page (the
-         slide-switch flicker). The swipe runs its own manual pass at
-         release/commit, so dropping this tick loses nothing. */
-      if (document.body && document.body.dataset && document.body.dataset.ltSwipe) return;
+         slide-switch flicker). Never run MID-swipe — but never DROP the
+         pass either: the swipe's own manual pass can race React's row
+         mount (e.g. the Journal mounting after the immediate pass already
+         ran), and a dropped mutation never came back, so the "Full view"
+         pill stayed gone until some unrelated mutation re-triggered a run.
+         Retry on a timer instead (async — zero work on the touch path)
+         until the glide ends. Bounded so a stuck flag can't loop forever. */
+      if (document.body && document.body.dataset && document.body.dataset.ltSwipe) {
+        if (_enhanceBusyRetries < 15) {
+          _enhanceBusyRetries++;
+          _enhanceScheduled = true;
+          setTimeout(function () { _enhanceScheduled = false; scheduleEnhance(); }, 150);
+        } else {
+          _enhanceBusyRetries = 0;
+        }
+        return;
+      }
+      _enhanceBusyRetries = 0;
       var now = Date.now();
-      if (now - _lastEnhanceRun < 500) return;
+      if (now - _lastEnhanceRun < 500) {
+        /* Throttled window: this used to DISCARD the pass forever. If React
+           mounted the target DOM right after a just-finished pass (the exact
+           post-swipe Journal case), that discarded mutation was the only
+           trigger and nothing re-ran — enhancements silently missing until
+           reload. Reschedule the remainder instead; one pending timer max. */
+        _enhanceScheduled = true;
+        setTimeout(function () {
+          _enhanceScheduled = false;
+          scheduleEnhance();
+        }, Math.max(50, 500 - (now - _lastEnhanceRun)));
+        return;
+      }
       _lastEnhanceRun = now;
       if (!activeOverlay) runEnhancements();
     });

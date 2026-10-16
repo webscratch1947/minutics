@@ -1040,7 +1040,13 @@ if (typeof window !== 'undefined') {
           }
         };
         window.addEventListener('click', swallower, true);
-        setTimeout(function () { window.removeEventListener('click', swallower, true); }, 250);
+        /* Long enough to cover a BLOCKING confirm()/dialog: while one is
+           open the late real click sits in the event queue and only
+           dispatches after the user dismisses it — typically well past
+           250ms, which is how "Cancel, and it pops right back up (twice)"
+           happened. One-shot (removes itself on swallow) so a deliberate
+           re-tap after the window still works. */
+        setTimeout(function () { window.removeEventListener('click', swallower, true); }, 900);
       } catch (err) {}
     }, 70);
   }, true);
