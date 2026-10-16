@@ -9455,6 +9455,18 @@ import { getApps } from "firebase/app";
       _navPassPending = null;
       var n = _inNow();
       var parked = _sawPointer && _inDown && n - _inMoved >= 260;
+      /* Peek preview live ([data-lt-peek] just mounted) → run NOW, no input
+         gate, no flag gate. This is the controlled moment the manual dispatch
+         was always meant for (see the peek-effect comment: "the pass completes
+         WHILE THE FINGER IS STILL DRAGGING"): the peek pane is the injection
+         target, the source page is already enhanced so the pass writes
+         essentially nothing into the moving pane (no re-raster, no flicker),
+         and waiting for a quiet moment meant the Full view pill only appeared
+         AFTER release — "I don't see the full view until I release". */
+      if (document.querySelector('[data-lt-peek]')) {
+        runEnhancementsImmediate();
+        return;
+      }
       if (t >= 24) { try { window.__ltPassDebug = { path: 'navfloor', t: t, busy: _inputBusy(), down: _inDown, sinceMove: Math.round(n - _inMoved), saw: _sawPointer }; } catch (e) {} runEnhancementsImmediate(); return; } /* 6s floor */
       if (_inputBusy() ||
           (document.body && document.body.dataset && document.body.dataset.ltSwipe &&
