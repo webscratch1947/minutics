@@ -9453,6 +9453,7 @@ import { getApps } from "firebase/app";
   (function initPrivacyScreen() {
     var KEY = "lt_privacy_screen_v1";
     var overlay = null, peekBtn = null, listening = false, engaged = false, peeking = false;
+    var tiltStreak = 0, lastEventAt = 0, staleTimer = null;
 
     function enabled() {
       try { return localStorage.getItem(KEY) === "1"; } catch (e) { return false; }
@@ -9509,14 +9510,45 @@ import { getApps } from "firebase/app";
     function evaluate(gamma, beta) {
       if (typeof gamma !== "number" || typeof beta !== "number" ||
           isNaN(gamma) || isNaN(beta)) return;
+      lastEventAt = Date.now();
       var tilt = Math.abs(gamma);
+      var sideWays = tilt > 45;
+      var flatUp = beta < 10;  /* screen lying face-up on a surface */
       if (!engaged) {
-        /* Engage: turned sideways, or laid nearly flat (screen up). */
-        if (tilt > 45 || beta < 10) { engaged = true; apply(); }
+        /* Engage only after 3 CONSECUTIVE readings in the protected zone:
+           phones fire single bogus all-zero readings while the sensors
+           calibrate, and one bad frame used to black the whole screen even
+           with the phone perfectly upright ("can't see it from the front
+           either"). Three agreeing readings in a row is under half a
+           second — still instant to a side viewer, immune to glitches. */
+        if (sideWays || flatUp) {
+          tiltStreak += 1;
+          if (tiltStreak >= 3) { engaged = true; tiltStreak = 0; apply(); startWatchdog(); }
+        } else {
+          tiltStreak = 0;
+        }
       } else {
         /* Release with ~6° of hysteresis so the edge never strobes. */
-        if (tilt < 39 && beta > 16) { engaged = false; peeking = false; apply(); }
+        if (tilt < 39 && beta > 16) { engaged = false; peeking = false; tiltStreak = 0; apply(); stopWatchdog(); }
       }
+    }
+
+    /* Never trap the owner behind a black screen: if orientation events stop
+       flowing (sensor stall, app switch, a WebView with no sensors) the real
+       angle is unknowable — release and let fresh readings re-engage. Real
+       side-view protection always has live events, so this can only ever
+       release for the owner. */
+    function startWatchdog() {
+      stopWatchdog();
+      staleTimer = setInterval(function () {
+        if (Date.now() - lastEventAt > 6000) {
+          engaged = false; peeking = false; tiltStreak = 0;
+          apply(); stopWatchdog();
+        }
+      }, 1000);
+    }
+    function stopWatchdog() {
+      if (staleTimer) { clearInterval(staleTimer); staleTimer = null; }
     }
 
     function onOrientation(e) { evaluate(e.gamma, e.beta); }
@@ -9533,7 +9565,8 @@ import { getApps } from "firebase/app";
       if (!listening) return;
       window.removeEventListener("deviceorientation", onOrientation, true);
       listening = false;
-      engaged = false; peeking = false;
+      engaged = false; peeking = false; tiltStreak = 0;
+      stopWatchdog();
       apply();
     }
 
@@ -9541,6 +9574,15 @@ import { getApps } from "firebase/app";
 
     window.addEventListener("lt-privacy-changed", sync);
     window.addEventListener("storage", function (e) { if (e.key === KEY) sync(); });
+    /* Returning to the app after it was hidden: the last-known angle is
+       stale by definition — release and let the first fresh readings
+       re-engage (they arrive within a few hundred milliseconds). */
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden && engaged) {
+        engaged = false; peeking = false; tiltStreak = 0;
+        apply(); stopWatchdog();
+      }
+    });
     /* Test hook: __ltPrivacyTest(50, 30) simulates a sideways tilt. */
     window.__ltPrivacyTest = function (gamma, beta) { ensureOverlay(); evaluate(gamma, beta); };
     sync();

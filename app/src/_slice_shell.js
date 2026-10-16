@@ -710,6 +710,31 @@ export function ak({ profile }) {
     }
   };
 
+  /* The tab-swipe belongs ONLY to the 5 pure bottom-nav pages, and it must
+     never move the page while a tool panel / modal / sheet owns the screen
+     (time block, category picker, date sheet, share, plans…): a swipe that
+     slid the page out from under an open tool looked exactly like the app
+     "refreshing" mid-use. Pure-page swiping is untouched. */
+  const LT_MODAL_SELECTOR =
+    '#lt-overlay-root:not([data-lt-closing]),' +
+    ' #lt-cat-modal-overlay:not([data-lt-closing]),' +
+    ' #lt-date-sheet, #lt-share-sheet-overlay, #lt-emoji-pop-overlay,' +
+    ' #lt-upgrade-modal, #lt-fv-report-overlay, #lt-fv-share-overlay,' +
+    ' #lt-badge-overlay, #lt-curr-sheet, #lt-plans-modal,' +
+    ' #lt-routine-library, #lt-cancel-subscription-dialog';
+  const ltModalOwnsScreen = () => {
+    try {
+      const el = document.querySelector(LT_MODAL_SELECTOR);
+      return !!(el && el.isConnected && el.getClientRects().length);
+    } catch (e) { return false; }
+  };
+  const ltPureTabRoute = () => {
+    try {
+      const h = (window.location.hash || '').replace(/^#/, '').split('?')[0];
+      return TABS.indexOf(h === '' ? '/' : h) !== -1;
+    } catch (e) { return true; }
+  };
+
   const onTouchStart = (e) => {
     /* Any new touch resets the busy flag — a stale flag would mute the
        enhancement auto-paths for the rest of the session. */
@@ -722,7 +747,8 @@ export function ak({ profile }) {
     try {
       if (!(e.target && e.target.closest &&
             e.target.closest('#root') &&
-            !e.target.closest('input, textarea, select, [data-lt-no-swipe]'))) {
+            !e.target.closest('input, textarea, select, [data-lt-no-swipe]')) ||
+          ltModalOwnsScreen() || !ltPureTabRoute()) {
         gRef.current.active = false;
         gRef.current.locked = null;
         return;
