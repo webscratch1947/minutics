@@ -20,8 +20,21 @@ import { ltAlert } from "./ui_dialog.js";
   (function showStartupSplash() {
     var MAX_MS = 3000;   /* grey alone: release by 3s — never a lingering empty screen */
     var HARD_MS = 7000;  /* absolute escape hatch, even if a playing video runs to its full ~4s */
-    var splash  = document.createElement("div");
-    splash.id   = "lt-startup-splash";
+
+    /* ADOPT the splash index.html's inline bootstrap already created at
+       HTML parse — its video download started in parallel with the app
+       bundle instead of only AFTER the 900KB JS downloaded, parsed and
+       evaluated ("the splash sometimes doesn't play" on slower connections:
+       the video was still unrequested seconds in, missed MAX_MS and got cut).
+       Create everything only when the bootstrap isn't there (tests, older
+       cached HTML). The visuals are byte-identical either way. */
+    var splash = document.getElementById("lt-startup-splash");
+    var video  = document.getElementById("lt-startup-splash-video");
+    var adopted = !!(splash && video);
+    if (!splash) {
+      splash = document.createElement("div");
+      splash.id = "lt-startup-splash";
+    }
     splash.style.cssText =
       "position:fixed;inset:0;z-index:2147483647;background:#FDFBF7;" +
       "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
@@ -31,20 +44,22 @@ import { ltAlert } from "./ui_dialog.js";
        video (a static logo standing in front of it was reported as
        "another splash animation"). Cream shows until the video's first
        frame; the timeouts below guarantee it never lingers. */
-    var video = document.createElement("video");
-    video.id = "lt-startup-splash-video";
-    /* ?v=5: the user's own splash export (1080x1920, 4.011s, WITH its AAC
-       audio track) — served byte-for-byte as given. Version bumps dodge the
-       immutable 1y cache. */
-    video.src = "assets/lt/minutics_splash.mp4?v=5"; /* bump ?v=N when replacing the file (immutable 1y cache) */
-    video.autoplay = true;
-    video.setAttribute("playsinline", "");
-    video.setAttribute("webkit-playsinline", "");
-    video.preload = "auto";
-    video.loop = false;
-    video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s ease;";
-    splash.appendChild(video);
-    (document.body || document.documentElement).appendChild(splash);
+    if (!video) {
+      video = document.createElement("video");
+      video.id = "lt-startup-splash-video";
+      /* ?v=5: the user's own splash export (1080x1920, 4.011s, WITH its AAC
+         audio track) — served byte-for-byte as given. Version bumps dodge the
+         immutable 1y cache. */
+      video.src = "assets/lt/minutics_splash.mp4?v=5"; /* bump ?v=N when replacing the file (immutable 1y cache) */
+      video.autoplay = true;
+      video.setAttribute("playsinline", "");
+      video.setAttribute("webkit-playsinline", "");
+      video.preload = "auto";
+      video.loop = false;
+      video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s ease;";
+      splash.appendChild(video);
+    }
+    if (!splash.parentNode) (document.body || document.documentElement).appendChild(splash);
 
     var dismissed = false;
     var videoStarted = false;
@@ -65,6 +80,14 @@ import { ltAlert } from "./ui_dialog.js";
     /* Video broken/missing: release quickly — never a dead colour screen,
        never a stuck splash. */
     video.addEventListener("error", function () { setTimeout(dismiss, 1200); });
+
+    /* Adopted mid-flight: the bootstrap's video may already be playing or
+       finished by the time this bundle evaluates — mirror the state the
+       'playing' / 'ended' listeners would have captured. */
+    if (adopted) {
+      if (video.ended) { videoStarted = true; video.style.opacity = "1"; setTimeout(dismiss, 200); }
+      else if (!video.paused && video.readyState >= 2) { window.__ltSplashVideoPlaying = true; videoStarted = true; video.style.opacity = "1"; }
+    }
 
     /* WITH SOUND — this is the user's own export; its audio is part of the
        intro. Android's WebView allows it (mediaPlaybackRequiresUserGesture
@@ -95,7 +118,19 @@ import { ltAlert } from "./ui_dialog.js";
     /* Cream alone is released by MAX_MS; a video that actually started
        plays through to its natural end (ended → dismiss above), with
        HARD_MS as the absolute escape hatch. */
-    setTimeout(function () { if (!videoStarted) dismiss(); }, MAX_MS);
+    setTimeout(function () {
+      if (videoStarted) return;
+      /* Still fetching at the 3s mark (slow connection — the download now
+         starts at HTML parse, so this is the rare leftover): give it up to
+         2.5s more instead of cutting away before a single frame plays —
+         HARD_MS remains the absolute cap either way. */
+      var stillComing = !!video && (video.readyState >= 2 || video.networkState === 2);
+      if (stillComing && !video.ended) {
+        setTimeout(function () { if (!videoStarted) dismiss(); }, 2500);
+        return;
+      }
+      dismiss();
+    }, MAX_MS);
     setTimeout(dismiss, HARD_MS);
   })();
 
@@ -1695,13 +1730,17 @@ import { ltAlert } from "./ui_dialog.js";
     injectedStyle2 = true;
     var s = document.createElement("style");
     s.textContent = [
-      /* Productivity toast */
-      "#lt-prod-toast{position:fixed;left:14px;right:14px;bottom:18px;z-index:2147483000;background:#1c1c1e;color:#fff;border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 26px rgba(0,0,0,.35);opacity:0;transform:translateY(12px);transition:opacity .25s,transform .25s}",
+      /* Productivity toast — ABOVE the bottom nav (bottom:80px, the same
+         offset as the nudge toast) and pointer-through: at bottom:18px this
+         full-width toast covered the nav pill for ~8s after every activity
+         start, swallowing nav taps ("Life Hub doesn't open"). Only the ✕
+         receives pointer events. */
+      "#lt-prod-toast{position:fixed;left:14px;right:14px;bottom:80px;z-index:2147483000;background:#1c1c1e;color:#fff;border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 26px rgba(0,0,0,.35);opacity:0;transform:translateY(12px);transition:opacity .25s,transform .25s;pointer-events:none}",
       "#lt-prod-toast.lt-show{opacity:1;transform:translateY(0)}",
       ".lt-prod-toast-body{flex:1;min-width:0}",
       ".lt-prod-toast-title{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.55);margin:0 0 3px}",
       ".lt-prod-toast-msg{font-size:13px;line-height:1.35;margin:0;color:#fff}",
-      ".lt-prod-toast-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0;-webkit-tap-highlight-color:transparent}",
+      ".lt-prod-toast-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0;-webkit-tap-highlight-color:transparent;pointer-events:auto}",
       /* Category selection modal */
       "#lt-cat-modal-overlay{position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center;animation:lt-bd-in .2s ease}",
       ".lt-cat-modal{width:100%;max-width:480px;background:#fff;color:hsl(var(--foreground));border-radius:28px 28px 0 0;box-sizing:border-box;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -24px 64px rgba(15,23,42,.28);position:relative;animation:lt-rise .28s cubic-bezier(.22,.61,.36,1)}",
@@ -2273,13 +2312,17 @@ import { ltAlert } from "./ui_dialog.js";
     if (existing) existing.remove();
     var el = document.createElement("div");
     el.id = "lt-simple-toast";
-    el.setAttribute("style", "position:fixed;left:14px;right:14px;bottom:18px;z-index:2147483000;background:#1c1c1e;color:#fff;border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 26px rgba(0,0,0,.35);opacity:0;transform:translateY(12px);transition:opacity .25s,transform .25s");
+    /* Above the bottom nav (80px) + pointer-through container: this toast
+       sat at bottom:18px full-width over the nav pill — invisible at
+       opacity:0 before its first rAF, yet swallowing every tap on it
+       ("the Life Hub tab doesn't open"). Only the ✕ takes pointers. */
+    el.setAttribute("style", "position:fixed;left:14px;right:14px;bottom:80px;z-index:2147483000;background:#1c1c1e;color:#fff;border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 26px rgba(0,0,0,.35);opacity:0;transform:translateY(12px);transition:opacity .25s,transform .25s;pointer-events:none");
     el.innerHTML =
       '<div style="flex:1;min-width:0">' +
         '<p style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.55);margin:0 0 3px">' + escapeHtml(title) + '</p>' +
         '<p style="font-size:13px;line-height:1.35;margin:0;color:#fff">' + escapeHtml(msg) + '</p>' +
       '</div>' +
-      '<button style="background:none;border:none;color:rgba(255,255,255,.5);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0" id="lt-simple-toast-close">\u2715</button>';
+      '<button style="background:none;border:none;color:rgba(255,255,255,.5);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0;pointer-events:auto" id="lt-simple-toast-close">\u2715</button>';
     document.body.appendChild(el);
     requestAnimationFrame(function () { el.style.opacity = "1"; el.style.transform = "translateY(0)"; });
     function dismiss() {
@@ -9376,15 +9419,16 @@ import { ltAlert } from "./ui_dialog.js";
         return;
       }
       _enhanceBusyRetries = 0;
-      /* Input-wins (same rule as _scheduleNavPass): never START a heavy pass
-         while a finger is moving or an interaction is <400ms old — this is
-         the mutation path that stacked a second ~full-DOM pass right on top
-         of the nav pass after a tab switch ("must wait 1.5s before I can
-         scroll or click"). Wait for a quiet moment instead; 6s floor so a
-         non-stop interaction stream can't defer it forever. Automation
-         dispatches no pointer events (_sawPointer false) → runs immediately,
-         timing unchanged for tests. */
-      if (_sawPointer && _inputBusy() && _enhanceInputRetries < 24) {
+      /* Inside the post-navigation freshness window the pass runs NOW: the
+         rows mounting at this moment (Journal list, Life Hub tiles) ARE the
+         content the user is waiting for. */
+      var freshNav = Date.now() < _routeFreshUntil;
+      /* Input-wins for the MUTATION path only (typing re-renders etc.):
+         never START a heavy pass while a finger is moving or an interaction
+         is <400ms old. Deferred250ms at a time; 6s floor so a non-stop
+         interaction stream can't defer it forever. Automation dispatches no
+         pointer events (_sawPointer false) → runs immediately. */
+      if (!freshNav && _sawPointer && _inputBusy() && _enhanceInputRetries < 24) {
         _enhanceInputRetries++;
         _enhanceScheduled = true;
         setTimeout(function () { _enhanceScheduled = false; scheduleEnhance(); }, 250);
@@ -9392,7 +9436,7 @@ import { ltAlert } from "./ui_dialog.js";
       }
       _enhanceInputRetries = 0;
       var now = Date.now();
-      if (now - _lastEnhanceRun < 500) {
+      if (!freshNav && now - _lastEnhanceRun < 500) {
         /* Throttled window: this used to DISCARD the pass forever. If React
            mounted the target DOM right after a just-finished pass (the exact
            post-swipe Journal case), that discarded mutation was the only
@@ -9452,6 +9496,15 @@ import { ltAlert } from "./ui_dialog.js";
   var _navPassPending = null;
   var _sawPointer = false;
   var _inDown = false, _inMoved = 0, _inEnd = 0;
+  /* Post-navigation freshness window: the tap that CAUSED a route change is
+     always <400ms old, so the old "input wins" gate delayed EVERY nav pass
+     by 400ms+ of retries, and the follow-up pass (Journal rows mount when
+     their query data lands) got throttled behind it again — the "Full view
+     takes ~1.5s to show after switching tabs" / "Life Hub tools missing
+     right after opening" lag. For 2s after a route change, mutation-driven
+     passes skip the input gate and the 500ms throttle (single-flight still
+     applies). The swipe this gate protected no longer exists. */
+  var _routeFreshUntil = 0;
   /* Trailing finger-position samples (last ~4×80ms) — "is the user LOOKING
      at the peek (held / drifting slowly) or THROWING the page (flick)?"
      Recency-of-move can't tell: a held finger on a touchscreen keeps firing
@@ -9525,18 +9578,24 @@ import { ltAlert } from "./ui_dialog.js";
         return;
       }
       if (t >= 24) { try { window.__ltPassDebug = { path: 'navfloor', t: t, busy: _inputBusy(), down: _inDown, sinceMove: Math.round(n - _inMoved), saw: _sawPointer }; } catch (e) {} runEnhancementsImmediate(); return; } /* 6s floor */
-      if (_inputBusy() ||
-          (document.body && document.body.dataset && document.body.dataset.ltSwipe &&
-           !parked && _sawPointer)) {
+      /* The tab switch IS the interaction — the old input gate here delayed
+         every single nav pass by 400ms+ ("Full view / Life Hub tools show
+         ~1.5s late"). Nothing to protect mid-gesture anymore: the slide
+         switcher is gone. Only the (dead) swipe flag could ever defer. */
+      if (document.body && document.body.dataset && document.body.dataset.ltSwipe &&
+          !parked && _sawPointer) {
         _scheduleNavPass(t + 1);
         return;
       }
       try { window.__ltPassDebug = { path: 'nav', t: t, busy: _inputBusy(), down: _inDown, sinceMove: Math.round(n - _inMoved), saw: _sawPointer }; } catch (e) {}
       runEnhancementsImmediate();
     };
+    /* rAF (post-commit, pre-paint) instead of requestIdleCallback's 250ms
+       deadline: the new screen's DOM is already mounted when RouteWatcher
+       dispatches, so the pass can inject right into it — the pill/tiles land
+       in the FIRST painted frames of the new tab. */
     if (t > 0) _navPassPending = setTimeout(attempt, 250);
-    else if (window.requestIdleCallback) _navPassPending = window.requestIdleCallback(attempt, { timeout: 250 });
-    else _navPassPending = setTimeout(attempt, 150);
+    else _navPassPending = requestAnimationFrame(attempt);
   }
 
   /* P3+P4+P5 REMOVED: Nav mask system, installOverlayNavGuard, history patches
@@ -9667,8 +9726,13 @@ import { ltAlert } from "./ui_dialog.js";
       if (activeOverlay) closeOverlay();
       if (catModalRoot) { catModalPushedHistory = false; closeCategoryModal("popstate"); }
       if (document.getElementById("lt-clockpicker-overlay")) closeClockPicker();
-      /* Heavy pass runs IDLE (see _scheduleNavPass) — never on the
-         navigation's critical path. */
+      /* Fresh-navigation window: the tap that caused this switch is always
+         <400ms old — mutations that mount the new screen's content (Journal
+         rows, Life Hub tiles) inside this window run their enhancement
+         pass instantly instead of waiting out input/age gates. */
+      _routeFreshUntil = Date.now() + 2000;
+      /* Heavy pass runs right after paint (see _scheduleNavPass) — never on
+         the navigation's critical path. */
       _scheduleNavPass();
     });
     setTimeout(maybeShowOverlayPermissionModal, 1200);
@@ -9747,12 +9811,12 @@ import { ltAlert } from "./ui_dialog.js";
       overlay.style.cssText =
         "position:fixed;inset:0;background:#000;z-index:2147483647;" +
         "opacity:0;pointer-events:none;transition:opacity .12s ease;" +
-        "display:flex;align-items:flex-end;justify-content:center;padding-bottom:26px;";
+        "display:flex;align-items:flex-end;justify-content:center;padding-bottom:78px;";
       peekBtn = document.createElement("button");
       peekBtn.type = "button";
       peekBtn.textContent = "Hold to peek";
       peekBtn.style.cssText =
-        "pointer-events:auto;background:rgba(255,255,255,.14);color:rgba(255,255,255,.8);" +
+        "pointer-events:none;background:rgba(255,255,255,.14);color:rgba(255,255,255,.8);" +
         "border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:8px 16px;" +
         "font:600 12px/1 system-ui,sans-serif;letter-spacing:.04em;cursor:pointer;" +
         "-webkit-user-select:none;user-select:none;touch-action:none;opacity:.9;";
@@ -9789,6 +9853,16 @@ import { ltAlert } from "./ui_dialog.js";
       }
       overlay.style.opacity = show ? "1" : "0";
       overlay.style.pointerEvents = show ? "auto" : "none";
+      /* The peek button sits at the bottom-centre of the screen — EXACTLY
+         over the middle nav tab (Life Hub) — so it must be completely out
+         of hit-testing whenever the shutter isn't engaged: at opacity:0 an
+         enabled-but-not-tilted shutter left it tappable and every "Life
+         Hub" tap landed on this invisible button ("the life hub doesn't
+         open"). While PEEKING it keeps its current state — flipping
+         pointer-events mid-hold cancels the touch on Android (pointercancel
+         would end the peek instantly); taps that START elsewhere already
+         pass through (no pointer capture). */
+      if (peekBtn && !peeking) peekBtn.style.pointerEvents = show ? "auto" : "none";
     }
 
     function evaluate(gamma, beta) {
@@ -9843,6 +9917,7 @@ import { ltAlert } from "./ui_dialog.js";
       if (listening || !enabled()) return;
       if (typeof DeviceOrientationEvent === "undefined") return;
       ensureOverlay();
+      apply();   /* until the first tilt: overlay AND peek button fully inert */
       window.addEventListener("deviceorientation", onOrientation, true);
       listening = true;
     }

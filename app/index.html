@@ -39,6 +39,34 @@
   </head>
   <body>
     <div id="lt-boot-splash"></div>
+    <!-- Splash bootstrap — runs at HTML PARSE: creates the splash + video so
+         the 2.3MB video downloads in parallel with the app bundle. Before,
+         the download only started AFTER the 900KB JS loaded/parsed/ran — on
+         slower connections no frame ever made it before the 3s release
+         ("the splash animation doesn't play sometimes"). The enhancements
+         module adopts these exact elements (styles byte-identical) and owns
+         playback/audio from there — visuals unchanged. -->
+    <script>
+      (function () {
+        try {
+          if (document.getElementById("lt-startup-splash")) return;
+          var s = document.createElement("div");
+          s.id = "lt-startup-splash";
+          s.setAttribute("style", "position:fixed;inset:0;z-index:2147483647;background:#FDFBF7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;");
+          var v = document.createElement("video");
+          v.id = "lt-startup-splash-video";
+          v.src = "assets/lt/minutics_splash.mp4?v=5";
+          v.autoplay = true;
+          v.setAttribute("playsinline", "");
+          v.setAttribute("webkit-playsinline", "");
+          v.preload = "auto";
+          v.loop = false;
+          v.setAttribute("style", "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s ease;");
+          s.appendChild(v);
+          document.body.appendChild(s);
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
   </body>
 </html>

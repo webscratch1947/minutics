@@ -874,9 +874,7 @@ export function SettingsScreen() {
           jsx(Card, {
             children: jsx(CardRow, {
               label: "Privacy screen",
-              desc: privacyEnabled
-                ? "On — the screen turns black when the phone is tilted sideways, so onlookers beside you see a dark screen (hold the peek button to reveal)"
-                : "Digital privacy shutter — black the screen when the phone tilts sideways so side viewers see nothing",
+              desc: "Digital privacy shutter — the screen turns black when the phone tilts sideways, so people beside you see a dark screen (hold the peek button to reveal)",
               children: jsx(Toggle, { enabled: privacyEnabled, onToggle: handlePrivacyToggle })
             })
           })
