@@ -2088,63 +2088,118 @@ import { ltAlert } from "./ui_dialog.js";
     var existing = document.getElementById("lt-date-sheet");
     if (existing) existing.remove();
 
-    var current = input.value ? new Date(input.value + "T00:00:00") : new Date();
+    var sel = input.value ? new Date(input.value + "T00:00:00") : new Date();
+    if (isNaN(sel.getTime())) sel = new Date();
     var maxDate = input.getAttribute("max") ? new Date(input.getAttribute("max") + "T00:00:00") : null;
+    if (maxDate && isNaN(maxDate.getTime())) maxDate = null;
     var minYear = 1920;
-    var maxYear = maxDate ? maxDate.getFullYear() : new Date().getFullYear();
+    var now = new Date();
 
     var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    var dows = ["S","M","T","W","T","F","S"];
+
+    /* Selection + the month being VIEWED are separate: flipping months in
+       the header must not lose the picked day until Confirm. */
+    var selY = sel.getFullYear(), selM = sel.getMonth(), selD = sel.getDate();
+    var viewY = selY, viewM = selM;
 
     var sheet = document.createElement("div");
     sheet.id = "lt-date-sheet";
     sheet.style.cssText = "position:fixed;inset:0;z-index:999997;background:rgba(20,24,45,.55);display:flex;align-items:flex-end;justify-content:center;font-family:'Inter',sans-serif;animation:lt-bd-in .2s ease";
+    /* App bottom-sheet language: 28px top corners, grabber bar, pill
+       buttons, dark-ink filled circles for the selected day and a gold
+       ring for today — the same tokens as the category modal & tool
+       sheets. The old version was a bare white box with three <select>s. */
     sheet.innerHTML =
-      '<div style="width:100%;max-width:420px;background:#fff;padding:20px;box-sizing:border-box;animation:lt-rise .28s cubic-bezier(.22,.61,.36,1)">' +
-        '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 14px">Select date</p>' +
-        '<div style="display:flex;gap:8px;margin-bottom:16px">' +
-          '<select id="lt-date-day" style="flex:1;padding:12px 8px;border:1px solid hsl(220 13% 85%);background:hsl(220 15% 97%);color:hsl(230 40% 16%);font-size:15px;font-family:inherit"></select>' +
-          '<select id="lt-date-month" style="flex:1.6;padding:12px 8px;border:1px solid hsl(220 13% 85%);background:hsl(220 15% 97%);color:hsl(230 40% 16%);font-size:15px;font-family:inherit"></select>' +
-          '<select id="lt-date-year" style="flex:1;padding:12px 8px;border:1px solid hsl(220 13% 85%);background:hsl(220 15% 97%);color:hsl(230 40% 16%);font-size:15px;font-family:inherit"></select>' +
+      '<div style="width:100%;max-width:420px;background:#fff;border-radius:28px 28px 0 0;box-sizing:border-box;padding:10px 18px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -24px 64px rgba(15,23,42,.28);animation:lt-rise .28s cubic-bezier(.22,.61,.36,1);-webkit-user-select:none;user-select:none">' +
+        '<div style="width:40px;height:4px;border-radius:99px;background:hsl(220 13% 88%);margin:2px auto 12px"></div>' +
+        '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 10px">Select date</p>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+          '<button id="lt-date-prev" type="button" aria-label="Previous month" style="width:36px;height:36px;border-radius:50%;border:none;background:hsl(220 15% 94%);color:hsl(230 40% 16%);font-size:18px;font-weight:800;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent">&#8249;</button>' +
+          '<p id="lt-date-title" style="margin:0;color:hsl(230 40% 16%);font-size:16px;font-weight:800;letter-spacing:-.01em"></p>' +
+          '<button id="lt-date-next" type="button" aria-label="Next month" style="width:36px;height:36px;border-radius:50%;border:none;background:hsl(220 15% 94%);color:hsl(230 40% 16%);font-size:18px;font-weight:800;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent">&#8250;</button>' +
         '</div>' +
-        '<button id="lt-date-confirm" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">Confirm</button>' +
-        '<button id="lt-date-cancel" class="lt-cancel-btn" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:hsl(220 10% 40%);padding:12px;font-size:14px;cursor:pointer;font-family:inherit">Cancel</button>' +
+        '<div style="display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:2px">' +
+          dowRow() +
+        '</div>' +
+        '<div id="lt-date-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px 0;justify-items:center;margin-bottom:16px"></div>' +
+        '<button id="lt-date-confirm" type="button" style="width:100%;background:#111114;border:none;color:#fff;border-radius:999px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:6px;touch-action:manipulation;-webkit-tap-highlight-color:transparent">Confirm</button>' +
+        '<button id="lt-date-cancel" type="button" style="width:100%;background:transparent;border:none;color:hsl(220 10% 45%);padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent">Cancel</button>' +
       '</div>';
     document.body.appendChild(sheet);
 
-    var daySel = document.getElementById("lt-date-day");
-    var monthSel = document.getElementById("lt-date-month");
-    var yearSel = document.getElementById("lt-date-year");
-
-    for (var y = maxYear; y >= minYear; y--) {
-      var yo = document.createElement("option"); yo.value = y; yo.textContent = y;
-      yearSel.appendChild(yo);
-    }
-    months.forEach(function (m, idx) {
-      var mo = document.createElement("option"); mo.value = idx; mo.textContent = m;
-      monthSel.appendChild(mo);
-    });
-    function populateDays() {
-      var y = parseInt(yearSel.value, 10), m = parseInt(monthSel.value, 10);
-      var daysInMonth = new Date(y, m + 1, 0).getDate();
-      var prevVal = daySel.value;
-      daySel.innerHTML = "";
-      for (var d = 1; d <= daysInMonth; d++) {
-        var opt = document.createElement("option"); opt.value = d; opt.textContent = d;
-        daySel.appendChild(opt);
+    function dowRow() {
+      var out = "";
+      for (var i = 0; i < 7; i++) {
+        out += '<span style="text-align:center;font-size:10px;font-weight:800;letter-spacing:.08em;color:hsl(220 10% 62%)">' + dows[i] + "</span>";
       }
-      if (prevVal && Number(prevVal) <= daysInMonth) daySel.value = prevVal;
+      return out;
     }
-    yearSel.value = current.getFullYear();
-    monthSel.value = current.getMonth();
-    populateDays();
-    daySel.value = current.getDate();
-    monthSel.addEventListener("change", populateDays);
-    yearSel.addEventListener("change", populateDays);
+
+    var grid = document.getElementById("lt-date-grid");
+    var titleEl = document.getElementById("lt-date-title");
+
+    function sameDay(y, m, d) { return y === selY && m === selM && d === selD; }
+    function isToday(y, m, d) { return y === now.getFullYear() && m === now.getMonth() && d === now.getDate(); }
+    function beyondMax(y, m, d) { return !!maxDate && new Date(y, m, d) > maxDate; }
+
+    function render() {
+      titleEl.textContent = months[viewM] + " " + viewY;
+      /* Never navigate past the allowed ceiling; never before 1920. */
+      /* Ceiling only when the field has one (max attr): without it any
+         month/year is reachable — a year-only fallback wrongly froze
+         forward navigation for the whole current year. */
+      var atMax = !!maxDate && (viewY > maxDate.getFullYear() || (viewY === maxDate.getFullYear() && viewM >= maxDate.getMonth()));
+      document.getElementById("lt-date-next").style.opacity = atMax ? ".3" : "1";
+      document.getElementById("lt-date-next").disabled = atMax;
+      var atMin = viewY <= minYear && viewM === 0;
+      document.getElementById("lt-date-prev").style.opacity = atMin ? ".3" : "1";
+      document.getElementById("lt-date-prev").disabled = atMin;
+
+      var firstDow = new Date(viewY, viewM, 1).getDay();
+      var daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+      var html = "";
+      for (var b = 0; b < firstDow; b++) html += "<span></span>";
+      for (var d = 1; d <= daysInMonth; d++) {
+        var selDay = sameDay(viewY, viewM, d);
+        var today = isToday(viewY, viewM, d);
+        var blocked = beyondMax(viewY, viewM, d);
+        var style = "width:38px;height:38px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:700;border:2px solid transparent;font-family:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:" + (blocked ? "default" : "pointer") + ";";
+        /* The today ring is a BORDER, not a box-shadow: the app's global
+           tap-highlight reset (killHighlighting) nukes every box-shadow
+           with !important — a box-shadow ring silently never renders. */
+        if (selDay) {
+          style += "background:hsl(230 40% 16%);color:#fff;" + (today ? "border-color:#F59E0B;" : "");
+        } else if (today) {
+          style += "background:transparent;color:hsl(230 40% 16%);border-color:#F59E0B;";
+        } else {
+          style += "background:transparent;color:hsl(230 40% 22%);";
+        }
+        if (blocked) style += "opacity:.28;";
+        html += '<button type="button" data-lt-d="' + d + '" ' + (blocked ? "disabled " : "") + 'style="' + style + '">' + d + "</button>";
+      }
+      grid.innerHTML = html;
+    }
+
+    grid.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest("button[data-lt-d]") : null;
+      if (!btn) return;
+      selY = viewY; selM = viewM; selD = parseInt(btn.getAttribute("data-lt-d"), 10);
+      render();
+    });
+    document.getElementById("lt-date-prev").addEventListener("click", function () {
+      viewM -= 1; if (viewM < 0) { viewM = 11; viewY -= 1; } render();
+    });
+    document.getElementById("lt-date-next").addEventListener("click", function () {
+      viewM += 1; if (viewM > 11) { viewM = 0; viewY += 1; } render();
+    });
+
+    render();
 
     document.getElementById("lt-date-cancel").addEventListener("click", function () { sheet.remove(); });
     sheet.addEventListener("click", function (e) { if (e.target === sheet) sheet.remove(); });
     document.getElementById("lt-date-confirm").addEventListener("click", function () {
-      var y = yearSel.value, m = String(Number(monthSel.value) + 1).padStart(2, "0"), d = String(daySel.value).padStart(2, "0");
+      var y = selY, m = String(selM + 1).padStart(2, "0"), d = String(selD).padStart(2, "0");
       var iso = y + "-" + m + "-" + d;
       var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
       nativeSetter.call(input, iso);

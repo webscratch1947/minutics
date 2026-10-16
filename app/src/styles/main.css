@@ -74,3 +74,17 @@
     scrollbar-width: none;
   }
 }
+
+/* Date fields are hijacked into the app's own themed calendar sheet by the
+   enhancement pass — but that pass lands a beat AFTER React paints, so the
+   native picker icon flashed first and vanished when readonly was applied
+   ("for the first 1 second I see a calendar symbol next to date but it
+   disappears"). Hiding the native indicator in the FIRST stylesheet means
+   the icon never exists — no flicker, any device, any timing. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
