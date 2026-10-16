@@ -33,10 +33,10 @@ import { ltAlert } from "./ui_dialog.js";
        frame; the timeouts below guarantee it never lingers. */
     var video = document.createElement("video");
     video.id = "lt-startup-splash-video";
-    /* ?v=4: version bumps force a fresh download past immutable 1y caches —
-       v4 is YOUR animation (1080×1920, 4s) with its original audio track
-       muxed back on (a past "11x smaller" re-encode had stripped it). */
-    video.src = "assets/lt/minutics_splash.mp4?v=4"; /* bump ?v=N when replacing the file (immutable 1y cache) */
+    /* ?v=5: the user's own splash export (1080x1920, 4.011s, WITH its AAC
+       audio track) — served byte-for-byte as given. Version bumps dodge the
+       immutable 1y cache. */
+    video.src = "assets/lt/minutics_splash.mp4?v=5"; /* bump ?v=N when replacing the file (immutable 1y cache) */
     video.autoplay = true;
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
@@ -66,23 +66,29 @@ import { ltAlert } from "./ui_dialog.js";
        never a stuck splash. */
     video.addEventListener("error", function () { setTimeout(dismiss, 1200); });
 
-    /* WITH SOUND — the splash video's own audio is part of the intro.
-       Android's WebView allows it (mediaPlaybackRequiresUserGesture is off
-       in MainActivity). Desktop browsers block autoplay-with-sound before a
-       user gesture, so there: start muted (video still plays), and the first
-       real tap/pointer restores the sound for the rest of the clip. */
+    /* WITH SOUND — this is the user's own export; its audio is part of the
+       intro. Android's WebView allows it (mediaPlaybackRequiresUserGesture
+       is off in MainActivity) so the APK plays sound every time. Desktop
+       browsers HARD-BLOCK autoplay sound before any user gesture (Chrome /
+       Firefox / Safari policy — no code can bypass it): there the video
+       starts muted and the FIRST tap/click/key while the splash is on
+       screen restores the sound for the rest of the clip. */
+    video.defaultMuted = false;
     video.muted = false;
     video.play().catch(function () {
+      video.defaultMuted = true;
       video.muted = true;
       video.play().catch(function () {});
     });
     try {
       var unmuteOnGesture = function () {
-        if (!dismissed) { video.muted = false; video.play().catch(function () {}); }
+        if (!dismissed) { video.defaultMuted = false; video.muted = false; video.play().catch(function () {}); }
         window.removeEventListener("pointerdown", unmuteOnGesture, true);
+        window.removeEventListener("touchstart", unmuteOnGesture, true);
         window.removeEventListener("keydown", unmuteOnGesture, true);
       };
       window.addEventListener("pointerdown", unmuteOnGesture, true);
+      window.addEventListener("touchstart", unmuteOnGesture, true);
       window.addEventListener("keydown", unmuteOnGesture, true);
     } catch (e) {}
 
