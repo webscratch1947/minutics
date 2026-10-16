@@ -724,8 +724,42 @@ export function ak({ profile }) {
     ' #lt-routine-library, #lt-cancel-subscription-dialog';
   const ltModalOwnsScreen = () => {
     try {
-      const el = document.querySelector(LT_MODAL_SELECTOR);
-      return !!(el && el.isConnected && el.getClientRects().length);
+      /* 1) the known vanilla ids (closing ones release the screen again) */
+      const known = document.querySelector(LT_MODAL_SELECTOR);
+      if (known && known.isConnected && known.getClientRects().length) return true;
+      /* 2) GENERIC layer sweep — every sheet/modal/overlay/drawer/picker in
+            the app (React ones like the "How do you want to track this?"
+            sheet included — that one slipped through a fixed list once) is
+            name-tagged and, when visible while covering real screen area,
+            owns the screen: the page underneath must not slide sideways. */
+      const layers = document.querySelectorAll(
+        '[class*="sheet"],[id*="sheet"],[class*="modal"],[id*="modal"],' +
+        '[class*="overlay"],[id*="overlay"],[class*="drawer"],[id*="drawer"],' +
+        '[class*="picker"],[role="dialog"],[role="sheet"]'
+      );
+      const vw = window.innerWidth, vh = window.innerHeight;
+      for (let i = 0; i < layers.length; i++) {
+        const el = layers[i];
+        if (!el.isConnected) continue;
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden' ||
+            (cs.opacity !== '' && parseFloat(cs.opacity) < 0.05)) continue;
+        if (cs.position !== 'fixed' && cs.position !== 'absolute') continue;
+        const r = el.getBoundingClientRect();
+        /* Small chips/toasts/labels never count — a layer must span at least
+           half the viewport wide and a third tall to own the screen. */
+        if (r.width < vw * 0.5 || r.height < vh * 0.3) continue;
+        return true;
+      }
+      return false;
+    } catch (e) { return false; }
+  };
+  const ltTouchInsideLayer = (target) => {
+    try {
+      return !!(target && target.closest &&
+        target.closest('[class*="sheet"],[id*="sheet"],[class*="modal"],[id*="modal"],' +
+          '[class*="overlay"],[id*="overlay"],[class*="drawer"],[id*="drawer"],' +
+          '[class*="picker"],[role="dialog"],[role="sheet"]'));
     } catch (e) { return false; }
   };
   const ltPureTabRoute = () => {
@@ -748,6 +782,7 @@ export function ak({ profile }) {
       if (!(e.target && e.target.closest &&
             e.target.closest('#root') &&
             !e.target.closest('input, textarea, select, [data-lt-no-swipe]')) ||
+          ltTouchInsideLayer(e.target) ||
           ltModalOwnsScreen() || !ltPureTabRoute()) {
         gRef.current.active = false;
         gRef.current.locked = null;
