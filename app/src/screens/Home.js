@@ -2174,25 +2174,38 @@ function LtMinStrip({ label, detail, onExpand, move, className }) {
         ? jsx('span', { className: 'shrink-0 max-w-[45%] truncate text-[10.5px] font-extrabold tabular-nums text-foreground/45', children: detail })
         : null,
       jsx('svg', {
-        width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none',
+        /* Eye (shown) — pairs with the eye-off minimize button, like a
+           password-reveal toggle (user request: "remove the minus, put
+           the eye hide icon"). */
+        width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none',
         className: 'shrink-0 text-foreground/40',
-        children: jsx('path', { d: 'M2.5 7.5 L6 4 L9.5 7.5', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' })
+        stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+        children: [
+          jsx('path', { d: 'M1 6s3.5-4.5 11-4.5S23 6 23 6s-3.5 4.5-11 4.5S1 6 1 6z' }),
+          jsx('circle', { cx: 12, cy: 6, r: 2.6 })
+        ]
       })
     ]
   });
 }
 
-/* Round minus button in each card header. */
+/* Round eye-off button in each card header — hides (minimizes) the card;
+   the collapsed strip's eye brings it back (password-reveal style). */
 function LtMinBtn({ onMinimize }) {
   return jsx('button', {
     type: 'button',
     onClick: (e) => { e.stopPropagation(); onMinimize(); },
-    title: 'Minimize',
-    'aria-label': 'Minimize card',
+    title: 'Hide card',
+    'aria-label': 'Hide card',
     className: 'shrink-0 w-6 h-6 rounded-full bg-foreground/[0.06] border border-foreground/10 flex items-center justify-center text-foreground/50 hover:bg-foreground/10 active:scale-95 transition cursor-pointer',
     children: jsx('svg', {
-      width: 12, height: 12, viewBox: '0 0 12 12', fill: 'none',
-      children: jsx('path', { d: 'M2.5 6h7', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' })
+      width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none',
+      stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      children: [
+        jsx('path', { d: 'M1 6s3.5-4.5 11-4.5S23 6 23 6s-3.5 4.5-11 4.5S1 6 1 6z' }),
+        jsx('circle', { cx: 12, cy: 6, r: 2.6 }),
+        jsx('line', { x1: 3, y1: 21, x2: 21, y2: 3 })
+      ]
     })
   });
 }

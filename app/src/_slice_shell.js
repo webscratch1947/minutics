@@ -39,6 +39,11 @@ function DemoClock({ tone }) {
   const text = demoClockText();
   if (!text) return null;
   return jsx('span', {
+    /* data-lt-tick: this node re-renders EVERY second — the enhancement
+       MutationObserver must not treat those ticks as "content changed"
+       (it re-ran the full enhancement pass ~twice per second forever and
+       is exactly why the app felt super laggy even while idle). */
+    'data-lt-tick': '1',
     className: 'shrink-0 text-[11px] font-bold tabular-nums ' + (tone || 'text-white/55'),
     children: text
   });
@@ -109,6 +114,7 @@ function LTTopNav() {
         className: 'w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 animate-pulse'
       }),
       jsx('span', {
+        'data-lt-tick': '1', /* elapsed timer text — re-renders every second */
         className: 'flex-1 truncate',
         children: (activity ? activity.name : 'Activity') + ' — ' + timeStr
       }),

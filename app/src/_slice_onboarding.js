@@ -557,7 +557,12 @@ export function mk({
         children: body
       }),
       jsx("div", {
+        /* safe-area: on Android 15 (targetSdk 35) the platform draws the
+           page behind the system navigation bar, which covered the
+           "Next" / "Get Started" CTAs — pad by the inset (0 when the
+           native opt-out keeps content between the bars). */
         className: "px-6 pt-3 pb-8 bg-[#FDFBF7]",
+        style: { paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" },
         children: footer
       })
     ]

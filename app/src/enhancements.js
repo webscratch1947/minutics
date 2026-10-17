@@ -5,7 +5,7 @@ import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.j
 import { getStore } from "./lib/storage.js";
 import { getMessaging, getToken } from "firebase/messaging";
 import { getApps } from "firebase/app";
-import { ltAlert } from "./ui_dialog.js";
+import { ltAlert, ltAsk } from "./ui_dialog.js";
 
 (function () {
   "use strict";
@@ -6570,6 +6570,28 @@ import { ltAlert } from "./ui_dialog.js";
     setTimeout(function () { if (el.parentNode) el.remove(); }, 250);
   }
 
+  /* Full View is an OVERLAY, not a route — but the Android back button and
+     the on-screen ← must both work ("the back button doesn't work" bug).
+     Each open pushes a history entry; back/close pops it, and the popstate
+     handler below closes the top-most fv overlay. Depth counting keeps a
+     report+share stack honest; if history is unavailable the close runs
+     directly. */
+  var _fvPushes = 0;
+  function fvPushHistory() {
+    try { history.pushState({ ltFv: 1 }, ""); _fvPushes++; return true; } catch (e) { return false; }
+  }
+  function fvBackFlow() {
+    if (_fvPushes > 0) { _fvPushes--; try { history.back(); } catch (e) {} return; }
+    var share = document.getElementById("lt-fv-share-overlay");
+    var report = document.getElementById("lt-fv-report-overlay");
+    fvCloseOverlay(share || report);
+  }
+  function fvHandleBack() {
+    if (!document.getElementById("lt-fv-share-overlay") && !document.getElementById("lt-fv-report-overlay")) return false;
+    fvBackFlow();
+    return true;
+  }
+
   /* Stage 1: the report tab — donut + per-activity bars + summary, with a
      "Share" button that leads to the shareable visiting-card image. */
   
@@ -6608,10 +6630,14 @@ import { ltAlert } from "./ui_dialog.js";
         (pendingActivities !== null ? '' : emptyHtml) +
       '</div>';
     document.body.appendChild(overlay);
+    fvPushHistory();
 
     overlay.addEventListener("click", function (e) {
-      if (e.target.id === "lt-fv-report-close") { fvCloseOverlay(overlay); return; }
-      if (e.target.id === "lt-fv-report-share-btn" && pendingActivities) {
+      /* closest(): the tap can land on the ← glyph itself — id checks on
+         e.target alone is exactly why the arrow "didn't work". */
+      var t = e.target;
+      if (t && t.closest && t.closest("#lt-fv-report-close")) { fvBackFlow(); return; }
+      if (t && t.closest && t.closest("#lt-fv-report-share-btn") && pendingActivities) {
         fvOpenShareCard(dateText, pendingActivities);
       }
     });
@@ -6694,12 +6720,14 @@ import { ltAlert } from "./ui_dialog.js";
         '<button id="lt-fv-share-btn">Share</button>' +
         '<button id="lt-fv-save-btn">Save image</button>' +
       '</div>' +
-      '<p class="lt-fv-hint">Tip: you can also long-press the image above to save or share it directly to WhatsApp Status, Instagram, or anywhere else.</p>';
+      '<p class="lt-fv-hint">Tip: tap \u201cSave image\u201d to keep it in your photo gallery, or \u201cShare\u201d to post it to WhatsApp, Instagram, or anywhere else.</p>';
     document.body.appendChild(overlay);
+    fvPushHistory();
 
     overlay.addEventListener("click", function (e) {
       /* Only the back button closes — content taps do nothing. */
-      if (e.target.id === "lt-fv-share-close") { fvCloseOverlay(overlay); }
+      var t = e.target;
+      if (t && t.closest && t.closest("#lt-fv-share-close")) { fvBackFlow(); }
     });
 
     var canvas = fvDrawCard(dateText, activities, sharerName);
@@ -7093,6 +7121,43 @@ import { ltAlert } from "./ui_dialog.js";
       }).catch(function () {});
     } catch (e) {}
   }
+
+  /* In-app notification explainer — replaces the native Android dialog
+     ("Turn on notifications … OPEN SETTINGS / NOT NOW"): the standing
+     rule is NO native/browser popups anywhere, only the app's own themed
+     popups. MainActivity now dispatches 'minutics-notif-disabled' instead
+     of showing its AlertDialog; when the user opts in we also ask for the
+     battery-optimization exemption (without it MIUI/aggressive OEMs kill
+     the 10-minute background reminder alarms — "notifications don't come
+     until we open the app"). */
+  window.addEventListener("minutics-notif-disabled", function () {
+    try {
+      ltAsk(
+        "Minutics needs notifications to reach you when the app is closed — your Time Waste budget and \"Still there?\" reminders are delivered that way.",
+        "Turn on notifications",
+        { no: "Not now", yes: "Open settings" }
+      ).then(function (ok) {
+        if (!ok) return;
+        try {
+          var b = window.AndroidBridge;
+          if (b && typeof b.openNotificationSettings === "function") b.openNotificationSettings();
+        } catch (e) {}
+      });
+    } catch (e) {}
+  });
+  /* Notifications just got granted → once, also exempt the app from
+     battery optimization so the background 10-min checks survive the app
+     being closed (system dialog, one time, user-approved flow). */
+  window.addEventListener("minutics-notification-permission", function (ev) {
+    try {
+      var perm = ev && ev.detail && ev.detail.permission;
+      if (perm !== "granted") return;
+      if (localStorage.getItem("lt_batt_exempt_asked") === "1") return;
+      localStorage.setItem("lt_batt_exempt_asked", "1");
+      var b = window.AndroidBridge;
+      if (b && typeof b.requestIgnoreBatteryOptimizations === "function") b.requestIgnoreBatteryOptimizations();
+    } catch (e) {}
+  });
 
   function nativeLastNudgeAt() {
     try {
@@ -9367,6 +9432,8 @@ import { ltAlert } from "./ui_dialog.js";
       closeOverlay();
       return true;
     }
+    /* Full View report/share overlays (they push their own history). */
+    if (fvHandleBack()) return true;
     /* React bottom sheets (activity picker / log block / etc.) — they are
        fixed full-screen overlays with a backdrop, not activeOverlay. */
     var reactSheet = document.querySelector('[class*="fixed inset-0"][class*="z-["]');
@@ -9393,6 +9460,15 @@ import { ltAlert } from "./ui_dialog.js";
     }
     if (activeOverlay) {
       closeOverlay();
+      return;
+    }
+    /* Full View: a pop (← flow or Android back) closes the top overlay.
+       Close ONLY — never history.back() from inside popstate (that would
+       double-pop a report+share stack and close both at once). */
+    var fvTop = document.getElementById("lt-fv-share-overlay") || document.getElementById("lt-fv-report-overlay");
+    if (fvTop) {
+      if (_fvPushes > 0) _fvPushes--;
+      fvCloseOverlay(fvTop);
     }
   });
 
@@ -9420,7 +9496,14 @@ import { ltAlert } from "./ui_dialog.js";
     try { fn(); } catch (e) { if (window.console) console.error("[minutics enhancements]", fn.name || "step", e); }
   }
 
-  function runEnhancements() {
+  function runEnhancements(structural) {
+    /* structural === false means this pass was triggered by pure TEXT
+       re-renders (the 1s nav clock, elapsed counters) — the full-DOM text
+       normalizers below only matter when real ELEMENTS mount (new rows,
+       new screens) or on a route change, so a tick-triggered pass skips
+       them entirely. That, plus the data-lt-tick observer exclusion, is
+       what stopped the app burning CPU every half second while idle. */
+    var deep = structural !== false;
     var p = location.pathname + location.hash;
     sweepStuckUi();
     var onHome = (location.pathname === "/" && !location.hash) || location.hash === "#/" || location.hash === "#";
@@ -9454,13 +9537,15 @@ import { ltAlert } from "./ui_dialog.js";
     if (stray && stray.parentNode) stray.parentNode.removeChild(stray);
     /* Timer / Activity page */
     if (onTimerOrActivity) {
-      safeRun(normalizeOriginalLabels);
+      if (deep) {
+        safeRun(normalizeOriginalLabels);
+        safeRun(ensureActivityActionDescriptions);
+        safeRun(replaceRupeeGlobally);
+      }
       safeRun(hijackDateInputs);
-      safeRun(ensureActivityActionDescriptions);
       safeRun(pollRunningTimer);
       safeRun(checkIdleNudge);
       safeRun(updateStreak);
-      safeRun(replaceRupeeGlobally);
     }
     /* Journal page */
     if (onJournal) {
@@ -9484,6 +9569,15 @@ import { ltAlert } from "./ui_dialog.js";
   var _lastRunRoute = null;
   var _enhanceBusyRetries = 0;
   var _enhanceInputRetries = 0;
+  /* Set by the MutationObserver when a batch added REAL elements (rows,
+     tiles, sheets mounting); pure characterData ticks leave it false so
+     the pass can skip the full-DOM text walks. */
+  var _lastMutStructural = false;
+  /* How many times the 500ms throttle has re-armed back-to-back on the
+     same route. Capped below: the old "always reschedule, never drop"
+     rule let continuous text ticks re-run the FULL pass every 500ms
+     forever — the idle CPU machine behind the lag. */
+  var _enhanceChainCount = 0;
   function scheduleEnhance() {
     if (_enhanceScheduled) return;
     _enhanceScheduled = true;
@@ -9532,7 +9626,12 @@ import { ltAlert } from "./ui_dialog.js";
            mounted the target DOM right after a just-finished pass (the exact
            post-swipe Journal case), that discarded mutation was the only
            trigger and nothing re-ran — enhancements silently missing until
-           reload. Reschedule the remainder instead; one pending timer max. */
+           reload. Reschedule the remainder instead; one pending timer max.
+           BURST CAP: at most 2 re-arms per route, then it stops — anything
+           genuinely new gets a fresh observer trigger or the 3s safety net;
+           continuous tick mutations no longer chain full passes forever. */
+        if (_enhanceChainCount >= 2) { _enhanceChainCount = 0; return; }
+        _enhanceChainCount++;
         _enhanceScheduled = true;
         setTimeout(function () {
           _enhanceScheduled = false;
@@ -9540,11 +9639,14 @@ import { ltAlert } from "./ui_dialog.js";
         }, Math.max(50, 500 - (now - _lastEnhanceRun)));
         return;
       }
+      _enhanceChainCount = 0;
       _lastEnhanceRun = now;
       _lastRunRoute = routeNow;
       window.__ltLastEnhanceRun = now;
-      try { window.__ltPassDebug = { path: 'mutation', retries: _enhanceInputRetries }; } catch (e) {}
-      if (!activeOverlay) runEnhancements();
+      try { window.__ltPassDebug = { path: 'mutation', retries: _enhanceInputRetries, structural: _lastMutStructural }; } catch (e) {}
+      var _struct = _lastMutStructural;
+      _lastMutStructural = false;
+      if (!activeOverlay) runEnhancements(_struct);
     });
   }
   /* Bypasses the throttle entirely. Used right when we KNOW a tab/route
@@ -9838,6 +9940,8 @@ import { ltAlert } from "./ui_dialog.js";
          rows, Life Hub tiles) inside this window run their enhancement
          pass instantly instead of waiting out input/age gates. */
       _routeFreshUntil = Date.now() + 2000;
+      _enhanceChainCount = 0;
+      _lastMutStructural = true; /* new screen = real elements → deep pass */
       /* Heavy pass runs right after paint (see _scheduleNavPass) — never on
          the navigation's critical path. */
       _scheduleNavPass();
@@ -9865,10 +9969,27 @@ import { ltAlert } from "./ui_dialog.js";
       if (activeOverlay) return;
       /* Mid-gesture mutations wait: no auto pass while a swipe owns the DOM. */
       if (document.body && document.body.dataset && document.body.dataset.ltSwipe) return;
+      var structural = false;
       var relevant = mutations.some(function (m) {
-        return !m.target.closest || !m.target.closest("[data-lt-enhancement],[data-lt-tile-injected]");
+        /* characterData mutations report the TEXT node — which has NO
+           .closest — so the old guard ("skip anything inside an
+           enhancement container") always passed for text edits, and the
+           nav clock's 1s re-render alone re-ran the FULL pass ~twice a
+           second forever: the idle CPU machine behind "the app is super
+           laggy even when doing nothing". Resolve to the owning element,
+           ignore the app's own ticking readouts, and note whether any
+           mutation added REAL elements (structural) so the pass knows if
+           the expensive full-DOM text walks are worth running at all. */
+        if (m.type === "childList" && m.addedNodes && m.addedNodes.length) structural = true;
+        var el = (m.target && m.target.nodeType === 1) ? m.target
+               : (m.target && m.target.parentElement) || null;
+        if (!el || !el.closest) return true;
+        return !el.closest("[data-lt-enhancement],[data-lt-tile-injected],[data-lt-tick]");
       });
-      if (relevant) scheduleEnhance();
+      if (relevant) {
+        if (structural) _lastMutStructural = true;
+        scheduleEnhance();
+      }
     });
     observer.observe(document.body, { childList:true, subtree:true, characterData:true });
     /* Fast-poll for the first 3 seconds after cold start (covers splash
@@ -9882,10 +10003,13 @@ import { ltAlert } from "./ui_dialog.js";
     setInterval(function () {
       /* Skip the tick while a swipe is mid-flight — a background full pass
          during the glide would re-raster the panes (flicker). The next
-         3s tick, or the route-change pass, catches anything it missed. */
+         3s tick, or the route-change pass, catches anything it missed.
+         LIGHT pass (structural=false): no full-DOM text walks — this is a
+         forever-timer and must stay cheap; deep walks run on route
+         changes and real element mounts only. */
       if (document.body.dataset.ltSwipe) return;
       sweepStuckUi();
-      if (!activeOverlay) runEnhancements();
+      if (!activeOverlay) runEnhancements(false);
     }, 3000);
   });
 
