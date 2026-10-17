@@ -2174,23 +2174,25 @@ function LtMinStrip({ label, detail, onExpand, move, className }) {
         ? jsx('span', { className: 'shrink-0 max-w-[45%] truncate text-[10.5px] font-extrabold tabular-nums text-foreground/45', children: detail })
         : null,
       jsx('svg', {
-        /* Eye (shown) — pairs with the eye-off minimize button, like a
-           password-reveal toggle (user request: "remove the minus, put
-           the eye hide icon"). */
+        /* Eye-OFF (closed) — shown on the COLLAPSED strip: the card is
+           hidden right now (icon reflects current state, like a
+           password-reveal toggle). Tap to bring the card back. */
         width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none',
         className: 'shrink-0 text-foreground/40',
         stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
         children: [
-          jsx('path', { d: 'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0' }),
-          jsx('path', { d: 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0' })
+          jsx('path', { d: 'M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49' }),
+          jsx('path', { d: 'M14.084 14.158a3 3 0 0 1-4.242-4.242' }),
+          jsx('path', { d: 'M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143' }),
+          jsx('path', { d: 'm2 2 20 20' })
         ]
       })
     ]
   });
 }
 
-/* Round eye-off button in each card header — hides (minimizes) the card;
-   the collapsed strip's eye brings it back (password-reveal style). */
+/* Round normal-eye button in each card header — the card is VISIBLE right
+   now (icon reflects current state); tap to hide (minimize) the card. */
 function LtMinBtn({ onMinimize }) {
   return jsx('button', {
     type: 'button',
@@ -2202,10 +2204,8 @@ function LtMinBtn({ onMinimize }) {
       width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none',
       stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
       children: [
-        jsx('path', { d: 'M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49' }),
-        jsx('path', { d: 'M14.084 14.158a3 3 0 0 1-4.242-4.242' }),
-        jsx('path', { d: 'M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143' }),
-        jsx('path', { d: 'm2 2 20 20' })
+        jsx('path', { d: 'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0' }),
+        jsx('path', { d: 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0' })
       ]
     })
   });
