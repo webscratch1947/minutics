@@ -2181,8 +2181,8 @@ function LtMinStrip({ label, detail, onExpand, move, className }) {
         className: 'shrink-0 text-foreground/40',
         stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
         children: [
-          jsx('path', { d: 'M1 6s3.5-4.5 11-4.5S23 6 23 6s-3.5 4.5-11 4.5S1 6 1 6z' }),
-          jsx('circle', { cx: 12, cy: 6, r: 2.6 })
+          jsx('path', { d: 'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0' }),
+          jsx('path', { d: 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0' })
         ]
       })
     ]
@@ -2202,9 +2202,10 @@ function LtMinBtn({ onMinimize }) {
       width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none',
       stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
       children: [
-        jsx('path', { d: 'M1 6s3.5-4.5 11-4.5S23 6 23 6s-3.5 4.5-11 4.5S1 6 1 6z' }),
-        jsx('circle', { cx: 12, cy: 6, r: 2.6 }),
-        jsx('line', { x1: 3, y1: 21, x2: 21, y2: 3 })
+        jsx('path', { d: 'M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49' }),
+        jsx('path', { d: 'M14.084 14.158a3 3 0 0 1-4.242-4.242' }),
+        jsx('path', { d: 'M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143' }),
+        jsx('path', { d: 'm2 2 20 20' })
       ]
     })
   });
