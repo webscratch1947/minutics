@@ -57,12 +57,11 @@
           #lt-hourHand,#lt-minHand{transform-box:view-box;transform-origin:256px 244px;}
           #lt-hourHand{animation:ltSp2 .8s cubic-bezier(.25,.8,.3,1) .08s both;}
           #lt-minHand{animation:ltSp3 .9s cubic-bezier(.25,.8,.3,1) .08s both;}
-          /* Hands match the original video: whip up from ~9 o'clock into the
-             final V within ~0.9s with a damped overshoot settle. The old
-             -300/-420 multi-turn sweeps dwelt horizontally across the face
-             for ~9 frames (the "green line") — these never pass 270deg. */
-          @keyframes ltSp2{from{transform:rotate(-30deg);}62%{transform:rotate(3.5deg);}84%{transform:rotate(-1.5deg);}to{transform:rotate(0deg);}}
-          @keyframes ltSp3{from{transform:rotate(-125deg);}62%{transform:rotate(6deg);}85%{transform:rotate(-2.5deg);}to{transform:rotate(0deg);}}
+          /* Hands do one full 360° turn, landing exactly where they end today
+             (the traced logo pose) with a small damped overshoot settle. The
+             turn is fast (~0.9s, heavy ease-out) so no horizontal dwell. */
+          @keyframes ltSp2{from{transform:rotate(-360deg);}62%{transform:rotate(3.5deg);}84%{transform:rotate(-1.5deg);}to{transform:rotate(0deg);}}
+          @keyframes ltSp3{from{transform:rotate(-360deg);}62%{transform:rotate(6deg);}85%{transform:rotate(-2.5deg);}to{transform:rotate(0deg);}}
           .lt-bar{transform-box:fill-box;transform-origin:bottom;animation:ltSp4 .5s cubic-bezier(.2,.75,.25,1) both;}
           .lt-b1{animation-delay:.35s}.lt-b2{animation-delay:.41s}.lt-b3{animation-delay:.47s}.lt-b4{animation-delay:.53s}
           .lt-b5{animation-delay:.59s}.lt-b6{animation-delay:.66s}.lt-b7{animation-delay:.73s}.lt-b8{animation-delay:.81s}
@@ -172,7 +171,7 @@
             <polygon points="132,398 132,399 132,400 133,401 133,402 133,403 134,404 134,405 134,406 135,407 135,408 135,409 136,410 136,411 137,412 137,413 138,414 138,415 139,416 139,417 140,418 140,419 141,420 141,421 142,422 142,423 143,424 144,425 144,426 145,427 146,428 146,429 147,430 148,431 148,432 149,433 150,434 151,435 152,436 152,437 153,438 154,439 155,440 156,441 157,442 158,443 159,444 160,445 161,446 162,447 163,448 164,449 165,450 166,451 168,452 169,453 170,454 171,455 173,456 174,457 176,458 176,459 178,460 180,461 182,462 183,463 185,464 187,465 189,466 191,467 193,468 195,469 197,470 199,471 201,472 204,473 206,474 209,475 211,476 214,477 217,478 221,479 225,480 228,481 229,481 228,480 227,479 225,478 224,477 223,476 222,475 221,474 220,473 219,472 218,471 218,470 217,469 216,468 215,467 213,466 211,465 209,464 207,463 205,462 203,461 202,460 200,459 199,458 197,457 196,456 195,455 193,454 192,453 191,452 190,451 189,450 188,449 187,448 186,447 186,446 185,445 184,444 183,443 183,442 182,441 181,440 181,439 180,438 179,437 179,436 178,435 178,434 177,433 177,432 177,431 176,430 176,429 174,428 172,427 170,426 168,425 166,424 164,423 162,422 161,421 159,420 158,419 156,418 155,417 153,416 152,415 151,414 149,413 148,412 147,411 145,410 144,409 143,408 142,407 141,406 140,405 138,404 137,403 136,402 135,401 134,400 133,399 132,398"/>
             <polygon points="184,432 185,434 187,436 188,438 190,440 192,442 194,444 197,446 197,448 196,450 198,452 201,454 204,456 208,458 211,460 214,461 213,460 212,458 211,456 210,454 210,452 209,450 209,448 209,446 208,444 208,442 208,440 203,438 196,436 190,434 185,432"/>
           </g>
-          <use href="#wingL" transform="translate(512,0) scale(-1,1)"/>
+          <use href="#lt-wingL" transform="translate(512,0) scale(-1,1)"/>
         </g>
         <!-- badge -->
         <g id="lt-badge">
