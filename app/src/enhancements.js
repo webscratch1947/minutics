@@ -78,15 +78,60 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
        splash that never started. */
     window.__ltSplashPlaying = true;
 
+    /* Natural-end release: counts from START or from the last RESTARTED run
+       (see resyncAnimWithAudio below). */
+    var endTimer = setTimeout(dismiss, END_MS);
+    setTimeout(dismiss, HARD_MS);
+
+    /* Sound arriving LATE — desktops hard-block autoplay until a gesture, and
+       on some launches even muted autoplay is blocked, so the clip sits at 0
+       while the CSS animation races ahead. Un-muting then would play the
+       jingle OVER a finished animation ("audio plays late, after the
+       animation ends"). The 'play' event fires exactly when sound (re)starts:
+       if it starts from ~0 this far into the animation, replay the WHOLE
+       splash animation from frame one together with the jingle — a late tap
+       becomes "tap to start", perfectly synced like a first launch. Playback
+       already in motion (the APK, or muted desktop playback that kept pace)
+       restarts nothing. */
+    var resyncs = 0, lastResync = 0;
+    function resyncAnimWithAudio() {
+      if (dismissed || !audio || audio.ended) return;
+      if (audio.currentTime > 0.5) return;   /* kept pace — already in sync */
+      /* How far the animation has actually run (emblem animation, includes
+         its .1s delay) — ground truth from the Web Animations API, with the
+         document timeline as fallback. */
+      var elapsed = null;
+      try {
+        var em = document.getElementById("lt-splash-emblem");
+        if (em && em.getAnimations) {
+          var aa = em.getAnimations();
+          if (aa && aa.length) elapsed = (aa[0].currentTime || 0) / 1000;
+        }
+      } catch (e) {}
+      if (elapsed === null) elapsed = ((document.timeline && document.timeline.currentTime) || 0) / 1000;
+      if (elapsed <= 0.35) return;             /* fresh start — already in sync */
+      var now = Date.now();
+      if (resyncs >= 2 || now - lastResync < 800) return; /* never loop a restart */
+      resyncs++; lastResync = now;
+      var anim = document.getElementById("lt-startup-splash-anim");
+      if (anim && anim.classList) {
+        anim.classList.add("run");
+        void anim.offsetWidth;                 /* forced style pass */
+        anim.classList.remove("run");          /* every animation replays */
+      }
+      try { audio.currentTime = 0; } catch (e) {}
+      clearTimeout(endTimer);                  /* dismissal now counts from */
+      endTimer = setTimeout(dismiss, END_MS);  /* the restarted run */
+    }
+
     if (audio) {
+      audio.addEventListener("play", resyncAnimWithAudio);
       audio.addEventListener("ended", function () { setTimeout(dismiss, 200); });
       /* Audio broken/missing: release quickly — never a stuck splash. */
       audio.addEventListener("error", function () { setTimeout(dismiss, 1200); });
       if (audio.ended) setTimeout(dismiss, 200);
       if (audio.paused) audio.play().catch(function () {});
     }
-    setTimeout(dismiss, END_MS);
-    setTimeout(dismiss, HARD_MS);
 
     /* WITH SOUND — the original intro audio (extracted from the v5 export).
        Android's WebView allows it (mediaPlaybackRequiresUserGesture is off
@@ -1084,7 +1129,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       var bigElem = card.querySelector("p[data-lt-tv-big]");
       if (!bigElem) bigElem = findBigEl();
       if (bigElem) {
-        var newText = getCurrency().symbol + adjusted.toFixed(2);
+        var newText = money(adjusted);
         if (bigElem.textContent !== newText) bigElem.textContent = newText;
       }
 
@@ -1229,7 +1274,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       /* Closing mirror: tools and their shells slide out together. */
       "#lt-overlay-root[data-lt-closing] .lt-tool-shell{animation:lt-shell-out .2s ease-in forwards}",
       "@keyframes lt-shell-out{to{opacity:0;transform:translateY(10px)}}",
-      ".lt-tool-shell{max-width:700px;margin:0 auto;padding:18px 16px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%}",
+      ".lt-tool-shell{max-width:700px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top, 0px)) 16px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%}",
       /* Classic borderless header — Back link on top, plain kicker, title, description */
       ".lt-tool-top{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin:0 0 18px;color:#111114}",
       ".lt-tool-kicker{display:inline-flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 7px}",
@@ -5908,7 +5953,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<div id="lt-tv-live" class="lt-tool-card" style="' + (stored.perMinute ? '' : 'display:none') + '">' +
           '<p class="lt-card-title">Today\'s live countdown</p>' +
           '<div style="text-align:center;padding:10px 0 4px">' +
-            '<div id="lt-tv-live-amt" style="font-size:32px;font-weight:900;color:hsl(var(--foreground))">' + (stored.perMinute ? sym + _liveTimeValue(stored).toFixed(2) : sym + '0.00') + '</div>' +
+            '<div id="lt-tv-live-amt" style="font-size:32px;font-weight:900;color:hsl(var(--foreground))">' + (stored.perMinute ? money(_liveTimeValue(stored)) : money(0)) + '</div>' +
             '<div id="lt-tv-live-left" style="font-size:13px;color:hsl(var(--muted-foreground));margin-top:4px">' + _timeLeftToday() + '</div>' +
           '</div>' +
           '<div style="margin-top:12px">' +
@@ -5960,7 +6005,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       var left = document.getElementById("lt-tv-live-left");
       var bar = document.getElementById("lt-tv-live-bar");
       var pct = document.getElementById("lt-tv-live-pct");
-      if (amt) amt.textContent = sym2 + _liveTimeValue(stored2).toFixed(2);
+      if (amt) amt.textContent = money(_liveTimeValue(stored2));
       if (left) left.textContent = _timeLeftToday();
       if (bar) bar.style.width = _dayProgressPct() + "%";
       if (pct) pct.textContent = _dayProgressPct() + "%";
@@ -5976,12 +6021,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return '<p class="lt-card-title">Your time value</p>' +
       '<div class="lt-calc-result">' +
         '<small>Per minute</small>' +
-        '<strong>' + escapeHtml(sym + data.perMinute.toFixed(2)) + '</strong>' +
+        '<strong>' + escapeHtml(money(data.perMinute)) + '</strong>' +
       '</div>' +
-      '<div class="lt-history-row"><span>Per hour</span><strong>' + escapeHtml(sym + (data.perMinute * 60).toFixed(2)) + '</strong></div>' +
-      '<div class="lt-history-row"><span>Per day (' + data.hours + 'h)</span><strong>' + escapeHtml(sym + (data.perMinute * 60 * data.hours).toFixed(2)) + '</strong></div>' +
-      '<div class="lt-history-row"><span>Per month</span><strong>' + escapeHtml(sym + data.salary) + '</strong></div>' +
-      '<div class="lt-history-row"><span>Per year</span><strong>' + escapeHtml(sym + (data.salary * 12).toLocaleString()) + '</strong></div>';
+      '<div class="lt-history-row"><span>Per hour</span><strong>' + escapeHtml(money(data.perMinute * 60)) + '</strong></div>' +
+      '<div class="lt-history-row"><span>Per day (' + data.hours + 'h)</span><strong>' + escapeHtml(money(data.perMinute * 60 * data.hours)) + '</strong></div>' +
+      '<div class="lt-history-row"><span>Per month</span><strong>' + escapeHtml(money(data.salary)) + '</strong></div>' +
+      '<div class="lt-history-row"><span>Per year</span><strong>' + escapeHtml(money(data.salary * 12)) + '</strong></div>';
   }
 
   function _liveTimeValue(data) {
@@ -6459,6 +6504,15 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     ctx.fillStyle = "rgba(55,48,163,0.45)";
     ctx.font = "600 14px Inter, Arial, sans-serif";
     ctx.fillText("Make every minute count \u2014 Minutics", 48, H - 38);
+
+    /* Website — bottom-right, drawn straight into the card pixels so every
+       saved/shared copy of the daily report carries the official domain
+       (the text is part of the image, not a DOM overlay). */
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(30,27,75,0.7)";
+    ctx.font = "700 16px Inter, Arial, sans-serif";
+    ctx.fillText("minutics.com", W - 48, H - 38);
+    ctx.textAlign = "left";
 
     return canvas;
   }

@@ -4,6 +4,7 @@ import { jsx, jsxs } from 'react/jsx-runtime';
 
 // App logic
 import { getStore, setStore, nextId, enrichBlocksForRange } from '../lib/storage.js';
+import { getCurrency, getCurrencySymbol } from '../lib/currency.js';
 import { calcRemainingTime, msToBreakdown } from '../lib/lifeCalc.js';
 import { getDistinctColor, resolveActivityColor } from '../lib/constants.js';
 import { blocksKey, activitiesKey, todayStatsKey } from '../lib/queryKeys.js';
@@ -81,7 +82,7 @@ function LTDailyValueBar() {
       }),
       jsxs('p', {
         className: 'text-2xl font-black',
-        children: ['Rs.', valueLeft.toFixed(2)]
+        children: curFmt(valueLeft)
       }),
       jsx('div', {
         className: 'h-1 w-full bg-white/10 overflow-hidden mt-3',
@@ -456,11 +457,22 @@ function LTEmojiPicker({ value, onSelect, onClose }) {
   });
 }
 
+// ─── Currency formatting (locale-aware grouping + selected symbol) ───────────
+// Every money display on this screen goes through these helpers so the
+// currency chosen in Settings is honoured everywhere (no more hardcoded
+// "Rs.") and grouping follows the currency's own locale — en-IN for INR
+// (Rs. 5,55,666.00), en-US for USD ($555,666.00), etc.
+function curLocale() { return getCurrency().code === 'INR' ? 'en-IN' : 'en-US'; }
+function curSym() { return getCurrencySymbol(getCurrency().code); }
+function curFmt(v, d = 2) {
+  return curSym() + Number(v || 0).toLocaleString(curLocale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
 // ─── Activity Card (DC) ─────────────────────────────────────────────────────
 // Individual activity row in the list. Shows emoji/icon, name, edit button,
 // elapsed time (when active), play/clock button, and trash button.
 
-function ActivityCard({ activity, isActive, activeBlock, onTap }) {
+function ActivityCard({ activity, isActive, activeBlock, onTap, onStop }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const deleteActivity = useDeleteActivity();
   const queryClient = useQueryClient();
@@ -628,16 +640,25 @@ function ActivityCard({ activity, isActive, activeBlock, onTap }) {
                     className: 'w-9 h-9 flex items-center justify-center rounded-full bg-red-600/10 border border-red-300 text-red-600 hover:text-red-700 hover:bg-red-600/20 transition-colors shrink-0',
                     children: jsx(lk, { className: 'w-4 h-4' })
                   }),
-                  jsx('span', {
-                    className: cn(
-                      'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all',
-                      isActive ? 'text-white shadow-[0_6px_16px_rgba(0,0,0,0.18)]' : 'bg-black text-white group-hover:bg-black/85 group-hover:scale-105'
-                    ),
-                    style: isActive ? { backgroundColor: resolveActivityColor(activity) } : {},
-                    children: isActive
-                      ? jsx(Zb, { className: 'w-4 h-4' })
-                      : jsx(nk, { className: 'w-4 h-4 ml-0.5' })
-                  })
+                  /* Running → an explicit STOP button (filled square in the
+                     activity's color) that stops the timer in ONE tap;
+                     idle → the round play affordance (opens the start flow).
+                     stopPropagation keeps the row's onTap (details sheet)
+                     from firing when the stop button itself is pressed. */
+                  isActive
+                    ? jsx('button', {
+                        type: 'button',
+                        onClick: (e) => { e.stopPropagation(); if (typeof onStop === 'function') onStop(); },
+                        title: 'Stop',
+                        'aria-label': 'Stop ' + activity.name,
+                        className: 'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all text-white shadow-[0_6px_16px_rgba(0,0,0,0.18)] hover:brightness-90 active:scale-95',
+                        style: { backgroundColor: resolveActivityColor(activity) },
+                        children: jsx(rh, { className: 'w-4 h-4' })
+                      })
+                    : jsx('span', {
+                        className: 'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all bg-black text-white group-hover:bg-black/85 group-hover:scale-105',
+                        children: jsx(nk, { className: 'w-4 h-4 ml-0.5' })
+                      })
                 ]
               })
             ]
@@ -1919,7 +1940,7 @@ function LifeProgressCard({ profile }) {
   } catch (e) { /* ignore */ }
   let tvSplit = null;
   if (tvData) {
-    const s = tvData.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const s = tvData.value.toLocaleString(curLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const dot = s.indexOf('.');
     tvSplit = [s.slice(0, dot), s.slice(dot + 1)];
   }
@@ -1959,7 +1980,7 @@ function LifeProgressCard({ profile }) {
         ? jsx(LtMinStrip, {
             move: 'timer.hero',
             label: 'Lifetime Timer',
-            detail: breakdown.years + 'y ' + months + 'm ' + remDays + 'd left',
+            detail: breakdown.years + 'y ' + months + 'm ' + remDays + 'd ' + breakdown.hours + 'h left',
             onExpand: toggleTimerMin
           })
         : jsxs('div', {
@@ -2034,7 +2055,16 @@ function LifeProgressCard({ profile }) {
                   heroPill(breakdown.hours, 'HOURS')
                 ]
               }),
-              heroPill(breakdown.seconds, 'SECONDS')
+              /* MINUTES + SECONDS on their own row: the unit sequence is now
+                 unbroken (years → months → days → hours → minutes → seconds);
+                 it used to jump HOURS → SECONDS and silently skip minutes. */
+              jsxs('div', {
+                className: 'flex justify-center gap-1.5',
+                children: [
+                  heroPill(breakdown.minutes, 'MINUTES'),
+                  heroPill(breakdown.seconds, 'SECONDS')
+                ]
+              })
             ]
           }),
           jsxs('div', {
@@ -2059,7 +2089,7 @@ function LifeProgressCard({ profile }) {
         ? jsx(LtMinStrip, {
             move: 'timer.money',
             label: 'Money Timer',
-            detail: 'Rs.' + tvSplit[0] + '.' + tvSplit[1] + ' left',
+            detail: curFmt(tvData.value) + ' left',
             onExpand: toggleMoneyMin
           })
         : jsxs('div', {
@@ -2086,7 +2116,7 @@ function LifeProgressCard({ profile }) {
                   jsxs('span', {
                     className: 'inline-flex items-baseline gap-1 bg-black/[.04] border border-black/[.14] rounded-full px-2.5 py-1 shrink-0',
                     children: [
-                      jsx('span', { className: 'text-[12px] font-black tabular-nums leading-none text-foreground', children: 'Rs.' + Number(tvData.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }),
+                      jsx('span', { className: 'text-[12px] font-black tabular-nums leading-none text-foreground', children: curFmt(tvData.rate) }),
                       jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/45', children: '/h' })
                     ]
                   }),
@@ -2098,13 +2128,15 @@ function LifeProgressCard({ profile }) {
           jsxs('div', {
             className: 'mt-2.5 flex items-center justify-between gap-3',
             children: [
-              jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Remaining time left' }),
+              /* Left label + value no longer say the same thing twice
+                 ("Remaining time left … 4h 30min LEFT TODAY"): the label owns
+                 the "when", the value is just the duration. */
+              jsx('p', { className: 'text-[9.5px] font-bold uppercase tracking-[0.18em] text-foreground/45', children: 'Time left today' }),
               jsxs('span', {
                 className: 'shrink-0 inline-flex items-center gap-1 text-[11px] font-extrabold tracking-wide text-foreground/50 tabular-nums',
                 children: [
                   jsx(Zb, { className: 'w-3 h-3 text-foreground/35' }),
-                  tvData.remHours + 'h ' + tvData.remMin + 'min',
-                  jsx('span', { className: 'text-foreground/35', children: ' LEFT TODAY' })
+                  tvData.remHours + 'h ' + tvData.remMin + 'min'
                 ]
               })
             ]
@@ -2112,7 +2144,7 @@ function LifeProgressCard({ profile }) {
           jsxs('div', {
             className: 'mt-1.5 relative flex items-baseline gap-1.5 min-w-0',
             children: [
-              jsx('span', { className: 'text-[17px] font-black leading-none text-foreground/55', children: 'Rs.' }),
+              jsx('span', { className: 'text-[17px] font-black leading-none text-foreground/55', children: curSym() }),
               jsxs('span', {
                 className: 'relative flex items-baseline min-w-0',
                 children: [
@@ -2754,6 +2786,21 @@ export function ActivityScreen({ profile }) {
     }
   };
 
+  /* One-tap stop from the row's explicit Stop button (ActivityCard): ends
+     the running block directly — no details sheet in between. */
+  const stopActivity = (activity) => {
+    if (!runningBlock || runningBlock.activityId !== activity.id) return;
+    updateBlock.mutate({
+      id: runningBlock.id,
+      data: { endTime: new Date().toISOString() }
+    }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: blocksKey() });
+        queryClient.invalidateQueries({ queryKey: todayStatsKey() });
+      }
+    });
+  };
+
   const startTimer = (activity) => {
     const doCreate = () => {
       createBlock.mutate({
@@ -2876,7 +2923,8 @@ export function ActivityScreen({ profile }) {
               activity,
               isActive: runningBlock?.activityId === activity.id,
               activeBlock: runningBlock?.activityId === activity.id ? runningBlock : null,
-              onTap: () => handleActivityTap(activity)
+              onTap: () => handleActivityTap(activity),
+              onStop: () => stopActivity(activity)
             }, activity.id)
           )
         ]

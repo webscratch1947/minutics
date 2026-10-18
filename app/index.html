@@ -55,10 +55,14 @@
           #lt-splash-emblem{transform-box:view-box;transform-origin:256px 250px;opacity:0;transform:scale(.88) translateY(10px);animation:ltSp1 .9s cubic-bezier(.18,.86,.28,1) .1s forwards;}
           @keyframes ltSp1{to{opacity:1;transform:scale(1) translateY(0)}}
           #lt-hourHand,#lt-minHand{transform-box:view-box;transform-origin:256px 244px;}
-          #lt-hourHand{animation:ltSp2 2.5s cubic-bezier(.2,.7,.2,1) .55s both;}
-          #lt-minHand{animation:ltSp3 2.7s cubic-bezier(.2,.7,.2,1) .55s both;}
-          @keyframes ltSp2{from{transform:rotate(-300deg);}to{transform:rotate(0deg);}}
-          @keyframes ltSp3{from{transform:rotate(-420deg);}to{transform:rotate(0deg);}}
+          #lt-hourHand{animation:ltSp2 .8s cubic-bezier(.25,.8,.3,1) .08s both;}
+          #lt-minHand{animation:ltSp3 .9s cubic-bezier(.25,.8,.3,1) .08s both;}
+          /* Hands match the original video: whip up from ~9 o'clock into the
+             final V within ~0.9s with a damped overshoot settle. The old
+             -300/-420 multi-turn sweeps dwelt horizontally across the face
+             for ~9 frames (the "green line") — these never pass 270deg. */
+          @keyframes ltSp2{from{transform:rotate(-30deg);}62%{transform:rotate(3.5deg);}84%{transform:rotate(-1.5deg);}to{transform:rotate(0deg);}}
+          @keyframes ltSp3{from{transform:rotate(-125deg);}62%{transform:rotate(6deg);}85%{transform:rotate(-2.5deg);}to{transform:rotate(0deg);}}
           .lt-bar{transform-box:fill-box;transform-origin:bottom;animation:ltSp4 .5s cubic-bezier(.2,.75,.25,1) both;}
           .lt-b1{animation-delay:.35s}.lt-b2{animation-delay:.41s}.lt-b3{animation-delay:.47s}.lt-b4{animation-delay:.53s}
           .lt-b5{animation-delay:.59s}.lt-b6{animation-delay:.66s}.lt-b7{animation-delay:.73s}.lt-b8{animation-delay:.81s}
@@ -76,6 +80,16 @@
           @keyframes ltSp9{0%{transform:scale(1);}35%{transform:scale(1.09);}70%{transform:scale(.985);}100%{transform:scale(1);}}
           #lt-wordmark{opacity:0;animation:ltSp10 .7s ease 2.62s both;}
           @keyframes ltSp10{from{opacity:0;letter-spacing:.32em;}to{opacity:1;letter-spacing:.155em;}}
+          /* Restart hook: when sound becomes audibly available LATE (desktop
+             autoplay policy held it at 0 while the animation ran ahead), the
+             enhancements module adds .run for one forced-style pass and
+             removes it — every splash animation replays from frame one in
+             lockstep with the jingle. No paint ever happens in between. */
+          #lt-startup-splash-anim.run #lt-splash-emblem,#lt-startup-splash-anim.run #lt-hourHand,#lt-startup-splash-anim.run #lt-minHand,#lt-startup-splash-anim.run .lt-bar,#lt-startup-splash-anim.run #lt-growthLine,#lt-startup-splash-anim.run .lt-gdot,#lt-startup-splash-anim.run #lt-growthHead,#lt-startup-splash-anim.run #lt-sheen,#lt-startup-splash-anim.run #lt-badge,#lt-startup-splash-anim.run #lt-wordmark{animation:none!important;}
+          #lt-startup-splash-anim.run #lt-splash-emblem{opacity:1!important;transform:none!important;}
+          #lt-startup-splash-anim.run #lt-growthLine{stroke-dashoffset:0!important;}
+          #lt-startup-splash-anim.run #lt-wordmark{opacity:1!important;letter-spacing:.155em!important;}
+          #lt-startup-splash-anim.run #lt-sheen{opacity:0!important;}
           @media (prefers-reduced-motion:reduce){
             #lt-splash-emblem,#lt-hourHand,#lt-minHand,.lt-bar,#lt-growthLine,.lt-gdot,#lt-growthHead,#lt-badge,#lt-wordmark{animation:none!important;opacity:1!important;transform:none!important;stroke-dashoffset:0!important;}
             #lt-sheen{animation:none!important;opacity:0!important;}
