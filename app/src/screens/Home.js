@@ -2006,8 +2006,9 @@ function LifeProgressCard({ profile }) {
             })
           }),
           /* Hero: the big box is YEARS, hugging the dotted arcs tightly
-             like before; the three pills — MONTHS, DAYS, SECONDS — sit on
-             their own centered row below so they can't push the arcs out. */
+             like before; the pills — MONTHS, DAYS, HOURS — sit on their
+             own centered row below so they can't push the arcs out, with
+             a same-sized SECONDS pill centered under the DAYS one. */
           jsxs('div', {
             className: 'flex items-center justify-center gap-1',
             children: [
@@ -2023,10 +2024,16 @@ function LifeProgressCard({ profile }) {
             ]
           }),
           jsxs('div', {
-            className: 'flex justify-center gap-1.5 mt-3',
+            className: 'flex flex-col items-center gap-1.5 mt-3',
             children: [
-              heroPill(months, 'MONTHS'),
-              heroPill(remDays, 'DAYS'),
+              jsxs('div', {
+                className: 'flex justify-center gap-1.5',
+                children: [
+                  heroPill(months, 'MONTHS'),
+                  heroPill(remDays, 'DAYS'),
+                  heroPill(breakdown.hours, 'HOURS')
+                ]
+              }),
               heroPill(breakdown.seconds, 'SECONDS')
             ]
           }),
