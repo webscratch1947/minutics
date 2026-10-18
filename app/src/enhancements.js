@@ -1,4 +1,4 @@
-﻿/* The app's DEFAULT emoji data (Home.js LTEmojiPicker) — the routine
+/* The app's DEFAULT emoji data (Home.js LTEmojiPicker) — the routine
    emoji bar must be this same full set with the same categories/recents,
    never a short hand-picked list. (Tasks deliberately have no emoji.) */
 import { LT_EMOJIS, LT_EMOJI_KEYWORDS, EMOJI_CATEGORIES } from "./screens/Home.js";
@@ -11,58 +11,57 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   "use strict";
 
   /* ── Startup loading screen ────────────────────────────────────────────
-     Branded from the FIRST frame: the static logo shows immediately while
-     the logo video buffers/decodes (the video starts at opacity:0 and used
-     to leave a blank cream screen for seconds — "sometimes the splash
-     animation didn't play"). The video fades in over the logo once it
-     actually plays; if it never does, the logo still carries the screen
-     until MAX_MS releases it — never a bare colour, never a stuck splash. */
+     Branded from the FIRST frame: the coded Minutics emblem animation
+     (traced 1:1 from the real logo) with the original intro audio, as
+     static markup in index.html — it paints at HTML PARSE, before this
+     bundle evaluates, so there is no buffering state at all (the old
+     video could sit on cream for seconds on slow connections — "sometimes
+     the splash animation didn't play"). This module only ADOPTS those
+     elements: sound policy, dismissal, escape hatches. */
   (function showStartupSplash() {
-    var MAX_MS = 3000;   /* grey alone: release by 3s — never a lingering empty screen */
-    var HARD_MS = 7000;  /* absolute escape hatch, even if a playing video runs to its full ~4s */
+    var HARD_MS = 7000;  /* absolute escape hatch */
+    var END_MS  = 4400;  /* natural end: the animation settles at ~3.65s and
+                            the 4.011s jingle ends right after → release at
+                            4.4s. Covers audio 'ended' never firing (blocked
+                            or undecodable element) so the splash can never
+                            stick over the settled logo. */
 
-    /* ADOPT the splash index.html's inline bootstrap already created at
-       HTML parse — its video download started in parallel with the app
-       bundle instead of only AFTER the 900KB JS downloaded, parsed and
-       evaluated ("the splash sometimes doesn't play" on slower connections:
-       the video was still unrequested seconds in, missed MAX_MS and got cut).
-       Create everything only when the bootstrap isn't there (tests, older
-       cached HTML). The visuals are byte-identical either way. */
+    /* ADOPT the coded splash index.html already rendered. The only stale
+       case is an old cached HTML carrying the VIDEO splash (no audio
+       element): replace it outright so exactly one splash type is ever on
+       screen. */
     var splash = document.getElementById("lt-startup-splash");
-    var video  = document.getElementById("lt-startup-splash-video");
-    var adopted = !!(splash && video);
+    var audio  = document.getElementById("lt-startup-splash-audio");
+    if (splash && !audio) {
+      try { splash.parentNode.removeChild(splash); } catch (e) {}
+      splash = null;
+    }
     if (!splash) {
       splash = document.createElement("div");
       splash.id = "lt-startup-splash";
+      splash.setAttribute("aria-hidden", "true");
+      audio = document.createElement("audio");
+      audio.id = "lt-startup-splash-audio";
+      /* ?v=1: audio extracted byte-for-byte from the v5 splash export —
+         bump ?v=N when replacing the file (immutable 1y cache on /assets/*). */
+      audio.src = "assets/lt/minutics_splash_audio.m4a?v=1";
+      audio.preload = "auto";
+      splash.appendChild(audio);
+      /* The full animation markup ships ONLY in index.html; this path fires
+         only for stale HTML / tests — a quiet branded card beats a bare
+         colour while the jingle plays. */
+      var fb = document.createElement("div");
+      fb.style.cssText = "font:700 34px/1 Inter,system-ui,sans-serif;letter-spacing:.3em;color:#012553;";
+      fb.textContent = "MINUTICS";
+      splash.appendChild(fb);
     }
     splash.style.cssText =
       "position:fixed;inset:0;z-index:2147483647;background:#FDFBF7;" +
-      "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
-      "gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
-
-    /* NO logo, NO added animation — the splash is ONLY the user's own
-       video (a static logo standing in front of it was reported as
-       "another splash animation"). Cream shows until the video's first
-       frame; the timeouts below guarantee it never lingers. */
-    if (!video) {
-      video = document.createElement("video");
-      video.id = "lt-startup-splash-video";
-      /* ?v=5: the user's own splash export (1080x1920, 4.011s, WITH its AAC
-         audio track) — served byte-for-byte as given. Version bumps dodge the
-         immutable 1y cache. */
-      video.src = "assets/lt/minutics_splash.mp4?v=5"; /* bump ?v=N when replacing the file (immutable 1y cache) */
-      video.autoplay = true;
-      video.setAttribute("playsinline", "");
-      video.setAttribute("webkit-playsinline", "");
-      video.preload = "auto";
-      video.loop = false;
-      video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s ease;";
-      splash.appendChild(video);
-    }
+      "display:flex;align-items:center;justify-content:center;" +
+      "transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;";
     if (!splash.parentNode) (document.body || document.documentElement).appendChild(splash);
 
     var dismissed = false;
-    var videoStarted = false;
     function dismiss() {
       if (dismissed) return;
       dismissed = true;
@@ -73,67 +72,64 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     }
     window.__ltSplashDismiss = dismiss;
 
-    video.addEventListener("playing", function () { window.__ltSplashVideoPlaying = true; videoStarted = true; video.style.opacity = "1"; });
-    video.addEventListener("ended", function () {
-      setTimeout(dismiss, 200);
-    });
-    /* Video broken/missing: release quickly — never a dead colour screen,
-       never a stuck splash. */
-    video.addEventListener("error", function () { setTimeout(dismiss, 1200); });
+    /* The CSS animation runs from the first painted frame, so the splash is
+       "playing" the moment it exists — auth's fast-path dropGate treats this
+       exactly like the old video's 'playing' event: it only force-releases a
+       splash that never started. */
+    window.__ltSplashPlaying = true;
 
-    /* Adopted mid-flight: the bootstrap's video may already be playing or
-       finished by the time this bundle evaluates — mirror the state the
-       'playing' / 'ended' listeners would have captured. */
-    if (adopted) {
-      if (video.ended) { videoStarted = true; video.style.opacity = "1"; setTimeout(dismiss, 200); }
-      else if (!video.paused && video.readyState >= 2) { window.__ltSplashVideoPlaying = true; videoStarted = true; video.style.opacity = "1"; }
+    if (audio) {
+      audio.addEventListener("ended", function () { setTimeout(dismiss, 200); });
+      /* Audio broken/missing: release quickly — never a stuck splash. */
+      audio.addEventListener("error", function () { setTimeout(dismiss, 1200); });
+      if (audio.ended) setTimeout(dismiss, 200);
+      if (audio.paused) audio.play().catch(function () {});
     }
+    setTimeout(dismiss, END_MS);
+    setTimeout(dismiss, HARD_MS);
 
-    /* WITH SOUND — this is the user's own export; its audio is part of the
-       intro. Android's WebView allows it (mediaPlaybackRequiresUserGesture
-       is off in MainActivity) so the APK plays sound every time. Desktop
-       browsers HARD-BLOCK autoplay sound before any user gesture (Chrome /
-       Firefox / Safari policy — no code can bypass it): there the video
-       starts muted and the FIRST tap/click/key while the splash is on
-       screen restores the sound for the rest of the clip.
+    /* WITH SOUND — the original intro audio (extracted from the v5 export).
+       Android's WebView allows it (mediaPlaybackRequiresUserGesture is off
+       in MainActivity) so the APK sounds from frame one. Desktop browsers
+       HARD-BLOCK autoplay sound before any user gesture (Chrome / Firefox /
+       Safari policy — no code can bypass it): there run muted and the FIRST
+       tap/click/key while the splash is on screen restores sound mid-clip.
 
-       The adopted element can arrive in a bad state (engine started it
-       muted for attribute-autoplay, or our first play() got rejected once
-       at load time) — a ONE-SHOT play() then latched into the muted
-       fallback with nothing ever retrying sound, which is how the splash
-       audio "stopped coming". ensureAudible() re-asserts audibility while
-       the splash is visible instead of giving up after one attempt. */
+       A ONE-SHOT play() at load can be rejected transiently while the app
+       bundle loads — that latch is how the old splash audio "stopped
+       coming". ensureAudible() re-asserts audibility while the splash is
+       visible instead of giving up after one attempt. */
     var splashAudioDead = false;
     var ensureAudible = function () {
-      if (dismissed || video.ended || splashAudioDead) return;
-      if (video.muted) { video.defaultMuted = false; video.muted = false; }
-      if (video.paused) {
-        video.play().catch(function () {
-          /* Desktop policy rejection: run muted so the visuals still play;
-             the gesture listeners below restore sound on first tap.
-             splashAudioDead stops further un-mute retries (re-muting a
-             policy-blocked video must not oscillate). */
+      if (dismissed || !audio || audio.ended || splashAudioDead) return;
+      if (audio.muted) { audio.defaultMuted = false; audio.muted = false; }
+      if (audio.paused) {
+        audio.play().catch(function () {
+          /* Desktop policy rejection: run muted so the animation (and its
+             timeline) still proceeds; the gesture listeners below restore
+             sound on first tap. splashAudioDead stops further un-mute
+             retries (re-muting a policy-blocked element must not oscillate). */
           splashAudioDead = true;
-          video.defaultMuted = true;
-          video.muted = true;
-          video.play().catch(function () {});
+          audio.defaultMuted = true;
+          audio.muted = true;
+          audio.play().catch(function () {});
         });
       }
     };
     ensureAudible();
-    /* Android WebView (the APK) — gesture requirement is OFF there, so
-       sound is guaranteed every launch: keep re-asserting every 250ms
-       until the splash ends. A single transient rejection during the
-       initial 2.3MB load can no longer freeze the splash in silence. */
+    /* Android WebView (the APK) — gesture requirement is OFF there, so sound
+       is guaranteed every launch: keep re-asserting every 250ms until the
+       splash ends. A single transient rejection during the initial load can
+       no longer freeze the splash in silence. */
     if (/; wv\)/.test(navigator.userAgent)) {
       var audibleTick = setInterval(function () {
-        if (dismissed || video.ended || splashAudioDead) { clearInterval(audibleTick); return; }
+        if (dismissed || !audio || audio.ended || splashAudioDead) { clearInterval(audibleTick); return; }
         ensureAudible();
       }, 250);
     }
     try {
       var unmuteOnGesture = function () {
-        if (!dismissed) { video.defaultMuted = false; video.muted = false; video.play().catch(function () {}); }
+        if (!dismissed && audio) { audio.defaultMuted = false; audio.muted = false; audio.play().catch(function () {}); }
         window.removeEventListener("pointerdown", unmuteOnGesture, true);
         window.removeEventListener("touchstart", unmuteOnGesture, true);
         window.removeEventListener("keydown", unmuteOnGesture, true);
@@ -142,24 +138,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       window.addEventListener("touchstart", unmuteOnGesture, true);
       window.addEventListener("keydown", unmuteOnGesture, true);
     } catch (e) {}
-
-    /* Cream alone is released by MAX_MS; a video that actually started
-       plays through to its natural end (ended → dismiss above), with
-       HARD_MS as the absolute escape hatch. */
-    setTimeout(function () {
-      if (videoStarted) return;
-      /* Still fetching at the 3s mark (slow connection — the download now
-         starts at HTML parse, so this is the rare leftover): give it up to
-         2.5s more instead of cutting away before a single frame plays —
-         HARD_MS remains the absolute cap either way. */
-      var stillComing = !!video && (video.readyState >= 2 || video.networkState === 2);
-      if (stillComing && !video.ended) {
-        setTimeout(function () { if (!videoStarted) dismiss(); }, 2500);
-        return;
-      }
-      dismiss();
-    }, MAX_MS);
-    setTimeout(dismiss, HARD_MS);
   })();
 
   /* ── Storage keys ──────────────────────────────────────────────────────── */

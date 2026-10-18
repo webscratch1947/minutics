@@ -36,7 +36,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'sha256-Gbis4Figzqrit7efIMh4pX2wM8oc1z/Xjfy3+zOoHSo=' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.telegram.org https://api.github.com https://raw.githubusercontent.com; worker-src 'self' blob:; manifest-src 'self'; frame-src 'self'; upgrade-insecure-requests"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'sha256-9kLaq+dX4B8KVivFtqCEDEiVzXyFEWNfkhfyMDxieJw=' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://raw.githubusercontent.com; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://*.googleapis.com https://api.telegram.org https://api.github.com https://raw.githubusercontent.com; worker-src 'self' blob:; manifest-src 'self'; frame-src 'self'; upgrade-insecure-requests"
         }
       ],
       "has": [{ "type": "host", "value": "app.minutics.com" }]

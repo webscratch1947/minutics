@@ -1439,7 +1439,7 @@ onAuthStateChanged(auth, function (user) {
       });
       /* If the splash video never started playing, the branded fallback
          animation has served its purpose — release it so the app shows. */
-      if (!window.__ltSplashVideoPlaying && window.__ltSplashDismiss) {
+      if (!window.__ltSplashPlaying && window.__ltSplashDismiss) {
         window.__ltSplashDismiss();
       }
     };

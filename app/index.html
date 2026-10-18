@@ -27,8 +27,6 @@
     <link rel="icon" type="image/png" href="./favicon.png" />
     <link rel="apple-touch-icon" href="./assets/icons/logo-192.png" />
     <link rel="manifest" href="/manifest.json" />
-    <!-- Video is cached immutable for 1y: bump ?v=N when replacing the file -->
-    <link rel="preload" as="video" href="/assets/lt/minutics_splash.mp4?v=5" type="video/mp4" />
     <meta name="theme-color" content="#1a2140" />
     <!-- Fonts self-hosted (SRI-safe, no third-party request) -->
     <link href="/fonts/inter.css" rel="stylesheet">
@@ -39,40 +37,148 @@
   </head>
   <body>
     <div id="lt-boot-splash"></div>
-    <!-- Splash bootstrap — runs at HTML PARSE: creates the splash + video so
-         the 2.3MB video downloads in parallel with the app bundle. Before,
-         the download only started AFTER the 900KB JS loaded/parsed/ran — on
-         slower connections no frame ever made it before the 3s release
-         ("the splash animation doesn't play sometimes"). The enhancements
-         module adopts these exact elements (styles byte-identical) and owns
-         playback/audio from there — visuals unchanged. -->
+    <!-- Splash: the coded Minutics emblem animation (traced 1:1 from the real
+         logo) with the original intro audio extracted byte-for-byte from the
+         v5 video export (assets/lt/minutics_splash_audio.m4a â€” bump ?v=N on
+         replace, /assets/* is immutable-cached 1y). Static markup paints at
+         HTML PARSE, before the app bundle; the tiny script starts audio where
+         the platform allows it (Android WebView: sound from frame one;
+         desktops block until the first gesture, which the enhancements module
+         restores mid-clip â€” same policy as the video splash). The
+         enhancements module adopts these exact ids and owns dismissal. -->
+    <div id="lt-startup-splash" aria-hidden="true" style="position:fixed;inset:0;z-index:2147483647;background:#FDFBF7;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;">
+      <audio id="lt-startup-splash-audio" src="assets/lt/minutics_splash_audio.m4a?v=1" preload="auto"></audio>
+      <div id="lt-startup-splash-anim" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:7vh 8vw;">
+        <style>
+          @font-face{font-family:'Poppins';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/poppins-700-latin.woff2) format('woff2');}
+          #lt-startup-splash-anim svg{width:100%;height:100%;max-width:min(560px,88vw);max-height:88vh;}
+          #lt-splash-emblem{transform-box:view-box;transform-origin:256px 250px;opacity:0;transform:scale(.88) translateY(10px);animation:ltSp1 .9s cubic-bezier(.18,.86,.28,1) .1s forwards;}
+          @keyframes ltSp1{to{opacity:1;transform:scale(1) translateY(0)}}
+          #lt-hourHand,#lt-minHand{transform-box:view-box;transform-origin:256px 244px;}
+          #lt-hourHand{animation:ltSp2 2.5s cubic-bezier(.2,.7,.2,1) .55s both;}
+          #lt-minHand{animation:ltSp3 2.7s cubic-bezier(.2,.7,.2,1) .55s both;}
+          @keyframes ltSp2{from{transform:rotate(-300deg);}to{transform:rotate(0deg);}}
+          @keyframes ltSp3{from{transform:rotate(-420deg);}to{transform:rotate(0deg);}}
+          .lt-bar{transform-box:fill-box;transform-origin:bottom;animation:ltSp4 .5s cubic-bezier(.2,.75,.25,1) both;}
+          .lt-b1{animation-delay:.35s}.lt-b2{animation-delay:.41s}.lt-b3{animation-delay:.47s}.lt-b4{animation-delay:.53s}
+          .lt-b5{animation-delay:.59s}.lt-b6{animation-delay:.66s}.lt-b7{animation-delay:.73s}.lt-b8{animation-delay:.81s}
+          @keyframes ltSp4{from{transform:scaleY(0);}to{transform:scaleY(1);}}
+          #lt-growthLine{stroke-dasharray:230;stroke-dashoffset:230;animation:ltSp5 .9s cubic-bezier(.35,.6,.3,1) 1.15s both;}
+          @keyframes ltSp5{to{stroke-dashoffset:0;}}
+          .lt-gdot{transform-box:fill-box;transform-origin:center;animation:ltSp6 .32s cubic-bezier(.2,1.5,.4,1) both;}
+          .lt-d1{animation-delay:1.18s}.lt-d2{animation-delay:1.38s}.lt-d3{animation-delay:1.58s}.lt-d4{animation-delay:1.82s}
+          @keyframes ltSp6{from{transform:scale(0);}to{transform:scale(1);}}
+          #lt-growthHead{transform-box:fill-box;transform-origin:30% 90%;animation:ltSp7 .4s cubic-bezier(.2,1.4,.4,1) 2.02s both;}
+          @keyframes ltSp7{from{transform:scale(0) rotate(-30deg);}to{transform:scale(1) rotate(0deg);}}
+          #lt-sheen{animation:ltSp8 1.5s ease-in-out 2.15s both;}
+          @keyframes ltSp8{0%{transform:translateX(-300px) skewX(-18deg);opacity:0;}18%{opacity:.9;}82%{opacity:.9;}100%{transform:translateX(320px) skewX(-18deg);opacity:0;}}
+          #lt-badge{transform-box:fill-box;transform-origin:center;animation:ltSp9 .6s ease 2.5s both;}
+          @keyframes ltSp9{0%{transform:scale(1);}35%{transform:scale(1.09);}70%{transform:scale(.985);}100%{transform:scale(1);}}
+          #lt-wordmark{opacity:0;animation:ltSp10 .7s ease 2.62s both;}
+          @keyframes ltSp10{from{opacity:0;letter-spacing:.32em;}to{opacity:1;letter-spacing:.155em;}}
+          @media (prefers-reduced-motion:reduce){
+            #lt-splash-emblem,#lt-hourHand,#lt-minHand,.lt-bar,#lt-growthLine,.lt-gdot,#lt-growthHead,#lt-badge,#lt-wordmark{animation:none!important;opacity:1!important;transform:none!important;stroke-dashoffset:0!important;}
+            #lt-sheen{animation:none!important;opacity:0!important;}
+          }
+        </style>
+        <svg viewBox="0 0 512 585" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="lt-gNavy" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a2043"/><stop offset="1" stop-color="#012553"/></linearGradient>
+            <linearGradient id="lt-gGreen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#006f47"/><stop offset="1" stop-color="#00523a"/></linearGradient>
+            <linearGradient id="lt-gGold2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d5a44d"/><stop offset="1" stop-color="#c08d35"/></linearGradient>
+            <linearGradient id="lt-gSheen" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+            <clipPath id="lt-ringClip"><path clip-rule="evenodd" fill-rule="evenodd" d="M256,37 A209.5,218 0 1 0 256,473 A209.5,218 0 1 0 256,37 Z M256,60 A187,196 0 1 1 256,452 A187,196 0 1 1 256,60 Z"/></clipPath>
+            <filter id="lt-fBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7"/></filter>
+            <filter id="lt-fSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6"/></filter>
+            <filter id="lt-fArrowShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#7a5a12" flood-opacity="0.28"/></filter>
+          </defs>
+          <g id="lt-splash-emblem">
+            <!-- ground shadow -->
+            <ellipse cx="256" cy="508" rx="152" ry="11" fill="#1a2246" opacity=".10" filter="url(#lt-fBlur)"/>
+        <!-- face (flat white) -->
+        <ellipse cx="256" cy="244" rx="168" ry="177" fill="#ffffff"/>
+        <!-- hairline: filled tapered polygon, open at bottom (kills circle-clock) -->
+        <path d="M308.6,413.9L311.5,412.9L314.2,411.8L317.0,410.7L319.8,409.5L322.4,408.0L325.0,406.6L327.6,405.1L330.2,403.6L332.8,402.1L335.4,400.6L337.9,399.0L340.4,397.4L342.9,395.7L345.3,394.0L347.7,392.2L350.1,390.4L352.4,388.5L354.8,386.8L357.2,385.0L359.6,383.2L361.9,381.3L364.2,379.4L366.3,377.2L368.4,375.1L370.5,372.9L372.5,370.7L374.5,368.4L376.5,366.2L378.5,364.0L380.5,361.7L382.4,359.4L384.3,357.1L386.1,354.7L387.9,352.2L389.6,349.7L391.3,347.2L392.9,344.7L394.5,342.1L396.0,339.5L397.5,336.9L398.9,334.2L400.3,331.6L401.8,328.9L403.2,326.3L404.6,323.6L406.0,320.8L407.3,318.1L408.5,315.3L409.6,312.5L410.7,309.7L411.7,306.8L412.7,303.9L413.7,301.1L414.7,298.2L415.6,295.3L416.5,292.3L417.3,289.4L418.0,286.4L418.7,283.5L419.4,280.5L419.9,277.5L420.5,274.5L421.0,271.4L421.4,268.4L421.8,265.4L422.2,262.3L422.5,259.3L422.8,256.2L423.0,253.2L423.1,250.1L423.2,247.1L423.3,244.0L423.2,240.9L423.2,237.9L423.1,234.8L422.9,231.7L422.7,228.7L422.4,225.6L422.1,222.6L421.8,219.5L421.3,216.5L420.9,213.5L420.4,210.4L419.8,207.4L419.2,204.4L418.5,201.4L417.8,198.5L417.0,195.5L416.2,192.6L415.4,189.6L414.4,186.7L413.5,183.8L412.5,180.9L411.4,178.1L410.3,175.2L409.2,172.4L408.0,169.6L406.7,166.8L405.4,164.0L404.1,161.3L402.7,158.6L401.3,155.9L399.8,153.3L398.3,150.6L396.8,148.0L395.2,145.4L393.6,142.9L391.9,140.3L390.2,137.8L388.4,135.4L386.6,132.9L384.8,130.5L382.9,128.2L381.0,125.8L379.0,123.6L377.1,121.3L375.0,119.1L372.9,116.9L370.8,114.7L368.7,112.6L366.5,110.6L364.3,108.5L362.1,106.5L359.8,104.6L357.5,102.7L355.1,100.8L352.8,99.0L350.3,97.2L347.9,95.5L345.4,93.8L343.0,92.1L340.4,90.5L337.9,89.0L335.3,87.6L332.6,86.2L330.0,84.8L327.3,83.5L324.6,82.3L321.9,81.1L319.2,79.9L316.4,78.8L313.7,77.7L310.9,76.7L308.1,75.8L305.3,74.9L302.4,74.0L299.6,73.2L296.7,72.5L293.9,71.8L291.0,71.1L288.1,70.5L285.2,70.0L282.3,69.5L279.4,69.1L276.5,68.7L273.6,68.3L270.7,68.1L267.7,67.9L264.8,67.7L261.9,67.6L258.9,67.5L256.0,67.5L253.1,67.5L250.1,67.5L247.2,67.6L244.3,67.8L241.3,68.0L238.4,68.2L235.5,68.5L232.6,68.9L229.6,69.3L226.7,69.8L223.8,70.3L220.9,70.9L218.1,71.5L215.2,72.2L212.3,72.9L209.5,73.8L206.7,74.6L203.8,75.6L201.0,76.5L198.3,77.6L195.5,78.6L192.8,79.8L190.0,80.9L187.3,82.2L184.6,83.4L182.0,84.8L179.3,86.1L176.7,87.5L174.1,89.0L171.6,90.5L169.0,92.1L166.5,93.7L164.0,95.3L161.5,97.0L159.1,98.8L156.7,100.6L154.3,102.4L152.0,104.3L149.6,106.2L147.4,108.1L145.1,110.1L142.9,112.2L140.7,114.3L138.6,116.4L136.4,118.6L134.4,120.8L132.3,123.0L130.3,125.3L128.4,127.6L126.5,130.0L124.6,132.4L122.8,134.8L121.0,137.2L119.2,139.7L117.5,142.2L115.8,144.8L114.2,147.4L112.6,150.0L111.1,152.6L109.6,155.3L108.1,158.0L106.7,160.7L105.4,163.5L104.1,166.3L102.9,169.1L101.7,171.9L100.5,174.7L99.4,177.6L98.4,180.5L97.3,183.4L96.4,186.3L95.5,189.3L94.6,192.2L93.8,195.2L93.0,198.2L92.3,201.2L91.6,204.2L91.0,207.2L90.4,210.2L89.9,213.3L89.5,216.3L89.0,219.4L88.7,222.4L88.3,225.5L88.1,228.6L87.9,231.7L87.7,234.7L87.6,237.8L87.5,240.9L87.5,244.0L87.6,247.1L87.7,250.2L87.9,253.2L88.1,256.3L88.4,259.4L88.7,262.5L89.1,265.5L89.5,268.6L90.0,271.6L90.5,274.6L91.1,277.6L91.7,280.7L92.4,283.7L93.1,286.6L93.9,289.6L94.7,292.6L95.5,295.5L96.4,298.4L97.4,301.3L98.4,304.2L99.4,307.1L100.4,310.0L101.5,312.9L102.6,315.7L103.8,318.5L105.1,321.3L106.4,324.0L107.8,326.7L109.2,329.4L110.7,332.1L112.2,334.7L113.7,337.4L115.3,339.9L116.9,342.5L118.6,345.0L120.2,347.6L121.9,350.1L123.7,352.6L125.4,355.0L127.3,357.4L129.0,359.8L130.9,362.3L132.7,364.6L134.6,367.0L136.6,369.3L138.7,371.4L140.9,373.5L143.1,375.6L145.4,377.6L147.6,379.5L149.9,381.6L152.1,383.5L154.4,385.5L156.7,387.4L159.1,389.2L161.5,391.0L163.9,392.8L166.4,394.5L168.9,396.1L171.4,397.8L173.9,399.4L176.4,400.9L179.0,402.5L181.6,403.9L184.3,405.4L186.9,406.8L189.5,408.2L192.2,409.5L194.9,410.8L197.6,412.1L200.5,413.1L203.3,414.1L203.4,413.8L200.6,412.6L197.9,411.3L195.2,410.0L192.6,408.7L190.0,407.3L187.4,405.8L184.8,404.3L182.2,402.7L179.7,401.1L177.3,399.5L174.8,397.8L172.4,396.1L170.0,394.4L167.6,392.6L165.2,390.9L162.9,389.1L160.6,387.2L158.3,385.3L156.1,383.4L153.9,381.4L151.7,379.4L149.6,377.3L147.5,375.2L145.5,373.1L143.4,371.0L141.4,368.8L139.5,366.6L137.6,364.3L135.7,362.0L133.9,359.7L132.1,357.3L130.4,354.9L128.7,352.5L127.0,350.1L125.4,347.6L123.8,345.1L122.3,342.6L120.7,340.1L119.0,337.6L117.5,335.1L116.0,332.6L114.5,330.0L113.1,327.4L111.8,324.7L110.6,322.0L109.4,319.3L108.2,316.6L107.1,313.8L106.0,311.0L105.0,308.2L104.0,305.4L103.1,302.6L102.1,299.8L101.2,297.0L100.3,294.1L99.5,291.3L98.7,288.4L98.0,285.5L97.3,282.6L96.6,279.7L96.0,276.7L95.5,273.8L95.0,270.9L94.5,267.9L94.1,264.9L93.7,262.0L93.4,259.0L93.1,256.0L92.9,253.0L92.7,250.0L92.6,247.0L92.5,244.0L92.5,241.0L92.5,238.0L92.6,235.0L92.8,232.0L93.0,229.0L93.2,226.0L93.5,223.0L93.9,220.0L94.3,217.0L94.7,214.1L95.2,211.1L95.8,208.2L96.4,205.2L97.0,202.3L97.7,199.4L98.4,196.4L99.2,193.5L100.0,190.7L100.9,187.8L101.8,184.9L102.8,182.1L103.8,179.3L104.8,176.5L105.9,173.7L107.1,170.9L108.3,168.2L109.5,165.5L110.8,162.8L112.1,160.1L113.5,157.5L115.0,154.9L116.5,152.3L118.1,149.8L119.7,147.3L121.4,144.8L123.1,142.4L124.8,140.0L126.6,137.6L128.4,135.3L130.2,133.0L132.1,130.7L134.1,128.5L136.0,126.3L138.0,124.1L140.1,122.0L142.1,119.9L144.2,117.9L146.4,115.9L148.6,113.9L150.8,112.0L153.0,110.1L155.3,108.3L157.6,106.5L159.9,104.8L162.3,103.1L164.6,101.4L167.0,99.8L169.5,98.2L171.9,96.7L174.4,95.2L176.9,93.8L179.4,92.3L181.9,91.0L184.5,89.6L187.1,88.3L189.6,87.1L192.3,85.9L194.9,84.8L197.5,83.7L200.2,82.6L202.9,81.6L205.6,80.7L208.3,79.8L211.0,78.9L213.8,78.1L216.5,77.4L219.3,76.7L222.1,76.1L224.9,75.5L227.7,75.0L230.5,74.5L233.3,74.1L236.1,73.7L239.0,73.4L241.8,73.1L244.6,72.9L247.5,72.7L250.3,72.6L253.2,72.5L256.0,72.5L258.8,72.5L261.7,72.6L264.5,72.7L267.4,72.9L270.2,73.1L273.0,73.4L275.9,73.7L278.7,74.1L281.5,74.5L284.3,75.0L287.1,75.6L289.9,76.2L292.7,76.8L295.4,77.5L298.2,78.2L300.9,79.0L303.7,79.9L306.4,80.8L309.1,81.7L311.7,82.8L314.4,83.8L317.0,84.9L319.7,86.0L322.3,87.2L324.9,88.5L327.4,89.8L330.0,91.1L332.5,92.5L335.0,93.9L337.5,95.4L339.9,96.9L342.3,98.5L344.7,100.1L347.1,101.8L349.4,103.5L351.7,105.3L354.0,107.1L356.2,108.9L358.4,110.8L360.6,112.7L362.8,114.7L364.9,116.6L367.0,118.7L369.0,120.8L371.0,122.9L373.0,125.0L375.0,127.2L376.9,129.4L378.7,131.6L380.6,133.9L382.3,136.2L384.1,138.6L385.8,141.0L387.5,143.4L389.1,145.8L390.7,148.3L392.3,150.8L393.8,153.3L395.2,155.9L396.7,158.5L398.1,161.1L399.4,163.7L400.7,166.3L402.0,169.0L403.2,171.7L404.4,174.4L405.5,177.1L406.6,179.9L407.7,182.7L408.7,185.5L409.6,188.3L410.5,191.1L411.4,194.0L412.2,196.8L413.0,199.7L413.7,202.6L414.4,205.5L415.0,208.4L415.6,211.3L416.1,214.3L416.6,217.2L417.0,220.2L417.4,223.1L417.8,226.1L418.0,229.1L418.3,232.0L418.5,235.0L418.6,238.0L418.7,241.0L418.8,244.0L418.7,247.0L418.5,250.0L418.3,253.0L418.1,255.9L417.8,258.9L417.5,261.9L417.1,264.8L416.6,267.8L416.1,270.7L415.5,273.6L415.1,276.6L414.5,279.5L414.0,282.4L413.3,285.3L412.7,288.2L411.9,291.1L411.1,294.0L410.3,296.8L409.4,299.6L408.4,302.4L407.4,305.2L406.3,308.0L405.1,310.7L403.9,313.4L402.7,316.1L401.6,318.8L400.4,321.5L399.2,324.2L397.9,326.8L396.6,329.5L395.2,332.1L393.8,334.7L392.4,337.3L390.9,339.8L389.4,342.4L387.9,344.9L386.3,347.3L384.6,349.8L382.9,352.2L381.2,354.6L379.4,356.9L377.5,359.1L375.5,361.3L373.6,363.5L371.6,365.7L369.7,367.9L367.8,370.1L365.8,372.3L363.8,374.5L361.8,376.6L359.6,378.6L357.5,380.6L355.3,382.6L353.1,384.6L350.9,386.5L348.6,388.4L346.3,390.2L344.0,392.0L341.7,393.8L339.3,395.5L336.9,397.3L334.4,398.9L332.0,400.6L329.5,402.2L326.9,403.7L324.4,405.4L321.9,407.0L319.4,408.6L316.7,409.9L314.0,411.2L311.3,412.4L308.5,413.6" fill="#c69642"/>
+        <!-- clock ticks: 9 needles at measured angles, tick4 short -->
+        <g fill="#c69642">
+          <g id="lt-tickN"><polygon points="253.5,85 258.5,85 255.5,112"/></g>
+          <polygon points="253.5,85 258.5,85 255.5,112" transform="rotate(26.75 256 244)"/>
+          <polygon points="253.5,85 258.5,85 255.5,112" transform="rotate(56.4 256 244)"/>
+          <polygon points="253.5,87 257.5,87 255.5,99" transform="rotate(88.25 256 244)"/>
+          <polygon points="253.5,85 258.5,85 255.5,112" transform="rotate(120.5 256 244)"/>
+          <polygon points="253.5,85 258.5,85 255.5,112" transform="rotate(239.6 256 244)"/>
+          <polygon points="253.5,85 258.5,85 255.5,112" transform="rotate(271.75 256 244)"/>
+          <polygon points="253.5,85 258.5,85 255.5,112" transform="rotate(303.1 256 244)"/>
+          <polygon points="253.5,85 258.5,85 255.5,112" transform="rotate(332.5 256 244)"/>
+        </g>
+        <!-- ring arcs: slanted seam at top-right, green sharp ending; tails taper behind wings -->
+        <path d="M330.5,39.8A209.4,218.5 0 0 1 426,374L424,378 L421,382 L418,386 L416,390 L414,392 L410,396 L408,398 L407,400 L405,402 L403,404 L402,406 L400,408 L398,410 L396,412 L394,414 L392,416 L390,418 L388,420 L386,422 L384,424 L382,426 L379,428 L377,430 L375,432 L372,434 L370,436 L367,438 L365,440 L362,442 L359,444 L356,446 L353,448 L350,450 L347,452 L344,454 L342,456 L344,454 L346,452 L349,450 L351,448 L353,446 L355,444 L357,442 L359,440 L360,438 L362,436 L364,434 L365,432 L367,430 L368,428 L369,426 L371,424 L372,422 L373,420 L374,418 L375,416 L376,414 L377,412 L378,410 L379,408 L379,406 L380,404 L381,402 L381,400 L382,398 L382,396 L384,394 L386,392 L387,390 L389,388 L391,386 L394,382 L397,378 L400,374 L403,370 L406,366 L409,362 L411,358 L414,354 L416,350 L418,346 L420,342 L422,338 L424,334 L425,330A187.4,195.5 0 0 0 313.3,57.9Z" fill="url(#lt-gGreen)"/>
+        <path d="M330.5,39.8A209.4,218.5 0 0 0 86,374L88,378 L91,382 L94,386 L96,390 L98,392 L102,396 L104,398 L105,400 L107,402 L109,404 L110,406 L112,408 L114,410 L116,412 L118,414 L120,416 L122,418 L124,420 L126,422 L128,424 L130,426 L133,428 L135,430 L137,432 L140,434 L142,436 L145,438 L147,440 L150,442 L153,444 L156,446 L159,448 L162,450 L165,452 L168,454 L170,456 L168,454 L166,452 L163,450 L161,448 L159,446 L157,444 L155,442 L153,440 L152,438 L150,436 L148,434 L147,432 L145,430 L144,428 L143,426 L141,424 L140,422 L139,420 L138,418 L137,416 L136,414 L135,412 L134,410 L133,408 L133,406 L132,404 L131,402 L131,400 L130,398 L130,396 L128,394 L126,392 L125,390 L123,388 L121,386 L118,382 L115,378 L112,374 L109,370 L106,366 L103,362 L101,358 L98,354 L96,350 L94,346 L92,342 L90,338 L88,334 L87,330A187.4,195.5 0 0 1 313.3,57.9Z" fill="url(#lt-gNavy)"/>        <!-- sheen (clipped to ring band; drawn over arcs so the sweep is visible) -->
+        <g clip-path="url(#lt-ringClip)">
+          <rect id="lt-sheen" x="96" y="-40" width="90" height="600" fill="url(#lt-gSheen)" filter="url(#lt-fSoft)"/>
+        </g>        <!-- growth bars (measured tops/widths, diagonal cuts on b1/b8) -->
+        <g fill="#006a41">
+          <polygon class="lt-bar lt-b1" points="153,343 172,343 172,386 153,369"/>
+          <rect class="lt-bar lt-b2" x="183" y="332" width="18" height="55"/>
+          <rect class="lt-bar lt-b3" x="211" y="322" width="19" height="65"/>
+          <rect class="lt-bar lt-b4" x="240" y="310" width="18" height="77"/>
+          <rect class="lt-bar lt-b5" x="269" y="298" width="18" height="89"/>
+          <rect class="lt-bar lt-b6" x="297" y="280" width="19" height="107"/>
+          <rect class="lt-bar lt-b7" x="326" y="257" width="19" height="130"/>
+          <polygon class="lt-bar lt-b8" points="355,229 374,229 374,354 355,373"/>
+        </g>
+        <!-- growth line + dots + arrowhead -->
+        <g filter="url(#lt-fArrowShadow)">
+          <path id="lt-growthLine" d="M164,325 L212,307 L254,291 L314,262 L356,216"
+                stroke="#c69642" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path id="lt-growthHead" d="M382,186 L374,218 L351,199 Z" fill="#c69642"/>
+          <circle class="lt-gdot lt-d1" cx="164" cy="325" r="6" fill="#c69642"/>
+          <circle class="lt-gdot lt-d2" cx="212" cy="307" r="6" fill="#c69642"/>
+          <circle class="lt-gdot lt-d3" cx="254" cy="291" r="6" fill="#c69642"/>
+          <circle class="lt-gdot lt-d4" cx="314" cy="262" r="6" fill="#c69642"/>
+        </g>
+        <!-- arrow hands (pivot 256,244) -->
+        <g transform="rotate(313 256 244)">
+          <g id="lt-hourHand">
+            <path d="M247.5,256 L249,150 L243,151 L256,121 L269,151 L263,150 L264.5,256 Z" fill="url(#lt-gNavy)"/>
+          </g>
+        </g>
+        <g transform="rotate(42.4 256 244)">
+          <g id="lt-minHand">
+            <path d="M247,256 L249,125 L242.5,126 L256,90 L269.5,126 L263,125 L265,256 Z" fill="url(#lt-gGreen)"/>
+          </g>
+        </g>
+        <!-- hub -->
+        <circle cx="256" cy="244" r="9.5" fill="#ffffff"/>
+        <circle cx="256" cy="244" r="11.5" stroke="#cd9d44" stroke-width="4" fill="none"/>
+        <circle cx="256" cy="244" r="8" fill="#012553"/>
+        <!-- laurel wings (traced crescent + chevron) -->
+        <g fill="url(#lt-gGold2)">
+          <g id="lt-wingL">
+            <polygon points="132,398 132,399 132,400 133,401 133,402 133,403 134,404 134,405 134,406 135,407 135,408 135,409 136,410 136,411 137,412 137,413 138,414 138,415 139,416 139,417 140,418 140,419 141,420 141,421 142,422 142,423 143,424 144,425 144,426 145,427 146,428 146,429 147,430 148,431 148,432 149,433 150,434 151,435 152,436 152,437 153,438 154,439 155,440 156,441 157,442 158,443 159,444 160,445 161,446 162,447 163,448 164,449 165,450 166,451 168,452 169,453 170,454 171,455 173,456 174,457 176,458 176,459 178,460 180,461 182,462 183,463 185,464 187,465 189,466 191,467 193,468 195,469 197,470 199,471 201,472 204,473 206,474 209,475 211,476 214,477 217,478 221,479 225,480 228,481 229,481 228,480 227,479 225,478 224,477 223,476 222,475 221,474 220,473 219,472 218,471 218,470 217,469 216,468 215,467 213,466 211,465 209,464 207,463 205,462 203,461 202,460 200,459 199,458 197,457 196,456 195,455 193,454 192,453 191,452 190,451 189,450 188,449 187,448 186,447 186,446 185,445 184,444 183,443 183,442 182,441 181,440 181,439 180,438 179,437 179,436 178,435 178,434 177,433 177,432 177,431 176,430 176,429 174,428 172,427 170,426 168,425 166,424 164,423 162,422 161,421 159,420 158,419 156,418 155,417 153,416 152,415 151,414 149,413 148,412 147,411 145,410 144,409 143,408 142,407 141,406 140,405 138,404 137,403 136,402 135,401 134,400 133,399 132,398"/>
+            <polygon points="184,432 185,434 187,436 188,438 190,440 192,442 194,444 197,446 197,448 196,450 198,452 201,454 204,456 208,458 211,460 214,461 213,460 212,458 211,456 210,454 210,452 209,450 209,448 209,446 208,444 208,442 208,440 203,438 196,436 190,434 185,432"/>
+          </g>
+          <use href="#wingL" transform="translate(512,0) scale(-1,1)"/>
+        </g>
+        <!-- badge -->
+        <g id="lt-badge">
+          <circle cx="255.5" cy="440.5" r="39.5" fill="#ffffff" stroke="url(#lt-gGold2)" stroke-width="6"/>
+          <polygon points="234,418.8 234,462.4 242.4,462.4 242.4,439.3 256,450.6 270,439.3 270,462.4 278.4,462.4 278.4,418.8 256,438.5" fill="#012553"/>
+        </g>
+            <!-- wordmark -->
+            <text id="lt-wordmark" x="256" y="552" text-anchor="middle"
+                  font-family="Poppins,Inter,sans-serif" font-weight="700" font-size="46"
+                  letter-spacing="7" fill="#012553">MINUTICS</text>
+          </g>
+        </svg>
+      </div>
+    </div>
     <script>
       (function () {
         try {
-          if (document.getElementById("lt-startup-splash")) return;
-          var s = document.createElement("div");
-          s.id = "lt-startup-splash";
-          s.setAttribute("style", "position:fixed;inset:0;z-index:2147483647;background:#FDFBF7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;");
-          var v = document.createElement("video");
-          v.id = "lt-startup-splash-video";
-          v.src = "assets/lt/minutics_splash.mp4?v=5";
-          v.autoplay = true;
-          v.setAttribute("playsinline", "");
-          v.setAttribute("webkit-playsinline", "");
-          v.preload = "auto";
-          v.loop = false;
-          v.setAttribute("style", "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s ease;");
-          s.appendChild(v);
-          document.body.appendChild(s);
-          /* Programmatic start WITH sound — the exact call the pre-adoption
-             splash used (relying on attribute-autoplay alone let a single
-             blocked/failed start latch into a MUTED fallback nothing ever
-             retried: "the splash audio stopped coming"). Android's WebView
-             allows it immediately (gesture requirement off) so the APK
-             sounds from the first frame; desktop browsers reject it until
-             a gesture and the enhancements module's own play() + first
-             tap/click take over exactly as before. */
-          try { var pr = v.play(); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
+          var a = document.getElementById("lt-startup-splash-audio");
+          var pr = a.play();
+          if (pr && pr.catch) pr.catch(function () {});
         } catch (e) {}
       })();
     </script>
