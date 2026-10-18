@@ -2113,13 +2113,9 @@ function LifeProgressCard({ profile }) {
               jsxs('div', {
                 className: 'flex items-center gap-1.5 shrink-0',
                 children: [
-                  jsxs('span', {
-                    className: 'inline-flex items-baseline gap-1 bg-black/[.04] border border-black/[.14] rounded-full px-2.5 py-1 shrink-0',
-                    children: [
-                      jsx('span', { className: 'text-[12px] font-black tabular-nums leading-none text-foreground', children: curFmt(tvData.rate) }),
-                      jsx('span', { className: 'text-[8px] font-extrabold tracking-widest text-foreground/45', children: '/h' })
-                    ]
-                  }),
+                  /* Hourly-rate chip removed (user request) — the big value
+                     below already carries the money; the header keeps only
+                     the hide button. */
                   jsx(LtMinBtn, { onMinimize: toggleMoneyMin })
                 ]
               })
@@ -2170,6 +2166,43 @@ function LifeProgressCard({ profile }) {
 const LT_DASH_MIN_KEY = 'lt_dash_min_v1';
 const _dashMinListeners = [];
 
+/* Hide/show slide animation (user request): the card slides UP away when
+   hidden and slides back DOWN into place when shown; the thin strip mirrors
+   it (slides down out / in). Exit classes are added by the tap handlers
+   below (the swap happens after the exit finishes); the IN class is added
+   right after React mounts the new element inside ltDashMinToggle. */
+let _ltMinStyleOn = false;
+function ltMinAnimStyle() {
+  if (_ltMinStyleOn || typeof document === 'undefined') return;
+  _ltMinStyleOn = true;
+  const s = document.createElement('style');
+  s.textContent =
+    '@keyframes ltCardIn{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}' +
+    '@keyframes ltStripIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}' +
+    '@keyframes ltCardOut{to{opacity:0;transform:translateY(-16px) scale(.98)}}' +
+    '@keyframes ltStripOut{to{opacity:0;transform:translateY(10px)}}' +
+    '.lt-card-in{animation:ltCardIn .26s cubic-bezier(.22,.61,.36,1)}' +
+    '.lt-strip-in{animation:ltStripIn .22s cubic-bezier(.22,.61,.36,1)}' +
+    '.lt-min-out{animation:ltCardOut .18s ease-in forwards}' +
+    '.lt-strip-out{animation:ltStripOut .15s ease-in forwards}' +
+    '@media (prefers-reduced-motion:reduce){.lt-card-in,.lt-strip-in,.lt-min-out,.lt-strip-out{animation:none!important}}';
+  document.head.appendChild(s);
+}
+
+/* Slide the CURRENT element out, then run the swap (tap-to-hide on a card,
+   tap-to-show on a strip). Double-taps during the ~180ms exit are ignored. */
+let _ltMinBusy = false;
+function ltMinSwap(el, outClass, ms, swap) {
+  ltMinAnimStyle();
+  if (_ltMinBusy) return;
+  if (!el) { swap(); return; }
+  _ltMinBusy = true;
+  el.classList.add(outClass);
+  setTimeout(() => {
+    try { swap(); } finally { setTimeout(() => { _ltMinBusy = false; }, 60); }
+  }, ms);
+}
+
 function ltDashMinRead() {
   try {
     const v = JSON.parse(localStorage.getItem(LT_DASH_MIN_KEY));
@@ -2178,10 +2211,18 @@ function ltDashMinRead() {
 }
 
 function ltDashMinToggle(id) {
+  ltMinAnimStyle();
   const cur = ltDashMinRead();
   cur[id] = !cur[id];
   try { localStorage.setItem(LT_DASH_MIN_KEY, JSON.stringify(cur)); } catch {}
   _dashMinListeners.forEach(fn => { try { fn(); } catch {} });
+  /* The element React just mounted (strip when hiding, card when showing)
+     gets its one-time slide-in — double rAF so the paint already exists. */
+  const move = id === 'timer' ? 'timer.hero' : 'timer.' + id;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const el = document.querySelector('[data-lt-move="' + move + '"]');
+    if (el) el.classList.add(cur[id] ? 'lt-strip-in' : 'lt-card-in');
+  }));
 }
 
 function useDashMin(id) {
@@ -2202,7 +2243,7 @@ function useDashMin(id) {
 function LtMinStrip({ label, detail, onExpand, move, className }) {
   return jsxs('button', {
     type: 'button',
-    onClick: onExpand,
+    onClick: (e) => { ltMinSwap(e.currentTarget, 'lt-strip-out', 150, onExpand); },
     'data-lt-move': move,
     title: 'Expand',
     className: 'flex items-center gap-2 px-4 py-2 bg-white border-2 border-accent/70 rounded-2xl text-left shadow-[0_10px_34px_rgba(15,23,42,0.05)] active:scale-[.995] transition-transform cursor-pointer' + (className ? ' ' + className : ''),
@@ -2235,7 +2276,13 @@ function LtMinStrip({ label, detail, onExpand, move, className }) {
 function LtMinBtn({ onMinimize }) {
   return jsx('button', {
     type: 'button',
-    onClick: (e) => { e.stopPropagation(); onMinimize(); },
+    onClick: (e) => {
+      e.stopPropagation();
+      /* Slide the card up+out first, then swap to the strip (which slides
+         in) — see ltMinSwap in the dashboard-minimize section. */
+      const card = e.currentTarget.closest('[data-lt-move]');
+      ltMinSwap(card, 'lt-min-out', 180, onMinimize);
+    },
     title: 'Hide card',
     'aria-label': 'Hide card',
     className: 'shrink-0 w-6 h-6 rounded-full bg-foreground/[0.06] border border-foreground/10 flex items-center justify-center text-foreground/50 hover:bg-foreground/10 active:scale-95 transition cursor-pointer',
