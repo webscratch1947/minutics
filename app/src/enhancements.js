@@ -65,7 +65,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     function dismiss() {
       if (dismissed) return;
       dismissed = true;
-      removeHint();
       splash.style.opacity = "0";
       setTimeout(function () {
         if (splash.parentNode) splash.parentNode.removeChild(splash);
@@ -81,65 +80,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     /* Natural-end release: counts from START or from the last RESTARTED run
        (see resyncAnimWithAudio below). */
-    var endTimer = setTimeout(endOrHold, END_MS);
-    var hardTimer = setTimeout(dismiss, HARD_MS);
-
-    /* ── Tap-to-start hold (desktop / mobile BROWSERS only) ─────────────────
-       Browsers hard-block audible autoplay before a first gesture — no code
-       can bypass it. Without this hold the splash ran silently and was gone
-       in 4.4s, so anyone who didn't tap WITHIN that window heard the jingle
-       never ("it doesn't have the audio"). Now: when sound was blocked, the
-       splash HOLDS on the settled emblem with a "Tap anywhere for sound"
-       hint; the first tap starts the jingle from 0 AND replays the whole
-       animation in lockstep (explicit restart in unmuteOnGesture below). A
-       silent user is never trapped: the hold auto-releases after HOLD_MS.
-       EVERY load where sound is blocked gets this chance — no once-per-tab
-       skip, or a hard-refresh would silently fall back to the old bug.
-       Android WebView (the APK) never blocks, so it never holds. */
-    var HOLD_MS = 4500;
-    var holdMode = false;
-    var tapStartSeen = false;
-    var hintEl = null;
-    function showHint() {
-      if (hintEl || dismissed) return;
-      hintEl = document.createElement("div");
-      hintEl.textContent = "\u266A Tap anywhere for sound";
-      hintEl.style.cssText =
-        "position:absolute;left:50%;bottom:4.5vh;transform:translateX(-50%);" +
-        "font:600 12.5px/1 Inter,system-ui,sans-serif;letter-spacing:.04em;color:#012553;" +
-        "background:rgba(255,255,255,.86);border:1px solid rgba(1,37,83,.14);border-radius:999px;" +
-        "padding:9px 16px;box-shadow:0 6px 18px rgba(1,37,83,.10);pointer-events:none;" +
-        "opacity:0;transition:opacity .35s ease;z-index:1;white-space:nowrap;";
-      splash.appendChild(hintEl);
-      requestAnimationFrame(function () { requestAnimationFrame(function () {
-        if (hintEl) hintEl.style.opacity = "1";
-      }); });
-    }
-    function removeHint() {
-      if (!hintEl) return;
-      var h = hintEl; hintEl = null;
-      h.style.opacity = "0";
-      setTimeout(function () { if (h.parentNode) h.parentNode.removeChild(h); }, 350);
-    }
-    function enterHold() {
-      if (dismissed || holdMode || tapStartSeen) return;
-      holdMode = true;
-      showHint();
-      /* During the hold the splash SWALLOWS taps — a "tap for sound" must
-         not fall through (pointer-events:none) and click an invisible
-         auth-gate button underneath. The window capture listener below
-         still fires either way. */
-      splash.style.pointerEvents = "auto";
-      clearTimeout(endTimer);
-      clearTimeout(hardTimer);          /* escape hatch re-armed for the hold */
-      hardTimer = setTimeout(dismiss, HOLD_MS);
-    }
-    function endOrHold() {
-      /* Sound never became audible and nobody tapped yet → hold with the
-         hint instead of dismissing into a jingle-less session. */
-      if (splashAudioDead && !tapStartSeen) { enterHold(); return; }
-      dismiss();
-    }
+    var endTimer = setTimeout(dismiss, END_MS);
+    setTimeout(dismiss, HARD_MS);
 
     /* Sound arriving LATE — desktops hard-block autoplay until a gesture, and
        on some launches even muted autoplay is blocked, so the clip sits at 0
@@ -184,9 +126,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     if (audio) {
       audio.addEventListener("play", resyncAnimWithAudio);
-      /* Natural end (muted desktop run included) — hold for a tap-to-sound
-         chance instead of dismissing into silence. */
-      audio.addEventListener("ended", function () { setTimeout(endOrHold, 200); });
+      audio.addEventListener("ended", function () { setTimeout(dismiss, 200); });
       /* Audio broken/missing: release quickly — never a stuck splash. */
       audio.addEventListener("error", function () { setTimeout(dismiss, 1200); });
       if (audio.ended) setTimeout(dismiss, 200);
@@ -234,30 +174,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     }
     try {
       var unmuteOnGesture = function () {
-        tapStartSeen = true;
-        removeHint();
-        splash.style.pointerEvents = "none";  /* replay behaves like the normal run */
-        if (!dismissed && audio) {
-          /* After a hold the clip has already ENDED muted: restart it AND the
-             whole splash animation explicitly from frame one — never rely on
-             play()'s ended-restart timing to fire the 'play' resync. A tap
-             mid-clip (no hold) keeps the original restore-mid-clip behavior. */
-          if (audio.ended) {
-            try { audio.currentTime = 0; } catch (e) {}
-            var anim = document.getElementById("lt-startup-splash-anim");
-            if (anim && anim.classList) {
-              anim.classList.add("run");
-              void anim.offsetWidth;            /* forced style pass */
-              anim.classList.remove("run");     /* every animation replays */
-            }
-            clearTimeout(endTimer);                  /* natural end counts from */
-            endTimer = setTimeout(dismiss, END_MS);  /* the restarted run */
-          }
-          audio.defaultMuted = false; audio.muted = false;
-          audio.play().catch(function () {});
-        }
-        clearTimeout(hardTimer);          /* the natural end (re-armed by */
-        hardTimer = setTimeout(dismiss, HARD_MS); /* the resync) governs now */
+        if (!dismissed && audio) { audio.defaultMuted = false; audio.muted = false; audio.play().catch(function () {}); }
         window.removeEventListener("pointerdown", unmuteOnGesture, true);
         window.removeEventListener("touchstart", unmuteOnGesture, true);
         window.removeEventListener("keydown", unmuteOnGesture, true);
