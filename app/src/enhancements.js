@@ -8688,9 +8688,15 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     if (existing) existing.remove();
     var modal = document.createElement("div");
     modal.id = "lt-plans-modal";
-    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(16,18,35,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:22px;font-family:'Inter',sans-serif;animation:ltDmOvIn .2s ease;";
     modal.innerHTML =
-      '<div style="width:100%;max-width:370px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);padding:26px 22px 20px;text-align:center">' +
+      '<style>' +
+        '@keyframes ltDmIn{from{opacity:0;transform:translateY(16px) scale(.95)}to{opacity:1;transform:none}}' +
+        '@keyframes ltDmOvIn{from{opacity:0}to{opacity:1}}' +
+        '#lt-demo-card{animation:ltDmIn .24s cubic-bezier(.2,.9,.3,1.15)}' +
+        '@media (prefers-reduced-motion:reduce){#lt-demo-card,#lt-plans-modal{animation:none}}' +
+      '</style>' +
+      '<div id="lt-demo-card" style="width:100%;max-width:370px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);padding:26px 22px 20px;text-align:center">' +
         '<span style="display:inline-block;padding:4px 12px;border-radius:999px;background:linear-gradient(135deg,#FCD34D,#F59E0B);color:#78350F;font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase">Early Access Demo</span>' +
         '<p style="color:hsl(230 40% 16%);font-size:20px;font-weight:800;margin:12px 0 6px">Premium is free for 30 minutes</p>' +
         '<p style="color:hsl(220 10% 50%);font-size:13.5px;line-height:1.55;margin:0 0 18px">This is an Early Access Demo. Your demo account gets every premium feature free for 30 minutes — when the timer runs out, the account and all of its data are deleted. Start a new demo anytime.</p>' +
@@ -8713,15 +8719,30 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     if (existing) existing.remove();
     var modal = document.createElement("div");
     modal.id = "lt-plans-modal";
-    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
+    /* Same presentation language as showUpgradePrompt (the popup users see
+       on gated Life Hub tiles / Telegram) — slide-up card + backdrop fade,
+       icon medallion, and a real "Not now" button instead of bare text
+       (user feedback: "it didn't have the animation and not now isn't a
+       button it is a text"). */
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(16,18,35,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:22px;font-family:'Inter',sans-serif;animation:ltUcOvIn .2s ease;";
     modal.innerHTML =
-      '<div style="width:100%;max-width:370px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);padding:26px 22px 20px;text-align:center">' +
-        '<span style="display:inline-block;padding:4px 12px;border-radius:999px;background:linear-gradient(135deg,#FCD34D,#F59E0B);color:#78350F;font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase">Early Access</span>' +
-        '<p style="color:hsl(230 40% 16%);font-size:20px;font-weight:800;margin:12px 0 6px">The app is under construction</p>' +
-        '<p style="color:hsl(220 10% 50%);font-size:13.5px;line-height:1.55;margin:0 0 18px">You can\u2019t use premium features here yet. Log out and create a demo account to use premium \u2014 every premium feature is free for 30 minutes.</p>' +
-        '<button id="lt-uc-demo" style="width:100%;background:linear-gradient(135deg,#4F46E5 0%,#9333EA 100%);border:none;color:#fff;padding:14px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;border-radius:999px;box-shadow:0 14px 30px -14px rgba(99,102,241,.85);margin-bottom:8px">Use Demo Account 30 Minute</button>' +
-        '<button id="lt-uc-logout" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:#DC2626;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:999px;margin-bottom:4px">Log out</button>' +
-        '<button id="lt-uc-close" style="width:100%;background:transparent;border:none;color:#8A8578;padding:11px 0 0;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>' +
+      '<style>' +
+        '@keyframes ltUcIn{from{opacity:0;transform:translateY(16px) scale(.95)}to{opacity:1;transform:none}}' +
+        '@keyframes ltUcOvIn{from{opacity:0}to{opacity:1}}' +
+        '#lt-uc-card{animation:ltUcIn .24s cubic-bezier(.2,.9,.3,1.15)}' +
+        '@media (prefers-reduced-motion:reduce){#lt-uc-card,#lt-plans-modal{animation:none}}' +
+      '</style>' +
+      '<div id="lt-uc-card" style="width:100%;max-width:330px;background:#fff;border-radius:26px;padding:26px 22px 18px;text-align:center;box-shadow:0 24px 60px rgba(8,10,25,.4);position:relative;overflow:hidden">' +
+        '<div style="position:absolute;inset:0 0 auto;height:130px;background:linear-gradient(180deg,rgba(252,211,77,.22),rgba(255,255,255,0));pointer-events:none"></div>' +
+        '<div style="position:relative;width:58px;height:58px;margin:0 auto 13px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#FCD34D,#F59E0B);box-shadow:0 10px 22px rgba(245,158,11,.4)">' +
+          '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>' +
+        '</div>' +
+        '<div style="position:relative;display:inline-block;padding:4px 11px;border-radius:999px;background:linear-gradient(135deg,#FCD34D,#F59E0B);color:#78350F;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px">Early Access</div>' +
+        '<p style="position:relative;color:#111;font-size:17px;font-weight:900;margin:0 0 7px;letter-spacing:-.01em">The app is under construction</p>' +
+        '<p style="position:relative;color:#6E6A5E;font-size:13.5px;line-height:1.5;margin:0 auto 18px;max-width:252px">You can\u2019t use premium features here yet. Log out and create a demo account to use premium \u2014 every premium feature is free for 30 minutes.</p>' +
+        '<button id="lt-uc-demo" style="position:relative;width:100%;background:linear-gradient(135deg,#4F46E5 0%,#9333EA 100%);border:none;color:#fff;padding:14px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;border-radius:999px;box-shadow:0 14px 30px -14px rgba(99,102,241,.85);margin-bottom:9px">Use Demo Account 30 Minute</button>' +
+        '<button id="lt-uc-logout" style="position:relative;width:100%;background:#fff;border:1px solid hsl(220 13% 85%);color:#DC2626;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:999px;margin-bottom:9px">Log out</button>' +
+        '<button id="lt-uc-close" style="position:relative;width:100%;background:#F4F2EC;border:1px solid rgba(17,17,20,.08);color:#57534E;padding:12px 0;font-size:13.5px;font-weight:800;cursor:pointer;font-family:inherit;border-radius:999px">Not now</button>' +
       '</div>';
     var host = activeOverlay && document.body.contains(activeOverlay) ? activeOverlay : document.body;
     host.appendChild(modal);
