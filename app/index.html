@@ -38,16 +38,15 @@
   <body>
     <div id="lt-boot-splash"></div>
     <!-- Splash: the coded Minutics emblem animation (traced 1:1 from the real
-         logo) with the original intro audio extracted byte-for-byte from the
-         v5 video export (assets/lt/minutics_splash_audio.m4a â€” bump ?v=N on
-         replace, /assets/* is immutable-cached 1y). Static markup paints at
+         logo) with the user's own Canva intro jingle (assets/lt/minutics_splash_audio.m4a
+         â€" bump ?v=N on replace, /assets/* is immutable-cached 1y). Static markup paints at
          HTML PARSE, before the app bundle; the tiny script starts audio where
          the platform allows it (Android WebView: sound from frame one;
          desktops block until the first gesture, which the enhancements module
-         restores mid-clip â€” same policy as the video splash). The
+         restores mid-clip). The
          enhancements module adopts these exact ids and owns dismissal. -->
     <div id="lt-startup-splash" aria-hidden="true" style="position:fixed;inset:0;z-index:2147483647;background:#FDFBF7;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;">
-      <audio id="lt-startup-splash-audio" src="assets/lt/minutics_splash_audio.m4a?v=1" preload="auto"></audio>
+      <audio id="lt-startup-splash-audio" src="assets/lt/minutics_splash_audio.m4a?v=2" preload="auto"></audio>
       <div id="lt-startup-splash-anim" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:7vh 8vw;">
         <style>
           @font-face{font-family:'Poppins';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/poppins-700-latin.woff2) format('woff2');}

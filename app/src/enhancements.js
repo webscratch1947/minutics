@@ -42,9 +42,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       splash.setAttribute("aria-hidden", "true");
       audio = document.createElement("audio");
       audio.id = "lt-startup-splash-audio";
-      /* ?v=1: audio extracted byte-for-byte from the v5 splash export —
+      /* ?v=2: Canva intro jingle (user's own file), converted byte-accurately
+         to AAC/m4a with a +5dB peak-safe boost (their export peaked at
+         -6.6dB — quiet on phone speakers; now -1.9dB, no clipping).
          bump ?v=N when replacing the file (immutable 1y cache on /assets/*). */
-      audio.src = "assets/lt/minutics_splash_audio.m4a?v=1";
+      audio.src = "assets/lt/minutics_splash_audio.m4a?v=2";
       audio.preload = "auto";
       splash.appendChild(audio);
       /* The full animation markup ships ONLY in index.html; this path fires
