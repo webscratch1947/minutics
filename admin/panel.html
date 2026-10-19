@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Minutics — Admin</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="/fonts/marketing.css" rel="stylesheet">
+<style>
+  :root{
+    --cream:#F6F1E7; --paper:#FCFAF4; --ink:#1D1A15; --ink-soft:#6E6656;
+    --ink-faint:#A79E8C; --brass:#BF8A2D; --brass-deep:#8B6321; --brass-light:#DABC8A;
+    --hairline:#E4DCC8; --hairline-2:#DACFB4; --green:#0E6B47; --rust:#9C4B34;
+    --navy:#0B2E5C;
+    --display:'Fraunces', ui-serif, Georgia, serif;
+    --body:'Inter', ui-sans-serif, system-ui, sans-serif;
+    --mono:'JetBrains Mono', ui-monospace, Menlo, monospace;
+    --ease:cubic-bezier(.16,.84,.32,1);
+  }
+  *{box-sizing:border-box}
+  html,body{min-height:100%}
+  body{
+    margin:0; background:var(--cream); color:var(--ink); font-family:var(--body);
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit}
+  .mono{font-family:var(--mono)}
+
+  /* ── shared brand ── */
+  .brand{display:flex; align-items:center; gap:11px}
+  .brand .dot{
+    width:26px; height:26px; border-radius:50%; flex:none;
+    background:radial-gradient(circle at 32% 30%, var(--brass), var(--brass-deep));
+    box-shadow:0 0 0 1px var(--hairline-2); position:relative;
+  }
+  .brand .dot::after{
+    content:""; position:absolute; left:50%; top:50%; width:2px; height:9px;
+    background:var(--paper); transform-origin:bottom center;
+    transform:translate(-50%,-100%) rotate(38deg); border-radius:2px;
+  }
+  .brand .name{font-family:var(--display); font-size:20px; font-weight:500; letter-spacing:.01em}
+  .brand .tag{
+    font-family:var(--mono); font-size:9.5px; letter-spacing:.18em; color:var(--brass-deep);
+    border:1px solid var(--hairline-2); background:rgba(191,138,45,.08);
+    padding:3px 8px; border-radius:999px; text-transform:uppercase;
+  }
+
+  /* ── login view ── */
+  .center{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px}
+  .login-card{
+    width:100%; max-width:400px; background:var(--paper); border:1px solid var(--hairline);
+    border-radius:24px; padding:34px 32px 30px; box-shadow:0 24px 60px rgba(29,26,21,.07);
+  }
+  .login-card .brand{justify-content:center; margin-bottom:8px}
+  .login-sub{
+    text-align:center; color:var(--ink-soft); font-size:13.5px; line-height:1.6;
+    margin:10px 0 24px;
+  }
+  .field{display:block; margin-bottom:16px}
+  .field span{
+    display:block; font-family:var(--mono); font-size:10.5px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--brass-deep); margin-bottom:7px;
+  }
+  .field input{
+    width:100%; font-family:var(--body); font-size:15px; color:var(--ink);
+    background:var(--cream); border:1px solid var(--hairline-2); border-radius:12px;
+    padding:13px 14px; outline:none; transition:border-color .2s ease, background .2s ease;
+  }
+  .field input:focus{border-color:var(--brass); background:#fff}
+  .err{
+    background:rgba(156,75,52,.09); border:1px solid rgba(156,75,52,.3); color:var(--rust);
+    font-size:13px; border-radius:10px; padding:10px 12px; margin:0 0 14px; line-height:1.45;
+  }
+  .primary{
+    width:100%; background:var(--ink); color:var(--paper); border:none; cursor:pointer;
+    font-size:15px; font-weight:600; border-radius:999px; padding:14px 20px;
+    transition:background .25s ease, transform .3s var(--ease);
+  }
+  .primary:hover{background:var(--brass-deep)}
+  .primary:active{transform:scale(.985)}
+  .primary[disabled]{opacity:.55; cursor:default}
+  .login-foot{
+    text-align:center; font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--ink-faint); margin-top:18px;
+  }
+
+  /* ── dashboard ── */
+  .topbar{
+    position:sticky; top:0; z-index:10; display:flex; align-items:center; justify-content:space-between;
+    gap:16px; padding:14px clamp(16px,4vw,36px); background:rgba(246,241,231,.92);
+    backdrop-filter:blur(8px); border-bottom:1px solid var(--hairline);
+  }
+  .top-actions{display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-end}
+  #updated{font-size:11px; color:var(--ink-faint); letter-spacing:.05em}
+  .btn-ghost{
+    background:transparent; border:1px solid var(--hairline-2); color:var(--ink-soft);
+    font-size:13px; font-weight:600; border-radius:999px; padding:9px 16px; cursor:pointer;
+    transition:border-color .2s ease, color .2s ease, background .2s ease;
+  }
+  .btn-ghost:hover{border-color:var(--ink); color:var(--ink); background:var(--paper)}
+  .btn-solid{
+    background:var(--ink); border:1px solid var(--ink); color:var(--paper);
+    font-size:13px; font-weight:600; border-radius:999px; padding:9px 16px; cursor:pointer;
+    transition:background .25s ease;
+  }
+  .btn-solid:hover{background:var(--brass-deep); border-color:var(--brass-deep)}
+
+  main{max-width:1180px; margin:0 auto; padding:26px clamp(16px,4vw,36px) 60px}
+  .banner{
+    background:rgba(191,138,45,.1); border:1px solid rgba(191,138,45,.35);
+    color:var(--brass-deep); font-size:13.5px; line-height:1.55;
+    border-radius:14px; padding:12px 16px; margin-bottom:20px;
+  }
+  .banner.bad{background:rgba(156,75,52,.08); border-color:rgba(156,75,52,.35); color:var(--rust)}
+
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:26px}
+  @media (max-width:900px){ .stats{grid-template-columns:repeat(2,1fr)} }
+  .stat{
+    background:var(--paper); border:1px solid var(--hairline); border-radius:18px;
+    padding:18px 18px 16px; position:relative; overflow:hidden;
+  }
+  .stat::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+    background:linear-gradient(var(--brass), var(--brass-light));
+  }
+  .stat .k{
+    font-family:var(--mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+  .stat .v{
+    font-family:var(--display); font-size:34px; font-weight:500; line-height:1.15;
+    margin-top:8px; font-variant-numeric:tabular-nums;
+  }
+  .stat .v small{font-size:15px; color:var(--ink-soft); font-family:var(--body); font-weight:500}
+
+  .panel{
+    background:var(--paper); border:1px solid var(--hairline); border-radius:20px;
+    margin-bottom:22px; overflow:hidden;
+  }
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:16px 20px; border-bottom:1px solid var(--hairline); flex-wrap:wrap;
+  }
+  .panel-head h2{
+    font-family:var(--display); font-size:19px; font-weight:500; margin:0;
+  }
+  .panel-head .count{
+    font-family:var(--mono); font-size:10.5px; color:var(--brass-deep); letter-spacing:.1em;
+    margin-left:8px; vertical-align:middle;
+  }
+  #userSearch{
+    font-family:var(--body); font-size:13.5px; color:var(--ink); background:var(--cream);
+    border:1px solid var(--hairline-2); border-radius:999px; padding:9px 15px;
+    outline:none; width:220px; transition:border-color .2s ease;
+  }
+  #userSearch:focus{border-color:var(--brass)}
+  .tablewrap{overflow-x:auto}
+  table{width:100%; border-collapse:collapse; font-size:13.5px}
+  th{
+    text-align:left; font-family:var(--mono); font-size:9.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--ink-faint); font-weight:500;
+    padding:11px 20px; border-bottom:1px solid var(--hairline); white-space:nowrap;
+  }
+  td{
+    padding:12px 20px; border-bottom:1px solid var(--hairline); color:var(--ink-soft);
+    vertical-align:top; white-space:nowrap;
+  }
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover td{background:rgba(191,138,45,.05)}
+  td.email{color:var(--ink); font-weight:500; max-width:300px; overflow:hidden; text-overflow:ellipsis}
+  .chip{
+    display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+    text-transform:uppercase; border-radius:999px; padding:3px 9px;
+    border:1px solid var(--hairline-2); color:var(--ink-soft); background:var(--cream);
+  }
+  .chip.on{color:var(--green); border-color:rgba(14,107,71,.4); background:rgba(14,107,71,.07)}
+  .chip.off{color:var(--ink-faint)}
+  .uid{font-family:var(--mono); font-size:11px; color:var(--ink-faint)}
+  .empty{
+    padding:34px 20px; text-align:center; color:var(--ink-faint); font-size:14px;
+    line-height:1.6; white-space:normal;
+  }
+  .foot{
+    text-align:center; font-family:var(--mono); font-size:10px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--ink-faint); margin-top:30px;
+  }
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+
+<!-- ─── login ─── -->
+<div class="center" id="loginView" hidden>
+  <div class="login-card">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="name">Minutics</span>
+      <span class="tag">Admin</span>
+    </div>
+    <p class="login-sub">Private control room — users, plans and purchases.<br>Authorized accounts only.</p>
+    <form id="loginForm" novalidate>
+      <label class="field"><span>Email</span>
+        <input id="email" type="email" autocomplete="username" spellcheck="false" required>
+      </label>
+      <label class="field"><span>Password</span>
+        <input id="password" type="password" autocomplete="current-password" required>
+      </label>
+      <div class="err" id="loginError" hidden></div>
+      <button class="primary" id="loginBtn" type="submit">Open the panel</button>
+    </form>
+    <div class="login-foot">Session stays open for 7 days</div>
+  </div>
+</div>
+
+<!-- ─── dashboard ─── -->
+<div id="dashView" hidden>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="name">Minutics</span>
+      <span class="tag">Admin</span>
+    </div>
+    <div class="top-actions">
+      <span id="updated" class="mono"></span>
+      <button class="btn-solid" id="refreshBtn" type="button">↻ Refresh</button>
+      <button class="btn-ghost" id="logoutBtn" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="banner" id="warnings" hidden></div>
+
+    <section class="stats" aria-label="Overview">
+      <div class="stat"><div class="k">Total users</div><div class="v" id="statUsers">—</div></div>
+      <div class="stat"><div class="k">Active plans</div><div class="v" id="statPlans">—</div></div>
+      <div class="stat"><div class="k">Purchases</div><div class="v" id="statPurchases">—</div></div>
+      <div class="stat"><div class="k">Recorded revenue</div><div class="v" id="statRevenue">—</div></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Users <span class="count" id="usersCount"></span></h2>
+        <input id="userSearch" type="search" placeholder="Filter by email or ID…" autocomplete="off">
+      </div>
+      <div class="tablewrap" id="usersWrap">
+        <table>
+          <thead><tr><th>Email</th><th>Joined</th><th>Last active</th><th>Plan</th><th>Status</th><th>UID</th></tr></thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="usersEmpty" hidden>No users yet — sign-ups land here as soon as the new login system is switched on.</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Purchases <span class="count" id="purchasesCount"></span></h2>
+      </div>
+      <div class="tablewrap" id="purchasesWrap">
+        <table>
+          <thead><tr><th>User</th><th>When</th><th>Plan</th><th>Amount</th><th>Status</th></tr></thead>
+          <tbody id="purchasesBody"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="purchasesEmpty" hidden>No purchases recorded yet.</p>
+    </section>
+
+    <div class="foot">Ledger read live from AWS · Session expires after 7 days</div>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var API = "/api/admin";
+  var $ = function (id) { return document.getElementById(id); };
+  var loginView = $("loginView"), dashView = $("dashView");
+  var rows = { users: [], purchases: [] };
+
+  function show(el, on) { if (on) el.removeAttribute("hidden"); else el.setAttribute("hidden", ""); }
+
+  async function call(query, opts) {
+    var res = await fetch(API + (query || ""), opts || {});
+    var body = null;
+    try { body = await res.json(); } catch (e) { body = null; }
+    return { status: res.status, body: body };
+  }
+
+  function showLogin(msg) {
+    show(loginView, true); show(dashView, false);
+    var err = $("loginError");
+    if (msg) { err.textContent = msg; show(err, true); } else { show(err, false); }
+  }
+
+  function showDash() { show(loginView, false); show(dashView, true); }
+
+  /* ── formatting (textContent only — never innerHTML) ── */
+  function fmtDate(v) {
+    if (v === null || v === undefined || v === "") return "—";
+    var d;
+    if (typeof v === "number") d = new Date(v < 1e12 ? v * 1000 : v);
+    else { d = new Date(v); if (isNaN(d.getTime())) return String(v).slice(0, 19); }
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function fmtMoney(item) {
+    var raw, keys = ["amount", "price", "total", "value"], i;
+    for (i = 0; i < keys.length; i++) if (typeof item[keys[i]] === "number") { raw = item[keys[i]]; break; }
+    if (raw === undefined) {
+      for (i = 0; i < keys.length; i++) if (item[keys[i]] !== undefined && item[keys[i]] !== null) return String(item[keys[i]]);
+      return "—";
+    }
+    var cur = typeof item.currency === "string" && /^[A-Za-z]{3}$/.test(item.currency) ? item.currency.toUpperCase() : null;
+    try {
+      return cur
+        ? new Intl.NumberFormat(undefined, { style: "currency", currency: cur, maximumFractionDigits: 2 }).format(raw)
+        : new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(raw);
+    } catch (e) { return String(raw); }
+  }
+
+  function shortUid(uid) {
+    var s = String(uid === null || uid === undefined ? "" : uid);
+    if (!s) return "—";
+    return s.length > 14 ? s.slice(0, 11) + "…" : s;
+  }
+
+  function td(text, cls) {
+    var cell = document.createElement("td");
+    cell.textContent = text;
+    if (cls) cell.className = cls;
+    return cell;
+  }
+
+  function chip(text, kind) {
+    var wrap = document.createElement("span");
+    wrap.className = "chip" + (kind ? " " + kind : "");
+    wrap.textContent = text;
+    var cell = document.createElement("td");
+    cell.appendChild(wrap);
+    return cell;
+  }
+
+  function planKind(plan, status) {
+    var FREE = { "": 1, free: 1, none: 1, trial: 1 };
+    var p = String(plan || "").toLowerCase();
+    var s = String(status || "");
+    if (FREE[p]) return "off";
+    if (s && /expired|cancelled|canceled|inactive|refunded/i.test(s)) return "off";
+    return "on";
+  }
+
+  /* ── render ── */
+  function renderStats(stats) {
+    $("statUsers").textContent = Number(stats.totalUsers || 0).toLocaleString();
+    $("statPlans").textContent = Number(stats.activePlans || 0).toLocaleString();
+    $("statPurchases").textContent = Number(stats.purchases || 0).toLocaleString();
+    var rev = Number(stats.revenue || 0);
+    $("statRevenue").textContent = rev.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+
+  function renderWarnings(list, isError) {
+    var el = $("warnings");
+    if (!list || !list.length) { show(el, false); return; }
+    el.textContent = list.join("  ·  ");
+    el.className = "banner" + (isError ? " bad" : "");
+    show(el, true);
+  }
+
+  function renderUsers() {
+    var q = $("userSearch").value.trim().toLowerCase();
+    var body = $("usersBody");
+    while (body.firstChild) body.removeChild(body.firstChild);
+    var shown = 0;
+    rows.users.forEach(function (u) {
+      if (!u || typeof u !== "object") return;
+      var email = String(u.email || u.username || "—");
+      var uid = String(u.uid || u.sub || u.id || "");
+      if (q && email.toLowerCase().indexOf(q) === -1 && uid.toLowerCase().indexOf(q) === -1) return;
+      shown++;
+      var tr = document.createElement("tr");
+      tr.appendChild(td(email, "email"));
+      tr.appendChild(td(fmtDate(u.createdAt || u.created || u.joinedAt)));
+      tr.appendChild(td(fmtDate(u.lastLoginAt || u.lastSeen || u.lastLogin)));
+      var plan = String(u.plan || "");
+      tr.appendChild(chip(plan || "free", planKind(plan, u.planStatus)));
+      var status = String(u.planStatus || (plan && planKind(plan) === "on" ? "active" : ""));
+      tr.appendChild(chip(status || "—", status ? planKind(plan, status) : ""));
+      tr.appendChild(td(shortUid(uid), "uid"));
+      body.appendChild(tr);
+    });
+    $("usersCount").textContent = rows.users.length ? "(" + rows.users.length + ")" : "";
+    var empty = rows.users.length === 0 || shown === 0;
+    show($("usersWrap"), !empty);
+    var p = $("usersEmpty");
+    if (empty) {
+      p.textContent = rows.users.length === 0
+        ? "No users yet — sign-ups land here as soon as the new login system is switched on."
+        : "No users match that filter.";
+      show(p, true);
+    } else show(p, false);
+  }
+
+  function renderPurchases() {
+    var body = $("purchasesBody");
+    while (body.firstChild) body.removeChild(body.firstChild);
+    var byUid = {};
+    rows.users.forEach(function (u) {
+      if (u && (u.uid || u.sub)) byUid[String(u.uid || u.sub)] = String(u.email || "");
+    });
+    rows.purchases.forEach(function (p) {
+      if (!p || typeof p !== "object") return;
+      var uid = String(p.uid || p.userId || p.user || "");
+      var who = String(p.email || byUid[uid] || uid || "—");
+      var tr = document.createElement("tr");
+      tr.appendChild(td(who, "email"));
+      tr.appendChild(td(fmtDate(p.purchasedAt || p.at || p.createdAt)));
+      tr.appendChild(td(String(p.plan || "—")));
+      tr.appendChild(td(fmtMoney(p)));
+      var status = String(p.status || p.planStatus || "");
+      tr.appendChild(chip(status || "—", status && !/fail|refund|error|cancel/i.test(status) ? "on" : ""));
+      body.appendChild(tr);
+    });
+    $("purchasesCount").textContent = rows.purchases.length ? "(" + rows.purchases.length + ")" : "";
+    var empty = rows.purchases.length === 0;
+    show($("purchasesWrap"), !empty);
+    show($("purchasesEmpty"), empty);
+  }
+
+  /* ── data ── */
+  async function loadData(opts) {
+    opts = opts || {};
+    if (opts.silent !== true) $("refreshBtn").disabled = true;
+    try {
+      var r = await call("?action=data");
+      if (r.status === 401) { showLogin(); return false; }
+      if (!r.body || !r.body.ok) {
+        renderWarnings([(r.body && r.body.error) || "Could not load the ledger."], true);
+        return false;
+      }
+      rows.users = Array.isArray(r.body.users) ? r.body.users : [];
+      rows.purchases = Array.isArray(r.body.purchases) ? r.body.purchases : [];
+      renderStats(r.body.stats || {});
+      renderWarnings(r.body.warnings, false);
+      renderUsers();
+      renderPurchases();
+      $("updated").textContent = "Updated " + new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      return true;
+    } catch (e) {
+      renderWarnings(["The server could not be reached. Try Refresh in a moment."], true);
+      return false;
+    } finally {
+      $("refreshBtn").disabled = false;
+    }
+  }
+
+  /* ── actions ── */
+  $("loginForm").addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    var btn = $("loginBtn"), err = $("loginError");
+    show(err, false);
+    btn.disabled = true; btn.textContent = "Checking…";
+    try {
+      var r = await call("", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "login", email: $("email").value, password: $("password").value })
+      });
+      if (r.status === 200 && r.body && r.body.ok) {
+        $("password").value = "";
+        showDash();
+        await loadData();
+      } else {
+        err.textContent = (r.body && r.body.error) || "Wrong email or password.";
+        show(err, true);
+      }
+    } catch (e) {
+      err.textContent = "The server could not be reached.";
+      show(err, true);
+    } finally {
+      btn.disabled = false; btn.textContent = "Open the panel";
+    }
+  });
+
+  $("logoutBtn").addEventListener("click", async function () {
+    try { await call("", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) }); } catch (e) {}
+    rows = { users: [], purchases: [] };
+    showLogin();
+  });
+
+  $("refreshBtn").addEventListener("click", function () { loadData(); });
+  $("userSearch").addEventListener("input", renderUsers);
+
+  /* ── boot ── */
+  (async function boot() {
+    try {
+      var r = await call("?action=state");
+      if (r.body && r.body.authed) { showDash(); await loadData({ silent: true }); return; }
+    } catch (e) {}
+    showLogin();
+  })();
+})();
+</script>
+</body>
+</html>

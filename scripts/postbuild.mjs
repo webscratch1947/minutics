@@ -94,5 +94,9 @@ if (target === "piapp") {
   // (Legacy sw.js copy removed — only firebase-messaging-sw.js is registered.)
   copy(join(appOutDir, 'firebase-messaging-sw.js'), join(outDir, 'firebase-messaging-sw.js'));
 
+  // Admin panel pages (admin.minutics.com) — static, self-contained files
+  // served via middleware rewrites: /admin/panel.html + /admin/error.html.
+  copyDir(join(projectRoot, 'admin'), join(outDir, 'admin'));
+
   console.log('[postbuild] Normal app postbuild complete');
 }
