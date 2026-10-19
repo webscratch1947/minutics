@@ -2166,55 +2166,13 @@ function LifeProgressCard({ profile }) {
 const LT_DASH_MIN_KEY = 'lt_dash_min_v1';
 const _dashMinListeners = [];
 
-/* Hide/show slide animation (user request): the card slides UP away when
-   hidden and slides back DOWN into place when shown; the thin strip mirrors
-   it (slides down out / in). Exit classes are added by the tap handlers
-   below (the swap happens after the exit finishes); the IN class is applied
-   by ltDashMinToggle BEFORE the new element's first paint (MutationObserver
-   microtask), so the entering element never shows a stray un-animated frame.
-
-   Motion design (v3 — user feedback on v2: "the hide and show for timer page
-   it is bad bro what is that animation"): v2 used an ease-IN exit curve, which
-   crawls for the first ~180ms — after a tap NOTHING visibly happens, then the
-   whole move + fade dumps into the last ~60ms (a flicker, not a slide), and
-   the strip-out had the same dead start. v3 flips every curve to ease-OUT:
-   visible motion from the FIRST frame after the tap (the card lifts ~30px
-   while still fully opaque within 50ms), the fade only carries the tail, and
-   the entering element ramps opacity faster (full by ~45% instead of a long
-   invisible start) so there is no empty flash frame on swap. Distances stay
-   real (card ±46px, strip ±22px); durations tighten (out .2s / strip .14s)
-   so the swap lands while the motion still reads as one gesture. */
-let _ltMinStyleOn = false;
-function ltMinAnimStyle() {
-  if (_ltMinStyleOn || typeof document === 'undefined') return;
-  _ltMinStyleOn = true;
-  const s = document.createElement('style');
-  s.textContent =
-    '@keyframes ltCardIn{from{opacity:0;transform:translateY(-26px) scale(.985)}45%{opacity:1}to{opacity:1;transform:none}}' +
-    '@keyframes ltStripIn{from{opacity:0;transform:translateY(-16px)}50%{opacity:1}to{opacity:1;transform:none}}' +
-    '@keyframes ltCardOut{0%{opacity:1;transform:none}60%{opacity:1;transform:translateY(-30px)}to{opacity:0;transform:translateY(-46px) scale(.985)}}' +
-    '@keyframes ltStripOut{0%{opacity:1;transform:none}60%{opacity:1;transform:translateY(14px)}to{opacity:0;transform:translateY(22px)}}' +
-    '.lt-card-in{animation:ltCardIn .22s cubic-bezier(.16,.84,.44,1)}' +
-    '.lt-strip-in{animation:ltStripIn .18s cubic-bezier(.16,.84,.44,1)}' +
-    '.lt-min-out{animation:ltCardOut .2s cubic-bezier(.16,.84,.44,1) forwards}' +
-    '.lt-strip-out{animation:ltStripOut .14s cubic-bezier(.16,.84,.44,1) forwards}' +
-    '@media (prefers-reduced-motion:reduce){.lt-card-in,.lt-strip-in,.lt-min-out,.lt-strip-out{animation:none!important}}';
-  document.head.appendChild(s);
-}
-
-/* Slide the CURRENT element out, then run the swap (tap-to-hide on a card,
-   tap-to-show on a strip). Double-taps during the ~140-200ms exit are ignored. */
-let _ltMinBusy = false;
-function ltMinSwap(el, outClass, ms, swap) {
-  ltMinAnimStyle();
-  if (_ltMinBusy) return;
-  if (!el) { swap(); return; }
-  _ltMinBusy = true;
-  el.classList.add(outClass);
-  setTimeout(() => {
-    try { swap(); } finally { setTimeout(() => { _ltMinBusy = false; }, 60); }
-  }, ms);
-}
+/* Hide/show = TELEPORT (user request v4): tap and the card is simply there
+   or gone on that very frame — no slide, no fade, no delay. v1–v3 tried
+   slide animations (v3 eased every curve out so motion started on the tap);
+   the user's verdict: "just remove the slide animation just like teleport
+   ok it is better". So the exit/enter classes, keyframes and the ~140-200ms
+   swap timers are gone: the tap handlers call the toggle directly and the
+   React re-render itself IS the transition. */
 
 function ltDashMinRead() {
   try {
@@ -2224,42 +2182,11 @@ function ltDashMinRead() {
 }
 
 function ltDashMinToggle(id) {
-  ltMinAnimStyle();
   const cur = ltDashMinRead();
   cur[id] = !cur[id];
   try { localStorage.setItem(LT_DASH_MIN_KEY, JSON.stringify(cur)); } catch {}
-  /* The element React just mounts (strip when hiding, card when showing)
-     must carry its slide-in class from its VERY FIRST PAINT. The old
-     double-rAF version added the class one frame later, so the new element
-     painted a single un-animated frame first — the "flash of how it looked
-     before it got hidden" the user saw. A MutationObserver callback runs as
-     a microtask right after React's DOM commit, before the browser paints,
-     so the first frame is already inside the animation. */
-  const move = id === 'timer' ? 'timer.hero' : 'timer.' + id;
-  const cls = cur[id] ? 'lt-strip-in' : 'lt-card-in';
-  const oldEl = document.querySelector('[data-lt-move="' + move + '"]'); // node being swapped OUT
-  let done = false;
-  let obs = null;
-  const applyIn = () => {
-    if (done) return;
-    const el = document.querySelector('[data-lt-move="' + move + '"]');
-    if (!el || el === oldEl) return;   // still the exiting node — wait for the swap
-    if (!el.classList.contains(cls)) el.classList.add(cls);
-    done = true;
-    if (obs) { obs.disconnect(); obs = null; }
-  };
-  if (typeof MutationObserver !== 'undefined') {
-    obs = new MutationObserver(applyIn);
-    obs.observe(document.documentElement, { childList: true, subtree: true });
-    /* Safety net: if the swap never mounts a matching element (e.g. the card
-       isn't rendered on this screen), stop observing after a beat. */
-    setTimeout(() => {
-      if (obs) { obs.disconnect(); obs = null; }
-      applyIn();                       /* last chance with the final DOM state */
-    }, 400);
-  } else {
-    requestAnimationFrame(() => requestAnimationFrame(applyIn));
-  }
+  /* No animation classes, no MutationObserver dance — React re-renders the
+     card<->strip swap immediately and that IS the whole transition. */
   _dashMinListeners.forEach(fn => { try { fn(); } catch {} });
 }
 
@@ -2281,7 +2208,7 @@ function useDashMin(id) {
 function LtMinStrip({ label, detail, onExpand, move, className }) {
   return jsxs('button', {
     type: 'button',
-    onClick: (e) => { ltMinSwap(e.currentTarget, 'lt-strip-out', 140, onExpand); },
+    onClick: () => { onExpand(); },
     'data-lt-move': move,
     title: 'Expand',
     className: 'flex items-center gap-2 px-4 py-2 bg-white border-2 border-accent/70 rounded-2xl text-left shadow-[0_10px_34px_rgba(15,23,42,0.05)] active:scale-[.995] transition-transform cursor-pointer' + (className ? ' ' + className : ''),
@@ -2316,10 +2243,8 @@ function LtMinBtn({ onMinimize }) {
     type: 'button',
     onClick: (e) => {
       e.stopPropagation();
-      /* Slide the card up+out first, then swap to the strip (which slides
-         in) — see ltMinSwap in the dashboard-minimize section. */
-      const card = e.currentTarget.closest('[data-lt-move]');
-      ltMinSwap(card, 'lt-min-out', 200, onMinimize);
+      /* TELEPORT: the card becomes its strip (and back) instantly on tap. */
+      onMinimize();
     },
     title: 'Hide card',
     'aria-label': 'Hide card',
