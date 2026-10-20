@@ -58,15 +58,17 @@ var _logoutInProgress = false; /* a real signOut() is in flight (set by
 /* ── Early Access Demo ───────────────────────────────────────────────────
    DEMO_MODE=true is the shipped Early Access Demo of the web app: the
    login/register gate offers a 30-minute premium demo account whose data
-   is fully wiped when the timer runs out. Real Firebase register/login
-   still works, but while demo mode is on, free accounts can't buy a plan
-   (the paywall shows an "under construction — use the demo" notice).
+   is fully wiped when the timer runs out. Real Cognito register/login
+   works alongside it, and every account can open the plan chooser and
+   "purchase" a plan — the checkout is test mode (fake card, no money,
+   nothing charged) and simply activates the plan on the device; the old
+   "under construction — use the demo" paywall is gone.
    To end the early-access period, flip DEMO_MODE to false: the demo
-   button disappears, the paywall sells normally, and the next time a real
-   account signs in on a browser that ever ran a demo (the
-   lt_early_access_demo_v1 marker survives every wipe; it is a flag, not
-   user data) that account is granted a free Lifetime plan — demo data
-   itself is never imported into real accounts. ─────────────────────────── */
+   button disappears, and the next time a real account signs in on a
+   browser that ever ran a demo (the lt_early_access_demo_v1 marker
+   survives every wipe; it is a flag, not user data) that account is
+   granted a free Lifetime plan — demo data itself is never imported
+   into real accounts. ─────────────────────────────────────────────────── */
 var DEMO_MODE = true;
 var DEMO_SESSION_KEY = "lt-demo-session-started";
 /* Sliding renewal stamp (activity pushed it forward). Kept separate from
