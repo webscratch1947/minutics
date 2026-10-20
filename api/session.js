@@ -300,8 +300,15 @@ export default async function handler(req, res) {
   if (!ddbGuard()) {
     /* AWS keys not configured yet (admin panel shows its own banner for
        this): answer honestly so the client stops enforcing instead of
-       kicking devices or looping. Auth itself is unaffected. */
-    res.status(200).json({ ok: true, device: null, claimed: false, degraded: true });
+       kicking devices or looping. Auth itself is unaffected.
+       "why" tells the owner's next "why isn't it saving?" report exactly
+       which piece is missing — booleans only, never a secret. */
+    res.status(200).json({
+      ok: true, device: null, claimed: false, degraded: true,
+      why: "missing-aws-env",
+      hasKeyId: !!process.env.AWS_ACCESS_KEY_ID,
+      hasSecret: !!process.env.AWS_SECRET_ACCESS_KEY,
+    });
     return;
   }
 
@@ -421,7 +428,13 @@ export default async function handler(req, res) {
     res.status(200).json({ ok: true, device: deviceId || prevDevice || null, claimed });
   } catch (e) {
     console.error("session/dynamo failed:", e && e.message);
-    /* Never punish the client for a ledger hiccup — auth still works. */
-    res.status(200).json({ ok: true, device: null, claimed: false, degraded: true });
+    /* Never punish the client for a ledger hiccup — auth still works.
+       "why" surfaces the root cause to the caller instead of hiding it
+       (error name + truncated message only — never credentials). */
+    res.status(200).json({
+      ok: true, device: null, claimed: false, degraded: true,
+      why: ((e && e.name) || "Error") + ": " + String((e && e.message) || "").slice(0, 160),
+      region: process.env.AWS_REGION || "ap-south-1(default)",
+    });
   }
 }

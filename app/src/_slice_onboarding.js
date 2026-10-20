@@ -42,13 +42,15 @@ function SheetPicker({ title, display, value, options, onPick }) {
     type: "button",
     "aria-haspopup": "listbox",
     onClick: () => setOpen(true),
-    className: "flex-1 flex items-center justify-between gap-1.5 bg-[#F5F6F8] border border-black/10 text-gray-900 text-base font-bold rounded-xl px-3 py-3 min-w-0 active:bg-white active:border-[#157347] transition-colors",
+    /* Value centred in the box (user request: values were hugging the far
+       left with dead space on the right); the chevron stays pinned right. */
+    className: "relative flex-1 flex items-center justify-center gap-1.5 bg-[#F5F6F8] border border-black/10 text-gray-900 text-base font-bold rounded-xl px-3 py-3 min-w-0 active:bg-white active:border-[#157347] transition-colors",
     children: [
       jsx("span", { className: "truncate", children: display }),
       jsx("svg", {
         width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "#6b7280",
         strokeWidth: 2.6, strokeLinecap: "round", strokeLinejoin: "round",
-        className: "shrink-0",
+        className: "shrink-0 absolute right-3",
         children: jsx("path", { d: "m6 9 6 6 6-6" })
       })
     ]
