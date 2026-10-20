@@ -193,7 +193,7 @@ export default async function handler(req, res) {
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
   body = body || {};
   const deviceId = typeof body.deviceId === "string" ? body.deviceId.trim() : "";
-  const mode = body.mode === "check" ? "check" : "claim";
+  const mode = body.mode === "check" ? "check" : body.mode === "plan" ? "plan" : "claim";
 
   /* ── Legacy Firebase claim path (old APKs): unchanged behavior ─────── */
   if (!cognitoPayload) {
@@ -253,6 +253,24 @@ export default async function handler(req, res) {
         }));
       } catch { /* heartbeat must never fail the check */ }
       res.status(200).json({ ok: true, device: item && item.deviceId ? item.deviceId : null });
+      return;
+    }
+
+    /* plan: this device reports the plan it activated (purchases are
+       device-local by design — this ledger write is what the admin panel
+       shows). Unknown values collapse to "free"; no deviceId involved. */
+    if (mode === "plan") {
+      const PLAN_IDS = ["free", "basic", "yearly", "lifetime", "pro"];
+      let plan = typeof body.plan === "string" ? body.plan.toLowerCase() : "free";
+      if (!PLAN_IDS.includes(plan)) plan = "free";
+      await docClient().send(new UpdateCommand({
+        TableName: TABLE,
+        Key: { pk: sub },
+        UpdateExpression: "SET email = :e, plan = :p, updatedAt = :t, #ifn = if_not_exists(#ifn, :t)",
+        ExpressionAttributeValues: { ":e": email, ":p": plan, ":t": now },
+        ExpressionAttributeNames: { "#ifn": "createdAt" },
+      }));
+      res.status(200).json({ ok: true, plan });
       return;
     }
 

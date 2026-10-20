@@ -405,6 +405,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     /* Plans are stored only on this device. Cancellation immediately returns
        this device to the free plan; no account/server subscription is shared. */
     setPlan("free");
+    /* Keep the admin ledger honest about the cancel too (fire-and-forget). */
+    try { if (window.LTAuth && window.LTAuth.syncPlan) window.LTAuth.syncPlan("free"); } catch (e) {}
   }
   function showCancelSubscriptionDialog(onConfirm) {
     var existing = document.getElementById("lt-cancel-subscription-dialog");
@@ -8627,6 +8629,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     modal.id = "lt-plans-modal";
     modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
     modal.innerHTML =
+      '<style>' +
+        '@keyframes ltPlOvIn{from{opacity:0}to{opacity:1}}' +
+        '@keyframes ltPlIn{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}' +
+        '#lt-plans-modal,#lt-checkout-modal{animation:ltPlOvIn .2s ease}' +
+        '#lt-plans-card,#lt-checkout-card{animation:ltPlIn .26s cubic-bezier(.2,.9,.3,1.15)}' +
+        '@media (prefers-reduced-motion:reduce){#lt-plans-modal,#lt-plans-card,#lt-checkout-modal,#lt-checkout-card{animation:none}}' +
+      '</style>' +
       '<div style="width:100%;max-width:520px;background:linear-gradient(180deg,#f8f7f4,#fff);border-radius:20px;box-shadow:0 25px 60px -12px rgba(0,0,0,.25);display:flex;flex-direction:column;max-height:90vh" id="lt-plans-card">' +
         '<div style="text-align:center;margin-bottom:16px;padding:32px 28px 0;flex-shrink:0">' +
           '<p style="color:hsl(230 40% 16%);font-size:22px;font-weight:800;margin:0 0 4px">' + (isPro() ? "Your " + getPlanName() + " Plan" : "Choose your plan") + '</p>' +
@@ -8735,11 +8744,18 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     modal.id = "lt-checkout-modal";
     modal.style.cssText = "position:fixed;inset:0;z-index:2147483648;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'Inter',sans-serif;";
     modal.innerHTML =
-      '<style>#lt-checkout-modal #lt-checkout-cancel-btn{background:#DC2626!important;color:#fff!important;border:none!important;border-radius:12px;font-weight:700}</style>' +
+      '<style>' +
+        '#lt-checkout-modal #lt-checkout-cancel-btn{background:#DC2626!important;color:#fff!important;border:none!important;border-radius:12px;font-weight:700}' +
+        '@keyframes ltPlOvIn{from{opacity:0}to{opacity:1}}' +
+        '@keyframes ltPlIn{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}' +
+        '#lt-checkout-modal{animation:ltPlOvIn .2s ease}' +
+        '#lt-checkout-card{animation:ltPlIn .26s cubic-bezier(.2,.9,.3,1.15)}' +
+        '@media (prefers-reduced-motion:reduce){#lt-checkout-modal,#lt-checkout-card{animation:none}}' +
+      '</style>' +
       '<div style="width:100%;max-width:340px;background:#fff;border:1px solid rgba(17,17,20,.08);padding:26px;border-radius:24px;box-shadow:0 24px 60px -12px rgba(0,0,0,.35)" id="lt-checkout-card">' +
         '<p style="display:inline-block;padding:3px 10px;border-radius:999px;background:#FEF3C7;color:#92400E;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:0 0 10px">Minutics ' + plan.label + '</p>' +
-        '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px"><span style="text-decoration:line-through;color:hsl(220 10% 68%);font-size:17px;font-weight:600;margin-right:9px">' + plan.price + '</span>Free</p>' +
-        '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 22px">Early Access test mode \u2014 nothing is charged. Budget Tracker, Telegram reports, full history & more</p>' +
+        '<p style="color:hsl(230 40% 16%);font-size:26px;font-weight:800;margin:0 0 2px">' + plan.price + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + plan.sub + '</span></p>' +
+        '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 22px">Budget Tracker, Telegram reports, full history & more</p>' +
         '<div id="lt-checkout-body">' +
           '<div style="background:hsl(220 15% 97%);border:1px solid hsl(220 13% 88%);padding:12px 14px;border-radius:12px;margin-bottom:10px">' +
             '<p style="color:hsl(220 10% 50%);font-size:10px;font-weight:700;text-transform:uppercase;margin:0 0 4px">Card number</p>' +
@@ -8755,7 +8771,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
               '<p style="color:hsl(230 40% 16%);font-size:14px;margin:0">•••</p>' +
             '</div>' +
           '</div>' +
-          '<button id="lt-checkout-pay-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px">Activate \u2014 Free</button>' +
+          '<button id="lt-checkout-pay-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px">Pay ' + plan.price + '</button>' +
           '<button id="lt-checkout-cancel-btn" class="lt-cancel-btn" style="width:100%;background:transparent;border:none;color:#DC2626;padding:10px;font-size:12px;cursor:pointer;margin-top:6px;font-family:inherit">Cancel</button>' +
           '<p style="color:hsl(220 10% 68%);font-size:9px;text-align:center;margin:10px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
@@ -8783,14 +8799,16 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         body.innerHTML =
           '<div style="text-align:center;padding:16px 0">' +
             '<div style="font-size:38px;margin-bottom:10px">\u2705</div>' +
-            '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Plan activated \u2014 free</p>' +
-            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\u2019re now on Minutics ' + plan.label + ' \u2014 enjoy premium.</p>' +
+            '<p style="color:hsl(230 40% 16%);font-size:15px;font-weight:800;margin:0 0 4px">Payment successful</p>' +
+            '<p style="color:hsl(220 10% 50%);font-size:12px;margin:0 0 20px">You\u2019re now on Minutics ' + plan.label + '</p>' +
             '<button id="lt-checkout-done-btn" style="width:100%;background:hsl(230 40% 16%);border:none;color:#fff;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px">Done</button>' +
           '</div>';
         document.getElementById("lt-checkout-done-btn").addEventListener("click", function () {
           modal.remove();
           setPlan(planId);
           refreshPlanGatedUI();
+          /* Report the purchase to the admin ledger (fire-and-forget) — silent offline. */
+          try { if (window.LTAuth && window.LTAuth.syncPlan) window.LTAuth.syncPlan(planId); } catch (e) {}
         });
       }, 1400);
     });

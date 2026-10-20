@@ -225,6 +225,52 @@ function claimSessionNow() {
   _sessionPost({ deviceId: getDeviceId(), mode: "claim" }).catch(function () { /* offline — lands on the next successful login */ });
 }
 
+/* The plan lives on the device (localStorage) by design; this reports it
+   to the ledger row so the admin panel shows the real plan instead of
+   "free". Silent by design: offline / degraded server / missing keys skip
+   quietly — the next successful sign-in retries. Demo sessions never
+   report: their throwaway 30-minute Lifetime grant would pollute the
+   ledger with fake purchases. */
+function syncPlanNow(plan) {
+  try {
+    var p = String(plan || "free").toLowerCase();
+    if (["free", "basic", "yearly", "lifetime", "pro"].indexOf(p) === -1) p = "free";
+    if (window.LTDemo && window.LTDemo.isActive && window.LTDemo.isActive()) return Promise.resolve(null);
+    return _sessionPost({ mode: "plan", plan: p });
+  } catch (e) { return Promise.resolve(null); }
+}
+
+function readLocalPlan() {
+  try { return String(JSON.parse(localStorage.getItem("lt_plan_v1") || '"free"') || "free"); }
+  catch (e) { return "free"; }
+}
+
+/* Some accounts (created outside the sign-up form) carry a generated
+   UUID username, and an ID token may have no email claim — so the address
+   is read straight from the account's attributes and remembered
+   (lt_auth_email) for Settings. Asynchronous, fire-and-forget: Settings
+   re-reads currentUser() on mount and on its short refresh loop, so the
+   e-mail appears as soon as this lands. */
+function syncCogEmail() {
+  try {
+    if (!_cogUser || !_cogUser.getUserAttributes) return;
+    _cogUser.getUserAttributes(function (err, attrs) {
+      try {
+        if (err || !attrs || !attrs.length) return;
+        var em = "";
+        for (var i = 0; i < attrs.length; i++) {
+          var a = attrs[i];
+          if (a && a.getName && a.getName() === "email") { em = a.getValue() || ""; break; }
+        }
+        if (/.+@.+\..+/.test(em)) {
+          rememberAuthEmail(em);
+          if (_cogCurrentUser && !_cogCurrentUser.email) _cogCurrentUser.email = em;
+        }
+      } catch (e) {}
+    });
+  } catch (e) {}
+}
+
 function forceLogoutSingleSession() {
   stopSessionWatch();
   _logoutInProgress = true;
@@ -656,6 +702,8 @@ window.LTAuth = {
     if (!_cogCurrentUser) return Promise.resolve(null);
     return _cogCurrentUser.getIdToken(!!force);
   },
+  /* Report this device's plan to the admin ledger (fire-and-forget). */
+  syncPlan: function (plan) { return syncPlanNow(plan); },
   /* Permanently delete the signed-in Cognito account. The session's own
      access token authorizes the delete — no server round-trip and no AWS
      keys needed. Resolves when Cognito confirms; the caller wipes local
@@ -1852,6 +1900,9 @@ function handleAuthUser(user) {
       maybeAskNotificationPermission();
     }
     try { startSessionWatch(); } catch (e) {}
+    /* Fill the real e-mail (attribute fetch — covers UUID-username accounts       whose ID token has no email claim) and report this device's plan to       the admin ledger, so the panel shows the purchased plan, not "free". */
+    try { syncCogEmail(); } catch (e) {}
+    try { syncPlanNow(readLocalPlan()); } catch (e) {}
     /* A genuine sign-in transition (the login gate was actually on screen
        a moment ago) must land on the Timer home screen — the router's URL
        was left wherever it was when the user logged out. On a normal page
