@@ -27,7 +27,7 @@
 
 import { setCors } from "../lib/cors.js";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import crypto from "node:crypto";
 
 /* ── Cognito pool identity (public values, verified against the token) ── */
@@ -261,7 +261,15 @@ export default async function handler(req, res) {
           ExpressionAttributeValues: { ":t": now },
         }));
       } catch { /* heartbeat must never fail the check */ }
-      res.status(200).json({ ok: true, device: item && item.deviceId ? item.deviceId : null });
+      res.status(200).json({
+        ok: true,
+        device: item && item.deviceId ? item.deviceId : null,
+        /* The subscription rides along on every check so a paid plan heals
+           (or is restored) within seconds of app open even if the one-shot
+           sign-in reconcile was missed. */
+        plan: item && typeof item.plan === "string" ? item.plan : null,
+        planSince: item && item.planSince ? item.planSince : null,
+      });
       return;
     }
 
@@ -284,7 +292,11 @@ export default async function handler(req, res) {
        shows and what plan-get restores after a storage wipe). Unknown
        values collapse to "free"; planSince records when the plan changed
        (kept across repeated reports of the same plan so expiry math stays
-       correct across devices/wipes). No deviceId involved. */
+       correct across devices/wipes). No deviceId involved.
+       NOTE: "plan" is a DynamoDB RESERVED WORD — it MUST be aliased
+       (#plan) in the expression or every write dies with a
+       ValidationException that the catch below would swallow as
+       "degraded" (that is exactly how purchases silently never saved). */
     if (mode === "plan") {
       const PLAN_IDS = ["free", "basic", "yearly", "lifetime", "pro"];
       let plan = typeof body.plan === "string" ? body.plan.toLowerCase() : "free";
@@ -297,12 +309,32 @@ export default async function handler(req, res) {
         TableName: TABLE,
         Key: { pk: sub },
         UpdateExpression:
-          "SET email = :e, plan = :p, updatedAt = :t" +
+          "SET email = :e, #plan = :p, updatedAt = :t" +
           (changed ? ", planSince = :t" : ", planSince = if_not_exists(planSince, :t)") +
           ", #ifn = if_not_exists(#ifn, :t)",
         ExpressionAttributeValues: { ":e": email, ":p": plan, ":t": now },
-        ExpressionAttributeNames: { "#ifn": "createdAt" },
+        ExpressionAttributeNames: { "#plan": "plan", "#ifn": "createdAt" },
       }));
+      /* An actual activation also lands in the Purchases ledger (what the
+         admin panel's Purchases card reads) — best-effort: the plan write
+         above is what matters, a receipt must never fail the response. */
+      if (changed && plan !== "free") {
+        try {
+          const PURCHASES_TABLE = process.env.AWS_TABLE_PURCHASES || "MinuticsPurchases";
+          const AMOUNTS = { basic: 1, yearly: 9, lifetime: 99, pro: 99 };
+          const purchaseId = "purchase#" + sub + "#" + now;
+          await docClient().send(new PutCommand({
+            TableName: PURCHASES_TABLE,
+            Item: {
+              pk: purchaseId, id: purchaseId, uid: sub, userId: sub,
+              email, plan, amount: AMOUNTS[plan] || 0,
+              purchasedAt: now, createdAt: now, status: "paid",
+            },
+          }));
+        } catch (e) {
+          console.error("purchase receipt failed (plan itself saved):", e && e.message);
+        }
+      }
       res.status(200).json({
         ok: true,
         plan,

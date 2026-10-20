@@ -255,11 +255,16 @@ function readLocalPlan() {
      • AWS has nothing paid but this device has one → push the device's
        purchase up (heals accounts bought before the ledger existed).
      • degraded/offline server → keep the device's plan; never destroy it. */
-function reconcilePlanWithServer() {
+function reconcilePlanWithServer(payload) {
   try {
     if (window.LTDemo && window.LTDemo.isActive && window.LTDemo.isActive()) return Promise.resolve(null);
-    return _sessionPost({ mode: "plan-get" }).then(function (d) {
+    /* Called with a check/plan-get payload (which already carries the
+       ledger's plan) or alone → asks for plan-get. Responses from servers
+       that predate the plan feature have no "plan" key → nothing to do. */
+    var got = payload ? Promise.resolve(payload) : _sessionPost({ mode: "plan-get" });
+    return got.then(function (d) {
       if (!d || !d.ok || d.degraded) return null;
+      if (!("plan" in d)) return null;
       var server = typeof d.plan === "string" ? d.plan : "";
       var local = readLocalPlan();
       if (server && server !== "free") {
@@ -326,6 +331,10 @@ function checkSessionClaim() {
   if (!_cogCurrentUser) return;
   _sessionPost({ mode: "check" }).then(function (d) {
     if (!d || d.degraded) return; /* degraded server — never kick, never claim-spam */
+    /* Every check also reconciles the subscription (the response carries
+       the ledger's plan): restores after a storage wipe / pushes a
+       device-only purchase up — self-healing every minute. */
+    try { reconcilePlanWithServer(d); } catch (e) {}
     if (!d.device) { claimSessionNow(); return; } /* healthy ledger but no row yet (this
        session started before the ledger existed) — claim once so the account shows up */
     if (d.device === getDeviceId()) return;

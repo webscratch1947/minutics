@@ -626,7 +626,7 @@ export function SettingsScreen() {
           }),
           jsx("p", {
             className: "px-1 mt-2.5 text-[11px] leading-relaxed font-medium text-amber-600",
-            children: "Warning: If you delete this app's local storage (clear app data / reinstall), your subscription will be removed and you'll need to purchase it again."
+            children: "Your subscription is saved to your account in the cloud — if you delete this app's local storage (clear app data / reinstall), just sign back in and your plan is restored automatically."
           })
         ]
       }),

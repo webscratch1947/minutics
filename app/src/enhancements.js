@@ -402,8 +402,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return p === "basic" || p === "yearly";
   }
   function cancelSubscription() {
-    /* Plans are stored only on this device. Cancellation immediately returns
-       this device to the free plan; no account/server subscription is shared. */
+    /* The plan lives on this device AND in the AWS ledger. Cancellation
+       returns this device to free immediately and settles the ledger too
+       (so the admin panel and any future restore agree). */
     setPlan("free");
     /* Keep the admin ledger honest about the cancel too (fire-and-forget). */
     try { if (window.LTAuth && window.LTAuth.syncPlan) window.LTAuth.syncPlan("free"); } catch (e) {}
@@ -8708,18 +8709,14 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     highlightPlan(isPro() ? getPlanId() : "yearly");
 
-    /* Card click handler — select plan (or checkout if already selected) */
+    /* Card click handler — SELECT only. The checkout opens exclusively via
+       the Continue button (user complaint: tapping an already-selected plan
+       twice jumped straight to the payment screen). */
     if (!isPro()) {
       modal.querySelectorAll(".lt-plan-card").forEach(function (card) {
         card.addEventListener("click", function (e) {
           if (!plansTap(e)) return;
-          var planId = card.getAttribute("data-plan");
-          if (selectedPlan === planId) {
-            modal.remove();
-            showDummyCheckoutForPlan(selectedPlan);
-          } else {
-            highlightPlan(planId);
-          }
+          highlightPlan(card.getAttribute("data-plan"));
         });
       });
     }
