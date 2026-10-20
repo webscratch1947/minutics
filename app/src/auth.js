@@ -1269,7 +1269,7 @@ function renderForgotGate() {
     '<main class="lt-auth-scr">' +
       '<button type="button" class="lt-auth-back" id="lt-forgot-back-link" aria-label="Back to login">' + BACK_ICON + '</button>' +
       '<h1 class="lt-auth-h1">Reset your password</h1>' +
-      '<p class="lt-auth-sub2">Enter your email and we\u2019ll send you a reset link</p>' +
+      '<p class="lt-auth-sub2">Enter your email and we\u2019ll send you a 6-digit code</p>' +
       '<section class="lt-auth-card">' +
         '<div class="lt-auth-error" id="lt-auth-error"></div>' +
         '<form id="lt-forgot-form" novalidate>' +
@@ -1281,7 +1281,7 @@ function renderForgotGate() {
           '</div>' +
           '<button class="lt-auth-submit" type="submit" id="lt-forgot-submit">' +
             '<span class="lt-auth-spinner"></span>' +
-            '<span id="lt-forgot-submit-label">Send reset link</span>' +
+            '<span id="lt-forgot-submit-label">Send code</span>' +
           '</button>' +
         '</form>' +
       '</section>' +
@@ -1299,7 +1299,7 @@ function renderForgotGate() {
   function setLoading(loading) {
     submitBtn.disabled = loading;
     submitBtn.classList.toggle("lt-auth-loading", loading);
-    submitLabel.textContent = loading ? "Sending..." : "Send reset link";
+    submitLabel.textContent = loading ? "Sending..." : "Send code";
   }
 
   form.addEventListener("submit", function (e) {
