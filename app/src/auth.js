@@ -1326,6 +1326,12 @@ function renderForgotGate() {
             showError(friendlyError(err));
             return;
           }
+          if (code === "NetworkError" || /failed to fetch|network ?error|network request/i.test(msg)) {
+            /* The request never reached Cognito — be honest about that
+               instead of pretending a code was sent. */
+            showError(friendlyError(err));
+            return;
+          }
           if (code === "InvalidParameterException" && msg.indexOf("no registered/verified") !== -1) {
             /* Unconfirmed account: Cognito refuses a password reset until
                the email is verified. The register flow already discloses
@@ -1566,9 +1572,10 @@ function hideError() {
 }
 
 function friendlyError(err) {
-  /* Cognito errors carry the exception name in .code (sometimes .name). */
-  var code = (err && (err.code || err.name)) || "";
-  var msg = (err && err.message) || "";
+  /* Cognito errors carry the exception name in .code (sometimes .name).
+     Some failures surface as a bare string instead of an Error. */
+  var code = (err && (err.code || err.name)) || (typeof err === "string" ? err : "") || "";
+  var msg = (err && err.message) || (typeof err === "string" ? err : "") || "";
   if (code === "UsernameExistsException") return "That email already has an account — try logging in instead.";
   if (code === "InvalidPasswordException") {
     if (/8|character|uppercase|lowercase|number/i.test(msg)) {
@@ -1588,7 +1595,7 @@ function friendlyError(err) {
   if (code === "LimitExceededException" || code === "TooManyRequestsException" || code === "TooManyFailedAttemptsException") {
     return "Too many attempts — please wait a moment and try again.";
   }
-  if (/failed to fetch|networkerror|network request/i.test(msg)) return "Network error — check your connection.";
+  if (code === "NetworkError" || /failed to fetch|network ?error|network request/i.test(msg)) return "Network error — check your connection.";
   return "Something went wrong. Please try again.";
 }
 
