@@ -1,7 +1,11 @@
 /* ══════════════════════════════════════════════════════════════════════════
    Lifetime — AWS Cognito Authentication Gate (identity moved off Firebase)
-   Email/password sign-up, email-code verification, login and password
-   reset all run against the Minutics Cognito user pool. No user data is
+   Email/password sign-up, login and password reset all run against the
+   Minutics Cognito user pool. EMAIL VERIFICATION IS GONE COMPLETELY:
+   signups are confirmed instantly by the pool (no code, no email), the
+   verify screen no longer exists anywhere, and password reset sets a new
+   password without any code (mode "set-password" on /api/session). No
+   user data is
    stored in Cognito — auth is identity-only. All app data (activities,
    budget, tasks, etc.) stays exactly where it already lived: on this
    device.
@@ -1075,7 +1079,6 @@ function renderGate(mode) {
 
   if (mode === "welcome") { renderWelcomeGate(); return; }
   if (mode === "forgot") { renderForgotGate(); return; }
-  if (mode === "confirm") { renderConfirmGate(); return; }
 
   var isSignup = mode === "signup";
   var MAIL_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
@@ -1225,9 +1228,9 @@ function renderGate(mode) {
   });
 }
 
-/* ── Cognito flows: sign-up → email code → auto-login; direct login ──── */
+/* ── Cognito flows: sign-up → instant auto-login (NO email verification);
+   direct login; codeless forgot-password ──── */
 var _gateSetLoadingFn = null;
-var _pendingConfirm = null; /* { email, password?, user } while verifying the email code */
 function gateSetLoading(loading) {
   try { if (_gateSetLoadingFn) _gateSetLoadingFn(loading); } catch (e) {}
 }
@@ -1242,21 +1245,19 @@ function cognitoSignUp(email, password) {
         _justSignedUp = false;
         gateSetLoading(false);
         if (err && (err.code || err.name) === "UsernameExistsException") {
-          /* Cognito tells us whether the existing account is still waiting
-             for its email code — if so, jump straight back to the code
-             screen instead of sending the user in a login circle. */
-          _pendingConfirm = { email: email, password: password, user: null };
-          renderGate("confirm");
-          setTimeout(function () {
-            showError("That email is signed up but not verified yet — enter the code we emailed you.");
-          }, 0);
+          /* The email already has an account — there is no verification
+             step anymore, so this is NEVER a "enter the code" screen: the
+             honest, actionable answer is "log in instead". */
+          showError(friendlyError(err));
           return;
         }
         showError(friendlyError(err));
         return;
       }
-      _pendingConfirm = { email: email, password: password, user: result && result.user };
-      renderGate("confirm");
+      /* No email verification exists (the pool confirms signups instantly)
+         — log the fresh account straight in, exactly like Firebase's
+         createUserWithEmailAndPassword used to do. */
+      cognitoLogin(email, password);
     });
   } catch (e) {
     _justSignedUp = false;
@@ -1279,19 +1280,9 @@ function cognitoLogin(email, password) {
       onFailure: function (err) {
         _justSignedUp = false;
         gateSetLoading(false);
-        var code = (err && (err.code || err.name)) || "";
-        if (code === "UserNotConfirmedException") {
-          /* Password verified, email code not yet entered — back to the
-             code screen. No stored password here (fresh page load), so
-             after confirming, the user returns to Login with a success
-             note instead of being logged in silently. */
-          _pendingConfirm = { email: email, password: null, user: cogUser };
-          renderGate("confirm");
-          setTimeout(function () {
-            showError("Your email isn't verified yet — enter the code we emailed you.");
-          }, 0);
-          return;
-        }
+        /* Email verification no longer exists anywhere — an
+           UserNotConfirmedException can only mean an account predating the
+           removal; friendlyError() explains it with NO code language. */
         showError(friendlyError(err));
       },
       newPasswordRequired: function () {
@@ -1362,9 +1353,11 @@ function renderWelcomeGate() {
   });
 }
 
-/* ── Forgot password — step 1: collect the email; Cognito emails a 6-digit
-   reset code. Step 2 (renderForgotCodeGate): enter the code + a new
-   password. Same screens as before, engine now Cognito. ─────────────── */
+/* ── Forgot password — ONE screen, NO code: email + new password →
+   mode "set-password" on /api/session sets a permanent Cognito password
+   without any email verification (verification was removed completely —
+   owner's decision, including the reset code), then the fresh password
+   logs the user straight in. ─────────────────────────────────────────── */
 function renderForgotGate() {
   injectStyles();
   var existing = document.getElementById("lt-auth-gate");
@@ -1373,112 +1366,9 @@ function renderForgotGate() {
     existing.style.visibility = "visible";
     existing.remove();
   }
-
-  // Clean up any Pro badge or enhancement visuals that might be lingering
   cleanupEnhancementVisuals();
 
   var MAIL_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
-  var BACK_ICON = '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-  var gate = document.createElement("div");
-  gate.id = "lt-auth-gate";
-  // Ensure the gate is fully opaque immediately to prevent any flash of underlying content
-  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:hsl(230 40% 16%);color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
-  gate.innerHTML =
-    '<div class="lt-auth-darkbg" aria-hidden="true"></div>' +
-    '<main class="lt-auth-scr">' +
-      '<button type="button" class="lt-auth-back" id="lt-forgot-back-link" aria-label="Back to login">' + BACK_ICON + '</button>' +
-      '<h1 class="lt-auth-h1">Reset your password</h1>' +
-      '<p class="lt-auth-sub2">Enter your email and we\u2019ll send you a 6-digit code</p>' +
-      '<section class="lt-auth-card">' +
-        '<div class="lt-auth-error" id="lt-auth-error"></div>' +
-        '<form id="lt-forgot-form" novalidate>' +
-          '<div class="lt-auth-field">' + MAIL_ICON +
-            '<div class="lt-auth-fbody">' +
-              '<label class="lt-auth-flabel" for="lt-forgot-email">Email Address</label>' +
-              '<input type="email" id="lt-forgot-email" placeholder="you@example.com" autocomplete="email" required>' +
-            '</div>' +
-          '</div>' +
-          '<button class="lt-auth-submit" type="submit" id="lt-forgot-submit">' +
-            '<span class="lt-auth-spinner"></span>' +
-            '<span id="lt-forgot-submit-label">Send code</span>' +
-          '</button>' +
-        '</form>' +
-      '</section>' +
-    '</main>';
-  document.body.appendChild(gate);
-
-  document.getElementById("lt-forgot-back-link").addEventListener("click", function () {
-    renderGate("login");
-  });
-
-  var form = document.getElementById("lt-forgot-form");
-  var submitBtn = document.getElementById("lt-forgot-submit");
-  var submitLabel = document.getElementById("lt-forgot-submit-label");
-
-  function setLoading(loading) {
-    submitBtn.disabled = loading;
-    submitBtn.classList.toggle("lt-auth-loading", loading);
-    submitLabel.textContent = loading ? "Sending..." : "Send code";
-  }
-
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    var email = document.getElementById("lt-forgot-email").value.trim();
-    hideError();
-    if (!email) { showError("Enter your email first."); return; }
-    setLoading(true);
-
-    try {
-      var cogUser = new CognitoUser({ Username: email, Pool: _cogPool });
-      var toCodeStep = function () {
-        setLoading(false);
-        renderForgotCodeGate(email, cogUser);
-      };
-      cogUser.forgotPassword({
-        onSuccess: toCodeStep,
-        inputVerificationCode: toCodeStep, /* some SDK versions land here */
-        onFailure: function (err) {
-          setLoading(false);
-          var code = (err && (err.code || err.name)) || "";
-          var msg = (err && err.message) || "";
-          if (code === "LimitExceededException" || code === "TooManyRequestsException") {
-            showError(friendlyError(err));
-            return;
-          }
-          if (code === "NetworkError" || /failed to fetch|network ?error|network request/i.test(msg)) {
-            /* The request never reached Cognito — be honest about that
-               instead of pretending a code was sent. */
-            showError(friendlyError(err));
-            return;
-          }
-          if (code === "InvalidParameterException" && msg.indexOf("no registered/verified") !== -1) {
-            /* Unconfirmed account: Cognito refuses a password reset until
-               the email is verified. The register flow already discloses
-               pending accounts, so an honest, actionable hint is
-               consistent — and much better than a dead generic message. */
-            showError("That email is signed up but not verified yet — check your inbox for the verification code, or register again to get a new one.");
-            return;
-          }
-          /* Never confirm/deny that an email is registered — the same
-             generic answer as the old flow. */
-          showError("If an account exists for that email, a reset code is on its way. Check your inbox (and spam folder).", true);
-        }
-      });
-    } catch (err) {
-      setLoading(false);
-      showError("Network error — check your connection and try again.");
-    }
-  });
-}
-
-/* ── Forgot password — step 2: the emailed code + the new password ──── */
-function renderForgotCodeGate(email, cogUser) {
-  injectStyles();
-  var existing = document.getElementById("lt-auth-gate");
-  if (existing) existing.remove();
-  cleanupEnhancementVisuals();
-
   var LOCK_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
   var BACK_ICON = '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -1489,15 +1379,15 @@ function renderForgotCodeGate(email, cogUser) {
     '<div class="lt-auth-darkbg" aria-hidden="true"></div>' +
     '<main class="lt-auth-scr">' +
       '<button type="button" class="lt-auth-back" id="lt-forgot-back-link" aria-label="Back to login">' + BACK_ICON + '</button>' +
-      '<h1 class="lt-auth-h1">Enter your reset code</h1>' +
-      '<p class="lt-auth-sub2">We emailed a 6-digit code to ' + String(email).replace(/[<>&]/g, "") + '</p>' +
+      '<h1 class="lt-auth-h1">Reset your password</h1>' +
+      '<p class="lt-auth-sub2">Enter your email and choose a new password</p>' +
       '<section class="lt-auth-card">' +
         '<div class="lt-auth-error" id="lt-auth-error"></div>' +
-        '<form id="lt-forgot-code-form" novalidate>' +
-          '<div class="lt-auth-field">' +
+        '<form id="lt-forgot-form" novalidate>' +
+          '<div class="lt-auth-field">' + MAIL_ICON +
             '<div class="lt-auth-fbody">' +
-              '<label class="lt-auth-flabel" for="lt-forgot-code">Verification code</label>' +
-              '<input type="text" inputmode="numeric" id="lt-forgot-code" placeholder="123456" autocomplete="one-time-code" required>' +
+              '<label class="lt-auth-flabel" for="lt-forgot-email">Email Address</label>' +
+              '<input type="email" id="lt-forgot-email" placeholder="you@example.com" autocomplete="email" required>' +
             '</div>' +
           '</div>' +
           '<div class="lt-auth-field">' + LOCK_ICON +
@@ -1512,7 +1402,6 @@ function renderForgotCodeGate(email, cogUser) {
             '<span id="lt-forgot-submit-label">Reset password</span>' +
           '</button>' +
         '</form>' +
-        '<div class="lt-auth-frow"><button type="button" class="lt-auth-forgot" id="lt-forgot-resend">Resend code</button></div>' +
       '</section>' +
     '</main>';
   document.body.appendChild(gate);
@@ -1528,152 +1417,37 @@ function renderForgotCodeGate(email, cogUser) {
     submitBtn.classList.toggle("lt-auth-loading", loading);
     submitLabel.textContent = loading ? "Resetting..." : "Reset password";
   }
+  _gateSetLoadingFn = setLoading; /* cognitoLogin() keeps this screen's spinner alive */
 
-  document.getElementById("lt-forgot-resend").addEventListener("click", function () {
-    try {
-      cogUser.forgotPassword({
-        onSuccess: function () { showError("A new code is on its way.", true); },
-        inputVerificationCode: function () { showError("A new code is on its way.", true); },
-        onFailure: function (err) { showError(friendlyError(err)); }
-      });
-    } catch (e) { showError("Network error — check your connection and try again."); }
-  });
-
-  document.getElementById("lt-forgot-code-form").addEventListener("submit", function (e) {
+  document.getElementById("lt-forgot-form").addEventListener("submit", function (e) {
     e.preventDefault();
-    var code = document.getElementById("lt-forgot-code").value.trim();
+    var email = document.getElementById("lt-forgot-email").value.trim();
     var newPw = document.getElementById("lt-forgot-newpw").value;
     hideError();
-    if (!code) { showError("Enter the code from your email."); return; }
+    if (!email) { showError("Enter your email first."); return; }
     if (!ltPasswordLooksStrong(newPw)) {
       showError("Password must be 8+ characters with an uppercase letter, a lowercase letter and a number.");
       return;
     }
     setLoading(true);
-    try {
-      cogUser.confirmPassword(code, newPw, {
-        onSuccess: function () {
-          setLoading(false);
-          renderGate("login");
-          setTimeout(function () {
-            showError("Password reset — log in with your new password.", true);
-          }, 0);
-        },
-        onFailure: function (err) {
-          setLoading(false);
-          showError(friendlyError(err));
-        }
-      });
-    } catch (err) {
+    fetch(apiOrigin() + "/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "set-password", email: email, password: newPw })
+    }).then(function (r) {
+      return (r && r.json) ? r.json() : null;
+    }).then(function (b) {
+      if (b && b.ok) {
+        /* Password set with NO email code — log straight in with it. */
+        cognitoLogin(email, newPw);
+        return;
+      }
+      setLoading(false);
+      showError((b && b.error) || "Network error — check your connection and try again.");
+    }).catch(function () {
       setLoading(false);
       showError("Network error — check your connection and try again.");
-    }
-  });
-}
-
-/* ── Email verification (register step 2): Cognito signs the account up
-   in a "waiting for code" state; the emailed 6-digit code confirms it.
-   When we came straight from Sign up the password is still in memory and
-   the confirm logs the user straight in; when it isn't (page reload /
-   login hit UserNotConfirmedException), the user returns to Login. ──── */
-function renderConfirmGate() {
-  injectStyles();
-  var existing = document.getElementById("lt-auth-gate");
-  if (existing) existing.remove();
-  cleanupEnhancementVisuals();
-
-  var p = _pendingConfirm || {};
-  var email = p.email || "";
-
-  var MAIL_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
-  var BACK_ICON = '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-  var gate = document.createElement("div");
-  gate.id = "lt-auth-gate";
-  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:hsl(230 40% 16%);color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
-  gate.innerHTML =
-    '<div class="lt-auth-darkbg" aria-hidden="true"></div>' +
-    '<main class="lt-auth-scr">' +
-      '<button type="button" class="lt-auth-back" id="lt-confirm-back-btn" aria-label="Back">' + BACK_ICON + '</button>' +
-      '<h1 class="lt-auth-h1">Verify your email</h1>' +
-      '<p class="lt-auth-sub2">Enter the 6-digit code we sent to ' + String(email).replace(/[<>&]/g, "") + '</p>' +
-      '<section class="lt-auth-card">' +
-        '<div class="lt-auth-error" id="lt-auth-error"></div>' +
-        '<form id="lt-confirm-form" novalidate>' +
-          '<div class="lt-auth-field">' + MAIL_ICON +
-            '<div class="lt-auth-fbody">' +
-              '<label class="lt-auth-flabel" for="lt-confirm-code">Verification code</label>' +
-              '<input type="text" inputmode="numeric" id="lt-confirm-code" placeholder="123456" autocomplete="one-time-code" required>' +
-            '</div>' +
-          '</div>' +
-          '<button class="lt-auth-submit" type="submit" id="lt-confirm-submit">' +
-            '<span class="lt-auth-spinner"></span>' +
-            '<span id="lt-confirm-submit-label">Verify email</span>' +
-          '</button>' +
-        '</form>' +
-        '<div class="lt-auth-frow"><button type="button" class="lt-auth-forgot" id="lt-confirm-resend">Resend code</button></div>' +
-      '</section>' +
-    '</main>';
-  document.body.appendChild(gate);
-
-  document.getElementById("lt-confirm-back-btn").addEventListener("click", function () {
-    renderGate("login");
-  });
-
-  var submitBtn = document.getElementById("lt-confirm-submit");
-  var submitLabel = document.getElementById("lt-confirm-submit-label");
-  function setLoading(loading) {
-    submitBtn.disabled = loading;
-    submitBtn.classList.toggle("lt-auth-loading", loading);
-    submitLabel.textContent = loading ? "Verifying..." : "Verify email";
-  }
-
-  function cogUserForConfirm() {
-    if (_pendingConfirm && _pendingConfirm.user) return _pendingConfirm.user;
-    return new CognitoUser({ Username: email, Pool: _cogPool });
-  }
-
-  document.getElementById("lt-confirm-resend").addEventListener("click", function () {
-    try {
-      /* resendConfirmationCode uses a node-style (err, result) callback —
-         NOT the { onSuccess, onFailure } map the other SDK calls take. */
-      cogUserForConfirm().resendConfirmationCode(function (err) {
-        if (err) { showError(friendlyError(err)); return; }
-        showError("A new code is on its way. Check your inbox.", true);
-      });
-    } catch (e) { showError("Network error — check your connection and try again."); }
-  });
-
-  document.getElementById("lt-confirm-form").addEventListener("submit", function (e) {
-    e.preventDefault();
-    var code = document.getElementById("lt-confirm-code").value.trim();
-    hideError();
-    if (!code) { showError("Enter the code from your email."); return; }
-    setLoading(true);
-    try {
-      cogUserForConfirm().confirmRegistration(code, true, function (err) {
-        if (err) {
-          setLoading(false);
-          showError(friendlyError(err));
-          return;
-        }
-        var pw = _pendingConfirm && _pendingConfirm.password;
-        if (pw) {
-          /* Straight from Sign up — the password is right here: log the
-             fresh account in immediately, exactly like Firebase's
-             createUserWithEmailAndPassword used to. */
-          cognitoLogin(email, pw);
-          return;
-        }
-        renderGate("login");
-        setTimeout(function () {
-          showError("Email verified — log in to continue.", true);
-        }, 0);
-      });
-    } catch (err) {
-      setLoading(false);
-      showError("Network error — check your connection and try again.");
-    }
+    });
   });
 }
 
@@ -1707,7 +1481,7 @@ function friendlyError(err) {
     if (/password/i.test(msg)) return "Password must be 8+ characters with an uppercase letter, a lowercase letter and a number.";
     return "That email address doesn't look right.";
   }
-  if (code === "UserNotConfirmedException") return "Your email isn't verified yet — check your inbox for the verification code.";
+  if (code === "UserNotConfirmedException") return "This account isn't activated — contact support and we'll switch it on (email verification no longer exists).";
   if (code === "CodeMismatchException") return "That code didn't match — check your email and try again.";
   if (code === "ExpiredCodeException") return "That code expired — request a new one.";
   if (code === "UserNotFoundException" || code === "NotAuthorizedException") return "Incorrect email or password.";

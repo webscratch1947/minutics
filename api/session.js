@@ -11,6 +11,18 @@
 //   { mode: "plan-get" }         → read the subscription back — AWS is the
 //                                  source of truth, so wiping the device's
 //                                  storage can't lose a purchase
+//
+// POST /api/session  (NO Authorization — the user is locked out by
+//   definition; dispatched before the token gate)
+//   { mode: "set-password", email, password }
+//                                  → set a permanent Cognito password with
+//                                  NO email code: email verification was
+//                                  removed entirely (pool auto-verify off,
+//                                  owner's decision — including the reset
+//                                  code). Resolves the email alias to the
+//                                  pool's internal username first.
+//   Responds { ok } / { ok:false, error } / degraded when unconfigured.
+//
 //   Responds { ok, device, claimed?, plan?, planSince?, degraded? }. When
 //   the AWS keys are not configured in the environment the endpoint answers
 //   degraded and the client simply stops enforcing — auth itself never
@@ -28,6 +40,7 @@
 import { setCors } from "../lib/cors.js";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { CognitoIdentityProviderClient, AdminGetUserCommand, AdminSetUserPasswordCommand } from "@aws-sdk/client-cognito-identity-provider";
 import crypto from "node:crypto";
 
 /* ── Cognito pool identity (public values, verified against the token) ── */
@@ -139,6 +152,46 @@ function fitClaims(claims) {
   return claims;
 }
 
+/* ── Codeless password reset (mode "set-password") ──────────────────────
+   No email codes exist anywhere anymore. The pool's usernames are UUIDs
+   with the email as an ALIAS: AdminGetUser accepts the alias and hands
+   back the real username, which is what AdminSetUserPassword requires.
+   Vercel key needs cognito-idp:AdminGetUser + AdminSetUserPassword. */
+async function handleSetPassword(body, res) {
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ ok: false, error: "Enter a valid email address." });
+    return;
+  }
+  if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    res.status(400).json({ ok: false, error: "Password must be 8+ characters with an uppercase letter, a lowercase letter and a number." });
+    return;
+  }
+  const region = POOL_ID.split("_")[0];
+  if (!region || !process.env.AWS_ACCESS_KEY_ID) {
+    res.status(200).json({ ok: false, degraded: true, error: "Password reset is unavailable right now." });
+    return;
+  }
+  try {
+    const cog = new CognitoIdentityProviderClient({ region });
+    const got = await cog.send(new AdminGetUserCommand({ UserPoolId: POOL_ID, Username: email }));
+    const username = got && got.Username ? got.Username : email;
+    await cog.send(new AdminSetUserPasswordCommand({
+      UserPoolId: POOL_ID, Username: username, Password: password, Permanent: true,
+    }));
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    const name = (e && (e.name || e.Code)) || "";
+    if (name === "UserNotFoundException") {
+      res.status(404).json({ ok: false, error: "No account with that email — register first." });
+      return;
+    }
+    console.error("set-password failed:", name, e && e.message);
+    res.status(500).json({ ok: false, error: "Could not reset the password — try again." });
+  }
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
   res.setHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS");
@@ -146,6 +199,14 @@ export default async function handler(req, res) {
 
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
   if (req.method !== "POST" && req.method !== "DELETE") { res.status(405).json({ ok: false, error: "Method not allowed" }); return; }
+
+  /* Body first — the codeless password reset runs WITHOUT a token (the
+     whole point: the user is locked out), so it dispatches before the
+     token gate below. */
+  let body = req.body;
+  if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
+  body = body || {};
+  if (req.method === "POST" && body.mode === "set-password") { await handleSetPassword(body, res); return; }
 
   const authHeader = req.headers.authorization || "";
   const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
@@ -195,9 +256,6 @@ export default async function handler(req, res) {
 
   /* ── POST ───────────────────────────────────────────────────────────── */
 
-  let body = req.body;
-  if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
-  body = body || {};
   const deviceId = typeof body.deviceId === "string" ? body.deviceId.trim() : "";
   const mode = body.mode === "check" ? "check"
     : body.mode === "plan" ? "plan"
