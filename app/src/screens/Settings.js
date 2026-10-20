@@ -360,12 +360,13 @@ export function SettingsScreen() {
   }
 
   /* ── delete account ────────────────────────────────────────────────
-     Server first: DELETE /api/session removes the Firebase Auth user that
-     owns the presented ID token (only that uid — never anyone else's).
-     Only after the server confirms do we wipe this account's local data:
-     live app keys, plan, identity, the lt_ns_<uid> snapshot, lt_active_uid,
-     firebase session keys, fcm token — everything. Other accounts' lt_ns_*
-     snapshots on this device are NOT this account's data and are kept.
+     Cognito first: LTAuth.deleteAccount() permanently removes the
+     signed-in Minutics account (authorized by this session's own token —
+     only ever this account, never anyone else's). Only after Cognito
+     confirms do we wipe this account's local data: live app keys, plan,
+     identity, the lt_ns_<uid> snapshot, lt_active_uid, session keys,
+     fcm token — everything. Other accounts' lt_ns_* snapshots on this
+     device are NOT this account's data and are kept.
      Local-only failure (offline / server error) aborts before any wipe. */
   function wipeAccountStorage(uid) {
     var deadSnapshot = "lt_ns_" + uid;
@@ -394,24 +395,13 @@ export function SettingsScreen() {
     }
     var u = (window.LTAuth && window.LTAuth.currentUser && window.LTAuth.currentUser()) || null;
     if (!u || !u.uid) { ltAlert("No account is signed in."); return; }
-    if (!await ltConfirmDanger("Delete your account permanently?\n\n• Your account is deleted from Firebase — you can never log in with it again\n• ALL data for this account is erased from this device: activities, budget, tasks, profile AND your subscription plan\n\nThis cannot be undone.", "Delete account?", { yes: "Delete" })) return;
+    if (!await ltConfirmDanger("Delete your account permanently?\n\n• Your account is deleted from Minutics — you can never log in with it again\n• ALL data for this account is erased from this device: activities, budget, tasks, profile AND your subscription plan\n\nThis cannot be undone.", "Delete account?", { yes: "Delete" })) return;
     if (!await ltConfirmDanger("Last confirmation: delete this account and everything in it?", "Last confirmation", { yes: "Delete" })) return;
 
-    var origin = (window.LTAuth && window.LTAuth.apiOrigin) ? window.LTAuth.apiOrigin() : "";
-    (window.LTAuth && window.LTAuth.getToken ? window.LTAuth.getToken(false) : Promise.resolve(null))
-      .then(function (tok) {
-        if (!tok) throw new Error("Not signed in — log in again first.");
-        return fetch(origin + "/api/session", {
-          method: "DELETE",
-          headers: { "Authorization": "Bearer " + tok }
-        }).then(function (r) {
-          return r.json().catch(function () { return {}; }).then(function (d) {
-            if (r.status !== 200 || !d || d.ok !== true) {
-              throw new Error((d && d.error) || ("server error " + r.status));
-            }
-          });
-        });
-      })
+    /* The account is deleted straight through Cognito by this session's
+       own token (LTAuth.deleteAccount) — no server round-trip. Only after
+       Cognito confirms do we wipe the local data below. */
+    (window.LTAuth && window.LTAuth.deleteAccount ? window.LTAuth.deleteAccount() : Promise.reject(new Error("Not available")))
       .then(function () {
         /* Server confirmed — now (and only now) destroy the local data. */
         wipeAccountStorage(u.uid);

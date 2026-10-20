@@ -1,25 +1,25 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   Lifetime — Firebase Authentication Gate
-   Email/password sign-up & login only. No user data is stored in Firebase —
-   auth is identity-only. All app data (activities, budget, tasks, etc.)
-   stays exactly where it already lived: on this device.
+   Lifetime — AWS Cognito Authentication Gate (identity moved off Firebase)
+   Email/password sign-up, email-code verification, login and password
+   reset all run against the Minutics Cognito user pool. No user data is
+   stored in Cognito — auth is identity-only. All app data (activities,
+   budget, tasks, etc.) stays exactly where it already lived: on this
+   device.
+
+   Sessions: Cognito hands out a short-lived access/ID token pair plus a
+   refresh token valid for 365 days. Every launch and every token read goes
+   through getSession(), which silently refreshes with the refresh token
+   whenever the tokens have expired — so a user who keeps their account
+   stays signed in for up to a whole year, not one hour.
+   Firebase remains ONLY for push notifications (FCM) — never identity.
 ══════════════════════════════════════════════════════════════════════════ */
 
 import { initializeApp } from "firebase/app";
 import { ltAlert } from "./ui_dialog.js";
-import {
-  initializeAuth,
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  indexedDBLocalPersistence,
-  browserLocalPersistence,
-  browserSessionPersistence,
-  inMemoryPersistence,
-} from "firebase/auth";
+import { CognitoUserPool, CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
 import { pushTelegramSchedule } from "./lib/telegram.js";
 
+/* Push notifications (FCM) still live on Firebase — auth does not. */
 const firebaseConfig = {
   apiKey: "AIzaSyBXruwmDU9SAX4nAe5_Do-x-5qmi_SFh7E",
   authDomain: "lifetime-a4bde.firebaseapp.com",
@@ -29,21 +29,18 @@ const firebaseConfig = {
   appId: "1:330723236770:web:7df53f2dba32fe87b0f0fb",
   measurementId: "G-L9CHDHYXNN",
 };
+initializeApp(firebaseConfig);
 
-const app = initializeApp(firebaseConfig);
-/* Explicit persistence CASCADE: IndexedDB first (where existing sessions
-   live), then localStorage, then session, then memory. When Chrome refuses
-   to open IndexedDB ("Database is closing/hidden" — hidden/bfcached pages),
-   Firebase falls through to the next store instead of failing silently,
-   which was making the login gate randomly reappear on reload. */
-const auth = initializeAuth(app, {
-  persistence: [
-    indexedDBLocalPersistence,
-    browserLocalPersistence,
-    browserSessionPersistence,
-    inMemoryPersistence,
-  ],
-});
+/* ── Cognito user pool (Minutics AWS account, ap-south-1) ───────────────
+   These are public identifiers, not secrets — the pool enforces identity,
+   the app client enforces the password policy (8+ chars, upper, lower,
+   number). Refresh tokens live 365 days (set at pool creation), which is
+   what makes the "stays logged in for a year" behavior possible. */
+var COG_POOL_ID = "ap-south-1_QAdugNxC2";
+var COG_CLIENT_ID = "8kq0askdobsj49crut3fg9akf";
+var _cogPool = new CognitoUserPool({ UserPoolId: COG_POOL_ID, ClientId: COG_CLIENT_ID });
+var _cogUser = null;        /* raw CognitoUser currently signed in (or null) */
+var _cogCurrentUser = null; /* the lightweight wrapper handed to the app */
 
 /* ── Per-account localStorage namespaces ─────────────────────────────────
    Every Firebase UID owns a private slice of localStorage. On logout /
@@ -89,8 +86,12 @@ function nsKey(uid) { return "lt_ns_" + uid; }
 function isReservedKey(k) {
   /* Demo keys are device-level session state, never account data: they
      must not be snapshotted into lt_ns_* blobs nor wiped by clearAppKeys
-     (only wipeDemoData / _killDemoForRealAuth remove them). */
+     (only wipeDemoData / _killDemoForRealAuth remove them).
+     CognitoIdentityServiceProvider.* is the Cognito SDK's own session
+     store (LastAuthUser + token cache) — it is the session itself, not
+     app data, so it is never snapshotted or wiped with account keys. */
   return k === ACTIVE_UID_KEY || k.indexOf("lt_ns_") === 0 || k.indexOf("firebase:") === 0
+    || k.indexOf("CognitoIdentityServiceProvider.") === 0
     || k === DEMO_SESSION_KEY || k === DEMO_RENEW_KEY || k === DEMO_HISTORY_KEY;
 }
 function appKeys() {
@@ -111,13 +112,62 @@ function setMarker(uid) {
   } catch (e) {}
 }
 
+/* ── Single-device sessions: see the DynamoDB-backed section below
+    (claim/check against /api/session). ─────────────────────────────── */
+
+function apiOrigin() {
+  var o = location.origin || "";
+  if (o.indexOf("minutics.com") !== -1) return "";        /* production — same origin */
+  if (o.indexOf("localhost") !== -1 || o.indexOf("127.0.0.1") !== -1) return "";
+  return "https://app.minutics.com";                      /* Android WebView (appassets) etc. */
+}
+
+/* ── Cognito session wrapper ────────────────────────────────────────────
+   Everything downstream (storage namespacing, Settings, telegram, the
+   Android bridge) used to read Firebase's user object — only .uid, .email
+   and .getIdToken() were ever touched. This wrapper keeps exactly that   shape over a Cognito session, so nothing else in the app changed. */
+function _jwtPayload(jwt) {
+  try {
+    var body = String(jwt).split(".")[1] || "";
+    body = body.replace(/-/g, "+").replace(/_/g, "/");
+    while (body.length % 4) body += "=";
+    return JSON.parse(atob(body));
+  } catch (e) { return null; }
+}
+function wrapCogUser(cogUser, session) {
+  var payload = null;
+  try { payload = session ? _jwtPayload(session.getIdToken()) : null; } catch (e) {}
+  return {
+    uid: (payload && payload.sub) || (cogUser && cogUser.getUsername && cogUser.getUsername()) || "",
+    email: (payload && payload.email) || (cogUser && cogUser.getUsername && cogUser.getUsername()) || "",
+    getIdToken: function (force) {
+      return new Promise(function (resolve) {
+        if (!cogUser) { resolve(null); return; }
+        cogUser.getSession(function (err, s) {
+          if (err || !s) { resolve(null); return; }
+          if (!force) { resolve(s.getIdToken()); return; }
+          /* force = bypass the cached token and refresh right now (used
+             by the session watch and the report scheduler's heartbeat).
+             The refresh token is valid for a year — a failed refresh here
+             is a real "signed out", never an hour-expiry artefact. */
+          s.refresh(function (e2, s2) {
+            resolve(e2 ? s.getIdToken() : s2.getIdToken());
+          });
+        });
+      });
+    }
+  };
+}
+
 /* ── Single-device sessions ─────────────────────────────────────────────
-   Every genuine login/register claims THIS device in the Firebase custom
-   claim `sessionDevice` (POST /api/session — the claim itself is the
-   registry, no database needed). Every signed-in client refreshes its ID
-   token once a minute; when the refreshed claims name a different device
-   it signs itself out (last login wins). The claim travels inside the ID
-   token, so nothing extra is stored on the server. ─────────────────────── */
+   Same rule as the Firebase days: an account is allowed on ONE device —
+   last login wins. A genuine login POSTs {deviceId, mode:"claim"} to
+   /api/session, which stores it on the user's row in the MinuticsUsers
+   DynamoDB table. Every signed-in client re-checks once a minute
+   (mode:"check", read-only) and signs itself out the moment another
+   device owns the claim. When the server is offline or its AWS keys are
+   not configured it answers degraded and the check no-ops — a server
+   hiccup must never kick a device. ─────────────────────────────────── */
 var DEVICE_ID_KEY = "lt_device_id_v1";
 var _sessionWatchTimer = null;
 var _claimGraceUntil = 0;
@@ -134,45 +184,46 @@ function getDeviceId() {
   } catch (e) { return "d-fallback-device"; }
 }
 
-function apiOrigin() {
-  var o = location.origin || "";
-  if (o.indexOf("minutics.com") !== -1) return "";        /* production — same origin */
-  if (o.indexOf("localhost") !== -1 || o.indexOf("127.0.0.1") !== -1) return "";
-  return "https://app.minutics.com";                      /* Android WebView (appassets) etc. */
-}
-
-function claimSessionNow() {
-  var u = auth.currentUser;
-  if (!u) return;
-  _claimGraceUntil = Date.now() + 20000; /* grace: never kick a device racing its own claim */
-  u.getIdToken(false).then(function (tok) {
+function _sessionPost(body) {
+  if (!_cogCurrentUser) return Promise.resolve(null);
+  return _cogCurrentUser.getIdToken(false).then(function (tok) {
+    if (!tok) return null;
     return fetch(apiOrigin() + "/api/session", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
-      body: JSON.stringify({ deviceId: getDeviceId() })
-    });
-  }).catch(function () { /* offline — the claim lands on the next successful login */ });
+      body: JSON.stringify(body)
+    }).then(function (r) { return (r && r.ok) ? r.json() : null; });
+  }).catch(function () { return null; });
+}
+
+function claimSessionNow() {
+  if (!_cogCurrentUser) return;
+  _claimGraceUntil = Date.now() + 20000; /* grace: never kick a device racing its own claim */
+  _sessionPost({ deviceId: getDeviceId(), mode: "claim" }).catch(function () { /* offline — lands on the next successful login */ });
 }
 
 function forceLogoutSingleSession() {
   stopSessionWatch();
   _logoutInProgress = true;
-  signOut(auth).then(function () {
+  try { if (_cogUser) _cogUser.signOut(); } catch (e) {}
+  _cogUser = null;
+  _cogCurrentUser = null;
+  setTimeout(function () {
+    notifySignedOut();
     setTimeout(function () {
       ltAlert("This account is only allowed on one device. You were signed out here — log in again on this device to take over.");
     }, 400);
-  }).catch(function () {});
+  }, 10);
 }
 
 function checkSessionClaim() {
-  var u = auth.currentUser;
-  if (!u) return;
-  u.getIdTokenResult(true).then(function (r) {
-    var d = r && r.claims ? r.claims.sessionDevice : null;
-    if (!d || d === getDeviceId()) return;
+  if (!_cogCurrentUser) return;
+  _sessionPost({ mode: "check" }).then(function (d) {
+    if (!d || !d.device) return; /* degraded server / no claim yet — never kick */
+    if (d.device === getDeviceId()) return;
     if (Date.now() < _claimGraceUntil) { claimSessionNow(); return; } /* still registering this device */
     forceLogoutSingleSession();
-  }).catch(function () { /* transient refresh/network failure — never sign out on this */ });
+  });
 }
 
 function _sessionOnVisible() { if (!document.hidden) checkSessionClaim(); }
@@ -533,31 +584,36 @@ window.LTDemo = {
 window.LTAuth = {
   logout: function () {
     /* Demo session: "Log out" ends the demo — full data wipe, back to
-       the welcome screen (never a Firebase signOut of a null user). */
+       the welcome screen (never a Cognito signOut of a null user). */
     if (DEMO_MODE && isDemoActive()) { disconnectTelegramAll(); endDemoSession(); return; }
     /* IMPORTANT: do NOT clear localStorage here. */
     _logoutInProgress = true;
-    
+
     // Clean up any enhancement visuals before logout to prevent flash
     cleanupEnhancementVisuals();
-    
+
     // Force #root invisible during logout so old UI can't flash.
     // Do NOT clear innerHTML — that breaks React's virtual DOM and the
     // nav bar disappears on re-login.
     var root = document.getElementById("root");
     if (root) root.style.cssText = "display:none!important";
 
-    /* Before the token goes away: kill the native alarm + local
+    /* Before the session goes away: kill the native alarm + local
        credentials and clear the server cron's schedule for this account. */
     disconnectTelegramAll();
 
-    try { signOut(auth).catch(function () {}); } catch (err) { console.error("signOut failed:", err); }
-    /* FAILSAFE: if signOut never settles (IndexedDB/network hang), the null
-       branch of onAuthStateChanged never runs — #root stays hidden above and
-       no gate is ever rendered → permanent white screen with the app DOM
-       sitting invisibly underneath. Force the login gate after 5s. Guard:
-       only when root is still hidden AND no gate exists (i.e. a quick
-       re-login or a completed logout both leave this a no-op). */
+    /* Cognito's local signOut is synchronous (clears the cached session);
+       the null-state funnel below parks this account's data and renders
+       the gate — exactly what Firebase's onAuthStateChanged(null) did. */
+    _cogCurrentUser = null;
+    try { if (_cogUser) _cogUser.signOut(); } catch (err) { console.error("signOut failed:", err); }
+    _cogUser = null;
+    notifySignedOut();
+    /* FAILSAFE: if notifySignedOut somehow never rendered a gate, the
+       #root stays hidden above and nothing is on screen → force the login
+       gate after 5s. Guard: only when root is still hidden AND no gate
+       exists (i.e. a quick re-login or a completed logout both leave this
+       a no-op). */
     setTimeout(function () {
       if (document.getElementById("lt-auth-gate")) return;
       var r = document.getElementById("root");
@@ -565,14 +621,29 @@ window.LTAuth = {
     }, 5000);
   },
   currentUser: function () {
-    return auth.currentUser;
+    return _cogCurrentUser;
   },
   getToken: function (force) {
-    var user = auth.currentUser;
-    if (!user) return Promise.resolve(null);
-    /* force=true bypasses the 1-hour token cache — needed to read fresh
-       custom claims (the report scheduler's heartbeat / last-sent state). */
-    return force ? user.getIdToken(true) : user.getIdToken();
+    /* Returns this session's ID token (refreshed when force=true). With
+       Cognito the session — not the token — is what lives for a year, so
+       "force" refreshes from the long-lived refresh token; it can never
+       log the user out. */
+    if (!_cogCurrentUser) return Promise.resolve(null);
+    return _cogCurrentUser.getIdToken(!!force);
+  },
+  /* Permanently delete the signed-in Cognito account. The session's own
+     access token authorizes the delete — no server round-trip and no AWS
+     keys needed. Resolves when Cognito confirms; the caller wipes local
+     data afterwards (Settings). */
+  deleteAccount: function () {
+    return new Promise(function (resolve, reject) {
+      var cu = _cogUser;
+      if (!cu) { reject(new Error("Not signed in — log in again first.")); return; }
+      cu.deleteUser(function (err) {
+        if (err) reject(new Error((err && err.message) || "Could not delete account"));
+        else resolve();
+      });
+    });
   },
   /* Absolute API origin for endpoints called from Settings ("" on web,
      https://app.minutics.com from the Android WebView / any non-app host). */
@@ -885,6 +956,7 @@ function renderGate(mode) {
 
   if (mode === "welcome") { renderWelcomeGate(); return; }
   if (mode === "forgot") { renderForgotGate(); return; }
+  if (mode === "confirm") { renderConfirmGate(); return; }
 
   var isSignup = mode === "signup";
   var MAIL_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
@@ -924,7 +996,10 @@ function renderGate(mode) {
             '</div>' +
             '<button type="button" class="lt-auth-pw-toggle" id="lt-auth-pw-toggle" aria-label="Show password">' + EYE_ICON + '</button>' +
           '</div>' +
-          '<p class="lt-auth-hint" id="lt-auth-pw-hint" style="display:' + (isSignup ? "block" : "none") + '">Password must be at least 6 characters</p>' +
+          '<p class="lt-auth-hint" id="lt-auth-pw-hint" style="display:' + (isSignup ? "block" : "none") + '">Password must be 8+ characters with an uppercase letter, a lowercase letter and a number</p>' +
+          '<div class="lt-auth-frow" id="lt-auth-forgot-row" style="display:' + (isSignup ? "none" : "flex") + '">' +
+            '<button type="button" class="lt-auth-forgot" id="lt-auth-forgot-link">Forgot password?</button>' +
+          '</div>' +
           '<button class="lt-auth-submit" type="submit" id="lt-auth-submit">' +
             '<span class="lt-auth-spinner"></span>' +
             '<span id="lt-auth-submit-label">' + (isSignup ? "Sign up" : "Login") + '</span>' +
@@ -964,11 +1039,20 @@ function renderGate(mode) {
     document.getElementById("lt-auth-password").autocomplete =
       toSignup ? "new-password" : "current-password";
     document.getElementById("lt-auth-pw-hint").style.display = toSignup ? "block" : "none";
+    document.getElementById("lt-auth-forgot-row").style.display = toSignup ? "none" : "flex";
     submitLabel.textContent = toSignup ? "Sign up" : "Login";
     hideError();
   }
   tabLogin.addEventListener("click", function () { switchTab(false); });
   tabSignup.addEventListener("click", function () { switchTab(true); });
+
+  var forgotLink = document.getElementById("lt-auth-forgot-link");
+  if (forgotLink) {
+    forgotLink.addEventListener("click", function () {
+      saveDraft();
+      renderGate("forgot");
+    });
+  }
 
   var pwInput = document.getElementById("lt-auth-password");
   var pwToggle = document.getElementById("lt-auth-pw-toggle");
@@ -995,29 +1079,111 @@ function renderGate(mode) {
       ? (isSignup ? "Signing up..." : "Logging in...")
       : (isSignup ? "Sign up" : "Login");
   }
+  _gateSetLoadingFn = setLoading;
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     var email = document.getElementById("lt-auth-email").value.trim();
     var password = pwInput.value;
     hideError();
+    if (!email) { showError("Enter your email first."); return; }
+    if (isSignup && !ltPasswordLooksStrong(password)) {
+      /* Same rule Cognito enforces server-side — check it here first so a
+         weak password never burns a signup attempt. */
+      showError("Password must be 8+ characters with an uppercase letter, a lowercase letter and a number.");
+      return;
+    }
 
     setLoading(true);
 
-    if (isSignup) _justSignedUp = true;
-
-    var action = isSignup
-      ? createUserWithEmailAndPassword(auth, email, password)
-      : signInWithEmailAndPassword(auth, email, password);
-
-    action
-      .catch(function (err) {
-        _justSignedUp = false;
-        showError(friendlyError(err));
-        setLoading(false);
-      });
-    /* On success, onAuthStateChanged (below) removes the gate automatically */
+    if (isSignup) {
+      _justSignedUp = true;
+      cognitoSignUp(email, password);
+    } else {
+      cognitoLogin(email, password);
+    }
+    /* On success the auth funnel (handleAuthUser) removes the gate */
   });
+}
+
+/* ── Cognito flows: sign-up → email code → auto-login; direct login ──── */
+var _gateSetLoadingFn = null;
+var _pendingConfirm = null; /* { email, password?, user } while verifying the email code */
+function gateSetLoading(loading) {
+  try { if (_gateSetLoadingFn) _gateSetLoadingFn(loading); } catch (e) {}
+}
+function ltPasswordLooksStrong(pw) {
+  return pw.length >= 8 && /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /[0-9]/.test(pw);
+}
+
+function cognitoSignUp(email, password) {
+  try {
+    _cogPool.signUp(email, password, [{ Name: "email", Value: email }], null, function (err, result) {
+      if (err) {
+        _justSignedUp = false;
+        gateSetLoading(false);
+        if (err && (err.code || err.name) === "UsernameExistsException") {
+          /* Cognito tells us whether the existing account is still waiting
+             for its email code — if so, jump straight back to the code
+             screen instead of sending the user in a login circle. */
+          _pendingConfirm = { email: email, password: password, user: null };
+          renderGate("confirm");
+          setTimeout(function () {
+            showError("That email is signed up but not verified yet — enter the code we emailed you.");
+          }, 0);
+          return;
+        }
+        showError(friendlyError(err));
+        return;
+      }
+      _pendingConfirm = { email: email, password: password, user: result && result.user };
+      renderGate("confirm");
+    });
+  } catch (e) {
+    _justSignedUp = false;
+    gateSetLoading(false);
+    showError("Something went wrong. Please try again.");
+  }
+}
+
+function cognitoLogin(email, password) {
+  try {
+    var cogUser = new CognitoUser({ Username: email, Pool: _cogPool });
+    var details = new AuthenticationDetails({ Username: email, Password: password });
+    cogUser.authenticateUser(details, {
+      onSuccess: function (session) {
+        _cogUser = cogUser;
+        handleAuthUser(wrapCogUser(cogUser, session));
+        _gateDraft.email = ""; _gateDraft.pw = "";
+      },
+      onFailure: function (err) {
+        _justSignedUp = false;
+        gateSetLoading(false);
+        var code = (err && (err.code || err.name)) || "";
+        if (code === "UserNotConfirmedException") {
+          /* Password verified, email code not yet entered — back to the
+             code screen. No stored password here (fresh page load), so
+             after confirming, the user returns to Login with a success
+             note instead of being logged in silently. */
+          _pendingConfirm = { email: email, password: null, user: cogUser };
+          renderGate("confirm");
+          setTimeout(function () {
+            showError("Your email isn't verified yet — enter the code we emailed you.");
+          }, 0);
+          return;
+        }
+        showError(friendlyError(err));
+      },
+      newPasswordRequired: function () {
+        gateSetLoading(false);
+        showError("This account needs a password reset first — use Forgot password below.");
+      }
+    });
+  } catch (e) {
+    _justSignedUp = false;
+    gateSetLoading(false);
+    showError("Something went wrong. Please try again.");
+  }
 }
 
 /* ── Welcome screen — "Get Started for Free": Leafboard-style arch (starry
@@ -1076,9 +1242,9 @@ function renderWelcomeGate() {
   });
 }
 
-/* ── Forgot password screen — collects an email, then asks our own
-   serverless endpoint (which sends the reset email through Brevo, not
-   Firebase's default mailer) to email a reset link ─────────────────── */
+/* ── Forgot password — step 1: collect the email; Cognito emails a 6-digit
+   reset code. Step 2 (renderForgotCodeGate): enter the code + a new
+   password. Same screens as before, engine now Cognito. ─────────────── */
 function renderForgotGate() {
   injectStyles();
   var existing = document.getElementById("lt-auth-gate");
@@ -1143,25 +1309,245 @@ function renderForgotGate() {
     if (!email) { showError("Enter your email first."); return; }
     setLoading(true);
 
-    /* Always use the full deployed URL so the request works from any
-       context (Android WebView from file://, app.local, custom scheme, etc.) */
-    fetch("https://app.minutics.com/api/send-reset-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email }),
-    })
-      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
-      .then(function (r) {
+    try {
+      var cogUser = new CognitoUser({ Username: email, Pool: _cogPool });
+      var toCodeStep = function () {
         setLoading(false);
-        /* Always show the same success message regardless of whether the
-           account exists — never confirm/deny an email is registered. */
-        showError("If an account exists for that email, a reset link is on its way. Check your inbox (and spam folder).", true);
-      })
-      .catch(function (err) {
-        console.error("send-reset-email failed:", err);
-        setLoading(false);
-        showError("Network error — check your connection and try again.");
+        renderForgotCodeGate(email, cogUser);
+      };
+      cogUser.forgotPassword({
+        onSuccess: toCodeStep,
+        inputVerificationCode: toCodeStep, /* some SDK versions land here */
+        onFailure: function (err) {
+          setLoading(false);
+          var code = (err && (err.code || err.name)) || "";
+          var msg = (err && err.message) || "";
+          if (code === "LimitExceededException" || code === "TooManyRequestsException") {
+            showError(friendlyError(err));
+            return;
+          }
+          if (code === "InvalidParameterException" && msg.indexOf("no registered/verified") !== -1) {
+            /* Unconfirmed account: Cognito refuses a password reset until
+               the email is verified. The register flow already discloses
+               pending accounts, so an honest, actionable hint is
+               consistent — and much better than a dead generic message. */
+            showError("That email is signed up but not verified yet — check your inbox for the verification code, or register again to get a new one.");
+            return;
+          }
+          /* Never confirm/deny that an email is registered — the same
+             generic answer as the old flow. */
+          showError("If an account exists for that email, a reset code is on its way. Check your inbox (and spam folder).", true);
+        }
       });
+    } catch (err) {
+      setLoading(false);
+      showError("Network error — check your connection and try again.");
+    }
+  });
+}
+
+/* ── Forgot password — step 2: the emailed code + the new password ──── */
+function renderForgotCodeGate(email, cogUser) {
+  injectStyles();
+  var existing = document.getElementById("lt-auth-gate");
+  if (existing) existing.remove();
+  cleanupEnhancementVisuals();
+
+  var LOCK_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
+  var BACK_ICON = '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  var gate = document.createElement("div");
+  gate.id = "lt-auth-gate";
+  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:hsl(230 40% 16%);color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
+  gate.innerHTML =
+    '<div class="lt-auth-darkbg" aria-hidden="true"></div>' +
+    '<main class="lt-auth-scr">' +
+      '<button type="button" class="lt-auth-back" id="lt-forgot-back-link" aria-label="Back to login">' + BACK_ICON + '</button>' +
+      '<h1 class="lt-auth-h1">Enter your reset code</h1>' +
+      '<p class="lt-auth-sub2">We emailed a 6-digit code to ' + String(email).replace(/[<>&]/g, "") + '</p>' +
+      '<section class="lt-auth-card">' +
+        '<div class="lt-auth-error" id="lt-auth-error"></div>' +
+        '<form id="lt-forgot-code-form" novalidate>' +
+          '<div class="lt-auth-field">' +
+            '<div class="lt-auth-fbody">' +
+              '<label class="lt-auth-flabel" for="lt-forgot-code">Verification code</label>' +
+              '<input type="text" inputmode="numeric" id="lt-forgot-code" placeholder="123456" autocomplete="one-time-code" required>' +
+            '</div>' +
+          '</div>' +
+          '<div class="lt-auth-field">' + LOCK_ICON +
+            '<div class="lt-auth-fbody">' +
+              '<label class="lt-auth-flabel" for="lt-forgot-newpw">New password</label>' +
+              '<input type="password" id="lt-forgot-newpw" placeholder="8+ chars, A-z, 0-9" autocomplete="new-password" required>' +
+            '</div>' +
+          '</div>' +
+          '<p class="lt-auth-hint">Password must be 8+ characters with an uppercase letter, a lowercase letter and a number</p>' +
+          '<button class="lt-auth-submit" type="submit" id="lt-forgot-submit">' +
+            '<span class="lt-auth-spinner"></span>' +
+            '<span id="lt-forgot-submit-label">Reset password</span>' +
+          '</button>' +
+        '</form>' +
+        '<div class="lt-auth-frow"><button type="button" class="lt-auth-forgot" id="lt-forgot-resend">Resend code</button></div>' +
+      '</section>' +
+    '</main>';
+  document.body.appendChild(gate);
+
+  document.getElementById("lt-forgot-back-link").addEventListener("click", function () {
+    renderGate("login");
+  });
+
+  var submitBtn = document.getElementById("lt-forgot-submit");
+  var submitLabel = document.getElementById("lt-forgot-submit-label");
+  function setLoading(loading) {
+    submitBtn.disabled = loading;
+    submitBtn.classList.toggle("lt-auth-loading", loading);
+    submitLabel.textContent = loading ? "Resetting..." : "Reset password";
+  }
+
+  document.getElementById("lt-forgot-resend").addEventListener("click", function () {
+    try {
+      cogUser.forgotPassword({
+        onSuccess: function () { showError("A new code is on its way.", true); },
+        inputVerificationCode: function () { showError("A new code is on its way.", true); },
+        onFailure: function (err) { showError(friendlyError(err)); }
+      });
+    } catch (e) { showError("Network error — check your connection and try again."); }
+  });
+
+  document.getElementById("lt-forgot-code-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var code = document.getElementById("lt-forgot-code").value.trim();
+    var newPw = document.getElementById("lt-forgot-newpw").value;
+    hideError();
+    if (!code) { showError("Enter the code from your email."); return; }
+    if (!ltPasswordLooksStrong(newPw)) {
+      showError("Password must be 8+ characters with an uppercase letter, a lowercase letter and a number.");
+      return;
+    }
+    setLoading(true);
+    try {
+      cogUser.confirmPassword(code, newPw, {
+        onSuccess: function () {
+          setLoading(false);
+          renderGate("login");
+          setTimeout(function () {
+            showError("Password reset — log in with your new password.", true);
+          }, 0);
+        },
+        onFailure: function (err) {
+          setLoading(false);
+          showError(friendlyError(err));
+        }
+      });
+    } catch (err) {
+      setLoading(false);
+      showError("Network error — check your connection and try again.");
+    }
+  });
+}
+
+/* ── Email verification (register step 2): Cognito signs the account up
+   in a "waiting for code" state; the emailed 6-digit code confirms it.
+   When we came straight from Sign up the password is still in memory and
+   the confirm logs the user straight in; when it isn't (page reload /
+   login hit UserNotConfirmedException), the user returns to Login. ──── */
+function renderConfirmGate() {
+  injectStyles();
+  var existing = document.getElementById("lt-auth-gate");
+  if (existing) existing.remove();
+  cleanupEnhancementVisuals();
+
+  var p = _pendingConfirm || {};
+  var email = p.email || "";
+
+  var MAIL_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
+  var BACK_ICON = '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  var gate = document.createElement("div");
+  gate.id = "lt-auth-gate";
+  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:hsl(230 40% 16%);color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
+  gate.innerHTML =
+    '<div class="lt-auth-darkbg" aria-hidden="true"></div>' +
+    '<main class="lt-auth-scr">' +
+      '<button type="button" class="lt-auth-back" id="lt-confirm-back-btn" aria-label="Back">' + BACK_ICON + '</button>' +
+      '<h1 class="lt-auth-h1">Verify your email</h1>' +
+      '<p class="lt-auth-sub2">Enter the 6-digit code we sent to ' + String(email).replace(/[<>&]/g, "") + '</p>' +
+      '<section class="lt-auth-card">' +
+        '<div class="lt-auth-error" id="lt-auth-error"></div>' +
+        '<form id="lt-confirm-form" novalidate>' +
+          '<div class="lt-auth-field">' + MAIL_ICON +
+            '<div class="lt-auth-fbody">' +
+              '<label class="lt-auth-flabel" for="lt-confirm-code">Verification code</label>' +
+              '<input type="text" inputmode="numeric" id="lt-confirm-code" placeholder="123456" autocomplete="one-time-code" required>' +
+            '</div>' +
+          '</div>' +
+          '<button class="lt-auth-submit" type="submit" id="lt-confirm-submit">' +
+            '<span class="lt-auth-spinner"></span>' +
+            '<span id="lt-confirm-submit-label">Verify email</span>' +
+          '</button>' +
+        '</form>' +
+        '<div class="lt-auth-frow"><button type="button" class="lt-auth-forgot" id="lt-confirm-resend">Resend code</button></div>' +
+      '</section>' +
+    '</main>';
+  document.body.appendChild(gate);
+
+  document.getElementById("lt-confirm-back-btn").addEventListener("click", function () {
+    renderGate("login");
+  });
+
+  var submitBtn = document.getElementById("lt-confirm-submit");
+  var submitLabel = document.getElementById("lt-confirm-submit-label");
+  function setLoading(loading) {
+    submitBtn.disabled = loading;
+    submitBtn.classList.toggle("lt-auth-loading", loading);
+    submitLabel.textContent = loading ? "Verifying..." : "Verify email";
+  }
+
+  function cogUserForConfirm() {
+    if (_pendingConfirm && _pendingConfirm.user) return _pendingConfirm.user;
+    return new CognitoUser({ Username: email, Pool: _cogPool });
+  }
+
+  document.getElementById("lt-confirm-resend").addEventListener("click", function () {
+    try {
+      /* resendConfirmationCode uses a node-style (err, result) callback —
+         NOT the { onSuccess, onFailure } map the other SDK calls take. */
+      cogUserForConfirm().resendConfirmationCode(function (err) {
+        if (err) { showError(friendlyError(err)); return; }
+        showError("A new code is on its way. Check your inbox.", true);
+      });
+    } catch (e) { showError("Network error — check your connection and try again."); }
+  });
+
+  document.getElementById("lt-confirm-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var code = document.getElementById("lt-confirm-code").value.trim();
+    hideError();
+    if (!code) { showError("Enter the code from your email."); return; }
+    setLoading(true);
+    try {
+      cogUserForConfirm().confirmRegistration(code, true, function (err) {
+        if (err) {
+          setLoading(false);
+          showError(friendlyError(err));
+          return;
+        }
+        var pw = _pendingConfirm && _pendingConfirm.password;
+        if (pw) {
+          /* Straight from Sign up — the password is right here: log the
+             fresh account in immediately, exactly like Firebase's
+             createUserWithEmailAndPassword used to. */
+          cognitoLogin(email, pw);
+          return;
+        }
+        renderGate("login");
+        setTimeout(function () {
+          showError("Email verified — log in to continue.", true);
+        }, 0);
+      });
+    } catch (err) {
+      setLoading(false);
+      showError("Network error — check your connection and try again.");
+    }
   });
 }
 
@@ -1180,13 +1566,29 @@ function hideError() {
 }
 
 function friendlyError(err) {
-  var code = (err && err.code) || "";
-  if (code.indexOf("email-already-in-use") !== -1) return "That email already has an account — try logging in instead.";
-  if (code.indexOf("invalid-email") !== -1) return "That email address doesn't look right.";
-  if (code.indexOf("weak-password") !== -1) return "Password must be at least 6 characters.";
-  if (code.indexOf("user-not-found") !== -1 || code.indexOf("invalid-credential") !== -1 || code.indexOf("wrong-password") !== -1) return "Incorrect email or password.";
-  if (code.indexOf("too-many-requests") !== -1) return "Too many attempts — please wait a moment and try again.";
-  if (code.indexOf("network-request-failed") !== -1) return "Network error — check your connection.";
+  /* Cognito errors carry the exception name in .code (sometimes .name). */
+  var code = (err && (err.code || err.name)) || "";
+  var msg = (err && err.message) || "";
+  if (code === "UsernameExistsException") return "That email already has an account — try logging in instead.";
+  if (code === "InvalidPasswordException") {
+    if (/8|character|uppercase|lowercase|number/i.test(msg)) {
+      return "Password must be 8+ characters with an uppercase letter, a lowercase letter and a number.";
+    }
+    return msg || "That password doesn't meet the requirements.";
+  }
+  if (code === "InvalidParameterException" || code === "InvalidEmailAddressException") {
+    if (/password/i.test(msg)) return "Password must be 8+ characters with an uppercase letter, a lowercase letter and a number.";
+    return "That email address doesn't look right.";
+  }
+  if (code === "UserNotConfirmedException") return "Your email isn't verified yet — check your inbox for the verification code.";
+  if (code === "CodeMismatchException") return "That code didn't match — check your email and try again.";
+  if (code === "ExpiredCodeException") return "That code expired — request a new one.";
+  if (code === "UserNotFoundException" || code === "NotAuthorizedException") return "Incorrect email or password.";
+  if (code === "PasswordResetRequiredException") return "This account needs a password reset first — use Forgot password.";
+  if (code === "LimitExceededException" || code === "TooManyRequestsException" || code === "TooManyFailedAttemptsException") {
+    return "Too many attempts — please wait a moment and try again.";
+  }
+  if (/failed to fetch|networkerror|network request/i.test(msg)) return "Network error — check your connection.";
   return "Something went wrong. Please try again.";
 }
 
@@ -1333,8 +1735,14 @@ setTimeout(function () {
   } catch (e) {}
 }, 7000);
 
-/* ── Auth state watcher: gate blocks the app until signed in ────────────── */
-onAuthStateChanged(auth, function (user) {
+/* ── Auth state funnel: gate blocks the app until signed in ─────────────
+   Firebase used to deliver this as onAuthStateChanged; Cognito has no
+   listener, so the state machine is ours. EVERY path — boot restore
+   (bootstrapAuth), login (cognitoLogin), signup-confirm auto-login,
+   LTAuth.logout, the single-device kick — feeds handleAuthUser(), and
+   the body below is the unchanged downstream logic (demo, storage
+   namespacing, gate, route landing). */
+function handleAuthUser(user) {
   _authStateChangedFired = true;
   console.log("AUTH STATE CHANGED:", user ? "AUTHENTICATED" : "NOT AUTHENTICATED", user);
   /* Active Early Access Demo wins over "signed out": resume it, or wipe
@@ -1482,5 +1890,30 @@ onAuthStateChanged(auth, function (user) {
 
     renderGate("welcome");
   }
-});
+}
+
+/* The explicit sign-out paths (LTAuth.logout, single-device kick) have no
+   Cognito event to wait for — they call the null funnel directly. */
+function notifySignedOut() { handleAuthUser(null); }
+
+/* ── Boot: restore a Cognito session if one exists on this device ──────
+   getSession() transparently refreshes expired tokens with the refresh
+   token (valid 365 days), so a user who keeps their account stays signed
+   in across launches for up to a whole year. No session / revoked
+   refresh / unreadable storage is simply "not signed in" → the gate. */
+function bootstrapAuth() {
+  try {
+    var cu = _cogPool.getCurrentUser();
+    if (!cu) { handleAuthUser(null); return; }
+    cu.getSession(function (err, session) {
+      /* Any error here (no cached session, refresh revoked, pool
+         unreachable with nothing cached) reads as signed out — never as
+         a bypass. */
+      if (err || !session) { handleAuthUser(null); return; }
+      _cogUser = cu;
+      handleAuthUser(wrapCogUser(cu, session));
+    });
+  } catch (e) { handleAuthUser(null); }
+}
+bootstrapAuth();
 
