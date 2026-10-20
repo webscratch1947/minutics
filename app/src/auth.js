@@ -152,7 +152,15 @@ function rememberAuthEmail(em) {
 }
 function wrapCogUser(cogUser, session) {
   var payload = null;
-  try { payload = session ? _jwtPayload(session.getIdToken()) : null; } catch (e) {}
+  /* The SDK's getIdToken() returns a CognitoIdToken OBJECT — every wire
+     use needs the raw JWT string (getJwtToken). Sending the object gave
+     the server "Bearer [object Object]" → 401 → every ledger call
+     (claim/check/plan) silently no-oped; THAT is why purchases never
+     saved. One helper, used everywhere. */
+  var jwtOf = function (s) {
+    try { return s && s.getIdToken && s.getIdToken().getJwtToken(); } catch (e) { return null; }
+  };
+  try { payload = session ? _jwtPayload(jwtOf(session)) : null; } catch (e) {}
   var username = (cogUser && cogUser.getUsername && cogUser.getUsername()) || "";
   var email = "";
   if (_looksLikeEmail(payload && payload.email)) email = payload.email;
@@ -172,13 +180,13 @@ function wrapCogUser(cogUser, session) {
         if (!cogUser) { resolve(null); return; }
         cogUser.getSession(function (err, s) {
           if (err || !s) { resolve(null); return; }
-          if (!force) { resolve(s.getIdToken()); return; }
+          if (!force) { resolve(jwtOf(s)); return; }
           /* force = bypass the cached token and refresh right now (used
              by the session watch and the report scheduler's heartbeat).
              The refresh token is valid for a year — a failed refresh here
              is a real "signed out", never an hour-expiry artefact. */
           s.refresh(function (e2, s2) {
-            resolve(e2 ? s.getIdToken() : s2.getIdToken());
+            resolve(e2 ? jwtOf(s) : jwtOf(s2));
           });
         });
       });
