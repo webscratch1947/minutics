@@ -249,7 +249,7 @@
           <tbody id="usersBody"></tbody>
         </table>
       </div>
-      <p class="empty" id="usersEmpty" hidden>No users yet — sign-ups land here as soon as the new login system is switched on.</p>
+      <p class="empty" id="usersEmpty" hidden>No users yet — an account appears here right after its first login in the app.</p>
     </section>
 
     <section class="panel">
@@ -395,7 +395,7 @@
     var p = $("usersEmpty");
     if (empty) {
       p.textContent = rows.users.length === 0
-        ? "No users yet — sign-ups land here as soon as the new login system is switched on."
+        ? "No users yet — an account appears here right after its first login in the app."
         : "No users match that filter.";
       show(p, true);
     } else show(p, false);

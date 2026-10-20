@@ -219,7 +219,9 @@ function forceLogoutSingleSession() {
 function checkSessionClaim() {
   if (!_cogCurrentUser) return;
   _sessionPost({ mode: "check" }).then(function (d) {
-    if (!d || !d.device) return; /* degraded server / no claim yet — never kick */
+    if (!d || d.degraded) return; /* degraded server — never kick, never claim-spam */
+    if (!d.device) { claimSessionNow(); return; } /* healthy ledger but no row yet (this
+       session started before the ledger existed) — claim once so the account shows up */
     if (d.device === getDeviceId()) return;
     if (Date.now() < _claimGraceUntil) { claimSessionNow(); return; } /* still registering this device */
     forceLogoutSingleSession();
@@ -1769,6 +1771,10 @@ function handleAuthUser(user) {
   if (user) {
     console.log("Removing auth gate and adding lt-authed class");
     _logoutInProgress = false;
+    /* Hand the signed-in user to LTAuth. Without this, Settings showed no
+       email ("Your data stays on this device") and the session claim never
+       posted an ID token — so no ledger row appeared in the admin panel. */
+    _cogCurrentUser = user;
     /* Surface the authenticated UI FIRST — no storage/session side effect
        below may ever strand the user on the opaque gate (white screen). */
     document.body.classList.add("lt-authed");
@@ -1873,6 +1879,7 @@ function handleAuthUser(user) {
     }
   } else {
     console.log("Removing lt-authed class and rendering login gate");
+    _cogCurrentUser = null;
     /* A null user while our active-account marker is still set — and no
        real sign-out is in flight — is the transient IndexedDB failure
        mode, not a genuine sign-out (genuine sign-outs flag

@@ -80,59 +80,72 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
        splash that never started. */
     window.__ltSplashPlaying = true;
 
-    /* Natural-end release: counts from START or from the last RESTARTED run
-       (see resyncAnimWithAudio below). */
+    /* Natural-end release: counts from adoption; startIntro() below re-bases
+       both it and the hard backstop on the ACTUAL intro start. */
     var endTimer = setTimeout(dismiss, END_MS);
-    setTimeout(dismiss, HARD_MS);
+    var hardTimer = setTimeout(dismiss, HARD_MS);
 
-    /* Sound arriving LATE — desktops hard-block autoplay until a gesture, and
-       on some launches even muted autoplay is blocked, so the clip sits at 0
-       while the CSS animation races ahead. Un-muting then would play the
-       jingle OVER a finished animation ("audio plays late, after the
-       animation ends"). The 'play' event fires exactly when sound (re)starts:
-       if it starts from ~0 this far into the animation, replay the WHOLE
-       splash animation from frame one together with the jingle — a late tap
-       becomes "tap to start", perfectly synced like a first launch. Playback
-       already in motion (the APK, or muted desktop playback that kept pace)
-       restarts nothing. */
-    var resyncs = 0, lastResync = 0;
-    function resyncAnimWithAudio() {
-      if (dismissed || !audio || audio.ended) return;
-      if (audio.currentTime > 0.5) return;   /* kept pace — already in sync */
-      /* How far the animation has actually run (emblem animation, includes
-         its .1s delay) — ground truth from the Web Animations API, with the
-         document timeline as fallback. */
-      var elapsed = null;
+    /* ── Exactly ONE play: audio + animation start on the same frame ──────
+       The CSS animation begins at HTML parse, but the jingle can begin a
+       beat later (audio buffering on slower connections, autoplay policy on
+       desktops). The old code REPLAYED the whole animation whenever the
+       audio finally started from 0 — users saw the intro twice with the
+       beats landing wrong. Now the animation is held at its first frame
+       until the audio is actually running, then both start together, once.
+       A late sound-unlock gesture only JOINS the music at its current
+       position — the animation never restarts. */
+    function splashAnimations() {
       try {
-        var em = document.getElementById("lt-splash-emblem");
-        if (em && em.getAnimations) {
-          var aa = em.getAnimations();
-          if (aa && aa.length) elapsed = (aa[0].currentTime || 0) / 1000;
+        if (splash.getAnimations) {
+          var own = splash.getAnimations({ subtree: true });
+          if (own && own.length) return own;
         }
-      } catch (e) {}
-      if (elapsed === null) elapsed = ((document.timeline && document.timeline.currentTime) || 0) / 1000;
-      if (elapsed <= 0.35) return;             /* fresh start — already in sync */
-      var now = Date.now();
-      if (resyncs >= 2 || now - lastResync < 800) return; /* never loop a restart */
-      resyncs++; lastResync = now;
-      var anim = document.getElementById("lt-startup-splash-anim");
-      if (anim && anim.classList) {
-        anim.classList.add("run");
-        void anim.offsetWidth;                 /* forced style pass */
-        anim.classList.remove("run");          /* every animation replays */
-      }
-      try { audio.currentTime = 0; } catch (e) {}
-      clearTimeout(endTimer);                  /* dismissal now counts from */
-      endTimer = setTimeout(dismiss, END_MS);  /* the restarted run */
+        return (document.getAnimations() || []).filter(function (a) {
+          try { return splash.contains(a.effect && a.effect.target); } catch (e) { return false; }
+        });
+      } catch (e) { return []; }
     }
+    var introStarted = false;
+    function startIntro() {
+      if (introStarted || dismissed) return;
+      introStarted = true;
+      /* Anchor both timelines at one instant: if the audio is already at t
+         (the inline play() at HTML parse beat us here), the animation joins
+         IT — usually t ≈ 0, i.e. the first frame. */
+      var at = 0;
+      try { if (audio && !audio.paused) at = Math.max(0, (audio.currentTime || 0) * 1000); } catch (e) {}
+      splashAnimations().forEach(function (a) {
+        try { a.currentTime = at; } catch (e) {}
+        try { a.play(); } catch (e) {}
+      });
+      clearTimeout(endTimer);                 /* dismissal counts from the */
+      endTimer = setTimeout(dismiss, END_MS); /* actual intro start */
+      clearTimeout(hardTimer);
+      hardTimer = setTimeout(dismiss, HARD_MS);
+    }
+    /* Freeze any pre-roll instantly (before the user can see it jump back). */
+    splashAnimations().forEach(function (a) { try { a.currentTime = 0; a.pause(); } catch (e) {} });
 
     if (audio) {
-      audio.addEventListener("play", resyncAnimWithAudio);
+      /* 'playing' = frames actually flowing: the one true start moment. */
+      audio.addEventListener("playing", startIntro);
       audio.addEventListener("ended", function () { setTimeout(dismiss, 200); });
-      /* Audio broken/missing: release quickly — never a stuck splash. */
-      audio.addEventListener("error", function () { setTimeout(dismiss, 1200); });
+      /* Audio broken/missing: keep the visuals going, release quickly. */
+      audio.addEventListener("error", function () { startIntro(); setTimeout(dismiss, 1200); });
       if (audio.ended) setTimeout(dismiss, 200);
-      if (audio.paused) audio.play().catch(function () {});
+      if (audio.paused) {
+        audio.play().catch(function () {
+          /* Desktop policy: the muted fallback below (ensureAudible) plays
+             the jingle silently in sync — first tap unmutes it in place. */
+        });
+      } else if (audio.currentTime > 0) {
+        startIntro(); /* the HTML-parse play() is already running */
+      }
+      /* Absolute safety: a jingle that never produces a frame must never
+         hold the splash hostage — visuals release after 3s at the latest. */
+      setTimeout(startIntro, 3000);
+    } else {
+      startIntro();
     }
 
     /* WITH SOUND — the original intro audio (extracted from the v5 export).
@@ -176,7 +189,23 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     }
     try {
       var unmuteOnGesture = function () {
-        if (!dismissed && audio) { audio.defaultMuted = false; audio.muted = false; audio.play().catch(function () {}); }
+        if (!dismissed && audio) {
+          audio.defaultMuted = false; audio.muted = false;
+          if (audio.paused) {
+            /* The music never started (hard-blocked launch): join it at the
+               animation's current position — the visuals never restart. */
+            try {
+              var at = 0;
+              splashAnimations().forEach(function (a) {
+                try { at = Math.max(at, (a.currentTime || 0)); } catch (e) {}
+              });
+              if (at > 0 && audio.duration) {
+                audio.currentTime = Math.min(at / 1000, Math.max(0, audio.duration - 0.2));
+              }
+            } catch (e) {}
+          }
+          audio.play().catch(function () {});
+        }
         window.removeEventListener("pointerdown", unmuteOnGesture, true);
         window.removeEventListener("touchstart", unmuteOnGesture, true);
         window.removeEventListener("keydown", unmuteOnGesture, true);
@@ -10068,170 +10097,4 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     }, 3000);
   });
 
-  /* ══════════════════════════════════════════════════════════════════════
-     DIGITAL PRIVACY SCREEN (user request)
-     A software stand-in for a physical privacy shutter: when the setting is
-     on in Settings, tilting the phone sideways (|gamma| past ~45°) or laying
-     it nearly flat (beta < 10°, screen facing up) covers the screen with
-     black so someone looking from the side sees a dark panel. Straightening
-     the phone reveals it again (6° of hysteresis so the edge never strobes).
-     A hold-to-peek button lets the owner reveal the screen without untipping
-     the phone. Motion sensors don't exist on desktop browsers — there the
-     toggle simply stays idle (and iOS 13+ grants access from the toggle's
-     own user gesture in Settings).
-  ══════════════════════════════════════════════════════════════════════ */
-  (function initPrivacyScreen() {
-    var KEY = "lt_privacy_screen_v1";
-    var overlay = null, peekBtn = null, listening = false, engaged = false, peeking = false;
-    var tiltStreak = 0, lastEventAt = 0, staleTimer = null;
-
-    function enabled() {
-      try { return localStorage.getItem(KEY) === "1"; } catch (e) { return false; }
-    }
-
-    function ensureOverlay() {
-      if (overlay && overlay.isConnected) return;
-      overlay = document.createElement("div");
-      overlay.id = "lt-privacy-shutter";
-      overlay.setAttribute("aria-hidden", "true");
-      overlay.style.cssText =
-        "position:fixed;inset:0;background:#000;z-index:2147483647;" +
-        "opacity:0;pointer-events:none;transition:opacity .12s ease;" +
-        "display:flex;align-items:flex-end;justify-content:center;padding-bottom:78px;";
-      peekBtn = document.createElement("button");
-      peekBtn.type = "button";
-      peekBtn.textContent = "Hold to peek";
-      peekBtn.style.cssText =
-        "pointer-events:none;background:rgba(255,255,255,.14);color:rgba(255,255,255,.8);" +
-        "border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:8px 16px;" +
-        "font:600 12px/1 system-ui,sans-serif;letter-spacing:.04em;cursor:pointer;" +
-        "-webkit-user-select:none;user-select:none;touch-action:none;opacity:.9;";
-      var holdStart = function (e) {
-        if (e && e.preventDefault) e.preventDefault();
-        peeking = true; apply();
-        /* NO pointer capture: while peeking the screen is revealed and the
-           owner must be able to TAP the app underneath. Capture routed every
-           pointer event to this button — "how can a person click while
-           holding the button, it won't work". The window-level pointerup
-           below still ends the peek from anywhere. */
-        window.addEventListener("pointerup", holdEnd, { once: true });
-        window.addEventListener("pointercancel", holdEnd, { once: true });
-      };
-      var holdEnd = function () {
-        if (peeking) { peeking = false; apply(); }
-      };
-      peekBtn.addEventListener("pointerdown", holdStart);
-      peekBtn.addEventListener("contextmenu", function (e) { e.preventDefault(); });
-      overlay.appendChild(peekBtn);
-      (document.documentElement || document.body).appendChild(overlay);
-    }
-
-    function apply() {
-      if (!overlay) return;
-      var show = engaged && !peeking;
-      if (show) {
-        /* Re-attach as the LAST element of <html> whenever it engages: the
-           shutter shares the max z-index with other top overlays (emoji
-           picker, Full View, toasts) and among ties the last node in tree
-           order paints on top — so an overlay opened earlier can never show
-           through the privacy screen. */
-        try { document.documentElement.appendChild(overlay); } catch (e) {}
-      }
-      overlay.style.opacity = show ? "1" : "0";
-      overlay.style.pointerEvents = show ? "auto" : "none";
-      /* The peek button sits at the bottom-centre of the screen — EXACTLY
-         over the middle nav tab (Life Hub) — so it must be completely out
-         of hit-testing whenever the shutter isn't engaged: at opacity:0 an
-         enabled-but-not-tilted shutter left it tappable and every "Life
-         Hub" tap landed on this invisible button ("the life hub doesn't
-         open"). While PEEKING it keeps its current state — flipping
-         pointer-events mid-hold cancels the touch on Android (pointercancel
-         would end the peek instantly); taps that START elsewhere already
-         pass through (no pointer capture). */
-      if (peekBtn && !peeking) peekBtn.style.pointerEvents = show ? "auto" : "none";
-    }
-
-    function evaluate(gamma, beta) {
-      if (typeof gamma !== "number" || typeof beta !== "number" ||
-          isNaN(gamma) || isNaN(beta)) return;
-      lastEventAt = Date.now();
-      var tilt = Math.abs(gamma);
-      var sideWays = tilt > 45;
-      if (!engaged) {
-        /* Engage only after 3 CONSECUTIVE readings in the protected zone:
-           phones fire single bogus all-zero readings while the sensors
-           calibrate, and one bad frame used to black the whole screen even
-           with the phone perfectly upright ("can't see it from the front
-           either"). Three agreeing readings in a row is under half a
-           second — still instant to a side viewer, immune to glitches. */
-        if (sideWays) {
-          tiltStreak += 1;
-          if (tiltStreak >= 3) { engaged = true; tiltStreak = 0; apply(); startWatchdog(); }
-        } else {
-          tiltStreak = 0;
-        }
-      } else {
-        /* Release with ~6° of hysteresis so the edge never strobes. Only a
-           sideways tilt ever engages (the old "lying flat" trigger covered
-           the screen whenever the phone was on a desk — the owner could
-           never reach the Settings toggle to turn it off). */
-        if (tilt < 39) { engaged = false; peeking = false; tiltStreak = 0; apply(); stopWatchdog(); }
-      }
-    }
-
-    /* Never trap the owner behind a black screen: if orientation events stop
-       flowing (sensor stall, app switch, a WebView with no sensors) the real
-       angle is unknowable — release and let fresh readings re-engage. Real
-       side-view protection always has live events, so this can only ever
-       release for the owner. */
-    function startWatchdog() {
-      stopWatchdog();
-      staleTimer = setInterval(function () {
-        if (Date.now() - lastEventAt > 6000) {
-          engaged = false; peeking = false; tiltStreak = 0;
-          apply(); stopWatchdog();
-        }
-      }, 1000);
-    }
-    function stopWatchdog() {
-      if (staleTimer) { clearInterval(staleTimer); staleTimer = null; }
-    }
-
-    function onOrientation(e) { evaluate(e.gamma, e.beta); }
-
-    function start() {
-      if (listening || !enabled()) return;
-      if (typeof DeviceOrientationEvent === "undefined") return;
-      ensureOverlay();
-      apply();   /* until the first tilt: overlay AND peek button fully inert */
-      window.addEventListener("deviceorientation", onOrientation, true);
-      listening = true;
-    }
-
-    function stop() {
-      if (!listening) return;
-      window.removeEventListener("deviceorientation", onOrientation, true);
-      listening = false;
-      engaged = false; peeking = false; tiltStreak = 0;
-      stopWatchdog();
-      apply();
-    }
-
-    function sync() { if (enabled()) start(); else stop(); }
-
-    window.addEventListener("lt-privacy-changed", sync);
-    window.addEventListener("storage", function (e) { if (e.key === KEY) sync(); });
-    /* Returning to the app after it was hidden: the last-known angle is
-       stale by definition — release and let the first fresh readings
-       re-engage (they arrive within a few hundred milliseconds). */
-    document.addEventListener("visibilitychange", function () {
-      if (!document.hidden && engaged) {
-        engaged = false; peeking = false; tiltStreak = 0;
-        apply(); stopWatchdog();
-      }
-    });
-    /* Test hook: __ltPrivacyTest(50, 30) simulates a sideways tilt. */
-    window.__ltPrivacyTest = function (gamma, beta) { ensureOverlay(); evaluate(gamma, beta); };
-    sync();
-  })();
 })();
