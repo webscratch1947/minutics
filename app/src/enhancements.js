@@ -8763,9 +8763,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '#lt-checkout-modal #lt-checkout-cancel-btn{background:#DC2626!important;color:#fff!important;border:none!important;border-radius:12px;font-weight:700}' +
         '@keyframes ltPlOvIn{from{opacity:0}to{opacity:1}}' +
         '@keyframes ltPlIn{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}' +
-        '/* No fade on the veil itself: during the old .2s fade the previous
-           screen showed through the translucent overlay — a visible flash.
-           The veil is instant; only the card animates. */' +
+        /* No fade on the veil itself: during the old .2s fade the previous screen showed through the translucent overlay — a visible flash. The veil is instant; only the card animates. */
         '#lt-checkout-card{animation:ltPlIn .26s cubic-bezier(.2,.9,.3,1.15)}' +
         '@media (prefers-reduced-motion:reduce){#lt-checkout-modal,#lt-checkout-card{animation:none}}' +
       '</style>' +
