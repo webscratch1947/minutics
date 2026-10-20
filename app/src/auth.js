@@ -134,12 +134,33 @@ function _jwtPayload(jwt) {
     return JSON.parse(atob(body));
   } catch (e) { return null; }
 }
+function _looksLikeEmail(v) {
+  return typeof v === "string" && /.+@.+\..+/.test(v);
+}
+/* The email the user ACTUALLY typed at sign-up/login — remembered so every
+   later screen (and a token that lacks an email claim) shows their real
+   address instead of ever falling back to the raw Cognito user id. */
+function rememberAuthEmail(em) {
+  if (!_looksLikeEmail(em)) return;
+  try { localStorage.setItem("lt_auth_email", em); } catch (e) {}
+}
 function wrapCogUser(cogUser, session) {
   var payload = null;
   try { payload = session ? _jwtPayload(session.getIdToken()) : null; } catch (e) {}
+  var username = (cogUser && cogUser.getUsername && cogUser.getUsername()) || "";
+  var email = "";
+  if (_looksLikeEmail(payload && payload.email)) email = payload.email;
+  else if (_looksLikeEmail(username)) email = username;
+  else {
+    try {
+      var saved = localStorage.getItem("lt_auth_email");
+      if (_looksLikeEmail(saved)) email = saved;
+    } catch (e) {}
+  }
+  rememberAuthEmail(email);
   return {
-    uid: (payload && payload.sub) || (cogUser && cogUser.getUsername && cogUser.getUsername()) || "",
-    email: (payload && payload.email) || (cogUser && cogUser.getUsername && cogUser.getUsername()) || "",
+    uid: (payload && payload.sub) || username || "",
+    email: email,
     getIdToken: function (force) {
       return new Promise(function (resolve) {
         if (!cogUser) { resolve(null); return; }
@@ -1155,6 +1176,7 @@ function cognitoLogin(email, password) {
     cogUser.authenticateUser(details, {
       onSuccess: function (session) {
         _cogUser = cogUser;
+        rememberAuthEmail(email); /* the address they typed, whatever the token says */
         handleAuthUser(wrapCogUser(cogUser, session));
         _gateDraft.email = ""; _gateDraft.pw = "";
       },

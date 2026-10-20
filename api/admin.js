@@ -17,6 +17,7 @@
 import crypto from "crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { CognitoIdentityProviderClient, ListUsersCommand } from "@aws-sdk/client-cognito-identity-provider";
 
 const ADMIN_HOST = "admin.minutics.com";
 const COOKIE_NAME = "lt_admin_session";
@@ -153,6 +154,78 @@ async function scanTable(table, cap) {
   return items.slice(0, cap);
 }
 
+/* ── Cognito: the authoritative account list ──────────────────────────
+   Every account that exists lives in the Cognito user pool; the
+   DynamoDB ledger only records logins (device + last seen). The panel
+   therefore lists users FROM COGNITO and enriches each row with its
+   ledger data, so a signup appears immediately — even before its first
+   login claim ever lands. */
+const USER_POOL_ID = process.env.COGNITO_POOL_ID || "ap-south-1_QAdugNxC2";
+
+function mapCognitoUser(u) {
+  const attrs = u.Attributes || [];
+  const attr = (n) => { const hit = attrs.find((a) => a.Name === n); return hit ? hit.Value : ""; };
+  const emailAttr = attr("email");
+  return {
+    sub: attr("sub") || u.Username || "",
+    username: u.Username || "",
+    email: emailAttr || (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.Username || "") ? u.Username : ""),
+    status: u.UserStatus || "",
+    enabled: u.Enabled !== false,
+    createdAt: u.UserCreateDate ? new Date(u.UserCreateDate).getTime() : "",
+  };
+}
+
+async function listCognitoUsers(cap) {
+  const client = new CognitoIdentityProviderClient({
+    region: process.env.AWS_REGION || "ap-south-1",
+  });
+  const out = [];
+  let token;
+  do {
+    const res = await client.send(new ListUsersCommand({
+      UserPoolId: USER_POOL_ID,
+      Limit: 60,
+      PaginationToken: token,
+    }));
+    for (const u of res.Users || []) out.push(mapCognitoUser(u));
+    token = res.PaginationToken;
+  } while (token && out.length < cap);
+  return out.slice(0, cap);
+}
+
+/* Cognito account + its login-ledger row → one panel row. Ledger rows that
+   match no Cognito account (old pre-Cognito records) are still appended so
+   nothing silently disappears. */
+function mergeUsers(cognitoUsers, ledger) {
+  const byKey = new Map();
+  for (const row of ledger || []) {
+    if (!row || typeof row !== "object") continue;
+    const sub = String(row.sub || row.pk || row.uid || "");
+    const email = String(row.email || "").toLowerCase();
+    if (sub) byKey.set("sub:" + sub, row);
+    if (email) byKey.set("email:" + email, row);
+  }
+  const users = [];
+  const matched = new Set();
+  for (const c of cognitoUsers || []) {
+    const row = byKey.get("sub:" + c.sub) || byKey.get("email:" + String(c.email || "").toLowerCase()) || {};
+    if (row && (row.sub || row.pk)) matched.add(row);
+    users.push(Object.assign({}, row, c, {
+      sub: c.sub || row.sub || row.pk || "",
+      email: c.email || row.email || "",
+      createdAt: c.createdAt || row.createdAt || row.joinedAt || "",
+      lastLoginAt: row.lastLoginAt || row.lastSeen || row.lastLogin || null,
+      lastSeenAt: row.lastSeenAt || row.lastLoginAt || null,
+    }));
+  }
+  for (const row of ledger || []) {
+    if (matched.has(row)) continue;
+    users.push(Object.assign({}, row, { sub: row.sub || row.pk || row.uid || "" }));
+  }
+  return users;
+}
+
 function computeStats(users, purchases) {
   const FREE = new Set(["", "free", "none", "trial"]);
   const active = users.filter(
@@ -177,11 +250,12 @@ async function readData() {
   if (!haveCreds) warnings.push("AWS keys are not set in the environment yet — showing an empty ledger.");
   if (!usersTable || !purchasesTable) warnings.push("Table names are not configured (AWS_TABLE / AWS_TABLE_PURCHASES).");
 
-  let users = [];
+  let ledger = [];
   let purchases = [];
+  let cognitoUsers = null;
   if (haveCreds && usersTable && purchasesTable) {
     try {
-      users = await scanTable(usersTable, DATA_CAP);
+      ledger = await scanTable(usersTable, DATA_CAP);
     } catch (e) {
       warnings.push("Could not read the users table (" + (e && e.name ? e.name : "error") + ").");
     }
@@ -191,7 +265,18 @@ async function readData() {
       warnings.push("Could not read the purchases table (" + (e && e.name ? e.name : "error") + ").");
     }
   }
+  if (haveCreds) {
+    try {
+      cognitoUsers = await listCognitoUsers(DATA_CAP);
+    } catch (e) {
+      warnings.push(
+        "Could not list the Cognito accounts (" + (e && e.name ? e.name : "error") +
+        ") — the AWS key needs permission to read the user pool (cognito-idp:ListUsers). Showing the login ledger only."
+      );
+    }
+  }
 
+  const users = mergeUsers(cognitoUsers, ledger);
   return { users, purchases, stats: computeStats(users, purchases), warnings };
 }
 

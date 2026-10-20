@@ -12,46 +12,42 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
   /* ── Startup loading screen ────────────────────────────────────────────
      Branded from the FIRST frame: the coded Minutics emblem animation
-     (traced 1:1 from the real logo) with the original intro audio, as
-     static markup in index.html — it paints at HTML PARSE, before this
-     bundle evaluates, so there is no buffering state at all (the old
-     video could sit on cream for seconds on slow connections — "sometimes
-     the splash animation didn't play"). This module only ADOPTS those
-     elements: sound policy, dismissal, escape hatches. */
+     (traced 1:1 from the real logo), static markup in index.html — it
+     paints at HTML PARSE, before this bundle evaluates, and the CSS
+     animation runs straight from that first frame. There is deliberately
+     NO audio and nothing may pause, gate or restart it: on every launch
+     or refresh the logo animation appears instantly and plays exactly
+     once. This module only ADOPTS the element: dismissal + escape
+     hatches. */
   (function showStartupSplash() {
     var HARD_MS = 7000;  /* absolute escape hatch */
-    var END_MS  = 4400;  /* natural end: the animation settles at ~3.65s and
-                            the 4.011s jingle ends right after → release at
-                            4.4s. Covers audio 'ended' never firing (blocked
-                            or undecodable element) so the splash can never
-                            stick over the settled logo. */
+    var END_MS  = 4400;  /* natural end: the animation settles at ~3.65s →
+                            release at 4.4s so the settled logo is never
+                            cut short. */
 
-    /* ADOPT the coded splash index.html already rendered. The only stale
-       case is an old cached HTML carrying the VIDEO splash (no audio
-       element): replace it outright so exactly one splash type is ever on
-       screen. */
+    /* ADOPT the coded splash index.html already rendered. Stale cached
+       HTML can carry an older splash (the video splash, or the previous
+       audio-carrying build): anything that isn't the current coded
+       animation is replaced outright so exactly one splash type is ever
+       on screen — and never with audio. */
     var splash = document.getElementById("lt-startup-splash");
-    var audio  = document.getElementById("lt-startup-splash-audio");
-    if (splash && !audio) {
-      try { splash.parentNode.removeChild(splash); } catch (e) {}
-      splash = null;
+    if (splash) {
+      try {
+        var staleAudio = document.getElementById("lt-startup-splash-audio");
+        if (staleAudio && staleAudio.parentNode) staleAudio.parentNode.removeChild(staleAudio);
+        if (!splash.querySelector || !splash.querySelector("#lt-startup-splash-anim")) {
+          splash.parentNode.removeChild(splash);
+          splash = null;
+        }
+      } catch (e) { splash = null; }
     }
     if (!splash) {
       splash = document.createElement("div");
       splash.id = "lt-startup-splash";
       splash.setAttribute("aria-hidden", "true");
-      audio = document.createElement("audio");
-      audio.id = "lt-startup-splash-audio";
-      /* ?v=2: Canva intro jingle (user's own file), converted byte-accurately
-         to AAC/m4a with a +5dB peak-safe boost (their export peaked at
-         -6.6dB — quiet on phone speakers; now -1.9dB, no clipping).
-         bump ?v=N when replacing the file (immutable 1y cache on /assets/*). */
-      audio.src = "assets/lt/minutics_splash_audio.m4a?v=2";
-      audio.preload = "auto";
-      splash.appendChild(audio);
       /* The full animation markup ships ONLY in index.html; this path fires
          only for stale HTML / tests — a quiet branded card beats a bare
-         colour while the jingle plays. */
+         colour while it shows. */
       var fb = document.createElement("div");
       fb.style.cssText = "font:700 34px/1 Inter,system-ui,sans-serif;letter-spacing:.3em;color:#012553;";
       fb.textContent = "MINUTICS";
@@ -80,140 +76,15 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
        splash that never started. */
     window.__ltSplashPlaying = true;
 
-    /* Natural-end release: counts from adoption; startIntro() below re-bases
-       both it and the hard backstop on the ACTUAL intro start. */
-    var endTimer = setTimeout(dismiss, END_MS);
-    var hardTimer = setTimeout(dismiss, HARD_MS);
+    /* Natural-end release + hard backstop — both count from adoption since
+       there is nothing else to synchronise with. */
+    setTimeout(dismiss, END_MS);
+    setTimeout(dismiss, HARD_MS);
 
-    /* ── Exactly ONE play: audio + animation start on the same frame ──────
-       The CSS animation begins at HTML parse, but the jingle can begin a
-       beat later (audio buffering on slower connections, autoplay policy on
-       desktops). The old code REPLAYED the whole animation whenever the
-       audio finally started from 0 — users saw the intro twice with the
-       beats landing wrong. Now the animation is held at its first frame
-       until the audio is actually running, then both start together, once.
-       A late sound-unlock gesture only JOINS the music at its current
-       position — the animation never restarts. */
-    function splashAnimations() {
-      try {
-        if (splash.getAnimations) {
-          var own = splash.getAnimations({ subtree: true });
-          if (own && own.length) return own;
-        }
-        return (document.getAnimations() || []).filter(function (a) {
-          try { return splash.contains(a.effect && a.effect.target); } catch (e) { return false; }
-        });
-      } catch (e) { return []; }
-    }
-    var introStarted = false;
-    function startIntro() {
-      if (introStarted || dismissed) return;
-      introStarted = true;
-      /* Anchor both timelines at one instant: if the audio is already at t
-         (the inline play() at HTML parse beat us here), the animation joins
-         IT — usually t ≈ 0, i.e. the first frame. */
-      var at = 0;
-      try { if (audio && !audio.paused) at = Math.max(0, (audio.currentTime || 0) * 1000); } catch (e) {}
-      splashAnimations().forEach(function (a) {
-        try { a.currentTime = at; } catch (e) {}
-        try { a.play(); } catch (e) {}
-      });
-      clearTimeout(endTimer);                 /* dismissal counts from the */
-      endTimer = setTimeout(dismiss, END_MS); /* actual intro start */
-      clearTimeout(hardTimer);
-      hardTimer = setTimeout(dismiss, HARD_MS);
-    }
-    /* Freeze any pre-roll instantly (before the user can see it jump back). */
-    splashAnimations().forEach(function (a) { try { a.currentTime = 0; a.pause(); } catch (e) {} });
+    /* (splash audio removed for good: nothing may pause, gate or restart
+       the animation — it runs once, straight from the first frame) */
 
-    if (audio) {
-      /* 'playing' = frames actually flowing: the one true start moment. */
-      audio.addEventListener("playing", startIntro);
-      audio.addEventListener("ended", function () { setTimeout(dismiss, 200); });
-      /* Audio broken/missing: keep the visuals going, release quickly. */
-      audio.addEventListener("error", function () { startIntro(); setTimeout(dismiss, 1200); });
-      if (audio.ended) setTimeout(dismiss, 200);
-      if (audio.paused) {
-        audio.play().catch(function () {
-          /* Desktop policy: the muted fallback below (ensureAudible) plays
-             the jingle silently in sync — first tap unmutes it in place. */
-        });
-      } else if (audio.currentTime > 0) {
-        startIntro(); /* the HTML-parse play() is already running */
-      }
-      /* Absolute safety: a jingle that never produces a frame must never
-         hold the splash hostage — visuals release after 3s at the latest. */
-      setTimeout(startIntro, 3000);
-    } else {
-      startIntro();
-    }
 
-    /* WITH SOUND — the original intro audio (extracted from the v5 export).
-       Android's WebView allows it (mediaPlaybackRequiresUserGesture is off
-       in MainActivity) so the APK sounds from frame one. Desktop browsers
-       HARD-BLOCK autoplay sound before any user gesture (Chrome / Firefox /
-       Safari policy — no code can bypass it): there run muted and the FIRST
-       tap/click/key while the splash is on screen restores sound mid-clip.
-
-       A ONE-SHOT play() at load can be rejected transiently while the app
-       bundle loads — that latch is how the old splash audio "stopped
-       coming". ensureAudible() re-asserts audibility while the splash is
-       visible instead of giving up after one attempt. */
-    var splashAudioDead = false;
-    var ensureAudible = function () {
-      if (dismissed || !audio || audio.ended || splashAudioDead) return;
-      if (audio.muted) { audio.defaultMuted = false; audio.muted = false; }
-      if (audio.paused) {
-        audio.play().catch(function () {
-          /* Desktop policy rejection: run muted so the animation (and its
-             timeline) still proceeds; the gesture listeners below restore
-             sound on first tap. splashAudioDead stops further un-mute
-             retries (re-muting a policy-blocked element must not oscillate). */
-          splashAudioDead = true;
-          audio.defaultMuted = true;
-          audio.muted = true;
-          audio.play().catch(function () {});
-        });
-      }
-    };
-    ensureAudible();
-    /* Android WebView (the APK) — gesture requirement is OFF there, so sound
-       is guaranteed every launch: keep re-asserting every 250ms until the
-       splash ends. A single transient rejection during the initial load can
-       no longer freeze the splash in silence. */
-    if (/; wv\)/.test(navigator.userAgent)) {
-      var audibleTick = setInterval(function () {
-        if (dismissed || !audio || audio.ended || splashAudioDead) { clearInterval(audibleTick); return; }
-        ensureAudible();
-      }, 250);
-    }
-    try {
-      var unmuteOnGesture = function () {
-        if (!dismissed && audio) {
-          audio.defaultMuted = false; audio.muted = false;
-          if (audio.paused) {
-            /* The music never started (hard-blocked launch): join it at the
-               animation's current position — the visuals never restart. */
-            try {
-              var at = 0;
-              splashAnimations().forEach(function (a) {
-                try { at = Math.max(at, (a.currentTime || 0)); } catch (e) {}
-              });
-              if (at > 0 && audio.duration) {
-                audio.currentTime = Math.min(at / 1000, Math.max(0, audio.duration - 0.2));
-              }
-            } catch (e) {}
-          }
-          audio.play().catch(function () {});
-        }
-        window.removeEventListener("pointerdown", unmuteOnGesture, true);
-        window.removeEventListener("touchstart", unmuteOnGesture, true);
-        window.removeEventListener("keydown", unmuteOnGesture, true);
-      };
-      window.addEventListener("pointerdown", unmuteOnGesture, true);
-      window.addEventListener("touchstart", unmuteOnGesture, true);
-      window.addEventListener("keydown", unmuteOnGesture, true);
-    } catch (e) {}
   })();
 
   /* ── Storage keys ──────────────────────────────────────────────────────── */

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
+import { createPortal } from 'react-dom';
 import { saveProfile } from './lib/profile.js';
 import { getCurrency, getCurrencySymbol } from './lib/currency.js';
 
@@ -11,6 +12,87 @@ const IMGS = {
   salary: "./assets/onboarding/salary.png"
 };
 const GREEN = "#157347";
+
+/* ── DOB pickers (month / year) ──────────────────────────────────────────
+   The native <select> popup is an unstyled OS control that clashes badly
+   with this card. These buttons open a themed sheet in the app's own   style: rounded chips, green selection, smooth entrance, auto-centred on   the current value. No native dropdown anywhere in onboarding. */
+const PICKER_STYLE_ID = "lt-onb-picker-css";
+if (typeof document !== "undefined" && !document.getElementById(PICKER_STYLE_ID)) {
+  const st = document.createElement("style");
+  st.id = PICKER_STYLE_ID;
+  st.textContent =
+    "@keyframes ltPkFade{from{opacity:0;}to{opacity:1;}}" +
+    "@keyframes ltPkIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}";
+  document.head.appendChild(st);
+}
+
+function SheetPicker({ title, display, value, options, onPick }) {
+  const [open, setOpen] = useState(false);
+  const listRef = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const sel = listRef.current && listRef.current.querySelector("[data-sel]");
+    if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: "center" });
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const btn = jsx("button", {
+    type: "button",
+    "aria-haspopup": "listbox",
+    onClick: () => setOpen(true),
+    className: "flex-1 flex items-center justify-between gap-1.5 bg-[#F5F6F8] border border-black/10 text-gray-900 text-base font-bold rounded-xl px-3 py-3 min-w-0 active:bg-white active:border-[#157347] transition-colors",
+    children: [
+      jsx("span", { className: "truncate", children: display }),
+      jsx("svg", {
+        width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "#6b7280",
+        strokeWidth: 2.6, strokeLinecap: "round", strokeLinejoin: "round",
+        className: "shrink-0",
+        children: jsx("path", { d: "m6 9 6 6 6-6" })
+      })
+    ]
+  });
+
+  if (!open) return btn;
+  return jsxs(Fragment, {
+    children: [
+      btn,
+      createPortal(jsxs("div", {
+        className: "fixed inset-0 z-[2147483000] flex items-end justify-center",
+        style: { animation: "ltPkFade .16s ease both" },
+        onClick: () => setOpen(false),
+        children: [
+          jsx("div", { className: "absolute inset-0 bg-black/45" }),
+          jsxs("div", {
+            ref: listRef,
+            role: "listbox",
+            "aria-label": title,
+            onClick: g => g.stopPropagation(),
+            className: "relative w-[88%] max-w-[350px] max-h-[60vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-3 pb-5",
+            style: { animation: "ltPkIn .24s cubic-bezier(.2,.9,.3,1) both", boxShadow: "0 24px 60px rgba(2,32,72,.35)" },
+            children: [
+              jsx("div", { className: "px-1.5 pb-2.5 pt-1 text-[11px] font-black uppercase tracking-[.18em] text-gray-400", children: title }),
+              jsx("div", { className: "grid grid-cols-3 gap-1.5", children: options.map(o => {
+                const sel = String(o.v) === String(value);
+                return jsx("button", {
+                  type: "button",
+                  "data-sel": sel ? "1" : undefined,
+                  onClick: () => { onPick(o.v); setOpen(false); },
+                  className: (sel
+                    ? "bg-[#157347] text-white shadow-[0_4px_10px_rgba(21,115,71,.3)]"
+                    : "text-gray-700 active:bg-black/[.06]") +
+                    " py-2.5 rounded-xl text-sm font-bold transition-colors",
+                  children: o.label
+                }, o.v);
+              }) })
+            ]
+          })
+        ]
+      }), document.body)
+    ]
+  });
+}
 
 /* Load every step illustration the moment the app opens (while the auth
    splash is still on screen). whenImageReady() holds a step transition
@@ -392,7 +474,6 @@ export function mk({
         i("");
       }
     };
-    const _selStyle = "flex-1 bg-[#F5F6F8] border border-black/10 text-gray-900 text-base font-bold outline-none rounded-xl px-2 py-3 text-center focus:border-[#157347] focus:bg-white focus:ring-2 focus:ring-[#157347]/15 transition-all min-w-0";
     body = jsxs("div", {
       children: [
         img,
@@ -401,17 +482,22 @@ export function mk({
           jsxs("div", {
             className: "flex items-center gap-2",
             children: [
-              jsxs("select", {
+              jsx(SheetPicker, {
+                title: "Month",
+                display: _months[_viewMonth - 1],
                 value: _viewM,
-                onChange: g => _updateDob(dY || _viewY, g.target.value, dD),
-                className: _selStyle,
-                children: _months.map((mname, ii) => jsx("option", { value: String(ii + 1).padStart(2, "0"), children: mname }, ii + 1))
+                options: _months.map((mn, ii) => ({ v: String(ii + 1).padStart(2, "0"), label: mn })),
+                onPick: v => _updateDob(dY || _viewY, v, dD)
               }),
-              jsxs("select", {
+              jsx(SheetPicker, {
+                title: "Year",
+                display: _viewY,
                 value: _viewY,
-                onChange: g => _updateDob(g.target.value, dM || _viewM, dD),
-                className: _selStyle,
-                children: Array.from({ length: _maxYear - _minYear + 1 }, (_, ii) => _maxYear - ii).map(yy => jsx("option", { value: String(yy), children: String(yy) }, yy))
+                options: Array.from({ length: _maxYear - _minYear + 1 }, (_, ii) => {
+                  const yy = _maxYear - ii;
+                  return { v: String(yy), label: String(yy) };
+                }),
+                onPick: v => _updateDob(v, dM || _viewM, dD)
               })
             ]
           }),

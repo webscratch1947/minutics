@@ -547,7 +547,11 @@ export function SettingsScreen() {
                     className: "flex-1 min-w-0",
                     children: [
                       jsx("p", { className: "text-lg font-bold text-foreground truncate", children: profileName }),
-                      jsx("p", { className: "text-xs text-muted-foreground mt-0.5 truncate", children: userEmail || "Your data stays on this device" })
+                      /* Only ever show a real email address here — a Cognito
+                         user id (or nothing) renders no subtitle at all. */
+                      (userEmail && userEmail.indexOf("@") !== -1)
+                        ? jsx("p", { className: "text-xs text-muted-foreground mt-0.5 truncate", children: userEmail })
+                        : null
                     ]
                   })
                 ]

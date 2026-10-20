@@ -38,15 +38,11 @@
   <body>
     <div id="lt-boot-splash"></div>
     <!-- Splash: the coded Minutics emblem animation (traced 1:1 from the real
-         logo) with the user's own Canva intro jingle (assets/lt/minutics_splash_audio.m4a
-         â€" bump ?v=N on replace, /assets/* is immutable-cached 1y). Static markup paints at
-         HTML PARSE, before the app bundle; the tiny script starts audio where
-         the platform allows it (Android WebView: sound from frame one;
-         desktops block until the first gesture, which the enhancements module
-         restores mid-clip). The
-         enhancements module adopts these exact ids and owns dismissal. -->
+         logo). Static markup paints at HTML PARSE, before the app bundle, and
+         the CSS animation runs straight from that first frame — nothing (no
+         audio, no gating) ever delays or restarts it. The enhancements module
+         adopts these exact ids and owns dismissal. -->
     <div id="lt-startup-splash" aria-hidden="true" style="position:fixed;inset:0;z-index:2147483647;background:#FDFBF7;display:flex;align-items:center;justify-content:center;transition:opacity .5s ease;opacity:1;pointer-events:none;overflow:hidden;">
-      <audio id="lt-startup-splash-audio" src="assets/lt/minutics_splash_audio.m4a?v=2" preload="auto"></audio>
       <div id="lt-startup-splash-anim" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:7vh 8vw;">
         <style>
           @font-face{font-family:'Poppins';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/poppins-700-latin.woff2) format('woff2');}
@@ -78,16 +74,6 @@
           @keyframes ltSp9{0%{transform:scale(1);}35%{transform:scale(1.09);}70%{transform:scale(.985);}100%{transform:scale(1);}}
           #lt-wordmark{opacity:0;animation:ltSp10 .7s ease 2.62s both;}
           @keyframes ltSp10{from{opacity:0;letter-spacing:.32em;}to{opacity:1;letter-spacing:.155em;}}
-          /* Restart hook: when sound becomes audibly available LATE (desktop
-             autoplay policy held it at 0 while the animation ran ahead), the
-             enhancements module adds .run for one forced-style pass and
-             removes it — every splash animation replays from frame one in
-             lockstep with the jingle. No paint ever happens in between. */
-          #lt-startup-splash-anim.run #lt-splash-emblem,#lt-startup-splash-anim.run #lt-hourHand,#lt-startup-splash-anim.run #lt-minHand,#lt-startup-splash-anim.run .lt-bar,#lt-startup-splash-anim.run #lt-growthLine,#lt-startup-splash-anim.run .lt-gdot,#lt-startup-splash-anim.run #lt-growthHead,#lt-startup-splash-anim.run #lt-sheen,#lt-startup-splash-anim.run #lt-badge,#lt-startup-splash-anim.run #lt-wordmark{animation:none!important;}
-          #lt-startup-splash-anim.run #lt-splash-emblem{opacity:1!important;transform:none!important;}
-          #lt-startup-splash-anim.run #lt-growthLine{stroke-dashoffset:0!important;}
-          #lt-startup-splash-anim.run #lt-wordmark{opacity:1!important;letter-spacing:.155em!important;}
-          #lt-startup-splash-anim.run #lt-sheen{opacity:0!important;}
           @media (prefers-reduced-motion:reduce){
             #lt-splash-emblem,#lt-hourHand,#lt-minHand,.lt-bar,#lt-growthLine,.lt-gdot,#lt-growthHead,#lt-badge,#lt-wordmark{animation:none!important;opacity:1!important;transform:none!important;stroke-dashoffset:0!important;}
             #lt-sheen{animation:none!important;opacity:0!important;}
@@ -185,15 +171,6 @@
         </svg>
       </div>
     </div>
-    <script>
-      (function () {
-        try {
-          var a = document.getElementById("lt-startup-splash-audio");
-          var pr = a.play();
-          if (pr && pr.catch) pr.catch(function () {});
-        } catch (e) {}
-      })();
-    </script>
     <div id="root"></div>
   </body>
 </html>
