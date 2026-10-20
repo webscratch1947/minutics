@@ -314,15 +314,15 @@ export default async function handler(req, res) {
 
   try {
     if (mode === "check") {
-      const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { pk: sub } }));
+      const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
       const item = got.Item || null;
       /* Best-effort heartbeat so the admin panel's ledger shows activity. */
       try {
         await docClient().send(new UpdateCommand({
           TableName: TABLE,
-          Key: { pk: sub },
+          Key: { uid: sub },
           UpdateExpression: "SET lastSeenAt = :t",
-          ConditionExpression: "attribute_exists(pk)",
+          ConditionExpression: "attribute_exists(uid)",
           ExpressionAttributeValues: { ":t": now },
         }));
       } catch { /* heartbeat must never fail the check */ }
@@ -342,7 +342,7 @@ export default async function handler(req, res) {
        the source of truth, so wiping the device's storage can never lose
        a purchase. Read-only; null when the account never bought anything. */
     if (mode === "plan-get") {
-      const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { pk: sub } }));
+      const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
       const item = got.Item || null;
       res.status(200).json({
         ok: true,
@@ -366,13 +366,13 @@ export default async function handler(req, res) {
       const PLAN_IDS = ["free", "basic", "yearly", "lifetime", "pro"];
       let plan = typeof body.plan === "string" ? body.plan.toLowerCase() : "free";
       if (!PLAN_IDS.includes(plan)) plan = "free";
-      const prevRow = await docClient().send(new GetCommand({ TableName: TABLE, Key: { pk: sub } }));
+      const prevRow = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
       const prevItem = prevRow.Item || null;
       const prevPlan = prevItem && typeof prevItem.plan === "string" ? prevItem.plan : "";
       const changed = prevPlan !== plan;
       await docClient().send(new UpdateCommand({
         TableName: TABLE,
-        Key: { pk: sub },
+        Key: { uid: sub },
         UpdateExpression:
           "SET email = :e, #plan = :p, updatedAt = :t" +
           (changed ? ", planSince = :t" : ", planSince = if_not_exists(planSince, :t)") +
@@ -387,13 +387,16 @@ export default async function handler(req, res) {
         try {
           const PURCHASES_TABLE = process.env.AWS_TABLE_PURCHASES || "MinuticsPurchases";
           const AMOUNTS = { basic: 1, yearly: 9, lifetime: 99, pro: 99 };
+          /* MinuticsPurchases key = uid (HASH) + purchasedAt (RANGE, string).
+             purchasedAt MUST be the ISO string — the table's sort key is type S. */
           const purchaseId = "purchase#" + sub + "#" + now;
           await docClient().send(new PutCommand({
             TableName: PURCHASES_TABLE,
             Item: {
-              pk: purchaseId, id: purchaseId, uid: sub, userId: sub,
+              uid: sub, purchasedAt: new Date(now).toISOString(),
+              id: purchaseId, userId: sub,
               email, plan, amount: AMOUNTS[plan] || 0,
-              purchasedAt: now, createdAt: now, status: "paid",
+              createdAt: now, status: "paid",
             },
           }));
         } catch (e) {
@@ -409,12 +412,12 @@ export default async function handler(req, res) {
     }
 
     /* claim: last login wins — this write IS the claim */
-    const prev = await docClient().send(new GetCommand({ TableName: TABLE, Key: { pk: sub } }));
+    const prev = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
     const prevDevice = prev.Item && prev.Item.deviceId ? prev.Item.deviceId : "";
     const claimed = !!deviceId && deviceId !== prevDevice;
     const upd = new UpdateCommand({
       TableName: TABLE,
-      Key: { pk: sub },
+      Key: { uid: sub },
       UpdateExpression:
         "SET email = :e, lastSeenAt = :t, updatedAt = :t, #ifn = if_not_exists(#ifn, :t)" +
         (deviceId ? ", deviceId = :d" : ""),
