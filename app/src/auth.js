@@ -245,6 +245,43 @@ function readLocalPlan() {
   catch (e) { return "free"; }
 }
 
+/* ── Subscription lives in AWS ───────────────────────────────────────────
+   The plan is reported to the ledger on purchase/cancel, and every
+   sign-in / app restore PULLS it back — so wiping this device's storage
+   (or getting a new phone) can never lose a subscription.
+   Reconcile rules:
+     • AWS has a paid plan → AWS wins; it is restored onto the device with
+       its original activation timestamp (expiry math stays correct).
+     • AWS has nothing paid but this device has one → push the device's
+       purchase up (heals accounts bought before the ledger existed).
+     • degraded/offline server → keep the device's plan; never destroy it. */
+function reconcilePlanWithServer() {
+  try {
+    if (window.LTDemo && window.LTDemo.isActive && window.LTDemo.isActive()) return Promise.resolve(null);
+    return _sessionPost({ mode: "plan-get" }).then(function (d) {
+      if (!d || !d.ok || d.degraded) return null;
+      var server = typeof d.plan === "string" ? d.plan : "";
+      var local = readLocalPlan();
+      if (server && server !== "free") {
+        if (server !== local) applyServerPlan(server, d.planSince || null);
+      } else if (local && local !== "free") {
+        syncPlanNow(local);
+      }
+      return d;
+    }).catch(function () { return null; });
+  } catch (e) { return Promise.resolve(null); }
+}
+
+function applyServerPlan(plan, since) {
+  try {
+    if (window.LTPlan && window.LTPlan.restore) { window.LTPlan.restore(plan, since || null); return; }
+    var p = plan === "pro" ? "lifetime" : plan;
+    localStorage.setItem("lt_plan_v1", JSON.stringify(p));
+    if (since) localStorage.setItem("lt_plan_since_v1", JSON.stringify(Number(since)));
+    window.dispatchEvent(new Event("lt-plan-changed"));
+  } catch (e) {}
+}
+
 /* Some accounts (created outside the sign-up form) carry a generated
    UUID username, and an ID token may have no email claim — so the address
    is read straight from the account's attributes and remembered
@@ -1900,9 +1937,9 @@ function handleAuthUser(user) {
       maybeAskNotificationPermission();
     }
     try { startSessionWatch(); } catch (e) {}
-    /* Fill the real e-mail (attribute fetch — covers UUID-username accounts       whose ID token has no email claim) and report this device's plan to       the admin ledger, so the panel shows the purchased plan, not "free". */
+    /* Fill the real e-mail (attribute fetch — covers UUID-username accounts       whose ID token has no email claim) and reconcile the subscription with       the AWS ledger: restore the purchased plan after a storage wipe / on a       new device, or heal the ledger with this device's purchase. */
     try { syncCogEmail(); } catch (e) {}
-    try { syncPlanNow(readLocalPlan()); } catch (e) {}
+    try { reconcilePlanWithServer(); } catch (e) {}
     /* A genuine sign-in transition (the login gate was actually on screen
        a moment ago) must land on the Timer home screen — the router's URL
        was left wherever it was when the user logged out. On a normal page

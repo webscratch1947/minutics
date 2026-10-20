@@ -79,9 +79,11 @@ function SheetPicker({ title, display, value, options, onPick }) {
                   type: "button",
                   "data-sel": sel ? "1" : undefined,
                   onClick: () => { onPick(o.v); setOpen(false); },
+                  /* Every option sits in its own visible box (user request);
+                     the chosen one fills green. */
                   className: (sel
-                    ? "bg-[#157347] text-white shadow-[0_4px_10px_rgba(21,115,71,.3)]"
-                    : "text-gray-700 active:bg-black/[.06]") +
+                    ? "bg-[#157347] text-white border border-[#157347] shadow-[0_4px_10px_rgba(21,115,71,.3)]"
+                    : "bg-[#F3F4F6] border border-black/10 text-gray-700 active:bg-white active:border-[#157347]") +
                     " py-2.5 rounded-xl text-sm font-bold transition-colors",
                   children: o.label
                 }, o.v);

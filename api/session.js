@@ -6,9 +6,15 @@
 //   { mode: "check" }            → read back the stored device (no write);
 //                                  the caller signs itself out when another
 //                                  device owns the claim
-//   Responds { ok, device, claimed?, degraded? }. When the AWS keys are not
-//   configured in the environment the endpoint answers degraded and the
-//   client simply stops enforcing — auth itself never depends on this.
+//   { mode: "plan", plan }       → record which subscription this account
+//                                  activated (purchase / cancel report)
+//   { mode: "plan-get" }         → read the subscription back — AWS is the
+//                                  source of truth, so wiping the device's
+//                                  storage can't lose a purchase
+//   Responds { ok, device, claimed?, plan?, planSince?, degraded? }. When
+//   the AWS keys are not configured in the environment the endpoint answers
+//   degraded and the client simply stops enforcing — auth itself never
+//   depends on this.
 //
 // Legacy compatibility (already-installed APKs / old web bundles):
 //   - POST with a Firebase ID token still updates the Firebase custom
@@ -193,7 +199,10 @@ export default async function handler(req, res) {
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
   body = body || {};
   const deviceId = typeof body.deviceId === "string" ? body.deviceId.trim() : "";
-  const mode = body.mode === "check" ? "check" : body.mode === "plan" ? "plan" : "claim";
+  const mode = body.mode === "check" ? "check"
+    : body.mode === "plan" ? "plan"
+    : body.mode === "plan-get" ? "plan-get"
+    : "claim";
 
   /* ── Legacy Firebase claim path (old APKs): unchanged behavior ─────── */
   if (!cognitoPayload) {
@@ -256,21 +265,49 @@ export default async function handler(req, res) {
       return;
     }
 
+    /* plan-get: the client asks AWS what subscription this account owns —
+       the source of truth, so wiping the device's storage can never lose
+       a purchase. Read-only; null when the account never bought anything. */
+    if (mode === "plan-get") {
+      const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { pk: sub } }));
+      const item = got.Item || null;
+      res.status(200).json({
+        ok: true,
+        plan: item && typeof item.plan === "string" ? item.plan : null,
+        planSince: item && item.planSince ? item.planSince : null,
+      });
+      return;
+    }
+
     /* plan: this device reports the plan it activated (purchases are
        device-local by design — this ledger write is what the admin panel
-       shows). Unknown values collapse to "free"; no deviceId involved. */
+       shows and what plan-get restores after a storage wipe). Unknown
+       values collapse to "free"; planSince records when the plan changed
+       (kept across repeated reports of the same plan so expiry math stays
+       correct across devices/wipes). No deviceId involved. */
     if (mode === "plan") {
       const PLAN_IDS = ["free", "basic", "yearly", "lifetime", "pro"];
       let plan = typeof body.plan === "string" ? body.plan.toLowerCase() : "free";
       if (!PLAN_IDS.includes(plan)) plan = "free";
+      const prevRow = await docClient().send(new GetCommand({ TableName: TABLE, Key: { pk: sub } }));
+      const prevItem = prevRow.Item || null;
+      const prevPlan = prevItem && typeof prevItem.plan === "string" ? prevItem.plan : "";
+      const changed = prevPlan !== plan;
       await docClient().send(new UpdateCommand({
         TableName: TABLE,
         Key: { pk: sub },
-        UpdateExpression: "SET email = :e, plan = :p, updatedAt = :t, #ifn = if_not_exists(#ifn, :t)",
+        UpdateExpression:
+          "SET email = :e, plan = :p, updatedAt = :t" +
+          (changed ? ", planSince = :t" : ", planSince = if_not_exists(planSince, :t)") +
+          ", #ifn = if_not_exists(#ifn, :t)",
         ExpressionAttributeValues: { ":e": email, ":p": plan, ":t": now },
         ExpressionAttributeNames: { "#ifn": "createdAt" },
       }));
-      res.status(200).json({ ok: true, plan });
+      res.status(200).json({
+        ok: true,
+        plan,
+        planSince: changed ? now : (prevItem && prevItem.planSince ? prevItem.planSince : now),
+      });
       return;
     }
 

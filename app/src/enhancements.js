@@ -447,8 +447,24 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       enforceStarCap();
     }
   }
-  /* Exposed so a future Razorpay/webhook flow (or manual testing) can flip this */
-  window.LTPlan = { isPro: isPro, setPlan: setPlan, getPlanName: getPlanName, showPlansScreen: showPlansScreen };
+  /* Exposed so a future Razorpay/webhook flow (or manual testing) can flip this.
+     refresh = re-render plan-gated UI; restore = apply the plan AWS reported
+     (re-sets the ledger's activation timestamp so expiry math survives a
+     storage wipe) and re-render. auth.js calls restore on every sign-in. */
+  window.LTPlan = {
+    isPro: isPro, setPlan: setPlan, getPlanName: getPlanName,
+    showPlansScreen: showPlansScreen, refresh: refreshPlanGatedUI,
+    restore: function (plan, since) {
+      var p = (plan === "basic" || plan === "yearly" || plan === "lifetime" || plan === "pro") ? plan : "free";
+      if (p === "pro") p = "lifetime";
+      setPlan(p);
+      if (p !== "free" && since) {
+        var n = Number(since);
+        if (n > 0) writeJson(PLAN_SINCE_KEY, n);
+      }
+      refreshPlanGatedUI();
+    }
+  };
 
   /* ── Plan expiry & star cap enforcement ──────────────────────────────────── */
   var PLAN_DURATIONS = { basic: 30 * 24 * 3600 * 1000, yearly: 365 * 24 * 3600 * 1000 };
@@ -493,6 +509,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     writeJson(PLAN_SINCE_KEY, null);
     enforceStarCap();
     refreshPlanGatedUI();
+    /* An expiry is a real plan change — settle it in the AWS ledger too       so the admin panel and future restores agree with this device. */
+    try { if (window.LTAuth && window.LTAuth.syncPlan) window.LTAuth.syncPlan("free"); } catch (e) {}
   }
 
   var GOAL_TYPE_DEFAULTS = {
