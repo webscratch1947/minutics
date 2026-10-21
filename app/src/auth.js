@@ -763,16 +763,31 @@ window.LTAuth = {
   /* Report this device's plan to the admin ledger (fire-and-forget). */
   syncPlan: function (plan) { return syncPlanNow(plan); },
   /* Permanently delete the signed-in Cognito account. The session's own
-     access token authorizes the delete — no server round-trip and no AWS
-     keys needed. Resolves when Cognito confirms; the caller wipes local
-     data afterwards (Settings). */
+     token authorizes the delete; a bounded best-effort companion call
+     then drops this account's AWS ledger row (mode "cleanup") so the
+     admin panel can't keep showing a ghost. Resolves when Cognito
+     confirms and the cleanup was sent; the caller wipes local data
+     afterwards (Settings). */
   deleteAccount: function () {
     return new Promise(function (resolve, reject) {
       var cu = _cogUser;
       if (!cu) { reject(new Error("Not signed in — log in again first.")); return; }
+      var idt = "";
+      try { var tok = cu.getIdToken(); idt = tok && typeof tok.getJwtToken === "function" ? tok.getJwtToken() : ""; } catch (e) {}
       cu.deleteUser(function (err) {
-        if (err) reject(new Error((err && err.message) || "Could not delete account"));
-        else resolve();
+        if (err) { reject(new Error((err && err.message) || "Could not delete account")); return; }
+        var done = function () { resolve(); };
+        if (!idt || typeof fetch !== "function") { done(); return; }
+        try {
+          var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+          if (ctl) setTimeout(function () { try { ctl.abort(); } catch (e) {} }, 5000);
+          fetch(apiOrigin() + "/api/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + idt },
+            body: JSON.stringify({ mode: "cleanup" }),
+            signal: ctl ? ctl.signal : undefined
+          }).then(done, done);
+        } catch (e) { done(); }
       });
     });
   },

@@ -534,7 +534,7 @@ export function mk({
                     ? "h-9 w-9 mx-auto rounded-full bg-[#157347] text-white text-[13px] font-black shadow-[0_4px_10px_rgba(21,115,71,.35)]"
                     : isFuture
                       ? "h-9 w-9 mx-auto rounded-full text-gray-300 text-[13px] font-bold cursor-default"
-                      : "h-9 w-9 mx-auto rounded-full bg-white border border-black/[.07] text-gray-800 text-[13px] font-bold shadow-[0_2px_6px_rgba(15,23,42,.05)] hover:bg-[#F0FDF4] hover:border-[#157347]/30 active:bg-[#DCFCE7] transition-colors",
+                      : "h-9 w-9 mx-auto rounded-full bg-[#F1ECE0] border border-black/[.12] text-gray-800 text-[13px] font-bold shadow-[0_2px_6px_rgba(15,23,42,.09)] hover:bg-[#E9E2D2] hover:border-[#157347]/30 active:bg-[#DCFCE7] transition-colors",
                   children: String(dd)
                 }, "day" + dd);
               })

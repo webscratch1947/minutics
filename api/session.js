@@ -39,7 +39,7 @@
 
 import { setCors } from "../lib/cors.js";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { CognitoIdentityProviderClient, AdminGetUserCommand, AdminSetUserPasswordCommand } from "@aws-sdk/client-cognito-identity-provider";
 import crypto from "node:crypto";
 
@@ -242,6 +242,13 @@ export default async function handler(req, res) {
     if (!legacyAuth || !uid) { res.status(401).json({ ok: false, error: "Invalid or expired token" }); return; }
     try {
       await legacyAuth.deleteUser(uid);
+      /* Also drop the ledger row — an old client's delete must not leave
+         a ghost in the admin panel either. Best-effort. */
+      try {
+        await docClient().send(new DeleteCommand({ TableName: TABLE, Key: { uid } }));
+      } catch (e) {
+        console.error("legacy ledger cleanup failed:", e && e.name, e && e.message);
+      }
       res.status(200).json({ ok: true });
     } catch (e) {
       if (e && e.code === "auth/user-not-found") {
@@ -260,7 +267,16 @@ export default async function handler(req, res) {
   const mode = body.mode === "check" ? "check"
     : body.mode === "plan" ? "plan"
     : body.mode === "plan-get" ? "plan-get"
+    : body.mode === "cleanup" ? "cleanup"
     : "claim";
+
+  /* cleanup exists only to remove the ledger row OF THE DELETED COGNITO
+     ACCOUNT — it needs a Cognito token. Legacy Firebase deletes go through
+     the DELETE method below (which now cleans the ledger too). */
+  if (mode === "cleanup" && !cognitoPayload) {
+    res.status(400).json({ ok: false, error: "cleanup requires a Cognito session" });
+    return;
+  }
 
   /* ── Legacy Firebase claim path (old APKs): unchanged behavior ─────── */
   if (!cognitoPayload) {
@@ -313,6 +329,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    /* cleanup: this account was just deleted through Cognito (the app's
+       Settings → Delete account) — remove its ledger row too, so the
+       admin panel can't keep showing a ghost. Only ever the row of the
+       sub inside THIS token. A missing row is success (idempotent);
+       purchase receipts stay — they are sales history. */
+    if (mode === "cleanup") {
+      try {
+        await docClient().send(new DeleteCommand({ TableName: TABLE, Key: { uid: sub } }));
+      } catch (e) {
+        console.error("ledger cleanup failed:", e && e.name, e && e.message);
+      }
+      res.status(200).json({ ok: true });
+      return;
+    }
+
     if (mode === "check") {
       const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
       const item = got.Item || null;

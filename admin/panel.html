@@ -108,6 +108,12 @@
   .head-tools{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
   .give-btn{border-color:rgba(191,138,45,.55); color:var(--brass-deep)}
   .give-btn:hover{border-color:var(--brass); color:var(--brass-deep); background:rgba(191,138,45,.08)}
+  .row-del{
+    background:transparent; border:none; color:var(--ink-faint); font-family:var(--mono);
+    font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; cursor:pointer;
+    padding:4px 9px; border-radius:999px; transition:color .2s ease, background .2s ease;
+  }
+  .row-del:hover{color:var(--rust); background:rgba(156,75,52,.08)}
 
   /* ── give subscription modal ── */
   .modal-back{
@@ -274,7 +280,7 @@
       </div>
       <div class="tablewrap" id="usersWrap">
         <table>
-          <thead><tr><th>Email</th><th>Joined</th><th>Last active</th><th>Plan</th><th>Status</th><th>UID</th></tr></thead>
+          <thead><tr><th>Email</th><th>Joined</th><th>Last active</th><th>Plan</th><th>Status</th><th>UID</th><th></th></tr></thead>
           <tbody id="usersBody"></tbody>
         </table>
       </div>
@@ -439,6 +445,14 @@
       var status = String(u.planStatus || (plan && planKind(plan) === "on" ? "active" : ""));
       tr.appendChild(chip(status || "—", status ? planKind(plan, status) : ""));
       tr.appendChild(td(shortUid(uid), "uid"));
+      var act = document.createElement("td");
+      var del = document.createElement("button");
+      del.className = "row-del";
+      del.type = "button";
+      del.textContent = "Delete";
+      del.addEventListener("click", function () { confirmDeleteAccount(uid, email); });
+      act.appendChild(del);
+      tr.appendChild(act);
       body.appendChild(tr);
     });
     $("usersCount").textContent = rows.users.length ? "(" + rows.users.length + ")" : "";
@@ -603,6 +617,29 @@
       btn.disabled = false; btn.textContent = "Give subscription";
     }
   });
+
+  /* ── delete account ── */
+  function confirmDeleteAccount(uid, email) {
+    var msg = "Delete " + email + " permanently?\n\n" +
+      "• They can never sign in again\n" +
+      "• Their row leaves Users and the plans count\n" +
+      "• Purchase records stay — sales history is never deleted\n\n" +
+      "This cannot be undone.";
+    if (!window.confirm(msg)) return;
+    call("", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete-account", uid: uid })
+    }).then(function (r) {
+      if (r.status === 401) { showLogin(); return; }
+      if (r.status === 200 && r.body && r.body.ok) {
+        window.alert(r.body.warning ? "Deleted, with a note:\n" + r.body.warning : "Account deleted.");
+        loadData({ silent: true });
+      } else {
+        window.alert((r.body && r.body.error) || "Could not delete the account.");
+      }
+    }).catch(function () { window.alert("The server could not be reached."); });
+  }
 
   /* ── boot ── */
   (async function boot() {

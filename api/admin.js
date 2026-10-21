@@ -16,8 +16,8 @@
 
 import crypto from "crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { CognitoIdentityProviderClient, ListUsersCommand } from "@aws-sdk/client-cognito-identity-provider";
+import { DynamoDBDocumentClient, ScanCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { CognitoIdentityProviderClient, ListUsersCommand, AdminDeleteUserCommand } from "@aws-sdk/client-cognito-identity-provider";
 
 const ADMIN_HOST = "admin.minutics.com";
 const COOKIE_NAME = "lt_admin_session";
@@ -378,6 +378,56 @@ export default async function handler(req, res) {
           error: "Could not write the subscription (" + (e && e.name ? e.name : "error") + ").",
         });
       }
+      return;
+    }
+
+    /* POST — delete an account completely (admin session required):
+       the sign-in account AND its ledger row. UserNotFoundException is a
+       success — that's the ghost case (sign-in already deleted outside
+       the app, only the ledger row left). Purchase receipts stay: they
+       are sales history. */
+    if (action === "delete-account") {
+      const session = sessionFrom(req);
+      if (!session) {
+        res.status(401).json({ ok: false, error: "Not signed in" });
+        return;
+      }
+      const uid = String(body.uid || "").trim();
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(uid)) {
+        res.status(400).json({ ok: false, error: "Pick a valid account." });
+        return;
+      }
+      const usersTable = process.env.AWS_TABLE;
+      const haveCreds = Boolean(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+      if (!haveCreds || !usersTable) {
+        res.status(503).json({ ok: false, error: "AWS is not configured on the server yet." });
+        return;
+      }
+      let cognitoWarning = null;
+      try {
+        const cog = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || "ap-south-1" });
+        await cog.send(new AdminDeleteUserCommand({ UserPoolId: USER_POOL_ID, Username: uid }));
+      } catch (e) {
+        const name = (e && (e.name || e.Code)) || "";
+        if (name !== "UserNotFoundException") {
+          console.error("delete-account: cognito delete failed:", name, e && e.message);
+          /* The panel row goes away either way — say so honestly instead
+             of half-failing; the console can finish the sign-in side. */
+          cognitoWarning = "The ledger row was deleted, but the sign-in account could not be removed (" +
+            name + "). If it still accepts logins, delete it in the Cognito console.";
+        }
+      }
+      try {
+        const client = DynamoDBDocumentClient.from(
+          new DynamoDBClient({ region: process.env.AWS_REGION || "ap-south-1" })
+        );
+        await client.send(new DeleteCommand({ TableName: usersTable, Key: { uid } }));
+      } catch (e) {
+        console.error("delete-account: ledger delete failed:", e && e.name, e && e.message);
+        res.status(500).json({ ok: false, error: "Could not delete the ledger row (" + (e && e.name ? e.name : "error") + ")." });
+        return;
+      }
+      res.status(200).json({ ok: true, uid, warning: cognitoWarning });
       return;
     }
 

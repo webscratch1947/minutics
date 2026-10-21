@@ -337,7 +337,9 @@ export function SettingsScreen() {
   /* ── delete account ────────────────────────────────────────────────
      Cognito first: LTAuth.deleteAccount() permanently removes the
      signed-in Minutics account (authorized by this session's own token —
-     only ever this account, never anyone else's). Only after Cognito
+     only ever this account, never anyone else's) and then best-effort
+     drops this account's AWS ledger row with the same token, so the
+     admin panel can't keep a ghost row. Only after Cognito
      confirms do we wipe this account's local data: live app keys, plan,
      identity, the lt_ns_<uid> snapshot, lt_active_uid, session keys,
      fcm token — everything. Other accounts' lt_ns_* snapshots on this
