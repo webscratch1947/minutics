@@ -16,7 +16,7 @@
 
 import crypto from "crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, ScanCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { CognitoIdentityProviderClient, ListUsersCommand, AdminDeleteUserCommand } from "@aws-sdk/client-cognito-identity-provider";
 
 const ADMIN_HOST = "admin.minutics.com";
@@ -278,7 +278,11 @@ async function readData() {
     }
   }
 
-  const users = mergeUsers(cognitoUsers, ledger);
+  /* Deleted accounts are tombstoned (uid + deletedAt only) in the users
+     table — deletion must never depend on a DeleteItem IAM grant — and
+     are filtered HERE so a deleted account can never appear as a user. */
+  const liveLedger = (ledger || []).filter((r) => r && !r.deletedAt);
+  const users = mergeUsers(cognitoUsers, liveLedger);
   return { users, purchases, stats: computeStats(users, purchases), warnings };
 }
 
@@ -413,7 +417,7 @@ export default async function handler(req, res) {
           console.error("delete-account: cognito delete failed:", name, e && e.message);
           /* The panel row goes away either way — say so honestly instead
              of half-failing; the console can finish the sign-in side. */
-          cognitoWarning = "The ledger row was deleted, but the sign-in account could not be removed (" +
+          cognitoWarning = "The user row was cleared, but the sign-in account could not be removed (" +
             name + "). If it still accepts logins, delete it in the Cognito console.";
         }
       }
@@ -421,10 +425,20 @@ export default async function handler(req, res) {
         const client = DynamoDBDocumentClient.from(
           new DynamoDBClient({ region: process.env.AWS_REGION || "ap-south-1" })
         );
-        await client.send(new DeleteCommand({ TableName: usersTable, Key: { uid } }));
+        /* Tombstone instead of DeleteItem: UpdateItem is the exact
+           permission the server key already runs constantly (claim /
+           plan / heartbeat), so deletion can never be blocked by IAM.
+           readData() hides deletedAt rows immediately. */
+        await client.send(new UpdateCommand({
+          TableName: usersTable,
+          Key: { uid },
+          UpdateExpression: "SET deletedAt = :t REMOVE #p, email, planSince, deviceId, lastSeenAt, createdAt, updatedAt",
+          ExpressionAttributeNames: { "#p": "plan" },
+          ExpressionAttributeValues: { ":t": Date.now() },
+        }));
       } catch (e) {
-        console.error("delete-account: ledger delete failed:", e && e.name, e && e.message);
-        res.status(500).json({ ok: false, error: "Could not delete the ledger row (" + (e && e.name ? e.name : "error") + ")." });
+        console.error("delete-account: ledger clear failed:", e && e.name, e && e.message);
+        res.status(500).json({ ok: false, error: "Could not clear the user row (" + (e && e.name ? e.name : "error") + ")." });
         return;
       }
       res.status(200).json({ ok: true, uid, warning: cognitoWarning });

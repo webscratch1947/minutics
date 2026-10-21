@@ -39,7 +39,7 @@
 
 import { setCors } from "../lib/cors.js";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, UpdateCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { CognitoIdentityProviderClient, AdminGetUserCommand, AdminSetUserPasswordCommand } from "@aws-sdk/client-cognito-identity-provider";
 import crypto from "node:crypto";
 
@@ -242,10 +242,16 @@ export default async function handler(req, res) {
     if (!legacyAuth || !uid) { res.status(401).json({ ok: false, error: "Invalid or expired token" }); return; }
     try {
       await legacyAuth.deleteUser(uid);
-      /* Also drop the ledger row — an old client's delete must not leave
-         a ghost in the admin panel either. Best-effort. */
+      /* Also tombstone the ledger row — an old client's delete must not
+         leave a visible ghost in the admin panel either. Best-effort. */
       try {
-        await docClient().send(new DeleteCommand({ TableName: TABLE, Key: { uid } }));
+        await docClient().send(new UpdateCommand({
+          TableName: TABLE,
+          Key: { uid },
+          UpdateExpression: "SET deletedAt = :t REMOVE #p, email, planSince, deviceId, lastSeenAt, createdAt, updatedAt",
+          ExpressionAttributeNames: { "#p": "plan" },
+          ExpressionAttributeValues: { ":t": Date.now() },
+        }));
       } catch (e) {
         console.error("legacy ledger cleanup failed:", e && e.name, e && e.message);
       }
@@ -330,13 +336,21 @@ export default async function handler(req, res) {
 
   try {
     /* cleanup: this account was just deleted through Cognito (the app's
-       Settings → Delete account) — remove its ledger row too, so the
-       admin panel can't keep showing a ghost. Only ever the row of the
-       sub inside THIS token. A missing row is success (idempotent);
-       purchase receipts stay — they are sales history. */
+       Settings → Delete account) — hide its ledger row from the admin
+       panel too, so a deleted account can never linger. Only ever the row
+       of the sub inside THIS token. Tombstone, not DeleteItem: the
+       server key is guaranteed UpdateItem (claim/check/plan use it
+       constantly) but may lack dynamodb:DeleteItem — deletion must never
+       be blockable by IAM. Purchase receipts stay — sales history. */
     if (mode === "cleanup") {
       try {
-        await docClient().send(new DeleteCommand({ TableName: TABLE, Key: { uid: sub } }));
+        await docClient().send(new UpdateCommand({
+          TableName: TABLE,
+          Key: { uid: sub },
+          UpdateExpression: "SET deletedAt = :t REMOVE #p, email, planSince, deviceId, lastSeenAt, createdAt, updatedAt",
+          ExpressionAttributeNames: { "#p": "plan" },
+          ExpressionAttributeValues: { ":t": now },
+        }));
       } catch (e) {
         console.error("ledger cleanup failed:", e && e.name, e && e.message);
       }
