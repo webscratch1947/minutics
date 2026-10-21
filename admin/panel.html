@@ -381,7 +381,7 @@
       var tr = document.createElement("tr");
       tr.appendChild(td(email, "email"));
       tr.appendChild(td(fmtDate(u.createdAt || u.created || u.joinedAt)));
-      tr.appendChild(td(fmtDate(u.lastLoginAt || u.lastSeen || u.lastLogin)));
+      tr.appendChild(td(fmtDate(u.lastSeenAt || u.lastLoginAt || u.lastSeen || u.lastLogin)));
       var plan = String(u.plan || "");
       tr.appendChild(chip(plan || "free", planKind(plan, u.planStatus)));
       var status = String(u.planStatus || (plan && planKind(plan) === "on" ? "active" : ""));

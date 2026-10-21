@@ -210,9 +210,11 @@ function mergeUsers(cognitoUsers, ledger) {
   const matched = new Set();
   for (const c of cognitoUsers || []) {
     const row = byKey.get("sub:" + c.sub) || byKey.get("email:" + String(c.email || "").toLowerCase()) || {};
-    if (row && (row.sub || row.pk)) matched.add(row);
+    /* Ledger rows carry the id as `uid` — match on it too or the SAME
+       account shows up twice (once from Cognito, once appended raw). */
+    if (row && (row.sub || row.pk || row.uid)) matched.add(row);
     users.push(Object.assign({}, row, c, {
-      sub: c.sub || row.sub || row.pk || "",
+      sub: c.sub || row.sub || row.pk || row.uid || "",
       email: c.email || row.email || "",
       createdAt: c.createdAt || row.createdAt || row.joinedAt || "",
       lastLoginAt: row.lastLoginAt || row.lastSeen || row.lastLogin || null,
