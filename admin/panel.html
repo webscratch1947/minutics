@@ -105,6 +105,32 @@
     transition:background .25s ease;
   }
   .btn-solid:hover{background:var(--brass-deep); border-color:var(--brass-deep)}
+  .head-tools{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .give-btn{border-color:rgba(191,138,45,.55); color:var(--brass-deep)}
+  .give-btn:hover{border-color:var(--brass); color:var(--brass-deep); background:rgba(191,138,45,.08)}
+
+  /* ── give subscription modal ── */
+  .modal-back{
+    position:fixed; inset:0; z-index:50; background:rgba(29,26,21,.42);
+    backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center;
+    padding:20px; animation:fadeIn .16s ease both;
+  }
+  .modal-card{
+    width:100%; max-width:430px; background:var(--paper); border:1px solid var(--hairline);
+    border-radius:22px; padding:26px 24px 22px; box-shadow:0 30px 70px rgba(29,26,21,.25);
+    animation:cardIn .22s var(--ease) both;
+  }
+  @keyframes fadeIn{from{opacity:0} to{opacity:1}}
+  @keyframes cardIn{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+  .modal-card h3{font-family:var(--display); font-size:21px; font-weight:500; margin:0 0 6px}
+  .modal-sub{color:var(--ink-soft); font-size:13px; line-height:1.55; margin:0 0 18px}
+  .field select{
+    width:100%; font-family:var(--body); font-size:15px; color:var(--ink);
+    background:var(--cream); border:1px solid var(--hairline-2); border-radius:12px;
+    padding:13px 14px; outline:none; cursor:pointer; transition:border-color .2s ease;
+  }
+  .field select:focus{border-color:var(--brass); background:#fff}
+  .modal-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:4px}
 
   main{max-width:1180px; margin:0 auto; padding:26px clamp(16px,4vw,36px) 60px}
   .banner{
@@ -241,7 +267,10 @@
     <section class="panel">
       <div class="panel-head">
         <h2>Users <span class="count" id="usersCount"></span></h2>
-        <input id="userSearch" type="search" placeholder="Filter by email or ID…" autocomplete="off">
+        <div class="head-tools">
+          <input id="userSearch" type="search" placeholder="Filter by email or ID…" autocomplete="off">
+          <button class="btn-ghost give-btn" id="giveBtn" type="button">＋ Give subscription</button>
+        </div>
       </div>
       <div class="tablewrap" id="usersWrap">
         <table>
@@ -267,6 +296,29 @@
 
     <div class="foot">Ledger read live from AWS · Session expires after 7 days</div>
   </main>
+</div>
+
+<!-- ─── give subscription ─── -->
+<div class="modal-back" id="giveModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="giveTitle">
+    <h3 id="giveTitle">Give subscription</h3>
+    <p class="modal-sub">The plan is written to AWS right away — it appears in this panel immediately, and on that person's app at its next check-in.</p>
+    <label class="field"><span>Account</span>
+      <select id="giveUser"></select>
+    </label>
+    <label class="field"><span>Subscription</span>
+      <select id="givePlan">
+        <option value="basic">Basic — $1 / month</option>
+        <option value="yearly">1 Year — $9 / year</option>
+        <option value="lifetime">Lifetime — $99 one time</option>
+      </select>
+    </label>
+    <div class="err" id="giveError" hidden></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="giveCancel" type="button">Cancel</button>
+      <button class="btn-solid" id="giveConfirm" type="button">Give subscription</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -490,6 +542,67 @@
 
   $("refreshBtn").addEventListener("click", function () { loadData(); });
   $("userSearch").addEventListener("input", renderUsers);
+
+  /* ── give subscription ── */
+  function openGiveModal() {
+    var sel = $("giveUser");
+    while (sel.firstChild) sel.removeChild(sel.firstChild);
+    rows.users.forEach(function (u) {
+      if (!u || typeof u !== "object") return;
+      var uid = String(u.uid || u.sub || u.id || "");
+      if (!uid) return;
+      var email = String(u.email || u.username || uid);
+      var opt = document.createElement("option");
+      opt.value = uid;
+      var plan = String(u.plan || "").toLowerCase();
+      opt.textContent = email + " — now " + (plan && plan !== "free" ? plan : "free");
+      opt.setAttribute("data-email", email);
+      sel.appendChild(opt);
+    });
+    show($("giveError"), false);
+    show($("giveModal"), true);
+  }
+  function closeGiveModal() { show($("giveModal"), false); }
+
+  $("giveBtn").addEventListener("click", openGiveModal);
+  $("giveCancel").addEventListener("click", closeGiveModal);
+  $("giveModal").addEventListener("click", function (ev) { if (ev.target === $("giveModal")) closeGiveModal(); });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape" && !$("giveModal").hasAttribute("hidden")) closeGiveModal();
+  });
+
+  $("giveConfirm").addEventListener("click", async function () {
+    var btn = $("giveConfirm"), err = $("giveError"), sel = $("giveUser");
+    show(err, false);
+    if (!sel.value) {
+      err.textContent = "There is no account to give a subscription to yet.";
+      show(err, true);
+      return;
+    }
+    var opt = sel.options[sel.selectedIndex];
+    var email = opt ? opt.getAttribute("data-email") || "" : "";
+    btn.disabled = true; btn.textContent = "Giving…";
+    try {
+      var r = await call("", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "give-plan", uid: sel.value, plan: $("givePlan").value, email: email })
+      });
+      if (r.status === 401) { closeGiveModal(); showLogin(); return; }
+      if (r.status === 200 && r.body && r.body.ok) {
+        closeGiveModal();
+        await loadData({ silent: true });
+      } else {
+        err.textContent = (r.body && r.body.error) || "Could not give the subscription.";
+        show(err, true);
+      }
+    } catch (e) {
+      err.textContent = "The server could not be reached.";
+      show(err, true);
+    } finally {
+      btn.disabled = false; btn.textContent = "Give subscription";
+    }
+  });
 
   /* ── boot ── */
   (async function boot() {

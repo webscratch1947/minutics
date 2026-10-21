@@ -16,7 +16,7 @@
 
 import crypto from "crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { CognitoIdentityProviderClient, ListUsersCommand } from "@aws-sdk/client-cognito-identity-provider";
 
 const ADMIN_HOST = "admin.minutics.com";
@@ -325,6 +325,59 @@ export default async function handler(req, res) {
       }
       setSessionCookie(res, makeToken(email));
       res.status(200).json({ ok: true, email });
+      return;
+    }
+
+    /* POST — give a subscription to an account (admin session required).
+       UpdateItem only, never Put: the device claim, email and history stay
+       untouched; an account that has never touched the ledger yet just gets
+       its row created. The plan starts now (planSince = now), so the normal
+       expiry math applies, and the person's app picks it up on its next
+       check-in because the server plan always wins over a stale local one. */
+    if (action === "give-plan") {
+      const session = sessionFrom(req);
+      if (!session) {
+        res.status(401).json({ ok: false, error: "Not signed in" });
+        return;
+      }
+      const uid = String(body.uid || "").trim();
+      const plan = String(body.plan || "").trim().toLowerCase();
+      const email = String(body.email || "").trim().toLowerCase();
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(uid)) {
+        res.status(400).json({ ok: false, error: "Pick an account to give a subscription to." });
+        return;
+      }
+      if (!["basic", "yearly", "lifetime"].includes(plan)) {
+        res.status(400).json({ ok: false, error: "Unknown subscription — pick Basic, 1 Year or Lifetime." });
+        return;
+      }
+      const usersTable = process.env.AWS_TABLE;
+      const haveCreds = Boolean(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+      if (!haveCreds || !usersTable) {
+        res.status(503).json({ ok: false, error: "AWS is not configured on the server yet." });
+        return;
+      }
+      try {
+        const client = DynamoDBDocumentClient.from(
+          new DynamoDBClient({ region: process.env.AWS_REGION || "ap-south-1" })
+        );
+        const now = Date.now();
+        await client.send(new UpdateCommand({
+          TableName: usersTable,
+          Key: { uid },
+          // `plan` is a DynamoDB reserved word → always aliased (#p).
+          UpdateExpression: "SET #p = :plan, planSince = :t, updatedAt = :t, email = if_not_exists(email, :e)",
+          ExpressionAttributeNames: { "#p": "plan" },
+          ExpressionAttributeValues: { ":plan": plan, ":t": now, ":e": email },
+        }));
+        res.status(200).json({ ok: true, uid, plan, planSince: now });
+      } catch (e) {
+        console.error("give-plan failed:", e && e.name, e && e.message);
+        res.status(500).json({
+          ok: false,
+          error: "Could not write the subscription (" + (e && e.name ? e.name : "error") + ").",
+        });
+      }
       return;
     }
 
