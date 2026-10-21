@@ -527,11 +527,14 @@ export function mk({
                   type: "button",
                   disabled: isFuture,
                   onClick: () => _updateDob(_viewY, _viewM, dd2),
+                  /* Every day is a visible circle chip (owner request); the
+                     selected day keeps its filled green circle, future days
+                     stay bare so "not pickable" still reads instantly. */
                   className: isSel
-                    ? "h-9 rounded-full bg-[#157347] text-white text-[13px] font-black shadow-[0_4px_10px_rgba(21,115,71,.35)]"
+                    ? "h-9 w-9 mx-auto rounded-full bg-[#157347] text-white text-[13px] font-black shadow-[0_4px_10px_rgba(21,115,71,.35)]"
                     : isFuture
-                      ? "h-9 rounded-full text-gray-300 text-[13px] font-bold cursor-default"
-                      : "h-9 rounded-full text-gray-800 text-[13px] font-bold hover:bg-black/5 active:bg-black/10 transition",
+                      ? "h-9 w-9 mx-auto rounded-full text-gray-300 text-[13px] font-bold cursor-default"
+                      : "h-9 w-9 mx-auto rounded-full bg-white border border-black/[.07] text-gray-800 text-[13px] font-bold shadow-[0_2px_6px_rgba(15,23,42,.05)] hover:bg-[#F0FDF4] hover:border-[#157347]/30 active:bg-[#DCFCE7] transition-colors",
                   children: String(dd)
                 }, "day" + dd);
               })
