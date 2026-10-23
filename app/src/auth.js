@@ -774,25 +774,49 @@ window.LTAuth = {
      confirms and the cleanup was sent; the caller wipes local data
      afterwards (Settings). */
   deleteAccount: function () {
-    return new Promise(function (resolve, reject) {
-      var cu = _cogUser;
-      if (!cu) { reject(new Error("Not signed in — log in again first.")); return; }
-      var idt = "";
-      try { var tok = cu.getIdToken(); idt = tok && typeof tok.getJwtToken === "function" ? tok.getJwtToken() : ""; } catch (e) {}
-      cu.deleteUser(function (err) {
-        if (err) { reject(new Error((err && err.message) || "Could not delete account")); return; }
-        var done = function () { resolve(); };
-        if (!idt || typeof fetch !== "function") { done(); return; }
+    var cu = _cogUser;
+    if (!cu) return Promise.reject(new Error("Not signed in — log in again first."));
+    /* Capture the id token BEFORE deleteUser() clears the cached session.
+       BUG FIX (23 Oct 2026): this used to call cu.getIdToken() on the RAW
+       CognitoUser — that method only exists on the wrapper — the TypeError
+       was swallowed by the catch, idt stayed "", and the ledger cleanup
+       was silently skipped: the Cognito account vanished while its ledger
+       row stayed visible in the panel (a ghost). Take the token from the
+       same proven source every working ledger call uses (the wrapper via
+       _cogCurrentUser), with the raw session as a fallback. */
+    var idtP = (_cogCurrentUser && typeof _cogCurrentUser.getIdToken === "function")
+      ? _cogCurrentUser.getIdToken(false)
+      : Promise.resolve(null);
+    return idtP.catch(function () { return null; }).then(function (tok) {
+      var idt = tok || "";
+      if (!idt) {
         try {
-          var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
-          if (ctl) setTimeout(function () { try { ctl.abort(); } catch (e) {} }, 5000);
-          fetch(apiOrigin() + "/api/session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + idt },
-            body: JSON.stringify({ mode: "cleanup" }),
-            signal: ctl ? ctl.signal : undefined
-          }).then(done, done);
-        } catch (e) { done(); }
+          var s = cu.getSignInUserSession && cu.getSignInUserSession();
+          idt = (s && s.getIdToken && s.getIdToken().getJwtToken()) || "";
+        } catch (e) {}
+      }
+      return new Promise(function (resolve, reject) {
+        cu.deleteUser(function (err) {
+          if (err) { reject(new Error((err && err.message) || "Could not delete account")); return; }
+          var done = function () { resolve(); };
+          if (!idt || typeof fetch !== "function") {
+            if (!idt) console.error("delete-account: no id token — ledger cleanup skipped (ghost risk)");
+            done(); return;
+          }
+          try {
+            var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+            if (ctl) setTimeout(function () { try { ctl.abort(); } catch (e) {} }, 5000);
+            fetch(apiOrigin() + "/api/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: "Bearer " + idt },
+              body: JSON.stringify({ mode: "cleanup" }),
+              signal: ctl ? ctl.signal : undefined
+            }).then(function (r) {
+              if (!r || !r.ok) console.error("delete-account: ledger cleanup failed", r && r.status);
+              done();
+            }, function (e) { console.error("delete-account: ledger cleanup failed", e); done(); });
+          } catch (e) { done(); }
+        });
       });
     });
   },
