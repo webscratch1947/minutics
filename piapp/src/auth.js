@@ -13,6 +13,10 @@ function getApiOrigin() {
 }
 
 /* ── Demo account (kept for parity with the web app) ─────────────────── */
+/* Owner decision (23 Oct 2026): the demo ACCOUNT is removed from the
+   product (gate entry + boot resume) — the code below is KEPT. Flip this
+   back to true to restore it. */
+const DEMO_MODE = false;
 const DEMO_STORAGE_KEY = "lt-demo-session-started";
 const DEMO_DURATION_MS = 30 * 60 * 1000;
 let demoTimerInterval = null;
@@ -251,8 +255,10 @@ function renderGate() {
         '<span class="lt-auth-spinner"></span>' +
         '<span id="lt-auth-pi-label">Continue with Pi</span>' +
       '</button>' +
-      '<div class="lt-auth-divider">or</div>' +
-      '<div class="lt-auth-demo">Try the demo — auto-logs-out after 30 min. Data is wiped on timeout.</div>' +
+      (DEMO_MODE
+        ? '<div class="lt-auth-divider">or</div>' +
+          '<div class="lt-auth-demo">Try the demo — auto-logs-out after 30 min. Data is wiped on timeout.</div>'
+        : '') +
       '<p class="lt-auth-disclaimer"><b>Please note:</b> your data (activities, budget, tasks, journal) is saved only on this device — it never leaves your phone. If you log in on another device, you\'ll start fresh there.</p>' +
     '</main>';
   document.body.appendChild(gate);
@@ -376,7 +382,7 @@ function checkExistingSession() {
 }
 
 /* ── Init: check session → show app or gate ──────────────────────────── */
-if (isDemoActive()) {
+if (DEMO_MODE && isDemoActive()) {
   if (demoTimeRemainingMs() > 0) {
     startDemoSession(false);
   } else {

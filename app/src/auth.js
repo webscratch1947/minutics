@@ -73,7 +73,12 @@ var _logoutInProgress = false; /* a real signOut() is in flight (set by
    survives every wipe; it is a flag, not user data) that account is
    granted a free Lifetime plan — demo data itself is never imported
    into real accounts. ─────────────────────────────────────────────────── */
-var DEMO_MODE = true;
+/* Owner decision (23 Oct 2026): the demo ACCOUNT is removed from the
+   product completely — no demo buttons, no "Early Access Demo" label, no
+   demo resume on boot. Every line of the engine is KEPT; flip this back
+   to true to restore the whole feature. Tools/tests can still start it
+   programmatically via window.LTDemo.start(). */
+var DEMO_MODE = false;
 var DEMO_SESSION_KEY = "lt-demo-session-started";
 /* Sliding renewal stamp (activity pushed it forward). Kept separate from
    DEMO_SESSION_KEY so the VISIBLE countdown can count down monotonically
