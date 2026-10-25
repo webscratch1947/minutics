@@ -13,6 +13,24 @@ const IMGS = {
 };
 const GREEN = "#157347";
 
+/* ── Onboarding redesign review flag ─────────────────────────────────────
+   The redesigned onboarding is REVIEW-ONLY until the owner approves it:
+   ONB_NEW_DEFAULT is false, so the live site + APK keep the current
+   onboarding. Opening the app with ?onboarding=new switches THIS browser
+   to the redesign (sticky via localStorage) and ?onboarding=old switches
+   back / clears the flag. Flipping ONB_NEW_DEFAULT to true ships the
+   redesign to everyone. */
+const ONB_NEW_DEFAULT = false;
+function resolveOnbV2() {
+  try {
+    const q = new URLSearchParams(window.location.search).get("onboarding");
+    if (q === "new") { window.localStorage.setItem("lt_onboarding_v2", "1"); return true; }
+    if (q === "old") { window.localStorage.removeItem("lt_onboarding_v2"); return false; }
+    return ONB_NEW_DEFAULT || window.localStorage.getItem("lt_onboarding_v2") === "1";
+  } catch { return ONB_NEW_DEFAULT; }
+}
+const ONB_V2 = typeof window !== "undefined" ? resolveOnbV2() : ONB_NEW_DEFAULT;
+
 /* ── DOB pickers (month / year) ──────────────────────────────────────────
    The native <select> popup is an unstyled OS control that clashes badly
    with this card. These buttons open a themed sheet in the app's own   style: rounded chips, green selection, smooth entrance, auto-centred on   the current value. No native dropdown anywhere in onboarding. */
@@ -24,6 +42,31 @@ if (typeof document !== "undefined" && !document.getElementById(PICKER_STYLE_ID)
     "@keyframes ltPkFade{from{opacity:0;}to{opacity:1;}}" +
     "@keyframes ltPkIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}";
   document.head.appendChild(st);
+}
+
+/* ── Redesigned onboarding chrome (review-only, see ONB_NEW_DEFAULT) ─────
+   Starry-navy dome at the top (echoes the login Get-Started screen), the
+   mascot illustration floating in a glowing white frame across the
+   horizon, frosted cards, segment progress ("Step x of 4") and a gradient
+   pill CTA. Pure chrome — every functional element (pickers, calendar,
+   chips, sliders, texts) is untouched, so all DOB-test contracts hold in
+   BOTH modes. */
+const ONB2_STYLE_ID = "lt-onb2-css";
+if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) {
+  const st2 = document.createElement("style");
+  st2.id = ONB2_STYLE_ID;
+  st2.textContent =
+    "@keyframes onb2In{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}" +
+    "@keyframes onb2Tw{0%,100%{opacity:.3;}50%{opacity:1;}}" +
+    ".onb2-step{animation:onb2In .3s cubic-bezier(.22,1,.36,1) both;}" +
+    ".onb2-sky{" +
+      "position:absolute;left:0;right:0;top:0;height:min(38vh,340px);overflow:hidden;pointer-events:none;" +
+      "background:radial-gradient(120% 90% at 50% -10%,#2B3070 0%,#1B1E45 52%,#141634 100%);" +
+      "border-bottom-left-radius:50% 80px;border-bottom-right-radius:50% 80px;" +
+    "}" +
+    ".onb2-star{animation:onb2Tw 2.6s ease-in-out infinite;}" +
+    "@media (prefers-reduced-motion:reduce){.onb2-step,.onb2-star{animation:none!important;}}";
+  document.head.appendChild(st2);
 }
 
 function SheetPicker({ title, display, value, options, onPick }) {
@@ -362,25 +405,63 @@ export function mk({
         type: "button",
         onClick: () => go(STEPS[idx - 1]),
         "aria-label": "Go back",
-        className: "w-9 h-9 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 shrink-0",
+        className: ONB_V2
+          ? "w-9 h-9 flex items-center justify-center rounded-full text-white/90 bg-white/15 border border-white/25 active:bg-white/25 shrink-0"
+          : "w-9 h-9 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 shrink-0",
         children: jsx("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round", children: jsx("polyline", { points: "15 18 9 12 15 6" }) })
       })
     : jsx("div", { className: "w-9 shrink-0" });
 
-  const dots = jsxs("div", {
-    className: "flex-1 flex items-center justify-center gap-2",
-    children: STEPS.map((_, k) => jsx("span", {
-      className: "rounded-full transition-all",
-      style: k <= idx
-        ? { width: k === idx ? 20 : 8, height: 8, background: GREEN }
-        : { width: 8, height: 8, background: "#E5E7EB" }
-    }, k))
-  });
+  /* Progress: v1 keeps the dots; v2 shows "Step x of 4" + filling segments
+     (sits on the starry dome, so it's light-on-dark). */
+  const dots = ONB_V2
+    ? jsxs("div", {
+        className: "flex-1 flex flex-col items-center justify-center gap-1.5",
+        children: [
+          jsx("span", { className: "text-[11px] font-bold tracking-[.14em] uppercase text-white/75", children: `Step ${idx + 1} of ${STEPS.length}` }),
+          jsxs("div", { className: "flex w-[152px] gap-1.5", children: STEPS.map((_, k) => jsx("span", {
+            key: k,
+            className: "h-1.5 flex-1 rounded-full transition-all duration-300",
+            style: k <= idx
+              ? { background: "linear-gradient(90deg,#34D399," + GREEN + ")" }
+              : { background: "rgba(255,255,255,.25)" }
+          })) })
+        ]
+      })
+    : jsxs("div", {
+        className: "flex-1 flex items-center justify-center gap-2",
+        children: STEPS.map((_, k) => jsx("span", {
+          className: "rounded-full transition-all",
+          style: k <= idx
+            ? { width: k === idx ? 20 : 8, height: 8, background: GREEN }
+            : { width: 8, height: 8, background: "#E5E7EB" }
+        }, k))
+      });
+
+  /* Decorative star field for the v2 dome (static positions — cheap). */
+  const onb2Sky = ONB_V2
+    ? jsx("div", { className: "onb2-sky", "aria-hidden": true,
+        children: jsx("svg", { className: "absolute inset-0 w-full h-full", viewBox: "0 0 400 340", preserveAspectRatio: "xMidYMid slice",
+          children: [
+            [30,44,1.2,.8],[74,96,.9,.5],[112,30,1.4,.9],[150,120,1,.6],[192,58,1.1,.7],
+            [236,102,.8,.45],[274,36,1.3,.85],[312,88,1,.55],[352,50,1.2,.75],[384,110,.9,.5],
+            [52,150,1,.6],[128,168,1.2,.7],[208,146,.9,.5],[290,160,1.1,.65],[360,150,1,.55],
+            [18,96,.8,.45],[96,64,.7,.4],[252,66,.8,.45],[332,124,.7,.4],[170,210,1,.55],
+            [260,214,.8,.45],[58,214,.9,.5],[388,196,1,.55],[136,84,.7,.4]
+          ].map((p, i) => jsx("circle", {
+            cx: p[0], cy: p[1], r: p[2], fill: "#fff", opacity: p[3],
+            className: i % 3 === 0 ? "onb2-star" : undefined,
+            style: i % 3 === 0 ? { animationDelay: (i * 0.37) + "s" } : undefined
+          }, i))
+        })
+      })
+    : null;
 
   /* All four illustrations stay MOUNTED (inactive ones hidden) so a step
-     switch is a pure visibility toggle â€” never a remount that blanks the
-     <img> for a few frames while it reloads/re-decodes (the 0.3s flicker). */
-  const img = jsxs("div", {
+     switch is a pure visibility toggle â€" never a remount that blanks the
+     <img> for a few frames while it reloads/re-decodes (the 0.3s flicker).
+     v2 floats the art in a glowing rounded frame that overlaps the dome. */
+  const imgStack = jsxs("div", {
     className: "relative w-full max-w-[330px] mx-auto h-[42vh]",
     children: STEPS.map((step) => jsx("img", {
       src: IMGS[step],
@@ -391,31 +472,61 @@ export function mk({
       style: { visibility: step === t ? "visible" : "hidden" }
     }, step))
   });
+  const img = ONB_V2
+    ? jsx("div", {
+        className: "relative w-[min(330px,86%)] mx-auto mt-1 mb-4 rounded-[28px] bg-white/95 p-3 backdrop-blur-sm",
+        style: {
+          boxShadow: "0 24px 60px -18px rgba(20,22,60,.55), 0 0 0 1px rgba(255,255,255,.7) inset, 0 0 44px -8px rgba(52,211,153,.28)"
+        },
+        children: imgStack
+      })
+    : imgStack;
 
   const label = (text) => jsx("label", {
     className: "block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2",
     children: text
   });
 
+  /* v2 CTA: green gradient pill with a soft glow; v1 keeps the flat green. */
   const nextBtn = (onClick, disabled, text) => jsx("button", {
     type: "button",
     onClick: onClick,
     disabled: disabled,
-    className: "w-full py-4 rounded-xl font-bold text-base text-white transition-opacity",
-    style: { background: GREEN, opacity: disabled ? 0.4 : 1 },
+    className: ONB_V2
+      ? "w-full py-4 rounded-2xl font-bold text-base text-white transition-all active:scale-[.98]"
+      : "w-full py-4 rounded-xl font-bold text-base text-white transition-opacity",
+    style: ONB_V2
+      ? {
+          background: "linear-gradient(135deg,#22A06B 0%," + GREEN + " 55%,#0E5C36 100%)",
+          opacity: disabled ? 0.4 : 1,
+          boxShadow: disabled ? "none" : "0 14px 30px -10px rgba(21,115,71,.65), 0 0 0 1px rgba(255,255,255,.18) inset"
+        }
+      : { background: GREEN, opacity: disabled ? 0.4 : 1 },
     children: text
   });
+
+  /* Shared card chrome: v2 cards are frosted glass over the cream page. */
+  const cardCls = ONB_V2
+    ? "bg-white/85 backdrop-blur-md border border-white/70 rounded-3xl px-4 py-4 shadow-[0_10px_34px_rgba(20,32,80,0.10)]"
+    : "bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]";
+  const cardClsTight = ONB_V2
+    ? "bg-white/85 backdrop-blur-md border border-white/70 rounded-3xl px-3.5 py-3 shadow-[0_10px_34px_rgba(20,32,80,0.10)]"
+    : "bg-white border border-black/[.08] rounded-2xl px-3.5 py-3 shadow-[0_6px_20px_rgba(15,23,42,0.07)]";
 
   /* â”€â”€ step bodies â”€â”€ */
   let body = null, footer = null;
 
   if (t === "welcome") {
     body = jsxs("div", {
-      className: "text-center pt-10",
+      className: "text-center" + (ONB_V2 ? " pt-2" : " pt-10"),
       children: [
         img,
+        ONB_V2 && jsx("h1", {
+          className: "text-[26px] font-extrabold tracking-tight text-[#14162E] mt-1",
+          children: "Let's set up your universe"
+        }),
         jsx("p", {
-          className: "text-gray-500 text-sm leading-relaxed mt-2 px-2",
+          className: (ONB_V2 ? "text-[#5B6478]" : "text-gray-500") + " text-sm leading-relaxed mt-2 px-2 font-medium",
           children: "A few quick questions and your minutes will start tracking."
         })
       ]
@@ -428,7 +539,7 @@ export function mk({
       children: [
         img,
         jsx("div", { className: "mt-2", children: jsxs("div", {
-          className: "bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]",
+          className: cardCls,
           children: [
             label("Your name"),
             jsx("input", {
@@ -481,7 +592,7 @@ export function mk({
     body = jsxs("div", {
       children: [
         img,
-        jsxs("div", { className: "mt-2 bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]", children: [
+        jsxs("div", { className: "mt-2 " + cardCls, children: [
           label("Date of birth"),
           jsxs("div", {
             className: "flex items-center gap-2",
@@ -541,7 +652,7 @@ export function mk({
             ]
           })
         ]}),
-        jsxs("div", { className: "mt-3 bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]", children: [
+        jsxs("div", { className: "mt-3 " + cardCls, children: [
           jsxs("label", {
             className: "block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2",
             children: ["Retire age \u2014 ", jsx("span", { style: { color: GREEN }, children: d })]
@@ -563,7 +674,7 @@ export function mk({
             ]
           })
         ]}),
-        u && s && jsxs("div", { className: "mt-3 bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]", children: [
+        u && s && jsxs("div", { className: "mt-3 " + cardCls, children: [
           label("Your timeline"),
           jsxs("div", {
             className: "flex h-4 w-full border border-[#E5DFCF] overflow-hidden rounded-full",
@@ -596,7 +707,7 @@ export function mk({
         jsx("div", { className: "mt-2", children: jsxs("div", {
           /* Compact card (user: "the box of the salary is too big"): tighter
              padding + a lighter input — the card takes ~1/3 less height. */
-          className: "bg-white border border-black/[.08] rounded-2xl px-3.5 py-3 shadow-[0_6px_20px_rgba(15,23,42,0.07)]",
+          className: cardClsTight,
           children: [
             label("Your monthly salary"),
             jsxs("div", {
@@ -630,31 +741,43 @@ export function mk({
         jsx("button", {
           type: "button",
           onClick: () => finish(false),
-          className: "w-full py-3 text-sm font-bold text-white rounded-xl transition-colors active:opacity-80",
-          style: { background: "#DC2626" },
+          /* v2 demotes "Skip" to a quiet ghost link (the red block competed
+             with the real CTA); v1 keeps the original red button. */
+          className: ONB_V2
+            ? "w-full py-3 text-sm font-bold text-gray-400 rounded-2xl transition-colors active:bg-black/5"
+            : "w-full py-3 text-sm font-bold text-white rounded-xl transition-colors active:opacity-80",
+          style: ONB_V2 ? undefined : { background: "#DC2626" },
           children: "Skip for now"
         })
       ]
     });
   }
 
+  /* v2 body wrapper: gentle per-step rise so switching steps feels alive
+     (this is the onboarding flow itself, NOT the login-screen open/close
+     animation the owner asked to remove — that one stays gone). */
+  const bodyWrap = ONB_V2
+    ? jsx("div", { className: "onb2-step", key: t, children: body })
+    : body;
+
   return jsxs("div", {
-    className: "min-h-[100dvh] bg-[#FDFBF7] flex flex-col",
+    className: "relative min-h-[100dvh] flex flex-col " + (ONB_V2 ? "bg-[#FDFBF7] overflow-hidden" : "bg-[#FDFBF7]"),
     children: [
+      onb2Sky,
       jsxs("div", {
-        className: "flex items-center gap-2 px-4 pt-10 pb-3",
+        className: "relative z-10 flex items-center gap-2 px-4 pt-10 pb-3",
         children: [backBtn, dots, jsx("div", { className: "w-9 shrink-0" })]
       }),
       jsx("div", {
-        className: "flex-1 overflow-y-auto px-6 pb-4",
-        children: body
+        className: "relative z-10 flex-1 overflow-y-auto px-6 pb-4",
+        children: bodyWrap
       }),
       jsx("div", {
         /* safe-area: on Android 15 (targetSdk 35) the platform draws the
            page behind the system navigation bar, which covered the
            "Next" / "Get Started" CTAs — pad by the inset (0 when the
            native opt-out keeps content between the bars). */
-        className: "px-6 pt-3 pb-8 bg-[#FDFBF7]",
+        className: "relative z-10 px-6 pt-3 pb-8 " + (ONB_V2 ? "bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7] to-transparent" : "bg-[#FDFBF7]"),
         style: { paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" },
         children: footer
       })

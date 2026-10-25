@@ -100,10 +100,13 @@ function isReservedKey(k) {
      (only wipeDemoData / _killDemoForRealAuth remove them).
      CognitoIdentityServiceProvider.* is the Cognito SDK's own session
      store (LastAuthUser + token cache) — it is the session itself, not
-     app data, so it is never snapshotted or wiped with account keys. */
+     app data, so it is never snapshotted or wiped with account keys.
+     lt_onboarding_v2 is the onboarding-redesign review flag: a device-level
+     UI preference (same class as the demo keys), never account data. */
   return k === ACTIVE_UID_KEY || k.indexOf("lt_ns_") === 0 || k.indexOf("firebase:") === 0
     || k.indexOf("CognitoIdentityServiceProvider.") === 0
-    || k === DEMO_SESSION_KEY || k === DEMO_RENEW_KEY || k === DEMO_HISTORY_KEY;
+    || k === DEMO_SESSION_KEY || k === DEMO_RENEW_KEY || k === DEMO_HISTORY_KEY
+    || k === "lt_onboarding_v2";
 }
 function appKeys() {
   var out = [];
@@ -854,8 +857,10 @@ function injectStyles() {
          children animate; the opaque background never does. */
     }
     #lt-auth-gate * { box-sizing: border-box; }
-    @keyframes lt-auth-fade { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes lt-auth-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+    /* No entrance animations on the auth screens: the owner (and the APK
+       audience — touch devices with no mouse) wants Login / Register /
+       Forgot / Get Started to simply BE there the instant they render.
+       Only feedback animations remain: error shake + loading spin. */
     @keyframes lt-auth-shake {
       10%, 90% { transform: translateX(-1px); }
       20%, 80% { transform: translateX(2px); }
@@ -875,12 +880,10 @@ function injectStyles() {
         linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
       background-size: auto, auto, 46px 46px, 46px 46px;
-      animation: lt-auth-fade .45s ease;
     }
     .lt-auth-scr {
       position: relative; z-index: 1; width: 100%; max-width: 460px;
       margin: auto; padding: 52px 22px calc(38px + env(safe-area-inset-bottom));
-      animation: lt-auth-rise .5s cubic-bezier(.22,1,.36,1);
     }
     .lt-auth-back {
       width: 44px; height: 44px; border-radius: 50%;
@@ -900,7 +903,6 @@ function injectStyles() {
       background: #fff; border-radius: 26px; margin-top: 28px;
       padding: 20px 18px 22px;
       box-shadow: 0 32px 64px -32px rgba(0,0,0,.6), 0 10px 26px -14px rgba(0,0,0,.35);
-      animation: lt-auth-rise .5s cubic-bezier(.22,1,.36,1) .06s backwards;
     }
     /* segmented Login / Register switcher (sliding indicator) */
     .lt-auth-tabs {
@@ -926,13 +928,16 @@ function injectStyles() {
     #lt-auth-form, #lt-forgot-form { display: block; margin-top: 16px; }
     .lt-auth-field {
       display: flex; align-items: center; gap: 12px;
-      background: #fff; border: 1.5px solid #E8E8F0; border-radius: 16px;
+      /* Purple border BY DEFAULT (owner: "boxes become purple only when I
+         click them" — Android has no hover/focus preview, so the resting
+         state must already show the brand color). Focus still adds the ring. */
+      background: #fff; border: 1.5px solid #4F46E5; border-radius: 16px;
       padding: 11px 14px; transition: border-color .15s, box-shadow .15s;
     }
     .lt-auth-field + .lt-auth-field { margin-top: 12px; }
     .lt-auth-field:focus-within { border-color: #4F46E5; box-shadow: 0 0 0 4px rgba(79,70,229,.13); }
     .lt-auth-field.lt-auth-invalid { border-color: #dc2626; }
-    .lt-auth-field-icon { width: 20px; height: 20px; flex-shrink: 0; color: #9AA0B0; pointer-events: none; transition: color .15s; }
+    .lt-auth-field-icon { width: 20px; height: 20px; flex-shrink: 0; color: #4F46E5; pointer-events: none; transition: color .15s; }
     .lt-auth-field:focus-within .lt-auth-field-icon { color: #4F46E5; }
     .lt-auth-fbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
     .lt-auth-flabel { font-size: 10.5px; font-weight: 600; letter-spacing: .03em; color: #9AA0B0; }
@@ -946,9 +951,10 @@ function injectStyles() {
       flex-shrink: 0; width: 30px; height: 30px;
       display: flex; align-items: center; justify-content: center;
       background: none; border: none; padding: 0; cursor: pointer;
-      color: #9AA0B0; -webkit-tap-highlight-color: transparent; transition: color .15s;
+      /* Real black at rest — the old #9AA0B0→#111827 hover transition was
+         invisible on Android (no mouse). No hover dependency. */
+      color: #111827; -webkit-tap-highlight-color: transparent; transition: color .15s;
     }
-    .lt-auth-pw-toggle:hover { color: #111827; }
     .lt-auth-pw-toggle svg { width: 20px; height: 20px; }
     .lt-auth-hint { margin: 10px 0 0; font-size: 12px; color: #9AA0B0; }
     .lt-auth-frow { display: flex; justify-content: flex-end; margin-top: 12px; }
@@ -1011,7 +1017,6 @@ function injectStyles() {
     .lt-auth-welcome {
       position: relative; width: 100%; max-width: 520px; min-height: 100%;
       margin: auto; display: flex; flex-direction: column;
-      animation: lt-auth-fade .45s ease;
     }
     .lt-auth-herowrap { position: relative; }
     .lt-auth-hero {
@@ -1021,6 +1026,43 @@ function injectStyles() {
       border-bottom-right-radius: 50% 96px;
     }
     .lt-auth-stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+    /* ── Star show: every ~6s a random star blooms (scale + glow), a gentle
+       ambient twinkle keeps the sky alive between shines, and an occasional
+       shooting star crosses the dome. All pure CSS transforms on the existing
+       <circle>s — cheap on the APK. The JS driver stops itself the moment the
+       gate is replaced. ─────────────────────────────────────────────────── */
+    @keyframes lt-star-shine {
+      0%   { transform: scale(1);   opacity: var(--so, .55); }
+      45%  { transform: scale(2.4); opacity: 1; }
+      100% { transform: scale(1);   opacity: var(--so, .55); }
+    }
+    @keyframes lt-star-twinkle {
+      0%, 100% { opacity: var(--so, .55); }
+      50%      { opacity: calc(var(--so, .55) + .4); }
+    }
+    .lt-auth-stars circle {
+      transform-box: fill-box; transform-origin: center;
+      transition: opacity .2s;
+    }
+    .lt-auth-stars circle.lt-star-shine {
+      animation: lt-star-shine 1.6s ease-in-out;
+      filter: drop-shadow(0 0 4px rgba(255,255,255,.95)) drop-shadow(0 0 10px rgba(196,181,253,.8));
+    }
+    .lt-auth-stars circle.lt-star-twinkle {
+      animation: lt-star-twinkle 1.8s ease-in-out;
+    }
+    @keyframes lt-shoot-star {
+      0%   { transform: translate(0,0) rotate(16deg); opacity: 0; }
+      8%   { opacity: .95; }
+      100% { transform: translate(360px,104px) rotate(16deg); opacity: 0; }
+    }
+    .lt-auth-shoot {
+      position: absolute; top: var(--y, 22%); left: -60px;
+      width: 74px; height: 2px; border-radius: 2px; pointer-events: none;
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.9) 70%, #fff 100%);
+      filter: drop-shadow(0 0 6px rgba(255,255,255,.9));
+      animation: lt-shoot-star 1.5s cubic-bezier(.3,.4,.6,1) forwards;
+    }
     .lt-auth-badge {
       position: absolute; left: 50%; bottom: -46px; transform: translateX(-50%);
       width: 94px; height: 94px; border-radius: 50%; background: #fff;
@@ -1071,6 +1113,10 @@ function injectStyles() {
     }
     @media (prefers-reduced-motion: reduce) {
       .lt-auth-darkbg, .lt-auth-scr, .lt-auth-card, .lt-auth-badge, .lt-auth-welcome { animation: none !important; }
+      /* Star show: fully off for reduced-motion users (the JS driver also
+         refuses to start, this is the belt to its braces). */
+      .lt-auth-stars circle { animation: none !important; }
+      .lt-auth-shoot { display: none !important; }
     }
   `;
   document.head.appendChild(style);
@@ -1397,12 +1443,75 @@ function renderWelcomeGate() {
     '</main>';
   document.body.appendChild(gate);
 
+  startStarShow(gate);
+
   document.getElementById("lt-auth-get-started").addEventListener("click", function () {
     renderGate("signup");
   });
   document.getElementById("lt-auth-wlogin-link").addEventListener("click", function () {
     renderGate("login");
   });
+}
+
+/* ── Welcome-screen star show ───────────────────────────────────────────
+   Drives the CSS star animations: a random star blooms every ~6s, a soft
+   ambient twinkle runs between shines, and a shooting star streaks across
+   the dome every ~9s. Every timer self-clears as soon as the gate leaves
+   the DOM (any renderGate() replaces it) so nothing keeps ticking behind
+   the login screens or the signed-in app. Reduced-motion users get a
+   completely static sky. */
+function startStarShow(gate) {
+  try {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var hero = gate.querySelector(".lt-auth-hero");
+    var svg = gate.querySelector(".lt-auth-stars");
+    if (!hero || !svg) return;
+    var timers = [];
+    var alive = function () {
+      if (document.body.contains(gate) && document.getElementById("lt-auth-gate") === gate) return true;
+      timers.forEach(clearInterval);
+      timers.forEach(clearTimeout);
+      timers = [];
+      return false;
+    };
+    var shine = function () {
+      if (!alive()) return;
+      var cs = svg.querySelectorAll("circle");
+      if (!cs.length) return;
+      var s = cs[Math.floor(Math.random() * cs.length)];
+      /* --so: each star keeps its own base opacity through the animation. */
+      s.style.setProperty("--so", s.getAttribute("opacity") || ".55");
+      s.classList.remove("lt-star-shine", "lt-star-twinkle");
+      void s.getBoundingClientRect(); /* restart the keyframes */
+      s.classList.add("lt-star-shine");
+      setTimeout(function () { s.classList.remove("lt-star-shine"); }, 1700);
+    };
+    var twinkle = function () {
+      if (!alive()) return;
+      var cs = svg.querySelectorAll("circle");
+      if (!cs.length) return;
+      var s = cs[Math.floor(Math.random() * cs.length)];
+      s.style.setProperty("--so", s.getAttribute("opacity") || ".45");
+      s.classList.remove("lt-star-shine", "lt-star-twinkle");
+      void s.getBoundingClientRect();
+      s.classList.add("lt-star-twinkle");
+      setTimeout(function () { s.classList.remove("lt-star-twinkle"); }, 1900);
+    };
+    var shoot = function () {
+      if (!alive()) return;
+      var m = document.createElement("div");
+      m.className = "lt-auth-shoot";
+      m.style.setProperty("--y", (14 + Math.random() * 46) + "%");
+      hero.appendChild(m);
+      setTimeout(function () { if (m.parentNode) m.parentNode.removeChild(m); }, 1600);
+    };
+    timers.push(setInterval(shine, 6000));
+    timers.push(setInterval(twinkle, 1800));
+    timers.push(setInterval(shoot, 9000));
+    /* First sparkles land immediately so the sky feels alive on arrival. */
+    setTimeout(shine, 600);
+    setTimeout(twinkle, 1400);
+  } catch {}
 }
 
 /* ── Forgot password — ONE screen, NO code: email + new password →
