@@ -107,9 +107,9 @@ if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) 
     ".onb2-star{animation:onb2Tw 2.6s ease-in-out infinite;}" +
     /* Horizon glow behind the mascot, at the dome/sheet seam. */
     ".onb2-glow{" +
-      "position:absolute;left:50%;bottom:-34px;width:min(340px,86%);height:130px;transform:translateX(-50%);" +
-      "background:radial-gradient(50% 60% at 50% 60%,rgba(52,211,153,.5) 0%,rgba(52,211,153,0) 70%);" +
-      "filter:blur(10px);animation:onb2Glow 4.5s ease-in-out infinite;pointer-events:none;" +
+      "position:absolute;left:50%;bottom:-30px;width:min(320px,84%);height:108px;transform:translateX(-50%);" +
+      "background:radial-gradient(50% 60% at 50% 60%,rgba(52,211,153,.38) 0%,rgba(52,211,153,0) 70%);" +
+      "filter:blur(9px);animation:onb2Glow 4.5s ease-in-out infinite;pointer-events:none;" +
     "}" +
     /* The floating illustration (transparent PNG on the sky). */
     ".onb2-art{" +
@@ -125,7 +125,7 @@ if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) 
     ".onb2-sheet{" +
       "position:relative;z-index:10;flex:1;min-height:0;margin-top:-26px;" +
       "background:#FDFBF7;border-top-left-radius:34px;border-top-right-radius:34px;" +
-      "box-shadow:0 -18px 40px -18px rgba(8,10,36,.65);" +
+      "box-shadow:0 -14px 34px -18px rgba(8,10,36,.5);" +
       "display:flex;flex-direction:column;" +
     "}" +
     "@media (prefers-reduced-motion:reduce){" +
@@ -516,10 +516,14 @@ export function mk({
     children: [backBtn, dots, jsx("div", { className: "w-9 shrink-0" })]
   });
 
+  /* Dome height — ONE constant shared by the sky and the art layer so the
+     two always match. Kept modest (42vh) so the form gets real room. */
+  const DOME_H = "clamp(284px,42vh,374px)";
+
   /* Decorative star field for the v2 dome (static positions — cheap).
      v3: the dome is a real stage — stars + header live inside it. */
   const onb2Sky = ONB_V2
-    ? jsxs("div", { className: "onb2-sky", style: { height: "clamp(300px,46vh,410px)" },
+    ? jsxs("div", { className: "onb2-sky", style: { height: DOME_H },
         children: [
           jsx("div", { className: "absolute inset-0", "aria-hidden": true,
             children: jsx("svg", { className: "w-full h-full", viewBox: "0 0 400 340", preserveAspectRatio: "xMidYMid slice",
@@ -561,7 +565,6 @@ export function mk({
   });
   /* v3 art layer: sits over the dome (z above the sheet, pointer-events
      off), bottom-aligned under the header. Height must equal the dome. */
-  const DOME_H = "clamp(300px,46vh,410px)";
   const artDome = ONB_V2
     ? jsx("div", {
         className: "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-end justify-center pb-4",
@@ -584,24 +587,36 @@ export function mk({
     children: text
   });
 
-  /* v3 CTA: full pill gradient with a soft green glow (echoes the login
-     CTA shape); v1 keeps the flat green button. */
+  /* v3 CTA: full pill — vivid gradient when actionable, CLEAN WARM GRAY
+     when disabled (never the washed-out pale green the owner flagged).
+     v1 keeps the flat green button. */
   const nextBtn = (onClick, disabled, text) => jsx("button", {
     type: "button",
     onClick: onClick,
     disabled: disabled,
     className: ONB_V2
-      ? "w-full py-[17px] rounded-full font-bold text-[15.5px] text-white transition-all active:scale-[.98]"
+      ? "w-full py-[17px] rounded-full font-bold text-[15.5px] transition-all active:scale-[.98]"
       : "w-full py-4 rounded-xl font-bold text-base text-white transition-opacity",
     style: ONB_V2
-      ? {
-          background: "linear-gradient(135deg,#22A06B 0%," + GREEN + " 55%,#0E5C36 100%)",
-          opacity: disabled ? 0.4 : 1,
-          boxShadow: disabled ? "none" : "0 16px 34px -12px rgba(21,115,71,.7), 0 0 0 1px rgba(255,255,255,.2) inset"
-        }
+      ? (disabled
+          ? { background: "#E9E4D7", color: "#9AA1AE", boxShadow: "none", cursor: "default" }
+          : {
+              background: "linear-gradient(135deg,#22A06B 0%," + GREEN + " 55%,#0E5C36 100%)",
+              color: "#fff",
+              boxShadow: "0 16px 34px -12px rgba(21,115,71,.7), 0 0 0 1px rgba(255,255,255,.2) inset"
+            })
       : { background: GREEN, opacity: disabled ? 0.4 : 1 },
     children: text
   });
+
+  /* Per-step headings (owner: every step needs a real title — the tiny
+     uppercase field labels alone left the sheet feeling empty). */
+  const head2 = (text) => ONB_V2
+    ? jsx("h2", {
+        className: "text-[23px] leading-tight font-extrabold tracking-tight text-[#14162E] text-center mb-3",
+        children: text
+      })
+    : null;
 
   /* v3 card chrome: solid white cards resting on the cream sheet (the old
      frosted look only made sense over the old flat background). */
@@ -637,7 +652,8 @@ export function mk({
     body = jsxs("div", {
       children: [
         bodyArt,
-        jsx("div", { className: "mt-2", children: jsxs("div", {
+        head2("What should we call you?"),
+        jsx("div", { className: "mt-1", children: jsxs("div", {
           className: cardCls,
           children: [
             label("Your name"),
@@ -691,7 +707,8 @@ export function mk({
     body = jsxs("div", {
       children: [
         bodyArt,
-        jsxs("div", { className: "mt-2 " + cardCls, children: [
+        head2("When's your birthday?"),
+        jsxs("div", { className: "mt-1 " + cardCls, children: [
           label("Date of birth"),
           jsxs("div", {
             className: "flex items-center gap-2",
@@ -803,7 +820,8 @@ export function mk({
     body = jsxs("div", {
       children: [
         bodyArt,
-        jsx("div", { className: "mt-2", children: jsxs("div", {
+        head2("What's your salary?"),
+        jsx("div", { className: "mt-1", children: jsxs("div", {
           /* Compact card (user: "the box of the salary is too big"): tighter
              padding + a lighter input — the card takes ~1/3 less height. */
           className: cardClsTight,
@@ -821,7 +839,7 @@ export function mk({
                   onChange: g => setSal(g.target.value),
                   placeholder: "e.g. 50,000",
                   autoFocus: true,
-                  className: "w-full bg-[#F5F6F8] border border-black/10 rounded-xl px-3 py-2.5 text-gray-900 text-[15px] font-semibold outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className: "w-full bg-[#F5F6F8] border border-black/10 rounded-xl px-3.5 py-3 text-gray-900 text-base font-semibold outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 })
               ]
             }),
@@ -843,7 +861,7 @@ export function mk({
           /* v2 demotes "Skip" to a quiet ghost link (the red block competed
              with the real CTA); v1 keeps the original red button. */
           className: ONB_V2
-            ? "w-full py-3 text-sm font-bold text-gray-400 rounded-2xl transition-colors active:bg-black/5"
+            ? "w-full py-3 text-sm font-bold text-gray-500 rounded-2xl transition-colors active:bg-black/5"
             : "w-full py-3 text-sm font-bold text-white rounded-xl transition-colors active:opacity-80",
           style: ONB_V2 ? undefined : { background: "#DC2626" },
           children: "Skip for now"
@@ -856,7 +874,7 @@ export function mk({
      (this is the onboarding flow itself, NOT the login-screen open/close
      animation the owner asked to remove — that one stays gone). */
   const bodyWrap = ONB_V2
-    ? jsx("div", { className: "onb2-step my-auto w-full", key: t, children: body })
+    ? jsx("div", { className: "onb2-step w-full", key: t, children: body })
     : body;
 
   const footerStyle = { paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" };
