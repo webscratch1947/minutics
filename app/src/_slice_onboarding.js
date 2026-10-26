@@ -75,16 +75,20 @@ if (typeof document !== "undefined" && !document.getElementById(PICKER_STYLE_ID)
   document.head.appendChild(st);
 }
 
-/* ── Redesigned onboarding chrome v5 (review-only, see ONB_NEW_DEFAULT) ──
-   FULL REWORK after the owner rejected the sky/sheet version: this one
-   deliberately does NOT reuse any login / register / Get-Started screen
-   language — no navy star dome, no arch curve, no glassy dark chrome, no
-   gradient pill CTA. Instead: a bright airy canvas — soft mint light
-   fading down from the top, the mascot floating in it with a gentle bob
-   and small glowing mint dots, a flat white content area, bold dark
-   headings, solid green rounded CTA. The class name ".onb2-sky" is KEPT
-   (the review suites key on it) but it is now the light illustration
-   stage, not a night sky. Pure chrome — every functional element
+/* ── Redesigned onboarding chrome v6 (review-only, see ONB_NEW_DEFAULT) ──
+   FULL-SCREEN STORY STYLE (owner picked it): the illustration is no longer
+   a strip on top of a form — it fills the WHOLE screen as the hero scene,
+   and the question/input/button live in a compact white PANEL over the
+   bottom third (the panel grows upward only when a step is tall, e.g. the
+   birthday calendar, and scrolls inside itself). Still deliberately
+   NOT the login / register / Get-Started look: light mint scene, no navy
+   dome, no arch, no gradient pill.
+   PERF (owner: "so laggy"): no filters on animated elements — the mascot
+   float is transform-only on its own compositor layer (will-change), the
+   glow uses a plain radial gradient (no blur pass), decorations are tiny
+   transform/opacity-only dots. Static shadows render once.
+   The class name ".onb2-sky" is KEPT (review suites key on it) but is now
+   the full-screen scene backdrop. Pure chrome — every functional element
    (pickers, calendar, chips, sliders, texts) is untouched, so all
    DOB-test contracts hold in BOTH modes. */
 const ONB2_STYLE_ID = "lt-onb2-css";
@@ -97,34 +101,44 @@ if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) 
     "@keyframes onb2Dot{0%,100%{opacity:.35;transform:scale(.8);}50%{opacity:.95;transform:scale(1.1);}}" +
     "@keyframes onb2Glow{0%,100%{opacity:.55;}50%{opacity:.95;}}" +
     ".onb2-step{animation:onb2In .32s cubic-bezier(.22,1,.36,1) both;}" +
-    /* Light illustration stage (class name kept for the review suites):
-       a soft mint wash that fades into pure white — flat, no dome curve. */
+    /* Full-screen scene backdrop (class name kept for the review suites):
+       soft mint + faint blue blobs fading to white. Absolute, painted
+       ONCE — no animated gradients. */
     ".onb2-sky{" +
-      "position:relative;flex-shrink:0;overflow:hidden;pointer-events:none;" +
-      "background:radial-gradient(120% 95% at 50% -5%,#E4F6EC 0%,#F1FAF5 55%,#FFFFFF 100%);" +
+      "position:absolute;inset:0;z-index:0;pointer-events:none;" +
+      "background:" +
+        "radial-gradient(85% 50% at 16% 10%,rgba(167,243,208,.5) 0%,rgba(167,243,208,0) 62%)," +
+        "radial-gradient(75% 45% at 88% 26%,rgba(191,219,254,.4) 0%,rgba(191,219,254,0) 66%)," +
+        "linear-gradient(180deg,#EAF8F0 0%,#F3FBF7 42%,#FFFFFF 100%);" +
     "}" +
-    /* Soft mint halo behind the mascot. */
+    /* Soft mint halo behind the mascot — a plain radial gradient, NO blur
+       pass (blur on an animated layer was a per-frame cost). */
     ".onb2-glow{" +
-      "position:absolute;left:50%;bottom:4px;width:min(300px,82%);height:150px;transform:translateX(-50%);" +
-      "background:radial-gradient(50% 55% at 50% 55%,rgba(21,115,71,.15) 0%,rgba(21,115,71,0) 72%);" +
-      "filter:blur(7px);animation:onb2Glow 5s ease-in-out infinite;pointer-events:none;" +
+      "position:absolute;left:50%;bottom:2px;width:min(320px,86%);height:150px;transform:translateX(-50%);" +
+      "background:radial-gradient(50% 55% at 50% 55%,rgba(21,115,71,.16) 0%,rgba(21,115,71,0) 72%);" +
+      "animation:onb2Glow 5s ease-in-out infinite;pointer-events:none;" +
     "}" +
-    /* The floating illustration (transparent PNG on the light stage) —
-       a GREEN-tinted shadow, not the dark night-shadow of v3. */
+    /* The floating illustration — transform ONLY (compositor-cheap), on its
+       own layer; the old drop-shadow filter is gone (static ground shadow
+       instead), because filters on animated art re-raster every frame on
+       phones. */
     ".onb2-art{" +
       "animation:onb2Float 5.2s ease-in-out infinite;" +
-      "filter:drop-shadow(0 16px 22px rgba(21,115,71,.16));" +
+      "will-change:transform;" +
     "}" +
-    /* Small glowing mint dots drifting around the mascot. */
+    /* Small glowing mint dots — tiny elements, transform+opacity only. */
     ".onb2-spark{" +
       "position:absolute;border-radius:50%;background:#34D399;pointer-events:none;" +
       "box-shadow:0 0 10px rgba(52,211,153,.75),0 0 22px rgba(52,211,153,.35);" +
       "animation:onb2Dot 4.6s ease-in-out infinite;" +
     "}" +
-    /* Flat white content area (no curved lip, no drop shadow). */
+    /* Bottom panel over the scene: grows from the bottom, caps at 72dvh,
+       scrolls inside itself when a step is tall (birthday calendar). */
     ".onb2-sheet{" +
-      "position:relative;z-index:10;flex:1;min-height:0;" +
+      "position:relative;z-index:10;flex-shrink:0;min-height:0;max-height:72dvh;" +
       "background:#FFFFFF;display:flex;flex-direction:column;" +
+      "border-top-left-radius:28px;border-top-right-radius:28px;" +
+      "box-shadow:0 -16px 40px -24px rgba(15,23,42,.45);" +
     "}" +
     "@media (prefers-reduced-motion:reduce){" +
       ".onb2-step,.onb2-art,.onb2-spark,.onb2-glow{animation:none!important;}" +
@@ -516,60 +530,49 @@ export function mk({
     children: [backBtn, dots, jsx("div", { className: "w-9 shrink-0" })]
   });
 
-  /* Stage height — ONE constant shared by the light stage and the art
-     layer so the two always match. Kept modest so the form gets real
-     room. */
-  const DOME_H = "clamp(284px,42vh,374px)";
-
-  /* v2 light stage: no star field, no night sky (that was the login
-     screen's language) — just the soft mint wash with the header row. */
+  /* v6 scene backdrop: full-screen, painted once (class name kept for the
+     review suites). No night sky, no stars — the login screens' language. */
   const onb2Sky = ONB_V2
-    ? jsxs("div", { className: "onb2-sky", style: { height: DOME_H },
-        children: [
-          headerRow
-        ]
-      })
+    ? jsx("div", { className: "onb2-sky", "aria-hidden": true })
     : null;
 
   /* All four illustrations stay MOUNTED (inactive ones hidden) so a step
      switch is a pure visibility toggle — never a remount that blanks the
      <img> for a few frames while it reloads/re-decodes (the 0.3s flicker).
-     v2: no frame at all — the transparent PNG floats directly on the
-     light stage (see artDome below); v1 keeps it inside the body. */
+     v6: the art fills the whole hero area (slight bleed past the edges for
+     the story feel); v1 keeps it inside the body at its old size. */
   const imgStack = jsxs("div", {
     className: ONB_V2
-      ? "onb2-art relative w-[min(332px,90%)] h-[calc(100%-96px)] mx-auto"
+      ? "onb2-art absolute inset-0"
       : "relative w-full max-w-[330px] mx-auto h-[42vh]",
     children: STEPS.map((step) => jsx("img", {
       src: IMGS[step],
       alt: "",
       draggable: false,
       "aria-hidden": step !== t,
-      className: "absolute inset-0 w-full h-full object-contain select-none",
+      className: ONB_V2
+        ? "absolute inset-0 w-full h-full object-contain select-none scale-[1.08]"
+        : "absolute inset-0 w-full h-full object-contain select-none",
       style: { visibility: step === t ? "visible" : "hidden" }
     }, step))
   });
-  /* v2 art layer: sits over the light stage (z above the content area,
-     pointer-events off), bottom-aligned under the header. Height must
-     equal the stage. Decorations are small glowing MINT dots (5), staggered
-     — no gold night-sky sparkles here. */
-  const artDome = ONB_V2
-    ? jsx("div", {
-        className: "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-end justify-center pb-4",
-        style: { height: DOME_H },
-        "aria-hidden": true,
-        children: [
+  /* v6 hero stage: header row on top, then the illustration filling every
+     remaining pixel above the bottom panel. Transform-only float, static
+     radial halo, tiny dots — no filters anywhere (the lag fix). */
+  const artStage = ONB_V2
+    ? jsxs("div", { className: "relative z-10 flex flex-col flex-1 min-h-0", children: [
+        jsx("div", { className: "pointer-events-none shrink-0", children: headerRow }),
+        jsxs("div", { className: "relative flex-1 min-h-0 overflow-hidden", children: [
           jsx("div", { className: "onb2-glow", "aria-hidden": true }),
           imgStack,
-          jsx("span", { className: "onb2-spark", style: { left: "7%", bottom: "36%", width: 11, height: 11, animationDelay: "0s" } }, "s1"),
-          jsx("span", { className: "onb2-spark", style: { right: "8%", bottom: "56%", width: 8, height: 8, animationDelay: "1.4s" } }, "s2"),
-          jsx("span", { className: "onb2-spark", style: { right: "17%", bottom: "26%", width: 10, height: 10, animationDelay: "2.7s" } }, "s3"),
-          jsx("span", { className: "onb2-spark", style: { left: "15%", bottom: "62%", width: 7, height: 7, animationDelay: "2.1s" } }, "s4"),
-          jsx("span", { className: "onb2-spark", style: { right: "30%", bottom: "70%", width: 9, height: 9, animationDelay: "3.6s" } }, "s5")
-        ]
-      })
+          jsx("span", { className: "onb2-spark", style: { left: "7%", bottom: "34%", width: 11, height: 11, animationDelay: "0s" } }, "s1"),
+          jsx("span", { className: "onb2-spark", style: { right: "8%", bottom: "54%", width: 8, height: 8, animationDelay: "1.4s" } }, "s2"),
+          jsx("span", { className: "onb2-spark", style: { right: "17%", bottom: "24%", width: 10, height: 10, animationDelay: "2.7s" } }, "s3"),
+          jsx("span", { className: "onb2-spark", style: { left: "15%", bottom: "60%", width: 7, height: 7, animationDelay: "3.6s" } }, "s4")
+        ]})
+      ]})
     : null;
-  /* In v2 the art lives in the dome (artDome), not in the step bodies. */
+  /* In v2 the art lives in the hero stage (artStage), not in the step bodies. */
   const bodyArt = ONB_V2 ? null : imgStack;
 
   const label = (text) => jsx("label", {
@@ -870,20 +873,20 @@ export function mk({
 
   const footerStyle = { paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" };
 
-  /* ── v2 root: light illustration stage + flat white content area ──────
-     Bright mint-fade stage (header + floating mascot) → white area with
-     the step body (scrollable) and the CTA. Deliberately NOT the login /
-     register / Get-Started screen look. */
+  /* ── v6 root: full-screen story hero + bottom panel ────────────────────
+     The scene paints behind everything; the illustration fills every
+     pixel above the panel; the white panel rises from the bottom with the
+     question + inputs + CTA (capped at 72dvh, scrolls inside itself when
+     a step is tall). Deliberately NOT the login / register / Get-Started
+     screen look. */
   if (ONB_V2) {
     return jsxs("div", {
-      className: "relative min-h-[100dvh] flex flex-col bg-white overflow-hidden",
+      className: "relative h-[100dvh] flex flex-col bg-white overflow-hidden",
       children: [
         onb2Sky,
-        artDome,
+        artStage,
         jsxs("div", { className: "onb2-sheet", children: [
           jsx("div", {
-            /* flex on the body: short steps (welcome/name/salary) sit
-               naturally; the tall DOB step overflows and scrolls. */
             className: "flex flex-col flex-1 min-h-0 overflow-y-auto px-6 pt-5 pb-3",
             children: bodyWrap
           }),
