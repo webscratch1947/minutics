@@ -1048,6 +1048,31 @@ function injectStyles() {
          white glint (shinier sky on phones, where nothing ever hovers). */
       filter: drop-shadow(0 0 2.5px rgba(255,255,255,.75));
     }
+    /* ── Ambient loop (ported from the onboarding dome, owner's pick):
+       every 3rd star carries a CONTINUOUS staggered twinkle, so the whole
+       sky keeps gently pulsing on its own. The single-shot shine/twinkle
+       rules below are defined AFTER this one — equal specificity means
+       they take over the element while the JS show runs on top of it,
+       then the loop resumes when their class comes off. ───────────────── */
+    @keyframes lt-star-ambient {
+      0%, 100% { opacity: var(--so, .5); }
+      50%      { opacity: 1; }
+    }
+    .lt-auth-stars circle.lt-star-ambient {
+      animation: lt-star-ambient 2.6s ease-in-out infinite;
+      animation-delay: var(--d, 0s);
+    }
+    /* Golden ✦ sparkles floating in the dome (same as the onboarding sky). */
+    .lt-auth-spark {
+      position: absolute; z-index: 2; color: #FDE68A; line-height: 1; pointer-events: none;
+      text-shadow: 0 0 8px rgba(253,230,138,.95), 0 0 20px rgba(253,230,138,.55);
+      animation: lt-sparkPulse 2.4s ease-in-out infinite;
+      animation-delay: var(--sd, 0s);
+    }
+    @keyframes lt-sparkPulse {
+      0%, 100% { opacity: .18; transform: scale(.7) rotate(0deg); }
+      50%      { opacity: 1;   transform: scale(1.25) rotate(20deg); }
+    }
     /* Shiny bloom: a hot white core, a wide violet halo and a long outer
        flare stacked as three drop-shadows — reads as a real glinting star
        on the phone, not just a brighter dot. */
@@ -1134,6 +1159,7 @@ function injectStyles() {
       /* Star show: fully off for reduced-motion users (the JS driver also
          refuses to start, this is the belt to its braces). */
       .lt-auth-stars circle { animation: none !important; }
+      .lt-auth-spark { animation: none !important; }
       .lt-auth-shoot { display: none !important; }
     }
   `;
@@ -1434,8 +1460,14 @@ function renderWelcomeGate() {
     [290,332,1.2,.65],[356,352,1.1,.55],[26,362,1.3,.7],[64,118,.8,.4],[198,150,.9,.45],
     [326,90,.9,.5],[252,60,.8,.4]
   ];
-  var stars = STAR_PTS.map(function (p) {
-    return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + p[2] + '" fill="#fff" opacity="' + p[3] + '"/>';
+  /* Every 3rd star runs the ambient twinkle loop (ported from the
+     onboarding dome): --so keeps its own base opacity, --d staggers the
+     phases so the sky pulses instead of blinking in unison. */
+  var stars = STAR_PTS.map(function (p, i) {
+    var amb = i % 3 === 0;
+    return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + p[2] + '" fill="#fff" opacity="' + p[3] + '"' +
+      (amb ? ' class="lt-star-ambient" style="--so:' + p[3] + ';--d:' + (i * 0.37).toFixed(2) + 's"' : '') +
+      '/>';
   }).join("");
 
   var gate = document.createElement("div");
@@ -1446,6 +1478,9 @@ function renderWelcomeGate() {
       '<div class="lt-auth-herowrap">' +
         '<div class="lt-auth-hero">' +
           '<svg class="lt-auth-stars" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + stars + '</svg>' +
+          '<span class="lt-auth-spark" style="left:8%;bottom:34%;font-size:17px;--sd:0s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="right:9%;bottom:56%;font-size:12px;--sd:.8s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="right:18%;bottom:24%;font-size:15px;--sd:1.5s" aria-hidden="true">&#10022;</span>' +
         '</div>' +
         '<div class="lt-auth-badge"><img class="lt-auth-badge-logo" src="./assets/icons/logo-512.png" alt="Minutics logo"></div>' +
       '</div>' +
