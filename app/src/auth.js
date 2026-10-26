@@ -1033,35 +1033,53 @@ function injectStyles() {
        gate is replaced. ─────────────────────────────────────────────────── */
     @keyframes lt-star-shine {
       0%   { transform: scale(1);   opacity: var(--so, .55); }
-      45%  { transform: scale(2.4); opacity: 1; }
+      40%  { transform: scale(3.6); opacity: 1; }
+      55%  { transform: scale(3.1); opacity: 1; }
       100% { transform: scale(1);   opacity: var(--so, .55); }
     }
     @keyframes lt-star-twinkle {
-      0%, 100% { opacity: var(--so, .55); }
-      50%      { opacity: calc(var(--so, .55) + .4); }
+      0%, 100% { opacity: var(--so, .55); filter: drop-shadow(0 0 2.5px rgba(255,255,255,.75)); }
+      50%      { opacity: 1; filter: drop-shadow(0 0 4px rgba(255,255,255,1)); }
     }
     .lt-auth-stars circle {
       transform-box: fill-box; transform-origin: center;
       transition: opacity .2s;
+      /* Permanent soft sparkle: even at rest every star carries a small
+         white glint (shinier sky on phones, where nothing ever hovers). */
+      filter: drop-shadow(0 0 2.5px rgba(255,255,255,.75));
     }
+    /* Shiny bloom: a hot white core, a wide violet halo and a long outer
+       flare stacked as three drop-shadows — reads as a real glinting star
+       on the phone, not just a brighter dot. */
     .lt-auth-stars circle.lt-star-shine {
-      animation: lt-star-shine 1.6s ease-in-out;
-      filter: drop-shadow(0 0 4px rgba(255,255,255,.95)) drop-shadow(0 0 10px rgba(196,181,253,.8));
+      animation: lt-star-shine 1.7s ease-in-out;
+      filter:
+        drop-shadow(0 0 2px rgba(255,255,255,1))
+        drop-shadow(0 0 8px rgba(255,255,255,.95))
+        drop-shadow(0 0 20px rgba(196,181,253,.9))
+        drop-shadow(0 0 44px rgba(147,111,253,.7));
     }
     .lt-auth-stars circle.lt-star-twinkle {
       animation: lt-star-twinkle 1.8s ease-in-out;
     }
     @keyframes lt-shoot-star {
       0%   { transform: translate(0,0) rotate(16deg); opacity: 0; }
-      8%   { opacity: .95; }
-      100% { transform: translate(360px,104px) rotate(16deg); opacity: 0; }
+      8%   { opacity: 1; }
+      100% { transform: translate(380px,110px) rotate(16deg); opacity: 0; }
     }
     .lt-auth-shoot {
       position: absolute; top: var(--y, 22%); left: -60px;
-      width: 74px; height: 2px; border-radius: 2px; pointer-events: none;
-      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.9) 70%, #fff 100%);
-      filter: drop-shadow(0 0 6px rgba(255,255,255,.9));
+      width: 92px; height: 3px; border-radius: 3px; pointer-events: none;
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.75) 55%, rgba(255,255,255,1) 82%, #fff 100%);
+      box-shadow: 0 0 6px #fff, 0 0 16px rgba(221,214,254,.95), 0 0 34px rgba(167,139,250,.8);
+      filter: drop-shadow(0 0 10px rgba(255,255,255,.95));
       animation: lt-shoot-star 1.5s cubic-bezier(.3,.4,.6,1) forwards;
+    }
+    .lt-auth-shoot::after {
+      content: ""; position: absolute; right: -5px; top: 50%;
+      width: 9px; height: 9px; border-radius: 50%; transform: translateY(-50%);
+      background: #fff;
+      box-shadow: 0 0 8px #fff, 0 0 22px rgba(196,181,253,1), 0 0 48px rgba(147,111,253,.85);
     }
     .lt-auth-badge {
       position: absolute; left: 50%; bottom: -46px; transform: translateX(-50%);

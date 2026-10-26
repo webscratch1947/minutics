@@ -13,15 +13,29 @@ const IMGS = {
 };
 const GREEN = "#157347";
 
-/* ── Onboarding redesign review flag ─────────────────────────────────────
-   The redesigned onboarding is REVIEW-ONLY until the owner approves it:
-   ONB_NEW_DEFAULT is false, so the live site + APK keep the current
-   onboarding. Opening the app with ?onboarding=new switches THIS browser
-   to the redesign (sticky via localStorage) and ?onboarding=old switches
-   back / clears the flag. Flipping ONB_NEW_DEFAULT to true ships the
-   redesign to everyone. */
+/* ── Onboarding redesign review flag — LOCALHOST ONLY ────────────────────
+   The redesigned onboarding exists on the developer's machine and NOWHERE
+   else until the owner approves it and flips ONB_NEW_DEFAULT to true:
+     • only localhost / 127.0.0.1 can ever resolve the new design — even
+       ?onboarding=new on the live site (or inside the APK) is ignored;
+     • on localhost, ?onboarding=new switches this browser to the redesign
+       (sticky via localStorage), ?onboarding=old switches back / clears it;
+     • ONB_NEW_DEFAULT=false keeps the live site + APK on the current
+       onboarding. Flipping it to true is what ships the redesign. */
 const ONB_NEW_DEFAULT = false;
+function onbLocalhostOnly() {
+  try {
+    const h = window.location.hostname;
+    return h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "";
+  } catch { return false; }
+}
 function resolveOnbV2() {
+  if (!onbLocalhostOnly()) {
+    /* Not the dev machine: the redesign must never appear here — and any
+       stray review flag a live URL could have planted is neutralized. */
+    try { window.localStorage.removeItem("lt_onboarding_v2"); } catch {}
+    return ONB_NEW_DEFAULT;
+  }
   try {
     const q = new URLSearchParams(window.location.search).get("onboarding");
     if (q === "new") { window.localStorage.setItem("lt_onboarding_v2", "1"); return true; }
