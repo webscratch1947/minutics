@@ -75,13 +75,16 @@ if (typeof document !== "undefined" && !document.getElementById(PICKER_STYLE_ID)
   document.head.appendChild(st);
 }
 
-/* ── Redesigned onboarding chrome (review-only, see ONB_NEW_DEFAULT) ─────
-   Starry-navy dome at the top (echoes the login Get-Started screen), the
-   mascot illustration floating in a glowing white frame across the
-   horizon, frosted cards, segment progress ("Step x of 4") and a gradient
-   pill CTA. Pure chrome — every functional element (pickers, calendar,
-   chips, sliders, texts) is untouched, so all DOB-test contracts hold in
-   BOTH modes. */
+/* ── Redesigned onboarding chrome v3 (review-only, see ONB_NEW_DEFAULT) ──
+   REMAKE: the old version boxed the mascot in a white card — the art PNGs
+   are actually TRANSPARENT, so now the illustration floats directly on a
+   tall starry-navy dome (echoing the login welcome sky) with a gentle
+   float, golden sparkles and a horizon glow. The form lives in a soft
+   cream BOTTOM SHEET with a curved top edge sliding over the night sky —
+   header ("Step x of 4" segments + back) sits on the dome, gradient pill
+   CTA anchors the sheet. Pure chrome — every functional element (pickers,
+   calendar, chips, sliders, texts) is untouched, so all DOB-test contracts
+   hold in BOTH modes. */
 const ONB2_STYLE_ID = "lt-onb2-css";
 if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) {
   const st2 = document.createElement("style");
@@ -89,14 +92,45 @@ if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) 
   st2.textContent =
     "@keyframes onb2In{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}" +
     "@keyframes onb2Tw{0%,100%{opacity:.3;}50%{opacity:1;}}" +
-    ".onb2-step{animation:onb2In .3s cubic-bezier(.22,1,.36,1) both;}" +
+    "@keyframes onb2Float{0%,100%{transform:translateY(0);}50%{transform:translateY(-9px);}}" +
+    "@keyframes onb2Spark{0%,100%{opacity:.18;transform:scale(.7) rotate(0deg);}50%{opacity:1;transform:scale(1.25) rotate(20deg);}}" +
+    "@keyframes onb2Glow{0%,100%{opacity:.55;}50%{opacity:.95;}}" +
+    ".onb2-step{animation:onb2In .32s cubic-bezier(.22,1,.36,1) both;}" +
+    /* Dome: the night sky stage (height set inline, shared with the art
+       layer so the two always match). Bottom curve = the sheet slides
+       over the horizon. */
     ".onb2-sky{" +
-      "position:absolute;left:0;right:0;top:0;height:min(38vh,340px);overflow:hidden;pointer-events:none;" +
-      "background:radial-gradient(120% 90% at 50% -10%,#2B3070 0%,#1B1E45 52%,#141634 100%);" +
-      "border-bottom-left-radius:50% 80px;border-bottom-right-radius:50% 80px;" +
+      "position:relative;flex-shrink:0;overflow:hidden;pointer-events:none;" +
+      "background:radial-gradient(125% 100% at 50% -14%,#2C3174 0%,#1B1E45 52%,#131534 100%);" +
+      "border-bottom-left-radius:50% 76px;border-bottom-right-radius:50% 76px;" +
     "}" +
     ".onb2-star{animation:onb2Tw 2.6s ease-in-out infinite;}" +
-    "@media (prefers-reduced-motion:reduce){.onb2-step,.onb2-star{animation:none!important;}}";
+    /* Horizon glow behind the mascot, at the dome/sheet seam. */
+    ".onb2-glow{" +
+      "position:absolute;left:50%;bottom:-34px;width:min(340px,86%);height:130px;transform:translateX(-50%);" +
+      "background:radial-gradient(50% 60% at 50% 60%,rgba(52,211,153,.5) 0%,rgba(52,211,153,0) 70%);" +
+      "filter:blur(10px);animation:onb2Glow 4.5s ease-in-out infinite;pointer-events:none;" +
+    "}" +
+    /* The floating illustration (transparent PNG on the sky). */
+    ".onb2-art{" +
+      "animation:onb2Float 4.6s ease-in-out infinite;" +
+      "filter:drop-shadow(0 18px 26px rgba(4,6,26,.55));" +
+    "}" +
+    ".onb2-spark{" +
+      "position:absolute;color:#FDE68A;line-height:1;pointer-events:none;" +
+      "text-shadow:0 0 8px rgba(253,230,138,.95),0 0 20px rgba(253,230,138,.55);" +
+      "animation:onb2Spark 2.4s ease-in-out infinite;" +
+    "}" +
+    /* Cream bottom sheet over the sky. */
+    ".onb2-sheet{" +
+      "position:relative;z-index:10;flex:1;min-height:0;margin-top:-26px;" +
+      "background:#FDFBF7;border-top-left-radius:34px;border-top-right-radius:34px;" +
+      "box-shadow:0 -18px 40px -18px rgba(8,10,36,.65);" +
+      "display:flex;flex-direction:column;" +
+    "}" +
+    "@media (prefers-reduced-motion:reduce){" +
+      ".onb2-step,.onb2-star,.onb2-art,.onb2-spark,.onb2-glow{animation:none!important;}" +
+    "}";
   document.head.appendChild(st2);
 }
 
@@ -475,31 +509,47 @@ export function mk({
         }, k))
       });
 
-  /* Decorative star field for the v2 dome (static positions — cheap). */
+  /* Header (back + progress): v1 renders it on the cream page; v3 sits it
+     INSIDE the dome on the night sky (light-on-dark). */
+  const headerRow = jsxs("div", {
+    className: "relative z-10 flex items-center gap-2 px-4 pt-10 pb-3",
+    children: [backBtn, dots, jsx("div", { className: "w-9 shrink-0" })]
+  });
+
+  /* Decorative star field for the v2 dome (static positions — cheap).
+     v3: the dome is a real stage — stars + header live inside it. */
   const onb2Sky = ONB_V2
-    ? jsx("div", { className: "onb2-sky", "aria-hidden": true,
-        children: jsx("svg", { className: "absolute inset-0 w-full h-full", viewBox: "0 0 400 340", preserveAspectRatio: "xMidYMid slice",
-          children: [
-            [30,44,1.2,.8],[74,96,.9,.5],[112,30,1.4,.9],[150,120,1,.6],[192,58,1.1,.7],
-            [236,102,.8,.45],[274,36,1.3,.85],[312,88,1,.55],[352,50,1.2,.75],[384,110,.9,.5],
-            [52,150,1,.6],[128,168,1.2,.7],[208,146,.9,.5],[290,160,1.1,.65],[360,150,1,.55],
-            [18,96,.8,.45],[96,64,.7,.4],[252,66,.8,.45],[332,124,.7,.4],[170,210,1,.55],
-            [260,214,.8,.45],[58,214,.9,.5],[388,196,1,.55],[136,84,.7,.4]
-          ].map((p, i) => jsx("circle", {
-            cx: p[0], cy: p[1], r: p[2], fill: "#fff", opacity: p[3],
-            className: i % 3 === 0 ? "onb2-star" : undefined,
-            style: i % 3 === 0 ? { animationDelay: (i * 0.37) + "s" } : undefined
-          }, i))
-        })
+    ? jsxs("div", { className: "onb2-sky", style: { height: "clamp(300px,46vh,410px)" },
+        children: [
+          jsx("div", { className: "absolute inset-0", "aria-hidden": true,
+            children: jsx("svg", { className: "w-full h-full", viewBox: "0 0 400 340", preserveAspectRatio: "xMidYMid slice",
+              children: [
+                [30,44,1.2,.8],[74,96,.9,.5],[112,30,1.4,.9],[150,120,1,.6],[192,58,1.1,.7],
+                [236,102,.8,.45],[274,36,1.3,.85],[312,88,1,.55],[352,50,1.2,.75],[384,110,.9,.5],
+                [52,150,1,.6],[128,168,1.2,.7],[208,146,.9,.5],[290,160,1.1,.65],[360,150,1,.55],
+                [18,96,.8,.45],[96,64,.7,.4],[252,66,.8,.45],[332,124,.7,.4],[170,210,1,.55],
+                [260,214,.8,.45],[58,214,.9,.5],[388,196,1,.55],[136,84,.7,.4]
+              ].map((p, i) => jsx("circle", {
+                cx: p[0], cy: p[1], r: p[2], fill: "#fff", opacity: p[3],
+                className: i % 3 === 0 ? "onb2-star" : undefined,
+                style: i % 3 === 0 ? { animationDelay: (i * 0.37) + "s" } : undefined
+              }, i))
+            })
+          }),
+          headerRow
+        ]
       })
     : null;
 
   /* All four illustrations stay MOUNTED (inactive ones hidden) so a step
-     switch is a pure visibility toggle â€" never a remount that blanks the
+     switch is a pure visibility toggle — never a remount that blanks the
      <img> for a few frames while it reloads/re-decodes (the 0.3s flicker).
-     v2 floats the art in a glowing rounded frame that overlaps the dome. */
+     v3: no frame at all — the transparent PNG floats directly on the
+     starry dome (see artDome below); v1 keeps it inside the body. */
   const imgStack = jsxs("div", {
-    className: "relative w-full max-w-[330px] mx-auto h-[42vh]",
+    className: ONB_V2
+      ? "onb2-art relative w-[min(332px,90%)] h-[calc(100%-96px)] mx-auto"
+      : "relative w-full max-w-[330px] mx-auto h-[42vh]",
     children: STEPS.map((step) => jsx("img", {
       src: IMGS[step],
       alt: "",
@@ -509,45 +559,57 @@ export function mk({
       style: { visibility: step === t ? "visible" : "hidden" }
     }, step))
   });
-  const img = ONB_V2
+  /* v3 art layer: sits over the dome (z above the sheet, pointer-events
+     off), bottom-aligned under the header. Height must equal the dome. */
+  const DOME_H = "clamp(300px,46vh,410px)";
+  const artDome = ONB_V2
     ? jsx("div", {
-        className: "relative w-[min(330px,86%)] mx-auto mt-1 mb-4 rounded-[28px] bg-white/95 p-3 backdrop-blur-sm",
-        style: {
-          boxShadow: "0 24px 60px -18px rgba(20,22,60,.55), 0 0 0 1px rgba(255,255,255,.7) inset, 0 0 44px -8px rgba(52,211,153,.28)"
-        },
-        children: imgStack
+        className: "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-end justify-center pb-4",
+        style: { height: DOME_H },
+        "aria-hidden": true,
+        children: [
+          jsx("div", { className: "onb2-glow", "aria-hidden": true }),
+          imgStack,
+          jsx("span", { className: "onb2-spark", style: { left: "7%", bottom: "36%", fontSize: "18px", animationDelay: "0s" }, children: "\u2726" }, "s1"),
+          jsx("span", { className: "onb2-spark", style: { right: "8%", bottom: "54%", fontSize: "13px", animationDelay: ".8s" }, children: "\u2726" }, "s2"),
+          jsx("span", { className: "onb2-spark", style: { right: "17%", bottom: "24%", fontSize: "16px", animationDelay: "1.5s" }, children: "\u2726" }, "s3")
+        ]
       })
-    : imgStack;
+    : null;
+  /* In v2 the art lives in the dome (artDome), not in the step bodies. */
+  const bodyArt = ONB_V2 ? null : imgStack;
 
   const label = (text) => jsx("label", {
     className: "block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2",
     children: text
   });
 
-  /* v2 CTA: green gradient pill with a soft glow; v1 keeps the flat green. */
+  /* v3 CTA: full pill gradient with a soft green glow (echoes the login
+     CTA shape); v1 keeps the flat green button. */
   const nextBtn = (onClick, disabled, text) => jsx("button", {
     type: "button",
     onClick: onClick,
     disabled: disabled,
     className: ONB_V2
-      ? "w-full py-4 rounded-2xl font-bold text-base text-white transition-all active:scale-[.98]"
+      ? "w-full py-[17px] rounded-full font-bold text-[15.5px] text-white transition-all active:scale-[.98]"
       : "w-full py-4 rounded-xl font-bold text-base text-white transition-opacity",
     style: ONB_V2
       ? {
           background: "linear-gradient(135deg,#22A06B 0%," + GREEN + " 55%,#0E5C36 100%)",
           opacity: disabled ? 0.4 : 1,
-          boxShadow: disabled ? "none" : "0 14px 30px -10px rgba(21,115,71,.65), 0 0 0 1px rgba(255,255,255,.18) inset"
+          boxShadow: disabled ? "none" : "0 16px 34px -12px rgba(21,115,71,.7), 0 0 0 1px rgba(255,255,255,.2) inset"
         }
       : { background: GREEN, opacity: disabled ? 0.4 : 1 },
     children: text
   });
 
-  /* Shared card chrome: v2 cards are frosted glass over the cream page. */
+  /* v3 card chrome: solid white cards resting on the cream sheet (the old
+     frosted look only made sense over the old flat background). */
   const cardCls = ONB_V2
-    ? "bg-white/85 backdrop-blur-md border border-white/70 rounded-3xl px-4 py-4 shadow-[0_10px_34px_rgba(20,32,80,0.10)]"
+    ? "bg-white border border-black/[.06] rounded-3xl px-4 py-4 shadow-[0_10px_30px_rgba(20,32,80,0.10)]"
     : "bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]";
   const cardClsTight = ONB_V2
-    ? "bg-white/85 backdrop-blur-md border border-white/70 rounded-3xl px-3.5 py-3 shadow-[0_10px_34px_rgba(20,32,80,0.10)]"
+    ? "bg-white border border-black/[.06] rounded-3xl px-3.5 py-3 shadow-[0_10px_30px_rgba(20,32,80,0.10)]"
     : "bg-white border border-black/[.08] rounded-2xl px-3.5 py-3 shadow-[0_6px_20px_rgba(15,23,42,0.07)]";
 
   /* â”€â”€ step bodies â”€â”€ */
@@ -557,7 +619,7 @@ export function mk({
     body = jsxs("div", {
       className: "text-center" + (ONB_V2 ? " pt-2" : " pt-10"),
       children: [
-        img,
+        bodyArt,
         ONB_V2 && jsx("h1", {
           className: "text-[26px] font-extrabold tracking-tight text-[#14162E] mt-1",
           children: "Let's set up your universe"
@@ -574,7 +636,7 @@ export function mk({
   if (t === "name") {
     body = jsxs("div", {
       children: [
-        img,
+        bodyArt,
         jsx("div", { className: "mt-2", children: jsxs("div", {
           className: cardCls,
           children: [
@@ -628,7 +690,7 @@ export function mk({
     };
     body = jsxs("div", {
       children: [
-        img,
+        bodyArt,
         jsxs("div", { className: "mt-2 " + cardCls, children: [
           label("Date of birth"),
           jsxs("div", {
@@ -740,7 +802,7 @@ export function mk({
   if (t === "salary") {
     body = jsxs("div", {
       children: [
-        img,
+        bodyArt,
         jsx("div", { className: "mt-2", children: jsxs("div", {
           /* Compact card (user: "the box of the salary is too big"): tighter
              padding + a lighter input — the card takes ~1/3 less height. */
@@ -794,17 +856,43 @@ export function mk({
      (this is the onboarding flow itself, NOT the login-screen open/close
      animation the owner asked to remove — that one stays gone). */
   const bodyWrap = ONB_V2
-    ? jsx("div", { className: "onb2-step", key: t, children: body })
+    ? jsx("div", { className: "onb2-step my-auto w-full", key: t, children: body })
     : body;
 
+  const footerStyle = { paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" };
+
+  /* ── v3 root: night-sky stage + cream bottom sheet ────────────────────
+     Dome (stars + header) → floating art layer over it → sheet slides up
+     over the horizon carrying the step body (scrollable) and the CTA. */
+  if (ONB_V2) {
+    return jsxs("div", {
+      className: "relative min-h-[100dvh] flex flex-col bg-[#FDFBF7] overflow-hidden",
+      children: [
+        onb2Sky,
+        artDome,
+        jsxs("div", { className: "onb2-sheet", children: [
+          jsx("div", {
+            /* flex + my-auto on the body: short steps (welcome/name/salary)
+               center in the free space; the tall DOB step overflows and
+               scrolls (auto margins collapse to 0). */
+            className: "flex flex-col flex-1 min-h-0 overflow-y-auto px-6 pt-5 pb-3",
+            children: bodyWrap
+          }),
+          jsx("div", {
+            className: "px-6 pt-2 pb-8",
+            style: footerStyle,
+            children: footer
+          })
+        ]})
+      ]
+    });
+  }
+
+  /* ── v1 root (unchanged original layout) ─────────────────────────────── */
   return jsxs("div", {
-    className: "relative min-h-[100dvh] flex flex-col " + (ONB_V2 ? "bg-[#FDFBF7] overflow-hidden" : "bg-[#FDFBF7]"),
+    className: "relative min-h-[100dvh] flex flex-col bg-[#FDFBF7]",
     children: [
-      onb2Sky,
-      jsxs("div", {
-        className: "relative z-10 flex items-center gap-2 px-4 pt-10 pb-3",
-        children: [backBtn, dots, jsx("div", { className: "w-9 shrink-0" })]
-      }),
+      headerRow,
       jsx("div", {
         className: "relative z-10 flex-1 overflow-y-auto px-6 pb-4",
         children: bodyWrap
@@ -814,8 +902,8 @@ export function mk({
            page behind the system navigation bar, which covered the
            "Next" / "Get Started" CTAs — pad by the inset (0 when the
            native opt-out keeps content between the bars). */
-        className: "relative z-10 px-6 pt-3 pb-8 " + (ONB_V2 ? "bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7] to-transparent" : "bg-[#FDFBF7]"),
-        style: { paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" },
+        className: "relative z-10 px-6 pt-3 pb-8 bg-[#FDFBF7]",
+        style: footerStyle,
         children: footer
       })
     ]
