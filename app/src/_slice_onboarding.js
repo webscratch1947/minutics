@@ -75,61 +75,59 @@ if (typeof document !== "undefined" && !document.getElementById(PICKER_STYLE_ID)
   document.head.appendChild(st);
 }
 
-/* ── Redesigned onboarding chrome v3 (review-only, see ONB_NEW_DEFAULT) ──
-   REMAKE: the old version boxed the mascot in a white card — the art PNGs
-   are actually TRANSPARENT, so now the illustration floats directly on a
-   tall starry-navy dome (echoing the login welcome sky) with a gentle
-   float, golden sparkles and a horizon glow. The form lives in a soft
-   cream BOTTOM SHEET with a curved top edge sliding over the night sky —
-   header ("Step x of 4" segments + back) sits on the dome, gradient pill
-   CTA anchors the sheet. Pure chrome — every functional element (pickers,
-   calendar, chips, sliders, texts) is untouched, so all DOB-test contracts
-   hold in BOTH modes. */
+/* ── Redesigned onboarding chrome v5 (review-only, see ONB_NEW_DEFAULT) ──
+   FULL REWORK after the owner rejected the sky/sheet version: this one
+   deliberately does NOT reuse any login / register / Get-Started screen
+   language — no navy star dome, no arch curve, no glassy dark chrome, no
+   gradient pill CTA. Instead: a bright airy canvas — soft mint light
+   fading down from the top, the mascot floating in it with a gentle bob
+   and small glowing mint dots, a flat white content area, bold dark
+   headings, solid green rounded CTA. The class name ".onb2-sky" is KEPT
+   (the review suites key on it) but it is now the light illustration
+   stage, not a night sky. Pure chrome — every functional element
+   (pickers, calendar, chips, sliders, texts) is untouched, so all
+   DOB-test contracts hold in BOTH modes. */
 const ONB2_STYLE_ID = "lt-onb2-css";
 if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) {
   const st2 = document.createElement("style");
   st2.id = ONB2_STYLE_ID;
   st2.textContent =
     "@keyframes onb2In{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}" +
-    "@keyframes onb2Tw{0%,100%{opacity:.3;}50%{opacity:1;}}" +
     "@keyframes onb2Float{0%,100%{transform:translateY(0);}50%{transform:translateY(-9px);}}" +
-    "@keyframes onb2Spark{0%,100%{opacity:.18;transform:scale(.7) rotate(0deg);}50%{opacity:1;transform:scale(1.25) rotate(20deg);}}" +
+    "@keyframes onb2Dot{0%,100%{opacity:.35;transform:scale(.8);}50%{opacity:.95;transform:scale(1.1);}}" +
     "@keyframes onb2Glow{0%,100%{opacity:.55;}50%{opacity:.95;}}" +
     ".onb2-step{animation:onb2In .32s cubic-bezier(.22,1,.36,1) both;}" +
-    /* Dome: the night sky stage (height set inline, shared with the art
-       layer so the two always match). Bottom curve = the sheet slides
-       over the horizon. */
+    /* Light illustration stage (class name kept for the review suites):
+       a soft mint wash that fades into pure white — flat, no dome curve. */
     ".onb2-sky{" +
       "position:relative;flex-shrink:0;overflow:hidden;pointer-events:none;" +
-      "background:radial-gradient(125% 100% at 50% -14%,#2C3174 0%,#1B1E45 52%,#131534 100%);" +
-      "border-bottom-left-radius:50% 76px;border-bottom-right-radius:50% 76px;" +
+      "background:radial-gradient(120% 95% at 50% -5%,#E4F6EC 0%,#F1FAF5 55%,#FFFFFF 100%);" +
     "}" +
-    ".onb2-star{animation:onb2Tw 2.6s ease-in-out infinite;}" +
-    /* Horizon glow behind the mascot, at the dome/sheet seam. */
+    /* Soft mint halo behind the mascot. */
     ".onb2-glow{" +
-      "position:absolute;left:50%;bottom:-30px;width:min(320px,84%);height:108px;transform:translateX(-50%);" +
-      "background:radial-gradient(50% 60% at 50% 60%,rgba(52,211,153,.38) 0%,rgba(52,211,153,0) 70%);" +
-      "filter:blur(9px);animation:onb2Glow 4.5s ease-in-out infinite;pointer-events:none;" +
+      "position:absolute;left:50%;bottom:4px;width:min(300px,82%);height:150px;transform:translateX(-50%);" +
+      "background:radial-gradient(50% 55% at 50% 55%,rgba(21,115,71,.15) 0%,rgba(21,115,71,0) 72%);" +
+      "filter:blur(7px);animation:onb2Glow 5s ease-in-out infinite;pointer-events:none;" +
     "}" +
-    /* The floating illustration (transparent PNG on the sky). */
+    /* The floating illustration (transparent PNG on the light stage) —
+       a GREEN-tinted shadow, not the dark night-shadow of v3. */
     ".onb2-art{" +
-      "animation:onb2Float 4.6s ease-in-out infinite;" +
-      "filter:drop-shadow(0 18px 26px rgba(4,6,26,.55));" +
+      "animation:onb2Float 5.2s ease-in-out infinite;" +
+      "filter:drop-shadow(0 16px 22px rgba(21,115,71,.16));" +
     "}" +
+    /* Small glowing mint dots drifting around the mascot. */
     ".onb2-spark{" +
-      "position:absolute;color:#FDE68A;line-height:1;pointer-events:none;" +
-      "text-shadow:0 0 8px rgba(253,230,138,.95),0 0 20px rgba(253,230,138,.55);" +
-      "animation:onb2Spark 2.4s ease-in-out infinite;" +
+      "position:absolute;border-radius:50%;background:#34D399;pointer-events:none;" +
+      "box-shadow:0 0 10px rgba(52,211,153,.75),0 0 22px rgba(52,211,153,.35);" +
+      "animation:onb2Dot 4.6s ease-in-out infinite;" +
     "}" +
-    /* Cream bottom sheet over the sky. */
+    /* Flat white content area (no curved lip, no drop shadow). */
     ".onb2-sheet{" +
-      "position:relative;z-index:10;flex:1;min-height:0;margin-top:-26px;" +
-      "background:#FDFBF7;border-top-left-radius:34px;border-top-right-radius:34px;" +
-      "box-shadow:0 -14px 34px -18px rgba(8,10,36,.5);" +
-      "display:flex;flex-direction:column;" +
+      "position:relative;z-index:10;flex:1;min-height:0;" +
+      "background:#FFFFFF;display:flex;flex-direction:column;" +
     "}" +
     "@media (prefers-reduced-motion:reduce){" +
-      ".onb2-step,.onb2-star,.onb2-art,.onb2-spark,.onb2-glow{animation:none!important;}" +
+      ".onb2-step,.onb2-art,.onb2-spark,.onb2-glow{animation:none!important;}" +
     "}";
   document.head.appendChild(st2);
 }
@@ -477,25 +475,25 @@ export function mk({
         onClick: () => go(STEPS[idx - 1]),
         "aria-label": "Go back",
         className: ONB_V2
-          ? "w-9 h-9 flex items-center justify-center rounded-full text-white/90 bg-white/15 border border-white/25 active:bg-white/25 shrink-0"
+          ? "pointer-events-auto w-9 h-9 flex items-center justify-center rounded-full text-gray-500 bg-white border border-black/10 shadow-sm active:bg-gray-50 shrink-0"
           : "w-9 h-9 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 shrink-0",
         children: jsx("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round", children: jsx("polyline", { points: "15 18 9 12 15 6" }) })
       })
     : jsx("div", { className: "w-9 shrink-0" });
 
-  /* Progress: v1 keeps the dots; v2 shows "Step x of 4" + filling segments
-     (sits on the starry dome, so it's light-on-dark). */
+  /* Progress: v1 keeps the dots; v2 shows "Step x of 4" + filling
+     segments — dark ink on the light stage (never white-on-navy). */
   const dots = ONB_V2
     ? jsxs("div", {
         className: "flex-1 flex flex-col items-center justify-center gap-1.5",
         children: [
-          jsx("span", { className: "text-[11px] font-bold tracking-[.14em] uppercase text-white/75", children: `Step ${idx + 1} of ${STEPS.length}` }),
+          jsx("span", { className: "text-[11px] font-bold tracking-[.14em] uppercase text-gray-400", children: `Step ${idx + 1} of ${STEPS.length}` }),
           jsxs("div", { className: "flex w-[152px] gap-1.5", children: STEPS.map((_, k) => jsx("span", {
             key: k,
             className: "h-1.5 flex-1 rounded-full transition-all duration-300",
             style: k <= idx
-              ? { background: "linear-gradient(90deg,#34D399," + GREEN + ")" }
-              : { background: "rgba(255,255,255,.25)" }
+              ? { background: GREEN }
+              : { background: "#E5E7EB" }
           })) })
         ]
       })
@@ -509,37 +507,25 @@ export function mk({
         }, k))
       });
 
-  /* Header (back + progress): v1 renders it on the cream page; v3 sits it
-     INSIDE the dome on the night sky (light-on-dark). */
+  /* Header (back + progress): v1 renders it on the cream page; v2 sits it
+     INSIDE the light stage. pointer-events-auto is required here — the
+     stage itself is pointer-events:none (art layer must not eat taps),
+     which otherwise silently kills the back button. */
   const headerRow = jsxs("div", {
     className: "relative z-10 flex items-center gap-2 px-4 pt-10 pb-3",
     children: [backBtn, dots, jsx("div", { className: "w-9 shrink-0" })]
   });
 
-  /* Dome height — ONE constant shared by the sky and the art layer so the
-     two always match. Kept modest (42vh) so the form gets real room. */
+  /* Stage height — ONE constant shared by the light stage and the art
+     layer so the two always match. Kept modest so the form gets real
+     room. */
   const DOME_H = "clamp(284px,42vh,374px)";
 
-  /* Decorative star field for the v2 dome (static positions — cheap).
-     v3: the dome is a real stage — stars + header live inside it. */
+  /* v2 light stage: no star field, no night sky (that was the login
+     screen's language) — just the soft mint wash with the header row. */
   const onb2Sky = ONB_V2
     ? jsxs("div", { className: "onb2-sky", style: { height: DOME_H },
         children: [
-          jsx("div", { className: "absolute inset-0", "aria-hidden": true,
-            children: jsx("svg", { className: "w-full h-full", viewBox: "0 0 400 340", preserveAspectRatio: "xMidYMid slice",
-              children: [
-                [30,44,1.2,.8],[74,96,.9,.5],[112,30,1.4,.9],[150,120,1,.6],[192,58,1.1,.7],
-                [236,102,.8,.45],[274,36,1.3,.85],[312,88,1,.55],[352,50,1.2,.75],[384,110,.9,.5],
-                [52,150,1,.6],[128,168,1.2,.7],[208,146,.9,.5],[290,160,1.1,.65],[360,150,1,.55],
-                [18,96,.8,.45],[96,64,.7,.4],[252,66,.8,.45],[332,124,.7,.4],[170,210,1,.55],
-                [260,214,.8,.45],[58,214,.9,.5],[388,196,1,.55],[136,84,.7,.4]
-              ].map((p, i) => jsx("circle", {
-                cx: p[0], cy: p[1], r: p[2], fill: "#fff", opacity: p[3],
-                className: i % 3 === 0 ? "onb2-star" : undefined,
-                style: i % 3 === 0 ? { animationDelay: (i * 0.37) + "s" } : undefined
-              }, i))
-            })
-          }),
           headerRow
         ]
       })
@@ -548,8 +534,8 @@ export function mk({
   /* All four illustrations stay MOUNTED (inactive ones hidden) so a step
      switch is a pure visibility toggle — never a remount that blanks the
      <img> for a few frames while it reloads/re-decodes (the 0.3s flicker).
-     v3: no frame at all — the transparent PNG floats directly on the
-     starry dome (see artDome below); v1 keeps it inside the body. */
+     v2: no frame at all — the transparent PNG floats directly on the
+     light stage (see artDome below); v1 keeps it inside the body. */
   const imgStack = jsxs("div", {
     className: ONB_V2
       ? "onb2-art relative w-[min(332px,90%)] h-[calc(100%-96px)] mx-auto"
@@ -563,8 +549,10 @@ export function mk({
       style: { visibility: step === t ? "visible" : "hidden" }
     }, step))
   });
-  /* v3 art layer: sits over the dome (z above the sheet, pointer-events
-     off), bottom-aligned under the header. Height must equal the dome. */
+  /* v2 art layer: sits over the light stage (z above the content area,
+     pointer-events off), bottom-aligned under the header. Height must
+     equal the stage. Decorations are small glowing MINT dots (5), staggered
+     — no gold night-sky sparkles here. */
   const artDome = ONB_V2
     ? jsx("div", {
         className: "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-end justify-center pb-4",
@@ -573,9 +561,11 @@ export function mk({
         children: [
           jsx("div", { className: "onb2-glow", "aria-hidden": true }),
           imgStack,
-          jsx("span", { className: "onb2-spark", style: { left: "7%", bottom: "36%", fontSize: "18px", animationDelay: "0s" }, children: "\u2726" }, "s1"),
-          jsx("span", { className: "onb2-spark", style: { right: "8%", bottom: "54%", fontSize: "13px", animationDelay: ".8s" }, children: "\u2726" }, "s2"),
-          jsx("span", { className: "onb2-spark", style: { right: "17%", bottom: "24%", fontSize: "16px", animationDelay: "1.5s" }, children: "\u2726" }, "s3")
+          jsx("span", { className: "onb2-spark", style: { left: "7%", bottom: "36%", width: 11, height: 11, animationDelay: "0s" } }, "s1"),
+          jsx("span", { className: "onb2-spark", style: { right: "8%", bottom: "56%", width: 8, height: 8, animationDelay: "1.4s" } }, "s2"),
+          jsx("span", { className: "onb2-spark", style: { right: "17%", bottom: "26%", width: 10, height: 10, animationDelay: "2.7s" } }, "s3"),
+          jsx("span", { className: "onb2-spark", style: { left: "15%", bottom: "62%", width: 7, height: 7, animationDelay: "2.1s" } }, "s4"),
+          jsx("span", { className: "onb2-spark", style: { right: "30%", bottom: "70%", width: 9, height: 9, animationDelay: "3.6s" } }, "s5")
         ]
       })
     : null;
@@ -587,23 +577,24 @@ export function mk({
     children: text
   });
 
-  /* v3 CTA: full pill — vivid gradient when actionable, CLEAN WARM GRAY
-     when disabled (never the washed-out pale green the owner flagged).
-     v1 keeps the flat green button. */
+  /* v2 CTA: SOLID green rounded button (no gradient, no pill — those
+     belong to the login screens, which the owner wants kept out of the
+     onboarding); CLEAN WARM GRAY when disabled (never the washed-out
+     pale green the owner flagged). v1 keeps the original flat button. */
   const nextBtn = (onClick, disabled, text) => jsx("button", {
     type: "button",
     onClick: onClick,
     disabled: disabled,
     className: ONB_V2
-      ? "w-full py-[17px] rounded-full font-bold text-[15.5px] transition-all active:scale-[.98]"
+      ? "w-full py-[17px] rounded-2xl font-bold text-[15.5px] transition-all active:scale-[.98]"
       : "w-full py-4 rounded-xl font-bold text-base text-white transition-opacity",
     style: ONB_V2
       ? (disabled
           ? { background: "#E9E4D7", color: "#9AA1AE", boxShadow: "none", cursor: "default" }
           : {
-              background: "linear-gradient(135deg,#22A06B 0%," + GREEN + " 55%,#0E5C36 100%)",
+              background: GREEN,
               color: "#fff",
-              boxShadow: "0 16px 34px -12px rgba(21,115,71,.7), 0 0 0 1px rgba(255,255,255,.2) inset"
+              boxShadow: "0 14px 28px -14px rgba(21,115,71,.65)"
             })
       : { background: GREEN, opacity: disabled ? 0.4 : 1 },
     children: text
@@ -879,20 +870,20 @@ export function mk({
 
   const footerStyle = { paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))" };
 
-  /* ── v3 root: night-sky stage + cream bottom sheet ────────────────────
-     Dome (stars + header) → floating art layer over it → sheet slides up
-     over the horizon carrying the step body (scrollable) and the CTA. */
+  /* ── v2 root: light illustration stage + flat white content area ──────
+     Bright mint-fade stage (header + floating mascot) → white area with
+     the step body (scrollable) and the CTA. Deliberately NOT the login /
+     register / Get-Started screen look. */
   if (ONB_V2) {
     return jsxs("div", {
-      className: "relative min-h-[100dvh] flex flex-col bg-[#FDFBF7] overflow-hidden",
+      className: "relative min-h-[100dvh] flex flex-col bg-white overflow-hidden",
       children: [
         onb2Sky,
         artDome,
         jsxs("div", { className: "onb2-sheet", children: [
           jsx("div", {
-            /* flex + my-auto on the body: short steps (welcome/name/salary)
-               center in the free space; the tall DOB step overflows and
-               scrolls (auto margins collapse to 0). */
+            /* flex on the body: short steps (welcome/name/salary) sit
+               naturally; the tall DOB step overflows and scrolls. */
             className: "flex flex-col flex-1 min-h-0 overflow-y-auto px-6 pt-5 pb-3",
             children: bodyWrap
           }),

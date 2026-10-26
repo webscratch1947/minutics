@@ -1049,29 +1049,31 @@ function injectStyles() {
       filter: drop-shadow(0 0 2.5px rgba(255,255,255,.75));
     }
     /* ── Ambient loop (ported from the onboarding dome, owner's pick):
-       every 3rd star carries a CONTINUOUS staggered twinkle, so the whole
-       sky keeps gently pulsing on its own. The single-shot shine/twinkle
-       rules below are defined AFTER this one — equal specificity means
-       they take over the element while the JS show runs on top of it,
-       then the loop resumes when their class comes off. ───────────────── */
+       half the stars carry a SLOW continuous shimmer (4.4s, staggered
+       across one full cycle) — a drift, not a strobe. The single-shot
+       shine rule below is defined AFTER this one — equal specificity
+       means it takes over the element while the JS show runs on top of
+       it, then the loop resumes when the class comes off. ─────────────── */
     @keyframes lt-star-ambient {
       0%, 100% { opacity: var(--so, .5); }
       50%      { opacity: 1; }
     }
     .lt-auth-stars circle.lt-star-ambient {
-      animation: lt-star-ambient 2.6s ease-in-out infinite;
+      animation: lt-star-ambient 4.4s ease-in-out infinite;
       animation-delay: var(--d, 0s);
     }
-    /* Golden ✦ sparkles floating in the dome (same as the onboarding sky). */
+    /* Golden ✦ sparkles floating in the dome — 8 of them, a slow gentle
+       shimmer (owner: the first pass had 3 and blinked about every
+       second; slower pulse + full spread now). */
     .lt-auth-spark {
       position: absolute; z-index: 2; color: #FDE68A; line-height: 1; pointer-events: none;
       text-shadow: 0 0 8px rgba(253,230,138,.95), 0 0 20px rgba(253,230,138,.55);
-      animation: lt-sparkPulse 2.4s ease-in-out infinite;
+      animation: lt-sparkPulse 4.8s ease-in-out infinite;
       animation-delay: var(--sd, 0s);
     }
     @keyframes lt-sparkPulse {
-      0%, 100% { opacity: .18; transform: scale(.7) rotate(0deg); }
-      50%      { opacity: 1;   transform: scale(1.25) rotate(20deg); }
+      0%, 100% { opacity: .3;  transform: scale(.85); }
+      50%      { opacity: 1;   transform: scale(1.12); }
     }
     /* Shiny bloom: a hot white core, a wide violet halo and a long outer
        flare stacked as three drop-shadows — reads as a real glinting star
@@ -1460,13 +1462,14 @@ function renderWelcomeGate() {
     [290,332,1.2,.65],[356,352,1.1,.55],[26,362,1.3,.7],[64,118,.8,.4],[198,150,.9,.45],
     [326,90,.9,.5],[252,60,.8,.4]
   ];
-  /* Every 3rd star runs the ambient twinkle loop (ported from the
-     onboarding dome): --so keeps its own base opacity, --d staggers the
-     phases so the sky pulses instead of blinking in unison. */
+  /* Every 2nd star runs the ambient shimmer (slowed per owner: a calm
+     drift, not a per-second blink): --so keeps its own base opacity, --d
+     staggers the phases across one full 4.4s cycle. */
   var stars = STAR_PTS.map(function (p, i) {
-    var amb = i % 3 === 0;
+    var amb = i % 2 === 0;
+    var d = ((i * 1.37) % 4.4).toFixed(2);
     return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + p[2] + '" fill="#fff" opacity="' + p[3] + '"' +
-      (amb ? ' class="lt-star-ambient" style="--so:' + p[3] + ';--d:' + (i * 0.37).toFixed(2) + 's"' : '') +
+      (amb ? ' class="lt-star-ambient" style="--so:' + p[3] + ';--d:' + d + 's"' : '') +
       '/>';
   }).join("");
 
@@ -1478,9 +1481,14 @@ function renderWelcomeGate() {
       '<div class="lt-auth-herowrap">' +
         '<div class="lt-auth-hero">' +
           '<svg class="lt-auth-stars" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + stars + '</svg>' +
-          '<span class="lt-auth-spark" style="left:8%;bottom:34%;font-size:17px;--sd:0s" aria-hidden="true">&#10022;</span>' +
-          '<span class="lt-auth-spark" style="right:9%;bottom:56%;font-size:12px;--sd:.8s" aria-hidden="true">&#10022;</span>' +
-          '<span class="lt-auth-spark" style="right:18%;bottom:24%;font-size:15px;--sd:1.5s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="left:6%;bottom:62%;font-size:14px;--sd:0s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="left:21%;bottom:37%;font-size:11px;--sd:1.2s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="left:37%;bottom:70%;font-size:13px;--sd:2.6s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="left:14%;bottom:22%;font-size:12px;--sd:3.7s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="right:34%;bottom:30%;font-size:10px;--sd:3.4s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="right:20%;bottom:57%;font-size:15px;--sd:.6s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="right:8%;bottom:33%;font-size:12px;--sd:2.1s" aria-hidden="true">&#10022;</span>' +
+          '<span class="lt-auth-spark" style="right:11%;bottom:66%;font-size:13px;--sd:4.1s" aria-hidden="true">&#10022;</span>' +
         '</div>' +
         '<div class="lt-auth-badge"><img class="lt-auth-badge-logo" src="./assets/icons/logo-512.png" alt="Minutics logo"></div>' +
       '</div>' +
@@ -1507,11 +1515,14 @@ function renderWelcomeGate() {
 }
 
 /* ── Welcome-screen star show ───────────────────────────────────────────
-   Drives the CSS star animations: a random star blooms every ~6s, a soft
-   ambient twinkle runs between shines, and a shooting star streaks across
-   the dome every ~9s. Every timer self-clears as soon as the gate leaves
-   the DOM (any renderGate() replaces it) so nothing keeps ticking behind
-   the login screens or the signed-in app. Reduced-motion users get a
+   Drives the CSS star animations: a random star blooms every ~6s and an
+   occasional shooting star streaks across the dome every ~9s. The steady
+   shimmer itself is pure CSS on every 2nd star (see .lt-star-ambient) —
+   the old 1.8s random-twinke FLASH was the "blinking every second" the
+   owner flagged, so it is no longer scheduled; the class/CSS stay for
+   compatibility. Every timer self-clears as soon as the gate leaves the
+   DOM (any renderGate() replaces it) so nothing keeps ticking behind the
+   login screens or the signed-in app. Reduced-motion users get a
    completely static sky. */
 function startStarShow(gate) {
   try {
@@ -1559,11 +1570,9 @@ function startStarShow(gate) {
       setTimeout(function () { if (m.parentNode) m.parentNode.removeChild(m); }, 1600);
     };
     timers.push(setInterval(shine, 6000));
-    timers.push(setInterval(twinkle, 1800));
     timers.push(setInterval(shoot, 9000));
     /* First sparkles land immediately so the sky feels alive on arrival. */
     setTimeout(shine, 600);
-    setTimeout(twinkle, 1400);
   } catch {}
 }
 
