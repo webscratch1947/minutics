@@ -45,6 +45,23 @@ function resolveOnbV2() {
 }
 const ONB_V2 = typeof window !== "undefined" ? resolveOnbV2() : ONB_NEW_DEFAULT;
 
+/* ── Onboarding PREVIEW (localhost only, owner's review link) ────────────
+   Opening localhost with ?onboarding=new must land DIRECTLY on the
+   redesigned wizard — no welcome/register/login screen in front of it
+   (the owner only asked for the onboarding to review, not the whole app).
+   The preview never persists anything: finishing or skipping just returns
+   to the normal welcome screen. If the real app takes over (demo engine /
+   a login — the way tests enter), main.js drops the overlay and the
+   in-app onboarding shows the same redesign. On the live site / in the APK
+   the host gate above makes this impossible — no query param can ever
+   trigger it there. */
+const ONB_PREVIEW = (function () {
+  try {
+    return onbLocalhostOnly() && new URLSearchParams(window.location.search).get("onboarding") === "new";
+  } catch { return false; }
+})();
+export { ONB_PREVIEW };
+
 /* ── DOB pickers (month / year) ──────────────────────────────────────────
    The native <select> popup is an unstyled OS control that clashes badly
    with this card. These buttons open a themed sheet in the app's own   style: rounded chips, green selection, smooth entrance, auto-centred on   the current value. No native dropdown anywhere in onboarding. */
@@ -206,7 +223,10 @@ function yrsShort(n) {
 }
 
 export function mk({
-  onComplete: e
+  onComplete: e,
+  /* preview: localhost review overlay — finish/skip must NOT save a profile
+     or boot the app, they only hand control back to the welcome screen. */
+  preview: pv
 }) {
   const [t, n] = useState("welcome"), [r, o] = useState(""), [s, i] = useState(""), [l, a] = useState(85), [dY, setDY] = useState(""), [dM, setDM] = useState(""), [dD, setDD] = useState(""), [sal, setSal] = useState(""), u = (() => {
     if (!s) return null;
@@ -236,6 +256,9 @@ export function mk({
 
   function finish(saveSalary) {
     if (!r.trim() || !dobValid) return;
+    /* Review preview: nothing is ever written — close and show the normal
+       welcome screen again (localStorage + profile stay untouched). */
+    if (pv) { try { if (e) e(null); } catch {} return; }
     const profile = {
       name: r.trim(),
       dob: s,
