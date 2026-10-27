@@ -57,7 +57,13 @@ const ONB_V2 = typeof window !== "undefined" ? resolveOnbV2() : ONB_NEW_DEFAULT;
    trigger it there. */
 const ONB_PREVIEW = (function () {
   try {
-    return onbLocalhostOnly() && new URLSearchParams(window.location.search).get("onboarding") === "new";
+    const on = onbLocalhostOnly() && new URLSearchParams(window.location.search).get("onboarding") === "new";
+    /* Review-only mode: tell the rest of the bundle (enhancements.js
+       startup splash, auth.js gate stars) to stand down so the wizard is
+       the ONLY thing on screen — no boot/emblem splash stacked on top of
+       it (owner: "random loading animation", "animation playing 2 times"). */
+    if (on) { try { window.__ltOnbPreview = true; } catch {} }
+    return on;
   } catch { return false; }
 })();
 export { ONB_PREVIEW };
@@ -97,9 +103,6 @@ if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) 
   st2.id = ONB2_STYLE_ID;
   st2.textContent =
     "@keyframes onb2In{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}" +
-    "@keyframes onb2Float{0%,100%{transform:translateY(0);}50%{transform:translateY(-9px);}}" +
-    "@keyframes onb2Dot{0%,100%{opacity:.35;transform:scale(.8);}50%{opacity:.95;transform:scale(1.1);}}" +
-    "@keyframes onb2Glow{0%,100%{opacity:.55;}50%{opacity:.95;}}" +
     ".onb2-step{animation:onb2In .32s cubic-bezier(.22,1,.36,1) both;}" +
     /* Full-screen scene backdrop (class name kept for the review suites):
        soft mint + faint blue blobs fading to white. Absolute, painted
@@ -112,25 +115,21 @@ if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) 
         "linear-gradient(180deg,#EAF8F0 0%,#F3FBF7 42%,#FFFFFF 100%);" +
     "}" +
     /* Soft mint halo behind the mascot — a plain radial gradient, NO blur
-       pass (blur on an animated layer was a per-frame cost). */
+       pass and NO animation (static: paints once). */
     ".onb2-glow{" +
       "position:absolute;left:50%;bottom:2px;width:min(320px,86%);height:150px;transform:translateX(-50%);" +
       "background:radial-gradient(50% 55% at 50% 55%,rgba(21,115,71,.16) 0%,rgba(21,115,71,0) 72%);" +
-      "animation:onb2Glow 5s ease-in-out infinite;pointer-events:none;" +
+      "pointer-events:none;" +
     "}" +
-    /* The floating illustration — transform ONLY (compositor-cheap), on its
-       own layer; the old drop-shadow filter is gone (static ground shadow
-       instead), because filters on animated art re-raster every frame on
-       phones. */
+    /* The illustration — static (no float loop): nothing per-frame, no
+       will-change layer, no re-raster on phones (owner: "so laggy"). */
     ".onb2-art{" +
-      "animation:onb2Float 5.2s ease-in-out infinite;" +
-      "will-change:transform;" +
+      "position:absolute;inset:0;" +
     "}" +
-    /* Small glowing mint dots — tiny elements, transform+opacity only. */
+    /* Small mint dots — static glow dots (no pulse loop). */
     ".onb2-spark{" +
       "position:absolute;border-radius:50%;background:#34D399;pointer-events:none;" +
       "box-shadow:0 0 10px rgba(52,211,153,.75),0 0 22px rgba(52,211,153,.35);" +
-      "animation:onb2Dot 4.6s ease-in-out infinite;" +
     "}" +
     /* Bottom panel over the scene: grows from the bottom, caps at 72dvh,
        scrolls inside itself when a step is tall (birthday calendar). */
@@ -550,9 +549,7 @@ export function mk({
       alt: "",
       draggable: false,
       "aria-hidden": step !== t,
-      className: ONB_V2
-        ? "absolute inset-0 w-full h-full object-contain select-none scale-[1.08]"
-        : "absolute inset-0 w-full h-full object-contain select-none",
+      className: "absolute inset-0 w-full h-full object-contain select-none",
       style: { visibility: step === t ? "visible" : "hidden" }
     }, step))
   });
@@ -589,7 +586,7 @@ export function mk({
     onClick: onClick,
     disabled: disabled,
     className: ONB_V2
-      ? "w-full py-[17px] rounded-2xl font-bold text-[15.5px] transition-all active:scale-[.98]"
+      ? "w-full py-3 rounded-xl font-bold text-[15px] transition-all active:scale-[.98]"
       : "w-full py-4 rounded-xl font-bold text-base text-white transition-opacity",
     style: ONB_V2
       ? (disabled
@@ -597,7 +594,7 @@ export function mk({
           : {
               background: GREEN,
               color: "#fff",
-              boxShadow: "0 14px 28px -14px rgba(21,115,71,.65)"
+              boxShadow: "0 6px 14px -8px rgba(21,115,71,.5)"
             })
       : { background: GREEN, opacity: disabled ? 0.4 : 1 },
     children: text
@@ -613,12 +610,15 @@ export function mk({
     : null;
 
   /* v3 card chrome: solid white cards resting on the cream sheet (the old
-     frosted look only made sense over the old flat background). */
+     frosted look only made sense over the old flat background).
+     v7 (owner): the outline must be VISIBLE (a near-white border on the
+     white card read as "boxes invisible"), the boxes must be smaller, and
+     the shadow must be tight (a 30px spread made each card look bulky). */
   const cardCls = ONB_V2
-    ? "bg-white border border-black/[.06] rounded-3xl px-4 py-4 shadow-[0_10px_30px_rgba(20,32,80,0.10)]"
+    ? "bg-white border border-[#E7E5DC] rounded-2xl px-3.5 py-3 shadow-[0_4px_14px_rgba(20,32,80,0.07)]"
     : "bg-white border border-black/[.08] rounded-2xl px-4 py-4 shadow-[0_6px_20px_rgba(15,23,42,0.07)]";
   const cardClsTight = ONB_V2
-    ? "bg-white border border-black/[.06] rounded-3xl px-3.5 py-3 shadow-[0_10px_30px_rgba(20,32,80,0.10)]"
+    ? "bg-white border border-[#E7E5DC] rounded-2xl px-3 py-2.5 shadow-[0_4px_14px_rgba(20,32,80,0.07)]"
     : "bg-white border border-black/[.08] rounded-2xl px-3.5 py-3 shadow-[0_6px_20px_rgba(15,23,42,0.07)]";
 
   /* â”€â”€ step bodies â”€â”€ */
@@ -639,7 +639,9 @@ export function mk({
         })
       ]
     });
-    footer = nextBtn(() => go("name"), false, "Get Started \u2192");
+    /* No arrow on the redesigned CTA (owner: "why is there a arrow for
+       every button"); v1/live keeps its original label untouched. */
+    footer = nextBtn(() => go("name"), false, ONB_V2 ? "Get Started" : "Get Started \u2192");
   }
 
   if (t === "name") {
@@ -657,13 +659,13 @@ export function mk({
               onChange: g => o(g.target.value.replace(/[^A-Za-z\s]/g, "")),
               placeholder: "e.g. Alex",
               autoFocus: true,
-              className: "w-full bg-[#F5F6F8] border border-black/10 text-gray-900 text-lg font-semibold rounded-xl px-3.5 py-3 outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all"
+              className: "w-full bg-[#F5F6F8] border border-black/10 text-gray-900 text-base font-semibold rounded-lg px-3 py-2.5 outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all"
             })
           ]
         }) })
       ]
     });
-    footer = nextBtn(() => go("dob"), !r.trim(), "Next \u2192");
+    footer = nextBtn(() => go("dob"), !r.trim(), ONB_V2 ? "Next" : "Next \u2192");
   }
 
   if (t === "dob") {
@@ -807,7 +809,7 @@ export function mk({
         ]})
       ]
     });
-    footer = nextBtn(() => go("salary"), !dobValid, "Next \u2192");
+    footer = nextBtn(() => go("salary"), !dobValid, ONB_V2 ? "Next" : "Next \u2192");
   }
 
   if (t === "salary") {
@@ -833,7 +835,7 @@ export function mk({
                   onChange: g => setSal(g.target.value),
                   placeholder: "e.g. 50,000",
                   autoFocus: true,
-                  className: "w-full bg-[#F5F6F8] border border-black/10 rounded-xl px-3.5 py-3 text-gray-900 text-base font-semibold outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className: "w-full bg-[#F5F6F8] border border-black/10 rounded-lg px-3 py-2.5 text-gray-900 text-base font-semibold outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 })
               ]
             }),
@@ -848,7 +850,7 @@ export function mk({
     footer = jsxs("div", {
       className: "flex flex-col gap-2",
       children: [
-        nextBtn(() => finish(true), !(salaryNum > 0), "Next \u2192"),
+        nextBtn(() => finish(true), !(salaryNum > 0), ONB_V2 ? "Next" : "Next \u2192"),
         jsx("button", {
           type: "button",
           onClick: () => finish(false),

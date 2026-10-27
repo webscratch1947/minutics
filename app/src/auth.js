@@ -1526,6 +1526,9 @@ function renderWelcomeGate() {
    completely static sky. */
 function startStarShow(gate) {
   try {
+    /* Review preview: the gate is hidden behind the onboarding overlay —
+       no star timers, no forced reflows for an animation nobody sees. */
+    if (window.__ltOnbPreview) return;
     if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     var hero = gate.querySelector(".lt-auth-hero");
     var svg = gate.querySelector(".lt-auth-stars");

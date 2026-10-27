@@ -30,6 +30,25 @@
     <meta name="theme-color" content="#1a2140" />
     <!-- Fonts self-hosted (SRI-safe, no third-party request) -->
     <link href="/fonts/inter.css" rel="stylesheet">
+    <!-- Review preview ONLY (localhost + ?onboarding=new): flag the bundle
+         before any module runs and keep both splash layers unpainted, so
+         the onboarding wizard is the first and only thing on screen.
+         On the live site / in the APK this never matches (host gate) and
+         does nothing at all. -->
+    <script>
+      (function () {
+        try {
+          var h = location.hostname;
+          var local = h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "";
+          if (local && new URLSearchParams(location.search).get("onboarding") === "new") {
+            window.__ltOnbPreview = true;
+            var s = document.createElement("style");
+            s.textContent = "#lt-boot-splash,#lt-startup-splash{display:none!important;}";
+            document.head.appendChild(s);
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="./src/enhancements.js"></script>
     <script type="module" src="./src/auth.js"></script>
     <script type="module" crossorigin src="./src/main.js"></script>

@@ -25,6 +25,21 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
                             release at 4.4s so the settled logo is never
                             cut short. */
 
+    /* ── Review preview (?onboarding=new on localhost) ──────────────────
+       The owner reviews the wizard directly: no emblem/boot splash may
+       ever sit on top of it (that stack read as a "random loading
+       animation" that "plays 2 times"). Remove the coded splash outright
+       and never adopt/create one here. */
+    if (window.__ltOnbPreview) {
+      try {
+        var pSplash = document.getElementById("lt-startup-splash");
+        if (pSplash && pSplash.parentNode) pSplash.parentNode.removeChild(pSplash);
+        var pBoot = document.getElementById("lt-boot-splash");
+        if (pBoot && pBoot.parentNode) pBoot.parentNode.removeChild(pBoot);
+      } catch (e) {}
+      return;
+    }
+
     /* ADOPT the coded splash index.html already rendered. Stale cached
        HTML can carry an older splash (the video splash, or the previous
        audio-carrying build): anything that isn't the current coded

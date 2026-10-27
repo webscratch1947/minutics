@@ -58,10 +58,32 @@ console.log("MAIN.JS: React render called");
   try {
     if (!ONB_PREVIEW) return;
     if (document.body && document.body.classList.contains("lt-authed")) return;
+    /* Review-only: the wizard must be the ONLY thing on screen. Belt and
+       braces with enhancements.js — sweep away any splash node that already
+       painted (boot splash + emblem splash stacked in front of the wizard
+       was the owner's "random loading animation" / "plays 2 times"), and
+       silence the welcome-screen star field that runs hidden behind this
+       overlay (per-frame work nobody can see). */
+    ["lt-boot-splash", "lt-startup-splash"].forEach(function (id) {
+      try {
+        var n = document.getElementById(id);
+        if (n && n.parentNode) n.parentNode.removeChild(n);
+      } catch {}
+    });
+    try {
+      document.body.classList.add("lt-onb-preview-active");
+      var pvCss = document.createElement("style");
+      pvCss.id = "lt-onb-preview-css";
+      pvCss.textContent =
+        "body.lt-onb-preview-active .lt-auth-stars circle," +
+        "body.lt-onb-preview-active circle.lt-star-ambient," +
+        "body.lt-onb-preview-active circle.lt-star-shine," +
+        "body.lt-onb-preview-active .lt-auth-spark{animation:none!important;}";
+      document.head.appendChild(pvCss);
+    } catch {}
     const host = document.createElement("div");
     host.id = "lt-onb-preview";
-    /* Sits above the gate (z 999999) but below the boot splash
-       (z 2147483646), which fades out on its own and reveals the wizard. */
+    /* Sits above the gate (z 999999); the splash nodes are already gone. */
     host.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:#FDFBF7;overflow-y:auto;-webkit-overflow-scrolling:touch;";
     document.body.appendChild(host);
     const root2 = createRoot(host);
