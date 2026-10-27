@@ -85,8 +85,12 @@ if (typeof document !== "undefined" && !document.getElementById(PICKER_STYLE_ID)
    FULL-SCREEN STORY STYLE (owner picked it): the illustration is no longer
    a strip on top of a form — it fills the WHOLE screen as the hero scene,
    and the question/input/button live in a compact white PANEL over the
-   bottom third (the panel grows upward only when a step is tall, e.g. the
-   birthday calendar, and scrolls inside itself). Still deliberately
+   bottom third. A tall step (birthday calendar) grows the panel and the
+   PAGE scrolls as one — illustration and panel move together (owner:
+   "it doesn't have a real scroll"), and the hero never shrinks below
+   48dvh so the art stays full size on every step (owner: "the picture
+   is so hella small"). The panel's top curve carries a dark outline.
+   Still deliberately
    NOT the login / register / Get-Started look: light mint scene, no navy
    dome, no arch, no gradient pill.
    PERF (owner: "so laggy"): no filters on animated elements — the mascot
@@ -131,11 +135,14 @@ if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) 
       "position:absolute;border-radius:50%;background:#34D399;pointer-events:none;" +
       "box-shadow:0 0 10px rgba(52,211,153,.75),0 0 22px rgba(52,211,153,.35);" +
     "}" +
-    /* Bottom panel over the scene: grows from the bottom, caps at 72dvh,
-       scrolls inside itself when a step is tall (birthday calendar). */
+    /* Bottom panel over the scene: takes its natural height (no cap) — the
+       WHOLE page scrolls as one (owner: "it doesn't have a real scroll …
+       the picture and stuff don't scroll"). The top curve carries a crisp
+       dark outline so the panel edge reads clearly over the illustration. */
     ".onb2-sheet{" +
-      "position:relative;z-index:10;flex-shrink:0;min-height:0;max-height:72dvh;" +
+      "position:relative;z-index:10;flex-shrink:0;min-height:0;" +
       "background:#FFFFFF;display:flex;flex-direction:column;" +
+      "border-top:2px solid #111827;" +
       "border-top-left-radius:28px;border-top-right-radius:28px;" +
       "box-shadow:0 -16px 40px -24px rgba(15,23,42,.45);" +
     "}" +
@@ -297,7 +304,23 @@ export function mk({
   })();
 
   const dobValid = /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime());
-  const salaryNum = parseFloat(sal) || 0;
+  const salaryNum = parseFloat(String(sal).replace(/,/g, "")) || 0;
+
+  /* ONE real page scroll (owner: "when i scroll it doesn't have a real
+     scroll … the picture and stuff don't scroll"): the whole wizard —
+     hero + panel — scrolls together in the page host. Start every step
+     back at the top so a step change never inherits the previous step's
+     scrolled position (the hero would be off-screen). v1 keeps its old
+     inner-scroll layout untouched. */
+  useEffect(() => {
+    if (!ONB_V2) return;
+    try {
+      const host = document.getElementById("lt-onb-preview");
+      if (host) host.scrollTop = 0;
+      if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+      window.scrollTo(0, 0);
+    } catch {}
+  }, [t]);
 
   function finish(saveSalary) {
     if (!r.trim() || !dobValid) return;
@@ -554,10 +577,13 @@ export function mk({
     }, step))
   });
   /* v6 hero stage: header row on top, then the illustration filling every
-     remaining pixel above the bottom panel. Transform-only float, static
-     radial halo, tiny dots — no filters anywhere (the lag fix). */
+     remaining pixel above the bottom panel — floored at 48dvh so a tall
+     step (birthday calendar) can never squeeze the art into a strip
+     (owner: "the top the picture small which doesn't suit"). Transform-only
+     float, static radial halo, tiny dots — no filters anywhere (the lag
+     fix). */
   const artStage = ONB_V2
-    ? jsxs("div", { className: "relative z-10 flex flex-col flex-1 min-h-0", children: [
+    ? jsxs("div", { className: "relative z-10 flex flex-col flex-1 min-h-[48dvh]", children: [
         jsx("div", { className: "pointer-events-none shrink-0", children: headerRow }),
         jsxs("div", { className: "relative flex-1 min-h-0 overflow-hidden", children: [
           jsx("div", { className: "onb2-glow", "aria-hidden": true }),
@@ -828,14 +854,20 @@ export function mk({
               children: [
                 jsx("span", { className: "text-base font-black text-gray-400 shrink-0", children: sym }),
                 jsx("input", {
-                  type: "number",
+                  /* Plain text field, not type=number: a number input
+                     increments on wheel/scroll (owner: "remove the scroll
+                     increase … the number increases") and starts on a stuck
+                     "0" that typing never replaces (owner: "in the salary it
+                     says 0 as default … it doesn't remove or update that 0").
+                     inputMode=decimal keeps the mobile numeric keypad. */
+                  type: "text",
                   inputMode: "decimal",
-                  min: 0,
+                  autoComplete: "off",
                   value: sal,
-                  onChange: g => setSal(g.target.value),
+                  onChange: g => setSal(g.target.value.replace(/[^\d,]/g, "").replace(/^0+(?=\d)/, "")),
                   placeholder: "e.g. 50,000",
                   autoFocus: true,
-                  className: "w-full bg-[#F5F6F8] border border-black/10 rounded-lg px-3 py-2.5 text-gray-900 text-base font-semibold outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className: "w-full bg-[#F5F6F8] border border-black/10 rounded-lg px-3 py-2.5 text-gray-900 text-base font-semibold outline-none placeholder:text-gray-400 focus:bg-white focus:border-[#157347] focus:ring-2 focus:ring-[#157347]/15 transition-all"
                 })
               ]
             }),
@@ -877,19 +909,23 @@ export function mk({
 
   /* ── v6 root: full-screen story hero + bottom panel ────────────────────
      The scene paints behind everything; the illustration fills every
-     pixel above the panel; the white panel rises from the bottom with the
-     question + inputs + CTA (capped at 72dvh, scrolls inside itself when
-     a step is tall). Deliberately NOT the login / register / Get-Started
+     pixel above the panel (and never shrinks below ~48dvh, so the art
+     stays full size on EVERY step — owner: "the picture is so hella
+     small"); the white panel rises from the bottom with the question +
+     inputs + CTA at its natural height. When a step is taller than the
+     screen the page itself scrolls — ONE real scroll where the picture
+     and the panel move together (owner: "it doesn't have a real
+     scroll"). Deliberately NOT the login / register / Get-Started
      screen look. */
   if (ONB_V2) {
     return jsxs("div", {
-      className: "relative h-[100dvh] flex flex-col bg-white overflow-hidden",
+      className: "relative min-h-[100dvh] flex flex-col bg-white",
       children: [
         onb2Sky,
         artStage,
         jsxs("div", { className: "onb2-sheet", children: [
           jsx("div", {
-            className: "flex flex-col flex-1 min-h-0 overflow-y-auto px-6 pt-5 pb-3",
+            className: "px-6 pt-5 pb-3",
             children: bodyWrap
           }),
           jsx("div", {
