@@ -1846,137 +1846,26 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return "Your productivity tends to be low at this hour \u2014 good time for light, low-effort tasks.";
   }
 
-  /* Overlap guard: if a bottom sheet is open, don't show a floating popup
-     that would overlap it — the popup shows after the sheet closes. */
-  var _popupDeferred = null;
-  function popupCanShow() {
-    var sheet = document.querySelector(".lt-tasks-sheet, .lt-gram-cp");
-    if (sheet && sheet.offsetParent !== null) return false;
-    return true;
-  }
-  function deferredShowPopup(fn, args) {
-    pauseCountdown();
-    _popupDeferred = { fn: fn, args: args || [] };
-  }
-  function flushDeferredPopup() {
-    if (!_popupDeferred) return;
-    var d = _popupDeferred; _popupDeferred = null;
-    resumeCountdown(d.args && d.args[2] ? d.args[2] : 8000); /* resume with duration */
-    d.fn.apply(null, d.args);
-  }
-  document.body.addEventListener("click", function () {
-    setTimeout(function () { if (popupCanShow() && _popupDeferred) flushDeferredPopup(); }, 400);
-  });
-
-  /* Dynamic teleport: detect ANY visible bottom-fixed sheet/tab
-     and slide the popup smoothly above it. For full tabs (Life Hub,
-     Tools) where bottom space is free, stay at 80px. */
-  function getPopupBottom() {
-    /* Only fixed/absolute elements near the bottom — real sheets/modal.
-       Excludes full-page content by checking position + bottom location. */
-    var maxHeight = 0;
-    var elements = document.querySelectorAll("div, section, article, form, aside");
-    for (var i = 0; i < elements.length; i++) {
-      var el = elements[i];
-      var style = window.getComputedStyle ? window.getComputedStyle(el) : el.style;
-      if (style.position !== "fixed" && style.position !== "absolute") continue;
-      var rect = el.getBoundingClientRect();
-      if (rect.height < 60 || rect.height > window.innerHeight * 0.7) continue;
-      if (rect.bottom < window.innerHeight - 150) continue;
-      if (rect.top < window.innerHeight * 0.35) continue;
-      if (rect.height > maxHeight) maxHeight = rect.height;
-    }
-    if (maxHeight > 60) return (maxHeight + 14) + "px";
-    return "80px";
-  }
-  function teleportPopup(el) {
-    if (!el) return;
-    var target = getPopupBottom();
-    /* Instant teleport — no slide/disappear animation. */
-    el.style.transition = "";
-    el.style.bottom = target;
-  }
-  function watchPopupPosition() {
-    var timer = setInterval(function () {
-      var toast = document.getElementById("lt-prod-toast") || document.getElementById("lt-simple-toast");
-      teleportPopup(toast);
-    }, 300);
-    /* Watch continuously until both toasts are gone. */
-    var checkTimer = setInterval(function () {
-      if (!document.getElementById("lt-prod-toast") && !document.getElementById("lt-simple-toast")) {
-        clearInterval(timer); clearInterval(checkTimer);
-      }
-    }, 500);
-  }
-
-  /* Countdown bar: green (full) → orange (~half) → red (near end). */
-  function countdownBarHtml(durationMs) {
-    return '<div class="lt-popup-countdown" style="position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 16px 16px;overflow:hidden;background:rgba(255,255,255,.15)">' +
-      '<div class="lt-popup-countdown-fill" id="lt-popup-countdown-fill" style="height:100%;width:100%;background:#22C55E;transition:width .2s linear,background .3s linear"></div></div>';
-  }
-  /* Persistent countdown: pauses when hidden/deferred, resumes with
-     remaining time when shown again — never resets to full. */
-  var _countdownState = null; /* { endAt, durationMs, tickId } */
-  function startCountdown(durationMs) {
-    var fill = document.getElementById("lt-popup-countdown-fill");
-    if (!fill) return;
-    if (_countdownState) {
-      /* Resume from existing endAt regardless of duration difference. */
-      if (Date.now() >= _countdownState.endAt) {
-        _countdownState = { endAt: Date.now() + durationMs, durationMs: durationMs, tickId: null };
-      }
-    } else {
-      _countdownState = { endAt: Date.now() + durationMs, durationMs: durationMs, tickId: null };
-      if (_countdownState.tickId) cancelAnimationFrame(_countdownState.tickId);
-    }
-    function tick() {
-      var left = Math.max(0, _countdownState.endAt - Date.now());
-      var pct = Math.max(0, (left / durationMs) * 100);
-      fill.style.width = pct.toFixed(1) + "%";
-      fill.style.background = left <= durationMs * 0.25 ? "#EF4444" : (left <= durationMs * 0.55 ? "#F59E0B" : "#22C55E");
-      if (left > 0) {
-        _countdownState.tickId = requestAnimationFrame(tick);
-      } else {
-        _countdownState = null;
-      }
-    }
-    tick();
-  }
-  function pauseCountdown() {
-    if (_countdownState && _countdownState.tickId) {
-      cancelAnimationFrame(_countdownState.tickId);
-      _countdownState.tickId = null;
-    }
-  }
-  function resumeCountdown(durationMs) {
-    if (!_countdownState) return;
-    startCountdown(durationMs);
-  }
-
   function showProductivityToast() {
     addStyle2();
-    if (!popupCanShow()) { deferredShowPopup(showProductivityToast, []); return; }
-    if (_popupDeferred) flushDeferredPopup();
-    /* No throttle — shows every time. */
+    /* No throttle — this used to skip showing again within 5 minutes,
+       which is why starting activities back-to-back only showed it once.
+       Now it shows every time an activity is started or logged. */
     var existing = document.getElementById("lt-prod-toast");
     if (existing) existing.remove();
 
     var score = currentProductivityScore();
-    var durationMs = 8000;
     var el = document.createElement("div");
     el.id = "lt-prod-toast";
     el.innerHTML =
       balloonSVG(score) +
       '<div class="lt-prod-toast-body">' +
-        '<p class="lt-prod-toast-title">Energy check · ' + score + '%</p>' +
+        '<p class="lt-prod-toast-title">Energy check \u00b7 ' + score + '%</p>' +
         '<p class="lt-prod-toast-msg">' + escapeHtml(productivityMessage(score)) + '</p>' +
       '</div>' +
-      '<button class="lt-prod-toast-close" id="lt-prod-toast-close">✕</button>' +
-      countdownBarHtml(durationMs);
+      '<button class="lt-prod-toast-close" id="lt-prod-toast-close">\u2715</button>';
     document.body.appendChild(el);
     requestAnimationFrame(function () { el.classList.add("lt-show"); });
-    startCountdown(durationMs);
-    watchPopupPosition();
 
     function dismiss() {
       el.classList.remove("lt-show");
@@ -1984,8 +1873,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     }
     var closeBtn = document.getElementById("lt-prod-toast-close");
     if (closeBtn) closeBtn.addEventListener("click", dismiss);
-    setTimeout(dismiss, durationMs);
+    setTimeout(dismiss, 8000);
   }
+
   /* ── Category selection modal (optional tag shown when a new timer starts) ─ */
 
   function catLogEntries() {
@@ -2462,8 +2352,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      for quick warnings, e.g. when a time block couldn't be measured. */
   function showSimpleToast(title, msg) {
     addStyle2();
-    if (!popupCanShow()) { deferredShowPopup(function(t, m) { showSimpleToast(t, m); }, [title, msg]); return; }
-    if (_popupDeferred) flushDeferredPopup();
     var existing = document.getElementById("lt-simple-toast");
     if (existing) existing.remove();
     var el = document.createElement("div");
@@ -2487,8 +2375,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     }
     var closeBtn = document.getElementById("lt-simple-toast-close");
     if (closeBtn) closeBtn.addEventListener("click", dismiss);
-    startCountdown(6000);
-    watchPopupPosition();
     setTimeout(dismiss, 6000);
   }
 
@@ -7015,48 +6901,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   });
   setInterval(maybeNotifyRunningActivity, 15000);
 
-  /* 30-minute repeating "Are you still doing this activity?" notification.
-     Fires at 30 min, 1 h, 1.5 h, 2 h, ... while an activity is still running.
-     Works even when the app is closed (via AndroidBridge notification when
-     hidden, and the native alarm path on Android; web uses the hidden-tab
-     Notification with a fixed tag so it replaces rather than stacks). */
-  var _lastActivityCheckMin = -1;
-  function maybeNotifyActivityCheck() {
-    try {
-      var nativeRunning = getNativeRunningBlock();
-      var startedAt = Number(readJson(RUNNING_TIMER_KEY, 0));
-      var timerIsRunning = !!nativeRunning || startedAt > 0;
-      if (!timerIsRunning) { _lastActivityCheckMin = -1; return; }
-      var elapsedMin = startedAt ? Math.floor((Date.now() - startedAt) / 60000) : 0;
-      if (elapsedMin < 30) { _lastActivityCheckMin = -1; return; }
-      var intervalMin = Math.floor(elapsedMin / 30) * 30; /* 30, 60, 90, ... */
-      if (intervalMin === _lastActivityCheckMin) return;
-      _lastActivityCheckMin = intervalMin;
-
-      var pending = readJson(PENDING_TIMER_CAT_KEY, null);
-      var activityName = (pending && (pending.activityName || pending.label || pending.category)) || "this activity";
-      var msg = "Are you still doing this activity : " + activityName;
-
-      /* Hidden / background: native bridge on Android, web Notification. */
-      if (document.visibilityState !== "visible" &&
-          typeof window !== "undefined" && window.AndroidBridge &&
-          typeof window.AndroidBridge.showNotification === "function") {
-        try { window.AndroidBridge.showNotification("Are you still doing this activity?", msg); } catch (e) {}
-        return;
-      }
-      if (typeof window !== "undefined" && "Notification" in window &&
-          window.Notification.permission === "granted") {
-        try {
-          new window.Notification("Are you still doing this activity?", {
-            body: msg, tag: "minutics-activity-check", icon: window.location.origin + "/favicon.png"
-          });
-        } catch (e) {}
-        return;
-      }
-    } catch (e) {}
-  }
-  setInterval(maybeNotifyActivityCheck, 30000);
-
   /* ══════════════════════════════════════════════════════════════════════════
      FEATURE 2 — Idle Nudge: fires after 10min with no activity running.
      The previous implementation watched a running Waste timer, which meant
@@ -7400,9 +7244,27 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       } catch (e) {}
     }
 
-    /* IN-APP "Still there?" popup removed per batch request.
-       The 15-minute system notification (AndroidBridge + web Notification)
-       stays; the floating overlay is the only thing removed. */
+    addStyle3();
+    var toast = document.getElementById("lt-nudge-toast");
+    if (toast) toast.remove();
+    toast = document.createElement("div");
+    toast.id = "lt-nudge-toast";
+    toast.innerHTML =
+      '<button id="lt-nudge-toast-close">\u2715</button>' +
+      '<div class="lt-nudge-icon">\uD83D\uDCA1</div>' +
+      '<div class="lt-nudge-body">' +
+        '<p>Still there?</p>' +
+        '<p>You haven\u2019t started an activity in a while \u2014 track what you\u2019re doing right now.</p>' +
+      '</div>';
+    document.body.appendChild(toast);
+    requestAnimationFrame(function () { toast.classList.add("lt-show"); });
+
+    function dismissNudge() {
+      toast.classList.remove("lt-show");
+      setTimeout(function () { if (toast.parentNode) toast.remove(); }, 380);
+    }
+    document.getElementById("lt-nudge-toast-close").addEventListener("click", dismissNudge);
+    setTimeout(dismissNudge, 12000);
   }
 
   /* Keep a hidden tab from retaining a stale reminder when the timer changes
