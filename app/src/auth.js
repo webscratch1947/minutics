@@ -1,10 +1,13 @@
 /* ══════════════════════════════════════════════════════════════════════════
    Lifetime — AWS Cognito Authentication Gate (identity moved off Firebase)
    Email/password sign-up, login and password reset all run against the
-   Minutics Cognito user pool. EMAIL VERIFICATION IS GONE COMPLETELY:
-   signups are confirmed instantly by the pool (no code, no email), the
-   verify screen no longer exists anywhere, and password reset sets a new
-   password without any code (mode "set-password" on /api/session). No
+   Minutics Cognito user pool. SIGNUP HAS NO EMAIL VERIFICATION: signups
+   are confirmed instantly by the pool (no code, no email) and the verify
+   screen no longer exists anywhere. Password reset DOES email a 6-digit
+   code (owner's call — it's the one thing standing between a stranger
+   and someone's account): "forgot-send" mails the code through Brevo,
+   "forgot-verify" (code + new password) sets the password server-side,
+   and the fresh password logs the user straight in. No
    user data is
    stored in Cognito — auth is identity-only. All app data (activities,
    budget, tasks, etc.) stays exactly where it already lived: on this
@@ -1373,7 +1376,7 @@ function renderGate(mode) {
 }
 
 /* ── Cognito flows: sign-up → instant auto-login (NO email verification);
-   direct login; codeless forgot-password ──── */
+   direct login; forgot-password via an emailed 6-digit code ──── */
 var _gateSetLoadingFn = null;
 function gateSetLoading(loading) {
   try { if (_gateSetLoadingFn) _gateSetLoadingFn(loading); } catch (e) {}
@@ -1579,11 +1582,14 @@ function startStarShow(gate) {
   } catch {}
 }
 
-/* ── Forgot password — ONE screen, NO code: email + new password →
-   mode "set-password" on /api/session sets a permanent Cognito password
-   without any email verification (verification was removed completely —
-   owner's decision, including the reset code), then the fresh password
-   logs the user straight in. ─────────────────────────────────────────── */
+/* ── Forgot password — TWO steps on one screen: email → we email a
+   6-digit code (mode "forgot-send") → the code + a new password (mode
+   "forgot-verify") sets a permanent Cognito password server-side, and
+   the fresh password logs the user straight in. The code proves the
+   mailbox: it expires in 10 minutes and 5 wrong tries burn it, so
+   knowing someone's email can no longer take over their account.
+   Signup itself still has NO verification — this code exists only
+   here (owner's call, Brevo SMTP, sender info@minutics.com). ────────── */
 function renderForgotGate() {
   injectStyles();
   var existing = document.getElementById("lt-auth-gate");
@@ -1596,6 +1602,7 @@ function renderForgotGate() {
 
   var MAIL_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
   var LOCK_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
+  var KEY_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
   var BACK_ICON = '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   var gate = document.createElement("div");
@@ -1606,14 +1613,31 @@ function renderForgotGate() {
     '<main class="lt-auth-scr">' +
       '<button type="button" class="lt-auth-back" id="lt-forgot-back-link" aria-label="Back to login">' + BACK_ICON + '</button>' +
       '<h1 class="lt-auth-h1">Reset your password</h1>' +
-      '<p class="lt-auth-sub2">Enter your email and choose a new password</p>' +
+      '<p class="lt-auth-sub2" id="lt-forgot-sub">Enter your email and we\'ll send you a 6-digit code</p>' +
       '<section class="lt-auth-card">' +
         '<div class="lt-auth-error" id="lt-auth-error"></div>' +
+
+        /* Step 1 — the mailbox */
         '<form id="lt-forgot-form" novalidate>' +
           '<div class="lt-auth-field">' + MAIL_ICON +
             '<div class="lt-auth-fbody">' +
               '<label class="lt-auth-flabel" for="lt-forgot-email">Email Address</label>' +
               '<input type="email" id="lt-forgot-email" placeholder="you@example.com" autocomplete="email" required>' +
+            '</div>' +
+          '</div>' +
+          '<button class="lt-auth-submit" type="submit" id="lt-forgot-send">' +
+            '<span class="lt-auth-spinner"></span>' +
+            '<span id="lt-forgot-send-label">Send code</span>' +
+          '</button>' +
+        '</form>' +
+
+        /* Step 2 — the code + the new password (hidden until step 1 lands) */
+        '<form id="lt-forgot-step2" novalidate style="display:none">' +
+          '<p class="lt-auth-hint" id="lt-forgot-sent-note" style="margin:0 0 14px;line-height:1.5"></p>' +
+          '<div class="lt-auth-field">' + KEY_ICON +
+            '<div class="lt-auth-fbody">' +
+              '<label class="lt-auth-flabel" for="lt-forgot-code">6-digit code from your email</label>' +
+              '<input type="text" id="lt-forgot-code" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="letter-spacing:.45em;font-size:17px" required>' +
             '</div>' +
           '</div>' +
           '<div class="lt-auth-field">' + LOCK_ICON +
@@ -1627,52 +1651,150 @@ function renderForgotGate() {
             '<span class="lt-auth-spinner"></span>' +
             '<span id="lt-forgot-submit-label">Reset password</span>' +
           '</button>' +
+          '<p class="lt-auth-hint" style="margin:14px 0 0;text-align:center">Didn\'t get it? ' +
+            '<button type="button" class="lt-auth-forgot" id="lt-forgot-resend">Resend code</button>' +
+            '<span style="color:#C3C7D4"> · </span>' +
+            '<button type="button" class="lt-auth-forgot" id="lt-forgot-change-email">Use a different email</button>' +
+          '</p>' +
         '</form>' +
       '</section>' +
     '</main>';
   document.body.appendChild(gate);
 
+  var emailInput = document.getElementById("lt-forgot-email");
+  var codeInput = document.getElementById("lt-forgot-code");
+  var step1 = document.getElementById("lt-forgot-form");
+  var step2 = document.getElementById("lt-forgot-step2");
+  var sub = document.getElementById("lt-forgot-sub");
+  var sentNote = document.getElementById("lt-forgot-sent-note");
+
+  /* The code box takes digits only — a paste of "Code: 123456" keeps the
+     digits; Android's SMS-style OTP autofill rides on one-time-code. */
+  codeInput.addEventListener("input", function () {
+    codeInput.value = codeInput.value.replace(/\D/g, "").slice(0, 6);
+  });
+
   document.getElementById("lt-forgot-back-link").addEventListener("click", function () {
     renderGate("login");
   });
 
+  function goToStep(step) {
+    hideError();
+    var toStep2 = step === 2;
+    step1.style.display = toStep2 ? "none" : "block";
+    step2.style.display = toStep2 ? "block" : "none";
+    sub.textContent = toStep2
+      ? "Enter the code from your email and choose a new password"
+      : "Enter your email and we'll send you a 6-digit code";
+    if (toStep2) { try { codeInput.focus(); } catch {} }
+  }
+
+  var sendBtn = document.getElementById("lt-forgot-send");
+  var sendLabel = document.getElementById("lt-forgot-send-label");
+  function setSending(loading) {
+    sendBtn.disabled = loading;
+    sendBtn.classList.toggle("lt-auth-loading", loading);
+    sendLabel.textContent = loading ? "Sending..." : "Send code";
+  }
   var submitBtn = document.getElementById("lt-forgot-submit");
   var submitLabel = document.getElementById("lt-forgot-submit-label");
-  function setLoading(loading) {
+  function setVerifying(loading) {
     submitBtn.disabled = loading;
     submitBtn.classList.toggle("lt-auth-loading", loading);
     submitLabel.textContent = loading ? "Resetting..." : "Reset password";
   }
-  _gateSetLoadingFn = setLoading; /* cognitoLogin() keeps this screen's spinner alive */
+  _gateSetLoadingFn = setVerifying; /* cognitoLogin() keeps this screen's spinner alive */
 
-  document.getElementById("lt-forgot-form").addEventListener("submit", function (e) {
+  /* The server enforces the real one-code-a-minute rule; this countdown
+     only keeps the button honest about when a resend can do anything. */
+  var resendBtn = document.getElementById("lt-forgot-resend");
+  var resendTimer = null;
+  function startResendCooldown() {
+    var left = 60;
+    resendBtn.disabled = true;
+    resendBtn.style.opacity = ".55";
+    resendBtn.textContent = "Resend code (60 sec)";
+    clearInterval(resendTimer);
+    resendTimer = setInterval(function () {
+      if (!document.body.contains(resendBtn)) { clearInterval(resendTimer); resendTimer = null; return; }
+      left -= 1;
+      if (left > 0) { resendBtn.textContent = "Resend code (" + left + " sec)"; return; }
+      clearInterval(resendTimer);
+      resendTimer = null;
+      resendBtn.disabled = false;
+      resendBtn.style.opacity = "";
+      resendBtn.textContent = "Resend code";
+    }, 1000);
+  }
+
+  function postReset(mode, extra, onOk, onErr) {
+    fetch(apiOrigin() + "/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ mode: mode, email: emailInput.value.trim() }, extra))
+    }).then(function (r) {
+      return (r && r.json) ? r.json() : null;
+    }).then(function (b) {
+      if (b && b.ok) { onOk(); return; }
+      onErr((b && b.error) || "Network error — check your connection and try again.");
+    }).catch(function () {
+      onErr("Network error — check your connection and try again.");
+    });
+  }
+
+  step1.addEventListener("submit", function (e) {
     e.preventDefault();
-    var email = document.getElementById("lt-forgot-email").value.trim();
-    var newPw = document.getElementById("lt-forgot-newpw").value;
+    var email = emailInput.value.trim();
     hideError();
     if (!email) { showError("Enter your email first."); return; }
+    setSending(true);
+    postReset("forgot-send", {}, function () {
+      setSending(false);
+      sentNote.textContent = "We emailed a 6-digit code to " + email + " — it's good for 10 minutes. Check your spam folder if you don't see it.";
+      goToStep(2);
+      startResendCooldown();
+    }, function (msg) {
+      setSending(false);
+      showError(msg);
+    });
+  });
+
+  resendBtn.addEventListener("click", function () {
+    if (resendBtn.disabled) return;
+    var email = emailInput.value.trim();
+    hideError();
+    postReset("forgot-send", {}, function () {
+      sentNote.textContent = "We sent a new code to " + email + " — it's good for 10 minutes.";
+      startResendCooldown();
+    }, function (msg) {
+      startResendCooldown();
+      showError(msg);
+    });
+  });
+
+  document.getElementById("lt-forgot-change-email").addEventListener("click", function () {
+    goToStep(1);
+    try { emailInput.focus(); } catch {}
+  });
+
+  step2.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var email = emailInput.value.trim();
+    var code = codeInput.value.trim();
+    var newPw = document.getElementById("lt-forgot-newpw").value;
+    hideError();
+    if (!/^\d{6}$/.test(code)) { showError("Enter the 6-digit code from your email."); return; }
     if (!ltPasswordLooksStrong(newPw)) {
       showError("Password must be 8+ characters with an uppercase letter, a lowercase letter and a number.");
       return;
     }
-    setLoading(true);
-    fetch(apiOrigin() + "/api/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "set-password", email: email, password: newPw })
-    }).then(function (r) {
-      return (r && r.json) ? r.json() : null;
-    }).then(function (b) {
-      if (b && b.ok) {
-        /* Password set with NO email code — log straight in with it. */
-        cognitoLogin(email, newPw);
-        return;
-      }
-      setLoading(false);
-      showError((b && b.error) || "Network error — check your connection and try again.");
-    }).catch(function () {
-      setLoading(false);
-      showError("Network error — check your connection and try again.");
+    setVerifying(true);
+    postReset("forgot-verify", { code: code, password: newPw }, function () {
+      /* Password set with the emailed code — log straight in with it. */
+      cognitoLogin(email, newPw);
+    }, function (msg) {
+      setVerifying(false);
+      showError(msg);
     });
   });
 }

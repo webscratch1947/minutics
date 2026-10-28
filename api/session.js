@@ -14,13 +14,22 @@
 //
 // POST /api/session  (NO Authorization — the user is locked out by
 //   definition; dispatched before the token gate)
-//   { mode: "set-password", email, password }
-//                                  → set a permanent Cognito password with
-//                                  NO email code: email verification was
-//                                  removed entirely (pool auto-verify off,
-//                                  owner's decision — including the reset
-//                                  code). Resolves the email alias to the
-//                                  pool's internal username first.
+//   { mode: "forgot-send", email }  → email a 6-digit reset code through
+//                                  Brevo SMTP (env BREVO_SMTP_KEY — never
+//                                  in the repo, this file is server-only).
+//                                  Only a HASH of the code is stored on
+//                                  the user's MinuticsUsers row; the code
+//                                  expires in 10 minutes and 5 wrong
+//                                  attempts burn it. Resolves the email
+//                                  alias to the pool's internal username.
+//   { mode: "forgot-verify",       → check the code against that hash,
+//     code, email, password }       then set the Cognito password
+//                                  permanently and clear the hash — the
+//                                  client logs in with it right after.
+//   { mode: "set-password", ... }  → RETIRED: the old codeless reset let
+//                                  anyone who knew an email take that
+//                                  account. Old bundles get a clear
+//                                  "update the app" error, never a hole.
 //   Responds { ok } / { ok:false, error } / degraded when unconfigured.
 //
 //   Responds { ok, device, claimed?, plan?, planSince?, degraded? }. When
@@ -152,34 +161,226 @@ function fitClaims(claims) {
   return claims;
 }
 
-/* ── Codeless password reset (mode "set-password") ──────────────────────
-   No email codes exist anywhere anymore. The pool's usernames are UUIDs
-   with the email as an ALIAS: AdminGetUser accepts the alias and hands
-   back the real username, which is what AdminSetUserPassword requires.
-   Vercel key needs cognito-idp:AdminGetUser + AdminSetUserPassword. */
-async function handleSetPassword(body, res) {
+/* ── Password reset with an emailed 6-digit code ────────────────────────
+   The pool's usernames are UUIDs with the email as an ALIAS: AdminGetUser
+   accepts the alias and hands back the real username, which is what
+   AdminSetUserPassword requires. Vercel key needs AdminGetUser +
+   AdminSetUserPassword (the reset code itself never touches Cognito —
+   it lives hashed on the MinuticsUsers ledger row).
+
+   forgot-send   → 6 digits, emailed through Brevo SMTP. Only sha256(uid:
+                   code) is stored, with a 10-minute expiry and an
+                   attempt counter; 5 wrong tries destroy the code.
+                   One code per minute per address, so the endpoint can't
+                   flood an inbox. Unknown email → 404 (the same honest
+                   message the old flow gave).
+   forgot-verify → timing-safe hash compare, then AdminSetUserPassword
+                   and the hash is wiped. Nobody can reset an account
+                   anymore just by knowing the email address. */
+const RESET_TTL_MS = 10 * 60 * 1000;   /* the code is good for 10 minutes */
+const RESET_MAX_ATTEMPTS = 5;          /* wrong tries before it's burned */
+const RESET_RESEND_MS = 60 * 1000;     /* one email per address per minute */
+
+function resetHash(uid, code) {
+  return crypto.createHash("sha256").update(uid + ":" + code).digest("hex");
+}
+function validResetInputs(email, code, password) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
+  if (!/^\d{6}$/.test(code)) return "Enter the 6-digit code from your email.";
+  if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    return "Password must be 8+ characters with an uppercase letter, a lowercase letter and a number.";
+  }
+  return null;
+}
+function resetAwsConfigured() {
+  const region = POOL_ID.split("_")[0];
+  if (!region || !process.env.AWS_ACCESS_KEY_ID) return false;
+  return !!docClient();
+}
+
+/* The email: plain, small, brand-neutral cream card with the code in a
+   dark box. It says once, quietly, that the request can be ignored —
+   and never asks the reader to do anything (no links to click), so a
+   reset code can't be phished out of this message. */
+function resetMail(code) {
+  const body =
+    '<div style="background:#FDFBF7;padding:32px 20px;font-family:Helvetica,Arial,sans-serif;color:#111827">' +
+      '<div style="max-width:460px;margin:0 auto;background:#fff;border:1px solid #E7E2D6;border-radius:16px;padding:30px 28px">' +
+        '<p style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#6B7280;margin:0 0 10px">Minutics</p>' +
+        '<h1 style="font-size:20px;margin:0 0 10px;color:#111827">Your password reset code</h1>' +
+        '<p style="font-size:14px;color:#4B5563;margin:0 0 18px;line-height:1.5">Enter this code in the app, then choose a new password:</p>' +
+        '<p style="font-size:30px;font-weight:700;letter-spacing:.4em;text-align:center;background:#111827;color:#FDFBF7;border-radius:12px;padding:16px 0;margin:0 0 18px">' + code + '</p>' +
+        '<p style="font-size:13px;color:#6B7280;margin:0 0 6px;line-height:1.5">It expires in 10 minutes, and each code works once.</p>' +
+        '<p style="font-size:13px;color:#6B7280;margin:0;line-height:1.5">Didn\'t request this? You can safely ignore this email — your password stays exactly as it is.</p>' +
+      '</div>' +
+    '</div>';
+  return {
+    from: process.env.BREVO_RESET_FROM || "Minutics <info@minutics.com>",
+    subject: "Your Minutics password reset code",
+    text:
+      "Your Minutics password reset code is: " + code + "\n\n" +
+      "It expires in 10 minutes, and each code works once.\n" +
+      "Didn't request this? You can safely ignore this email — your password stays exactly as it is.\n",
+    html: body,
+  };
+}
+async function sendResetEmail(to, code) {
+  /* Dynamic import: the mailer only loads when a code actually goes out,
+     keeping every other call to this function cheap to start. */
+  const nodemailer = (await import("nodemailer")).default;
+  const smtpPort = Number(process.env.BREVO_SMTP_PORT) || 587;
+  const transport = nodemailer.createTransport({
+    host: process.env.BREVO_SMTP_HOST || "smtp-relay.brevo.com",
+    port: smtpPort,
+    secure: smtpPort === 465,           /* 587 = STARTTLS, 465 = direct TLS */
+    auth: {
+      user: process.env.BREVO_SMTP_USER || "c05038001@smtp-brevo.com",
+      pass: process.env.BREVO_SMTP_KEY || "",
+    },
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 12000,
+  });
+  await transport.sendMail(Object.assign({ to }, resetMail(code)));
+}
+
+async function handleForgotSend(body, res) {
   const email = typeof body.email === "string" ? body.email.trim() : "";
-  const password = typeof body.password === "string" ? body.password : "";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     res.status(400).json({ ok: false, error: "Enter a valid email address." });
     return;
   }
-  if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
-    res.status(400).json({ ok: false, error: "Password must be 8+ characters with an uppercase letter, a lowercase letter and a number." });
+  if (!process.env.BREVO_SMTP_KEY) {
+    res.status(200).json({ ok: false, degraded: true, error: "Password reset email is unavailable right now — try again later." });
     return;
   }
-  const region = POOL_ID.split("_")[0];
-  if (!region || !process.env.AWS_ACCESS_KEY_ID) {
+  if (!resetAwsConfigured()) {
     res.status(200).json({ ok: false, degraded: true, error: "Password reset is unavailable right now." });
     return;
   }
   try {
+    const region = POOL_ID.split("_")[0];
     const cog = new CognitoIdentityProviderClient({ region });
-    const got = await cog.send(new AdminGetUserCommand({ UserPoolId: POOL_ID, Username: email }));
-    const username = got && got.Username ? got.Username : email;
-    await cog.send(new AdminSetUserPasswordCommand({
-      UserPoolId: POOL_ID, Username: username, Password: password, Permanent: true,
+    let uid = null;
+    try {
+      const got = await cog.send(new AdminGetUserCommand({ UserPoolId: POOL_ID, Username: email }));
+      uid = got && got.Username ? got.Username : email;
+    } catch (e) {
+      if (e && (e.name || e.Code) === "UserNotFoundException") {
+        res.status(404).json({ ok: false, error: "No account with that email — register first." });
+        return;
+      }
+      throw e;
+    }
+
+    /* One code a minute per address — a resend double-tap (or someone
+       else poking the endpoint) can never flood a real inbox. Answered
+       as ok so the button never looks broken. */
+    try {
+      const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid } }));
+      const sentAt = got.Item && typeof got.Item.pwResetAt === "number" ? got.Item.pwResetAt : 0;
+      if (Date.now() - sentAt < RESET_RESEND_MS) {
+        res.status(200).json({ ok: true, cooldown: true });
+        return;
+      }
+    } catch (e) {
+      console.error("forgot-send cooldown read failed:", e && e.name, e && e.message);
+    }
+
+    const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+    await sendResetEmail(email, code);   /* send FIRST: never store a code that was never delivered */
+
+    /* Only the hash lands in the ledger — the code itself exists exactly
+       once, in the email. if_not_exists keeps any pre-existing address. */
+    await docClient().send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { uid },
+      UpdateExpression: "SET email = if_not_exists(email, :e), pwResetHash = :h, pwResetExp = :x, pwResetAtt = :a, pwResetAt = :t",
+      ExpressionAttributeValues: {
+        ":e": email,
+        ":h": resetHash(uid, code),
+        ":x": Date.now() + RESET_TTL_MS,
+        ":a": 0,
+        ":t": Date.now(),
+      },
     }));
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    console.error("forgot-send failed:", (e && (e.name || e.code)) || "", e && e.message);
+    res.status(500).json({ ok: false, error: "Could not send the code — try again in a minute." });
+  }
+}
+
+async function handleForgotVerify(body, res) {
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const code = typeof body.code === "string" ? body.code.trim() : "";
+  const password = typeof body.password === "string" ? body.password : "";
+  const bad = validResetInputs(email, code, password);
+  if (bad) { res.status(400).json({ ok: false, error: bad }); return; }
+  if (!resetAwsConfigured()) {
+    res.status(200).json({ ok: false, degraded: true, error: "Password reset is unavailable right now." });
+    return;
+  }
+  try {
+    const region = POOL_ID.split("_")[0];
+    const cog = new CognitoIdentityProviderClient({ region });
+    let uid = null;
+    try {
+      const got = await cog.send(new AdminGetUserCommand({ UserPoolId: POOL_ID, Username: email }));
+      uid = got && got.Username ? got.Username : email;
+    } catch (e) {
+      if (e && (e.name || e.Code) === "UserNotFoundException") {
+        res.status(404).json({ ok: false, error: "No account with that email — register first." });
+        return;
+      }
+      throw e;
+    }
+
+    const clearCode = () => docClient().send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { uid },
+      UpdateExpression: "REMOVE pwResetHash, pwResetExp, pwResetAtt, pwResetAt",
+    }));
+    const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid } }));
+    const item = got.Item || null;
+    if (!item || !item.pwResetHash || typeof item.pwResetHash !== "string") {
+      res.status(400).json({ ok: false, error: "That code has expired — send a new one." });
+      return;
+    }
+    if (typeof item.pwResetExp !== "number" || Date.now() > item.pwResetExp) {
+      try { await clearCode(); } catch { /* already gone */ }
+      res.status(400).json({ ok: false, error: "That code has expired — send a new one." });
+      return;
+    }
+    const attempts = typeof item.pwResetAtt === "number" ? item.pwResetAtt : 0;
+    if (attempts >= RESET_MAX_ATTEMPTS) {
+      try { await clearCode(); } catch { /* already gone */ }
+      res.status(400).json({ ok: false, error: "Too many attempts — send a new code." });
+      return;
+    }
+
+    /* Timing-safe compare of the two hashes (equal length is guaranteed —
+       both are hex digests of sha256). */
+    const want = Buffer.from(item.pwResetHash, "utf8");
+    const have = Buffer.from(resetHash(uid, code), "utf8");
+    const match = want.length === have.length && crypto.timingSafeEqual(want, have);
+    if (!match) {
+      try {
+        await docClient().send(new UpdateCommand({
+          TableName: TABLE,
+          Key: { uid },
+          UpdateExpression: "SET pwResetAtt = :a",
+          ExpressionAttributeValues: { ":a": attempts + 1 },
+        }));
+      } catch { /* the attempt cap is best-effort hardening, not the lock */ }
+      res.status(400).json({ ok: false, error: "That code didn't match — check the email and try again." });
+      return;
+    }
+
+    await cog.send(new AdminSetUserPasswordCommand({
+      UserPoolId: POOL_ID, Username: uid, Password: password, Permanent: true,
+    }));
+    try { await clearCode(); } catch { /* the password is set — never fail over cleanup */ }
     res.status(200).json({ ok: true });
   } catch (e) {
     const name = (e && (e.name || e.Code)) || "";
@@ -187,7 +388,7 @@ async function handleSetPassword(body, res) {
       res.status(404).json({ ok: false, error: "No account with that email — register first." });
       return;
     }
-    console.error("set-password failed:", name, e && e.message);
+    console.error("forgot-verify failed:", name, e && e.message);
     res.status(500).json({ ok: false, error: "Could not reset the password — try again." });
   }
 }
@@ -200,13 +401,25 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
   if (req.method !== "POST" && req.method !== "DELETE") { res.status(405).json({ ok: false, error: "Method not allowed" }); return; }
 
-  /* Body first — the codeless password reset runs WITHOUT a token (the
-     whole point: the user is locked out), so it dispatches before the
-     token gate below. */
+  /* Body first — the password reset runs WITHOUT a token (the whole
+     point: the user is locked out), so it dispatches before the token
+     gate below. */
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = null; } }
   body = body || {};
-  if (req.method === "POST" && body.mode === "set-password") { await handleSetPassword(body, res); return; }
+  if (req.method === "POST" && body.mode === "forgot-send") { await handleForgotSend(body, res); return; }
+  if (req.method === "POST" && body.mode === "forgot-verify") { await handleForgotVerify(body, res); return; }
+  if (req.method === "POST" && body.mode === "set-password") {
+    /* RETIRED, on purpose: this mode used to set any account's password
+       with no email check at all — anyone who knew an address could take
+       the account over. Already-shipped bundles still call it, so they
+       get a clear nudge instead of a silent 404 (and never a hole). */
+    res.status(403).json({
+      ok: false,
+      error: "This reset step was upgraded for security — update the app (or reset your password on the website) to continue.",
+    });
+    return;
+  }
 
   const authHeader = req.headers.authorization || "";
   const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
