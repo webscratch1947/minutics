@@ -13,16 +13,17 @@ const IMGS = {
 };
 const GREEN = "#157347";
 
-/* ── Onboarding redesign review flag — LOCALHOST ONLY ────────────────────
-   The redesigned onboarding exists on the developer's machine and NOWHERE
-   else until the owner approves it and flips ONB_NEW_DEFAULT to true:
-     • only localhost / 127.0.0.1 can ever resolve the new design — even
-       ?onboarding=new on the live site (or inside the APK) is ignored;
-     • on localhost, ?onboarding=new switches this browser to the redesign
-       (sticky via localStorage), ?onboarding=old switches back / clears it;
-     • ONB_NEW_DEFAULT=false keeps the live site + APK on the current
-       onboarding. Flipping it to true is what ships the redesign. */
-const ONB_NEW_DEFAULT = false;
+/* ── Onboarding redesign flag (SHIPPED) — review switches localhost-only ────────────────────
+   The redesigned onboarding is SHIPPED (owner: "this onboarding looks
+   good replace our app onboarding with this") — ONB_NEW_DEFAULT=true
+   makes it the real onboarding on the live site and in the APK:
+     • only localhost / 127.0.0.1 ever resolve the REVIEW switches -
+       ?onboarding=new / ?onboarding=old (both sticky via localStorage)
+       so the old layout can still be compared side by side;
+     • everywhere else (live site, APK) the local switches are ignored
+       and neutralized: the shipped default is what shows. */
+
+const ONB_NEW_DEFAULT = true;
 function onbLocalhostOnly() {
   try {
     const h = window.location.hostname;
@@ -31,16 +32,19 @@ function onbLocalhostOnly() {
 }
 function resolveOnbV2() {
   if (!onbLocalhostOnly()) {
-    /* Not the dev machine: the redesign must never appear here — and any
-       stray review flag a live URL could have planted is neutralized. */
+    /* Not the dev machine: any stray review flag a live URL could have
+       planted is neutralized — everyone here sees the shipped default. */
     try { window.localStorage.removeItem("lt_onboarding_v2"); } catch {}
     return ONB_NEW_DEFAULT;
   }
   try {
     const q = new URLSearchParams(window.location.search).get("onboarding");
     if (q === "new") { window.localStorage.setItem("lt_onboarding_v2", "1"); return true; }
-    if (q === "old") { window.localStorage.removeItem("lt_onboarding_v2"); return false; }
-    return ONB_NEW_DEFAULT || window.localStorage.getItem("lt_onboarding_v2") === "1";
+    if (q === "old") { window.localStorage.setItem("lt_onboarding_v2", "0"); return false; }
+    const stored = window.localStorage.getItem("lt_onboarding_v2");
+    if (stored === "1") return true;
+    if (stored === "0") return false;
+    return ONB_NEW_DEFAULT;
   } catch { return ONB_NEW_DEFAULT; }
 }
 const ONB_V2 = typeof window !== "undefined" ? resolveOnbV2() : ONB_NEW_DEFAULT;
@@ -891,10 +895,12 @@ export function mk({
         jsx("button", {
           type: "button",
           onClick: () => finish(false),
-          /* v2 demotes "Skip" to a quiet ghost link (the red block competed
-             with the real CTA); v1 keeps the original red button. */
+          /* v2: a quiet ghost link (the red block competed with the real
+             CTA) — RED on the salary step (owner: "in the salary make the
+             skip text red"); earlier steps keep the quiet gray. v1 keeps
+             the original red button. */
           className: ONB_V2
-            ? "w-full py-3 text-sm font-bold text-gray-500 rounded-2xl transition-colors active:bg-black/5"
+            ? "w-full py-3 text-sm font-bold text-[#DC2626] rounded-2xl transition-colors active:bg-black/5"
             : "w-full py-3 text-sm font-bold text-white rounded-xl transition-colors active:opacity-80",
           style: ONB_V2 ? undefined : { background: "#DC2626" },
           children: "Skip for now"
