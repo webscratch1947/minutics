@@ -140,7 +140,7 @@ if (typeof document !== "undefined" && !document.getElementById(ONB2_STYLE_ID)) 
        the picture and stuff don't scroll"). The top curve carries a crisp
        dark outline so the panel edge reads clearly over the illustration. */
     ".onb2-sheet{" +
-      "position:relative;z-index:10;flex-shrink:0;min-height:0;" +
+      "position:relative;z-index:10;flex-shrink:0;min-height:0;margin-top:auto;" +
       "background:#FFFFFF;display:flex;flex-direction:column;" +
       "border-top:2px solid #111827;" +
       "border-top-left-radius:28px;border-top-right-radius:28px;" +
@@ -576,14 +576,19 @@ export function mk({
       style: { visibility: step === t ? "visible" : "hidden" }
     }, step))
   });
-  /* v6 hero stage: header row on top, then the illustration filling every
-     remaining pixel above the bottom panel — floored at 48dvh so a tall
-     step (birthday calendar) can never squeeze the art into a strip
-     (owner: "the top the picture small which doesn't suit"). Transform-only
-     float, static radial halo, tiny dots — no filters anywhere (the lag
-     fix). */
+  /* v6 hero stage: header row on top, then the illustration. The whole
+     hero sits in a FIXED size band (owner: "the DOB is fucking so big
+     image and the text and stuff so small") — ~30dvh of picture on a
+     phone, capped at 290px on tall screens, so the birthday step can't
+     turn into a giant illustration that makes the form look tiny. On
+     short steps the panel stays pinned to the bottom and the mint scene
+     fills the space between. Transform-only float, static radial halo,
+     tiny dots — no filters anywhere (the lag fix). */
   const artStage = ONB_V2
-    ? jsxs("div", { className: "relative z-10 flex flex-col flex-1 min-h-[48dvh]", children: [
+    ? jsxs("div", {
+        className: "relative z-10 flex flex-col flex-1 min-h-0 max-h-[378px]",
+        style: { minHeight: "clamp(273px,calc(30dvh + 88px),378px)" },
+        children: [
         jsx("div", { className: "pointer-events-none shrink-0", children: headerRow }),
         jsxs("div", { className: "relative flex-1 min-h-0 overflow-hidden", children: [
           jsx("div", { className: "onb2-glow", "aria-hidden": true }),
@@ -599,7 +604,7 @@ export function mk({
   const bodyArt = ONB_V2 ? null : imgStack;
 
   const label = (text) => jsx("label", {
-    className: "block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2",
+    className: "block text-[13px] font-bold uppercase tracking-wider text-gray-400 mb-2",
     children: text
   });
 
@@ -630,7 +635,7 @@ export function mk({
      uppercase field labels alone left the sheet feeling empty). */
   const head2 = (text) => ONB_V2
     ? jsx("h2", {
-        className: "text-[23px] leading-tight font-extrabold tracking-tight text-[#14162E] text-center mb-3",
+        className: "text-[25px] leading-tight font-extrabold tracking-tight text-[#14162E] text-center mb-3",
         children: text
       })
     : null;
@@ -660,7 +665,7 @@ export function mk({
           children: "Let's set up your universe"
         }),
         jsx("p", {
-          className: (ONB_V2 ? "text-[#5B6478]" : "text-gray-500") + " text-sm leading-relaxed mt-2 px-2 font-medium",
+          className: (ONB_V2 ? "text-[#5B6478] text-[15px]" : "text-gray-500 text-sm") + " leading-relaxed mt-2 px-2 font-medium",
           children: "A few quick questions and your minutes will start tracking."
         })
       ]
@@ -760,7 +765,7 @@ export function mk({
           jsx("div", {
             className: "grid grid-cols-7 gap-1 mt-3",
             children: ["S", "M", "T", "W", "T", "F", "S"].map((dn, ii) =>
-              jsx("span", { className: "text-center text-[10px] font-black text-gray-400 py-1", children: dn }, "wd" + ii)
+              jsx("span", { className: "text-center text-[11px] font-black text-gray-400 py-1", children: dn }, "wd" + ii)
             )
           }),
           jsx("div", {
@@ -780,10 +785,10 @@ export function mk({
                      selected day keeps its filled green circle, future days
                      stay bare so "not pickable" still reads instantly. */
                   className: isSel
-                    ? "h-9 w-9 mx-auto rounded-full bg-[#157347] text-white text-[13px] font-black shadow-[0_4px_10px_rgba(21,115,71,.35)]"
+                    ? "h-9 w-9 mx-auto rounded-full bg-[#157347] text-white text-[14px] font-black shadow-[0_4px_10px_rgba(21,115,71,.35)]"
                     : isFuture
-                      ? "h-9 w-9 mx-auto rounded-full text-gray-300 text-[13px] font-bold cursor-default"
-                      : "h-9 w-9 mx-auto rounded-full bg-[#F1ECE0] border border-black/[.12] text-gray-800 text-[13px] font-bold shadow-[0_2px_6px_rgba(15,23,42,.09)] hover:bg-[#E9E2D2] hover:border-[#157347]/30 active:bg-[#DCFCE7] transition-colors",
+                      ? "h-9 w-9 mx-auto rounded-full text-gray-300 text-[14px] font-bold cursor-default"
+                      : "h-9 w-9 mx-auto rounded-full bg-[#F1ECE0] border border-black/[.12] text-gray-800 text-[14px] font-bold shadow-[0_2px_6px_rgba(15,23,42,.09)] hover:bg-[#E9E2D2] hover:border-[#157347]/30 active:bg-[#DCFCE7] transition-colors",
                   children: String(dd)
                 }, "day" + dd);
               })
@@ -792,7 +797,7 @@ export function mk({
         ]}),
         jsxs("div", { className: "mt-3 " + cardCls, children: [
           jsxs("label", {
-            className: "block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2",
+            className: "block text-[13px] font-bold uppercase tracking-wider text-gray-400 mb-2",
             children: ["Retire age \u2014 ", jsx("span", { style: { color: GREEN }, children: d })]
           }),
           jsx("input", {
@@ -872,7 +877,7 @@ export function mk({
               ]
             }),
             jsx("p", {
-              className: "text-[11px] text-gray-400 mt-1.5 leading-relaxed",
+              className: "text-[12px] text-gray-400 mt-1.5 leading-relaxed",
               children: "Powers your Time Value Calculator \u2014 the value of every minute. You can change this later in Life Hub."
             })
           ]
