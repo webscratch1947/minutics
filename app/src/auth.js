@@ -741,6 +741,9 @@ window.LTAuth = {
     /* Before the session goes away: kill the native alarm + local
        credentials and clear the server cron's schedule for this account. */
     disconnectTelegramAll();
+    /* Stop any running timer so it doesn't outlive the session and leak
+       into a different account (same email, new login, etc.). */
+    try { localStorage.removeItem("lt_running_timer_start_v1"); localStorage.removeItem("lt_pending_timer_cat_v1"); } catch (e) {}
 
     /* Cognito's local signOut is synchronous (clears the cached session);
        the null-state funnel below parks this account's data and renders
@@ -804,7 +807,7 @@ window.LTAuth = {
       return new Promise(function (resolve, reject) {
         cu.deleteUser(function (err) {
           if (err) { reject(new Error((err && err.message) || "Could not delete account")); return; }
-          var done = function () { resolve(); };
+          var done = function () { try { localStorage.removeItem("lt_running_timer_start_v1"); localStorage.removeItem("lt_pending_timer_cat_v1"); } catch (e) {} resolve(); };
           if (!idt || typeof fetch !== "function") {
             if (!idt) console.error("delete-account: no id token — ledger cleanup skipped (ghost risk)");
             done(); return;

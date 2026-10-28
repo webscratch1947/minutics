@@ -1866,6 +1866,32 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     setTimeout(function () { if (popupCanShow() && _popupDeferred) flushDeferredPopup(); }, 400);
   });
 
+  /* Dynamic teleport: popup slides smoothly wherever space exists.
+     Countdown timer continues independently (won't reset). */
+  function getPopupBottom() {
+    var sheet = document.querySelector(".lt-tasks-sheet, .lt-gram-cp, .lt-tool-shell");
+    if (sheet && sheet.offsetParent !== null) {
+      var rect = sheet.getBoundingClientRect();
+      if (rect.top < 220) return "220px";
+    }
+    return "80px";
+  }
+  function teleportPopup(el) {
+    if (!el) return;
+    var target = getPopupBottom();
+    if (el.style.bottom !== target) {
+      el.style.transition = "bottom .25s ease, opacity .25s, transform .25s";
+      el.style.bottom = target;
+    }
+  }
+  function watchPopupPosition() {
+    var timer = setInterval(function () {
+      var toast = document.getElementById("lt-prod-toast") || document.getElementById("lt-simple-toast");
+      teleportPopup(toast);
+    }, 300);
+    setTimeout(function () { clearInterval(timer); }, 15000);
+  }
+
   /* Countdown bar: green (full) → orange (~half) → red (near end). */
   function countdownBarHtml(durationMs) {
     return '<div class="lt-popup-countdown" style="position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 16px 16px;overflow:hidden;background:rgba(255,255,255,.15)">' +
@@ -1908,6 +1934,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     document.body.appendChild(el);
     requestAnimationFrame(function () { el.classList.add("lt-show"); });
     startCountdown(durationMs);
+    watchPopupPosition();
 
     function dismiss() {
       el.classList.remove("lt-show");
@@ -2419,6 +2446,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var closeBtn = document.getElementById("lt-simple-toast-close");
     if (closeBtn) closeBtn.addEventListener("click", dismiss);
     startCountdown(6000);
+    watchPopupPosition();
     setTimeout(dismiss, 6000);
   }
 
