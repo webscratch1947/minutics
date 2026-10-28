@@ -1855,25 +1855,36 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return true;
   }
   function deferredShowPopup(fn, args) {
+    pauseCountdown();
     _popupDeferred = { fn: fn, args: args || [] };
   }
   function flushDeferredPopup() {
     if (!_popupDeferred) return;
     var d = _popupDeferred; _popupDeferred = null;
+    resumeCountdown(d.args && d.args[2] ? d.args[2] : 8000); /* resume with duration */
     d.fn.apply(null, d.args);
   }
   document.body.addEventListener("click", function () {
     setTimeout(function () { if (popupCanShow() && _popupDeferred) flushDeferredPopup(); }, 400);
   });
 
-  /* Dynamic teleport: popup slides smoothly wherever space exists.
-     Countdown timer continues independently (won't reset). */
+  /* Dynamic teleport: detect ANY visible bottom-fixed sheet/tab
+     and slide the popup smoothly above it. For full tabs (Life Hub,
+     Tools) where bottom space is free, stay at 80px. */
   function getPopupBottom() {
-    var sheet = document.querySelector(".lt-tasks-sheet, .lt-gram-cp, .lt-tool-shell");
-    if (sheet && sheet.offsetParent !== null) {
-      var rect = sheet.getBoundingClientRect();
-      if (rect.height > 80) return (rect.height + 14) + "px";
+    var elements = document.querySelectorAll("div, section, article");
+    var maxBottomHeight = 0;
+    for (var i = 0; i < elements.length; i++) {
+      var el = elements[i];
+      var style = window.getComputedStyle ? window.getComputedStyle(el) : el.style;
+      if (style.position === "fixed" || style.position === "absolute") {
+        var rect = el.getBoundingClientRect();
+        if (rect.height > maxBottomHeight && rect.bottom > window.innerHeight - 300) {
+          maxBottomHeight = rect.height;
+        }
+      }
     }
+    if (maxBottomHeight > 80) return (maxBottomHeight + 14) + "px";
     return "80px";
   }
   function teleportPopup(el) {
@@ -1902,18 +1913,40 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return '<div class="lt-popup-countdown" style="position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 16px 16px;overflow:hidden;background:rgba(255,255,255,.15)">' +
       '<div class="lt-popup-countdown-fill" id="lt-popup-countdown-fill" style="height:100%;width:100%;background:#22C55E;transition:width .2s linear,background .3s linear"></div></div>';
   }
+  /* Persistent countdown: pauses when hidden/deferred, resumes with
+     remaining time when shown again — never resets to full. */
+  var _countdownState = null; /* { endAt, durationMs, tickId } */
   function startCountdown(durationMs) {
     var fill = document.getElementById("lt-popup-countdown-fill");
     if (!fill) return;
-    var start = Date.now();
+    if (_countdownState && _countdownState.durationMs === durationMs) {
+      /* Same popup resumed; continue from endAt. */
+    } else {
+      _countdownState = { endAt: Date.now() + durationMs, durationMs: durationMs, tickId: null };
+      if (_countdownState.tickId) cancelAnimationFrame(_countdownState.tickId);
+    }
     function tick() {
-      var left = Math.max(0, durationMs - (Date.now() - start));
-      var pct = (left / durationMs) * 100;
+      var left = Math.max(0, _countdownState.endAt - Date.now());
+      var pct = Math.max(0, (left / durationMs) * 100);
       fill.style.width = pct.toFixed(1) + "%";
       fill.style.background = left <= durationMs * 0.25 ? "#EF4444" : (left <= durationMs * 0.55 ? "#F59E0B" : "#22C55E");
-      if (left > 0) requestAnimationFrame(tick);
+      if (left > 0) {
+        _countdownState.tickId = requestAnimationFrame(tick);
+      } else {
+        _countdownState = null;
+      }
     }
     tick();
+  }
+  function pauseCountdown() {
+    if (_countdownState && _countdownState.tickId) {
+      cancelAnimationFrame(_countdownState.tickId);
+      _countdownState.tickId = null;
+    }
+  }
+  function resumeCountdown(durationMs) {
+    if (!_countdownState) return;
+    startCountdown(durationMs);
   }
 
   function showProductivityToast() {
