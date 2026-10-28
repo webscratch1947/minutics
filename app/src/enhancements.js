@@ -1891,7 +1891,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     if (!el) return;
     var target = getPopupBottom();
     if (el.style.bottom !== target) {
-      el.style.transition = "bottom .25s ease, opacity .25s, transform .25s";
+      el.style.transition = "bottom .25s ease";
       el.style.bottom = target;
     }
   }
@@ -1919,8 +1919,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   function startCountdown(durationMs) {
     var fill = document.getElementById("lt-popup-countdown-fill");
     if (!fill) return;
-    if (_countdownState && _countdownState.durationMs === durationMs) {
-      /* Same popup resumed; continue from endAt. */
+    if (_countdownState && Math.abs(_countdownState.durationMs - durationMs) < 100) {
+      /* Same duration: resume from existing endAt, unless expired. */
+      if (Date.now() >= _countdownState.endAt) {
+        _countdownState = { endAt: Date.now() + durationMs, durationMs: durationMs, tickId: null };
+      }
     } else {
       _countdownState = { endAt: Date.now() + durationMs, durationMs: durationMs, tickId: null };
       if (_countdownState.tickId) cancelAnimationFrame(_countdownState.tickId);
