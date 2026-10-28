@@ -1872,19 +1872,26 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      and slide the popup smoothly above it. For full tabs (Life Hub,
      Tools) where bottom space is free, stay at 80px. */
   function getPopupBottom() {
-    var elements = document.querySelectorAll("div, section, article");
-    var maxBottomHeight = 0;
-    for (var i = 0; i < elements.length; i++) {
-      var el = elements[i];
-      var style = window.getComputedStyle ? window.getComputedStyle(el) : el.style;
-      if (style.position === "fixed" || style.position === "absolute") {
-        var rect = el.getBoundingClientRect();
-        if (rect.height > maxBottomHeight && rect.bottom > window.innerHeight - 300) {
-          maxBottomHeight = rect.height;
+    /* Only look at known bottom sheet/modal elements — never general
+       content containers that would push the popup off-screen. */
+    var selectors = [
+      ".lt-tasks-sheet", ".lt-gram-cp", ".lt-share-sheet",
+      ".lt-cat-modal", ".lt-date-sheet", ".lt-curr-sheet-card"
+    ];
+    var maxHeight = 0;
+    for (var s = 0; s < selectors.length; s++) {
+      var nodes = document.querySelectorAll(selectors[s]);
+      for (var n = 0; n < nodes.length; n++) {
+        var sheet = nodes[n];
+        if (sheet.offsetParent !== null) {
+          var rect = sheet.getBoundingClientRect();
+          if (rect.height > maxHeight && rect.bottom > window.innerHeight - 200) {
+            maxHeight = rect.height;
+          }
         }
       }
     }
-    if (maxBottomHeight > 80) return (maxBottomHeight + 14) + "px";
+    if (maxHeight > 60) return (maxHeight + 14) + "px";
     return "80px";
   }
   function teleportPopup(el) {
