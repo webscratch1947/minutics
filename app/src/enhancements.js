@@ -1872,17 +1872,18 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      and slide the popup smoothly above it. For full tabs (Life Hub,
      Tools) where bottom space is free, stay at 80px. */
   function getPopupBottom() {
-    /* Check ALL visible bottom elements. Only count real sheets/modals:
-       height > 60px, bottom near screen, but NOT full-screen containers. */
+    /* Only fixed/absolute elements near the bottom — real sheets/modal.
+       Excludes full-page content by checking position + bottom location. */
     var maxHeight = 0;
     var elements = document.querySelectorAll("div, section, article, form, aside");
     for (var i = 0; i < elements.length; i++) {
       var el = elements[i];
+      var style = window.getComputedStyle ? window.getComputedStyle(el) : el.style;
+      if (style.position !== "fixed" && style.position !== "absolute") continue;
       var rect = el.getBoundingClientRect();
-      if (rect.height < 60 || rect.height > window.innerHeight * 0.85) continue;
+      if (rect.height < 60 || rect.height > window.innerHeight * 0.7) continue;
       if (rect.bottom < window.innerHeight - 150) continue;
-      if (rect.top < window.innerHeight * 0.3) continue;
-      /* It's a bottom sheet/modal taking space — use its height. */
+      if (rect.top < window.innerHeight * 0.35) continue;
       if (rect.height > maxHeight) maxHeight = rect.height;
     }
     if (maxHeight > 60) return (maxHeight + 14) + "px";
