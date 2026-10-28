@@ -1872,7 +1872,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var sheet = document.querySelector(".lt-tasks-sheet, .lt-gram-cp, .lt-tool-shell");
     if (sheet && sheet.offsetParent !== null) {
       var rect = sheet.getBoundingClientRect();
-      if (rect.top < 220) return "220px";
+      if (rect.height > 80) return (rect.height + 14) + "px";
     }
     return "80px";
   }
@@ -1889,7 +1889,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       var toast = document.getElementById("lt-prod-toast") || document.getElementById("lt-simple-toast");
       teleportPopup(toast);
     }, 300);
-    setTimeout(function () { clearInterval(timer); }, 15000);
+    /* Watch continuously until both toasts are gone. */
+    var checkTimer = setInterval(function () {
+      if (!document.getElementById("lt-prod-toast") && !document.getElementById("lt-simple-toast")) {
+        clearInterval(timer); clearInterval(checkTimer);
+      }
+    }, 500);
   }
 
   /* Countdown bar: green (full) → orange (~half) → red (near end). */
