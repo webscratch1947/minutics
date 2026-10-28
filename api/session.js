@@ -49,7 +49,7 @@
 import { setCors } from "../lib/cors.js";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { CognitoIdentityProviderClient, AdminGetUserCommand, AdminSetUserPasswordCommand } from "@aws-sdk/client-cognito-identity-provider";
+import { CognitoIdentityProviderClient, AdminGetUserCommand, AdminSetUserPasswordCommand, AdminInitiateAuthCommand } from "@aws-sdk/client-cognito-identity-provider";
 import crypto from "node:crypto";
 
 /* ── Cognito pool identity (public values, verified against the token) ── */
@@ -311,6 +311,31 @@ async function handleForgotSend(body, res) {
   }
 }
 
+/* Same-password rejection: a reset must not accept the account's OWN
+   current password ("you can't add the same password in the reset" —
+   other users are free to pick anything, including a shared one; Cognito
+   never exposes password hashes, so the only probe is to try to AUTH
+   with the candidate: success ⇒ it IS the current password → reject,
+   NotAuthorized ⇒ it's different → proceed. Anything else (IAM key
+   missing the permission, pool flow disabled) fails OPEN: a reset is
+   never bricked by the guard itself, it just falls back to no check. */
+async function probeIsCurrentPassword(cog, uid, password) {
+  try {
+    await cog.send(new AdminInitiateAuthCommand({
+      UserPoolId: POOL_ID,
+      ClientId: CLIENT_ID,
+      AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+      AuthParameters: { USERNAME: uid, PASSWORD: password },
+    }));
+    return true;    /* authenticated with the candidate ⇒ it's the current one */
+  } catch (e) {
+    const name = (e && (e.name || e.Code)) || "";
+    if (name === "NotAuthorizedException" || name === "UserNotFoundException") return false;
+    console.error("same-password probe skipped:", name, e && e.message);
+    return false;   /* fail open — never block a reset over the probe */
+  }
+}
+
 async function handleForgotVerify(body, res) {
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const code = typeof body.code === "string" ? body.code.trim() : "";
@@ -374,6 +399,16 @@ async function handleForgotVerify(body, res) {
         }));
       } catch { /* the attempt cap is best-effort hardening, not the lock */ }
       res.status(400).json({ ok: false, error: "That code didn't match — check the email and try again." });
+      return;
+    }
+
+    /* The code is right — now the one password rule a reset can still
+       enforce: it can't be the account's current password. Checked
+       BEFORE anything is consumed, so a rejected "same password" keeps
+       the code fully usable for a real new choice. */
+    const same = await probeIsCurrentPassword(cog, uid, password);
+    if (same) {
+      res.status(400).json({ ok: false, error: "You can't use the same password in a reset — choose a new one." });
       return;
     }
 

@@ -989,6 +989,23 @@ function injectStyles() {
     }
     .lt-auth-error.lt-auth-shown { display: block; animation: lt-auth-shake .4s; }
     .lt-auth-error.lt-success { background: #F0FDF4; border-color: #BBF7D0; color: #16A34A; }
+    /* Tiny floating confirmation pill (post-reset "log in with your new
+       password"). pointer-events:none — it can never cover or block a tap,
+       and it fades itself out. */
+    .lt-gate-notice {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 1000001; pointer-events: none;
+      background: #F0FDF4; border: 1px solid #BBF7D0; color: #16A34A;
+      font-size: 12.5px; font-weight: 700; padding: 8px 16px;
+      border-radius: 999px; box-shadow: 0 8px 22px rgba(0,0,0,.30);
+      max-width: calc(100vw - 28px); text-align: center; line-height: 1.35;
+      animation: lt-notice-in .3s ease;
+    }
+    .lt-gate-notice-out { opacity: 0; transition: opacity .4s ease; }
+    @keyframes lt-notice-in {
+      from { opacity: 0; transform: translate(-50%, -8px); }
+      to   { opacity: 1; transform: translate(-50%, 0); }
+    }
     .lt-auth-disclaimer {
       margin-top: 18px; padding-top: 14px; border-top: 1px solid #F0F0F5;
       font-size: 10.5px; line-height: 1.6; color: #9AA0B0; text-align: center;
@@ -1223,6 +1240,11 @@ function renderGate(mode) {
 
   // Clean up any Pro badge or enhancement visuals that might be lingering
   cleanupEnhancementVisuals();
+
+  /* A stale confirmation pill (e.g. "log in with your new password") must
+     never follow the user to a different auth screen. */
+  var staleNotice = document.getElementById("lt-gate-notice");
+  if (staleNotice) staleNotice.remove();
 
   if (mode === "welcome") { renderWelcomeGate(); return; }
   if (mode === "forgot") { renderForgotGate(); return; }
@@ -1604,6 +1626,8 @@ function renderForgotGate() {
   var LOCK_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
   var KEY_ICON = '<svg class="lt-auth-field-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
   var BACK_ICON = '<svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var EYE_ICON = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
+  var EYE_OFF_ICON = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>';
 
   var gate = document.createElement("div");
   gate.id = "lt-auth-gate";
@@ -1645,6 +1669,7 @@ function renderForgotGate() {
               '<label class="lt-auth-flabel" for="lt-forgot-newpw">New password</label>' +
               '<input type="password" id="lt-forgot-newpw" placeholder="8+ chars, A-z, 0-9" autocomplete="new-password" required>' +
             '</div>' +
+            '<button type="button" class="lt-auth-pw-toggle" id="lt-forgot-pw-toggle" aria-label="Show password">' + EYE_ICON + '</button>' +
           '</div>' +
           '<p class="lt-auth-hint">Password must be 8+ characters with an uppercase letter, a lowercase letter and a number</p>' +
           '<button class="lt-auth-submit" type="submit" id="lt-forgot-submit">' +
@@ -1672,6 +1697,18 @@ function renderForgotGate() {
      digits; Android's SMS-style OTP autofill rides on one-time-code. */
   codeInput.addEventListener("input", function () {
     codeInput.value = codeInput.value.replace(/\D/g, "").slice(0, 6);
+  });
+
+  /* Eye toggle for the new password — the same show/hide the login screen
+     has had, so the reset screen isn't the one place you can't see what
+     you're typing. */
+  var newPwInput = document.getElementById("lt-forgot-newpw");
+  var forgotPwToggle = document.getElementById("lt-forgot-pw-toggle");
+  forgotPwToggle.addEventListener("click", function () {
+    var showing = newPwInput.type === "text";
+    newPwInput.type = showing ? "password" : "text";
+    forgotPwToggle.innerHTML = showing ? EYE_ICON : EYE_OFF_ICON;
+    forgotPwToggle.setAttribute("aria-label", showing ? "Show password" : "Hide password");
   });
 
   document.getElementById("lt-forgot-back-link").addEventListener("click", function () {
@@ -1790,8 +1827,14 @@ function renderForgotGate() {
     }
     setVerifying(true);
     postReset("forgot-verify", { code: code, password: newPw }, function () {
-      /* Password set with the emailed code — log straight in with it. */
-      cognitoLogin(email, newPw);
+      /* Password set with the emailed code — but do NOT log them in.
+         Land on the Login screen (email already filled) with a tiny
+         floating pill pointing at the new password; it can't block any
+         tap and fades away on its own. */
+      _gateDraft.email = email;
+      _gateDraft.pw = "";
+      renderGate("login");
+      showGateNotice("Password updated — log in with your new password");
     }, function (msg) {
       setVerifying(false);
       showError(msg);
@@ -1811,6 +1854,25 @@ function showError(msg, isSuccess) {
 function hideError() {
   var el = document.getElementById("lt-auth-error");
   if (el) el.classList.remove("lt-auth-shown");
+}
+
+/* Small floating pill on the auth screens — confirmation only, never a
+   blocker: pointer-events:none (covers nothing you could tap), gone by
+   itself in a few seconds. */
+function showGateNotice(msg) {
+  var old = document.getElementById("lt-gate-notice");
+  if (old) old.remove();
+  var el = document.createElement("div");
+  el.id = "lt-gate-notice";
+  el.className = "lt-gate-notice";
+  el.setAttribute("role", "status");
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function () {
+    if (!el.parentNode) return;
+    el.classList.add("lt-gate-notice-out");
+    setTimeout(function () { if (el.parentNode) el.remove(); }, 450);
+  }, 5000);
 }
 
 function friendlyError(err) {
