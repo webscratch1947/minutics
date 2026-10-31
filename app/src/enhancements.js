@@ -1846,36 +1846,224 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return "Your productivity tends to be low at this hour \u2014 good time for light, low-effort tasks.";
   }
 
+  /* ── Popup positioning system ──────────────────────────────────────────
+     Rules (same for every floating popup):
+     • Bottom free (full tabs like Life Hub / Tools) → bottom:80px.
+     • A bottom sheet is open AND there's space above it → the popup sits
+       just above the sheet's top edge.
+     • No space → the popup is hidden and shown again after the sheet
+       closes; the countdown PAUSES while hidden and RESUMES from the
+       remaining time (never restarts).
+     Detection is geometric: any fixed/absolute element anchored to the
+     viewport bottom, OR a relative panel inside a full-screen fixed
+     overlay (the Journal's "Edit time block" sheet renders exactly like
+     that — a full-screen fixed wrapper with a relative panel — which is
+     why position-only filters never detected it). */
+  var _popupDeferred = null; /* { fn, args } popup waiting for space */
+  var _popupHidden = false;  /* shown popup parked because a sheet covered it */
+
+  function sheetOverlayTop() {
+    /* Highest top edge of any visible bottom-anchored sheet, or null
+       when the bottom of the screen is free. */
+    var vh = window.innerHeight;
+    var minTop = Infinity;
+    var els = document.querySelectorAll("div, section, form, aside");
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (el.closest && (el.closest("[data-lt-bottomnav]") ||
+          el.closest("#lt-prod-toast") || el.closest("#lt-simple-toast"))) continue;
+      var style = window.getComputedStyle(el);
+      var anchored = style.position === "fixed" || style.position === "absolute";
+      if (!anchored) {
+        /* relative panel inside a full-screen fixed overlay */
+        var p = el.parentElement, depth = 0;
+        while (p && depth < 3) {
+          var ps = window.getComputedStyle(p);
+          if (ps.position === "fixed" && p.getBoundingClientRect().height >= vh - 8) { anchored = true; break; }
+          p = p.parentElement; depth++;
+        }
+      }
+      if (!anchored) continue;
+      var rect = el.getBoundingClientRect();
+      if (rect.height < 90 || rect.width < 120) continue; /* real sheets are big */
+      if (rect.height > vh * 0.96) continue;              /* full-screen wrappers/pages */
+      if (rect.bottom < vh - 24) continue;                /* must touch the bottom */
+      if (rect.top < minTop) minTop = rect.top;
+    }
+    return minTop === Infinity ? null : minTop;
+  }
+
+  /* px offset that lifts the popup just above the sheet's top edge,
+     "80px" when the bottom is free, or null when there is NO space
+     (less than the popup's own height, ~80px + 12px gap, above it). */
+  function getPopupBottom() {
+    var vh = window.innerHeight;
+    var top = sheetOverlayTop();
+    if (top === null) return "80px";
+    if (top < 96) return null; /* no space above the sheet for the popup */
+    return (vh - top + 12) + "px";
+  }
+  function popupCanShow() { return getPopupBottom() !== null; }
+  function deferredShowPopup(fn, args) {
+    _popupDeferred = { fn: fn, args: args || [] };
+  }
+  function flushDeferredPopup() {
+    if (!_popupDeferred) return;
+    var d = _popupDeferred; _popupDeferred = null;
+    d.fn.apply(null, d.args);
+  }
+  /* Sheets close by tap OR by drag-down; re-check shortly after either. */
+  function schedulePopupFlush() {
+    setTimeout(function () {
+      if (_popupDeferred && popupCanShow()) flushDeferredPopup();
+    }, 400);
+  }
+  document.body.addEventListener("click", schedulePopupFlush);
+  document.body.addEventListener("pointerup", schedulePopupFlush);
+
+  function activePopupEl() {
+    return document.getElementById("lt-prod-toast") || document.getElementById("lt-simple-toast");
+  }
+  /* Popup already on screen but a sheet with NO space opened over it:
+     hide it and pause the countdown; re-show with the remaining time
+     once the sheet closes. */
+  function hideActivePopup() {
+    var el = activePopupEl();
+    if (!el || _popupHidden) return;
+    _popupHidden = true;
+    pauseCountdown();
+    if (el._ltDismissTimer) { clearTimeout(el._ltDismissTimer); el._ltDismissTimer = null; }
+    el.style.display = "none";
+  }
+  function unhideActivePopup() {
+    var el = activePopupEl();
+    if (!el || !_popupHidden) return;
+    _popupHidden = false;
+    el.style.display = "";
+    el.style.bottom = getPopupBottom() || "80px";
+    var remain = _countdownState ? Math.max(500, _countdownState.endAt - Date.now()) : 0;
+    if (remain > 0) {
+      resumeCountdown(remain);
+      armPopupDismiss(el, remain);
+    }
+  }
+  function armPopupDismiss(el, durationMs) {
+    if (el._ltDismissTimer) clearTimeout(el._ltDismissTimer);
+    el._ltDismissTimer = setTimeout(function () {
+      el._ltDismissTimer = null;
+      dismissActivePopup(el);
+    }, durationMs);
+  }
+  function dismissActivePopup(el) {
+    if (!el) return;
+    el.classList.remove("lt-show");
+    el.style.opacity = "0"; el.style.transform = "translateY(12px)";
+    _countdownState = null;
+    _popupHidden = false;
+    setTimeout(function () { if (el.parentNode) el.remove(); }, 260);
+  }
+  /* Watch continuously until the popup is gone: relocate above any sheet
+     that opens (countdown keeps running), or hide+pause when a sheet
+     leaves no space, and restore when it closes. */
+  function watchPopupPosition() {
+    var timer = setInterval(function () {
+      var el = activePopupEl();
+      if (!el) return;
+      var target = getPopupBottom();
+      if (target === null) { hideActivePopup(); return; }
+      if (_popupHidden) { unhideActivePopup(); return; }
+      el.style.bottom = target;
+    }, 250);
+    var checkTimer = setInterval(function () {
+      if (!activePopupEl()) { clearInterval(timer); clearInterval(checkTimer); }
+    }, 500);
+  }
+
+  /* Countdown bar: green (full) → orange (~half) → red (near end). */
+  function countdownBarHtml() {
+    return '<div class="lt-popup-countdown" style="position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 16px 16px;overflow:hidden;background:rgba(255,255,255,.15)">' +
+      '<div class="lt-popup-countdown-fill" id="lt-popup-countdown-fill" style="height:100%;width:100%;background:#22C55E;transition:width .2s linear,background .3s linear"></div></div>';
+  }
+  /* Persistent countdown: pauses when the popup is hidden/deferred and
+     resumes from the REMAINING time — never resets to full. */
+  var _countdownState = null; /* { endAt, durationMs, tickId } */
+  function startCountdown(durationMs) {
+    if (_countdownState && Date.now() < _countdownState.endAt) {
+      /* resume: keep the original endAt + full duration for the % math */
+    } else {
+      if (_countdownState && _countdownState.tickId) cancelAnimationFrame(_countdownState.tickId);
+      _countdownState = { endAt: Date.now() + durationMs, durationMs: durationMs, tickId: null };
+    }
+    var fill = document.getElementById("lt-popup-countdown-fill");
+    if (!fill) return;
+    if (_countdownState.tickId) cancelAnimationFrame(_countdownState.tickId);
+    var full = _countdownState.durationMs;
+    function tick() {
+      if (!_countdownState) return;
+      var left = Math.max(0, _countdownState.endAt - Date.now());
+      var pct = Math.max(0, (left / full) * 100);
+      fill.style.width = pct.toFixed(1) + "%";
+      fill.style.background = left <= full * 0.25 ? "#EF4444" : (left <= full * 0.55 ? "#F59E0B" : "#22C55E");
+      if (left > 0) {
+        _countdownState.tickId = requestAnimationFrame(tick);
+      } else {
+        _countdownState = null;
+      }
+    }
+    tick();
+  }
+  function pauseCountdown() {
+    if (_countdownState && _countdownState.tickId) {
+      cancelAnimationFrame(_countdownState.tickId);
+      _countdownState.tickId = null;
+    }
+  }
+  function resumeCountdown(durationMs) {
+    if (!_countdownState) return;
+    startCountdown(durationMs);
+  }
+  /* Debug/verification hook (matches the other window.__lt* hooks). */
+  window.__ltPopup = {
+    show: function () { showProductivityToast(); },
+    showSimple: function (t, m) { showSimpleToast(t || "Test", m || "Popup message"); },
+    bottom: function () { return getPopupBottom(); },
+    state: function () {
+      return { deferred: !!_popupDeferred, hidden: _popupHidden,
+               endAt: _countdownState ? _countdownState.endAt : 0 };
+    }
+  };
+
   function showProductivityToast() {
     addStyle2();
-    /* No throttle — this used to skip showing again within 5 minutes,
-       which is why starting activities back-to-back only showed it once.
-       Now it shows every time an activity is started or logged. */
+    if (!popupCanShow()) { deferredShowPopup(showProductivityToast, []); return; }
     var existing = document.getElementById("lt-prod-toast");
     if (existing) existing.remove();
+    if (_countdownState && _countdownState.tickId) cancelAnimationFrame(_countdownState.tickId);
+    _countdownState = null;
+    _popupHidden = false;
 
     var score = currentProductivityScore();
+    var durationMs = 8000;
     var el = document.createElement("div");
     el.id = "lt-prod-toast";
     el.innerHTML =
       balloonSVG(score) +
       '<div class="lt-prod-toast-body">' +
-        '<p class="lt-prod-toast-title">Energy check \u00b7 ' + score + '%</p>' +
+        '<p class="lt-prod-toast-title">Energy check · ' + score + '%</p>' +
         '<p class="lt-prod-toast-msg">' + escapeHtml(productivityMessage(score)) + '</p>' +
       '</div>' +
-      '<button class="lt-prod-toast-close" id="lt-prod-toast-close">\u2715</button>';
+      '<button class="lt-prod-toast-close" id="lt-prod-toast-close">✕</button>' +
+      countdownBarHtml();
     document.body.appendChild(el);
+    el.style.bottom = getPopupBottom();
     requestAnimationFrame(function () { el.classList.add("lt-show"); });
+    startCountdown(durationMs);
+    armPopupDismiss(el, durationMs);
+    watchPopupPosition();
 
-    function dismiss() {
-      el.classList.remove("lt-show");
-      setTimeout(function () { if (el.parentNode) el.remove(); }, 260);
-    }
     var closeBtn = document.getElementById("lt-prod-toast-close");
-    if (closeBtn) closeBtn.addEventListener("click", dismiss);
-    setTimeout(dismiss, 8000);
+    if (closeBtn) closeBtn.addEventListener("click", function () { dismissActivePopup(el); });
   }
-
   /* ── Category selection modal (optional tag shown when a new timer starts) ─ */
 
   function catLogEntries() {
@@ -2352,8 +2540,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      for quick warnings, e.g. when a time block couldn't be measured. */
   function showSimpleToast(title, msg) {
     addStyle2();
+    if (!popupCanShow()) { deferredShowPopup(showSimpleToast, [title, msg]); return; }
     var existing = document.getElementById("lt-simple-toast");
     if (existing) existing.remove();
+    if (_countdownState && _countdownState.tickId) cancelAnimationFrame(_countdownState.tickId);
+    _countdownState = null;
+    _popupHidden = false;
+    var durationMs = 6000;
     var el = document.createElement("div");
     el.id = "lt-simple-toast";
     /* Above the bottom nav (80px) + pointer-through container: this toast
@@ -2366,16 +2559,16 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<p style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.55);margin:0 0 3px">' + escapeHtml(title) + '</p>' +
         '<p style="font-size:13px;line-height:1.35;margin:0;color:#fff">' + escapeHtml(msg) + '</p>' +
       '</div>' +
-      '<button style="background:none;border:none;color:rgba(255,255,255,.5);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0;pointer-events:auto" id="lt-simple-toast-close">\u2715</button>';
+      '<button style="background:none;border:none;color:rgba(255,255,255,.5);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0;pointer-events:auto" id="lt-simple-toast-close">✕</button>' +
+      countdownBarHtml();
     document.body.appendChild(el);
+    el.style.bottom = getPopupBottom();
     requestAnimationFrame(function () { el.style.opacity = "1"; el.style.transform = "translateY(0)"; });
-    function dismiss() {
-      el.style.opacity = "0"; el.style.transform = "translateY(12px)";
-      setTimeout(function () { if (el.parentNode) el.remove(); }, 260);
-    }
+    startCountdown(durationMs);
+    armPopupDismiss(el, durationMs);
+    watchPopupPosition();
     var closeBtn = document.getElementById("lt-simple-toast-close");
-    if (closeBtn) closeBtn.addEventListener("click", dismiss);
-    setTimeout(dismiss, 6000);
+    if (closeBtn) closeBtn.addEventListener("click", function () { dismissActivePopup(el); });
   }
 
   /* ── Shared in-app confirm dialog ──────────────────────────────────────
@@ -6901,13 +7094,55 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   });
   setInterval(maybeNotifyRunningActivity, 15000);
 
+  /* 30-minute repeating "Are you still doing this activity?" notification.
+     Fires at 30 min, 1 h, 1.5 h, 2 h, ... while an activity is still running.
+     Works even when the app is closed (via AndroidBridge notification when
+     hidden, and the native alarm path on Android; web uses the hidden-tab
+     Notification with a fixed tag so it replaces rather than stacks). */
+  var _lastActivityCheckMin = -1;
+  function maybeNotifyActivityCheck() {
+    try {
+      var nativeRunning = getNativeRunningBlock();
+      var startedAt = Number(readJson(RUNNING_TIMER_KEY, 0));
+      var timerIsRunning = !!nativeRunning || startedAt > 0;
+      if (!timerIsRunning) { _lastActivityCheckMin = -1; return; }
+      var elapsedMin = startedAt ? Math.floor((Date.now() - startedAt) / 60000) : 0;
+      if (elapsedMin < 30) { _lastActivityCheckMin = -1; return; }
+      var intervalMin = Math.floor(elapsedMin / 30) * 30; /* 30, 60, 90, ... */
+      if (intervalMin === _lastActivityCheckMin) return;
+      _lastActivityCheckMin = intervalMin;
+
+      var pending = readJson(PENDING_TIMER_CAT_KEY, null);
+      var activityName = (pending && (pending.activityName || pending.label || pending.category)) || "this activity";
+      var msg = "Are you still doing this activity : " + activityName;
+
+      /* Hidden / background: native bridge on Android, web Notification. */
+      if (document.visibilityState !== "visible" &&
+          typeof window !== "undefined" && window.AndroidBridge &&
+          typeof window.AndroidBridge.showNotification === "function") {
+        try { window.AndroidBridge.showNotification("Are you still doing this activity?", msg); } catch (e) {}
+        return;
+      }
+      if (typeof window !== "undefined" && "Notification" in window &&
+          window.Notification.permission === "granted") {
+        try {
+          new window.Notification("Are you still doing this activity?", {
+            body: msg, tag: "minutics-activity-check", icon: window.location.origin + "/favicon.png"
+          });
+        } catch (e) {}
+        return;
+      }
+    } catch (e) {}
+  }
+  setInterval(maybeNotifyActivityCheck, 30000);
+
   /* ══════════════════════════════════════════════════════════════════════════
      FEATURE 2 — Idle Nudge: fires after 10min with no activity running.
      The previous implementation watched a running Waste timer, which meant
      the app could nudge users while they were already tracking something.
   ══════════════════════════════════════════════════════════════════════════ */
 
-  var NUDGE_THRESHOLD_MS = 10 * 60 * 1000; /* 10 minutes */
+  var NUDGE_THRESHOLD_MS = 15 * 60 * 1000; /* 15 minutes */
   var _idleSystemNotification = null;
 
   function closeIdleSystemNotification() {
@@ -7244,27 +7479,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       } catch (e) {}
     }
 
-    addStyle3();
-    var toast = document.getElementById("lt-nudge-toast");
-    if (toast) toast.remove();
-    toast = document.createElement("div");
-    toast.id = "lt-nudge-toast";
-    toast.innerHTML =
-      '<button id="lt-nudge-toast-close">\u2715</button>' +
-      '<div class="lt-nudge-icon">\uD83D\uDCA1</div>' +
-      '<div class="lt-nudge-body">' +
-        '<p>Still there?</p>' +
-        '<p>You haven\u2019t started an activity in a while \u2014 track what you\u2019re doing right now.</p>' +
-      '</div>';
-    document.body.appendChild(toast);
-    requestAnimationFrame(function () { toast.classList.add("lt-show"); });
-
-    function dismissNudge() {
-      toast.classList.remove("lt-show");
-      setTimeout(function () { if (toast.parentNode) toast.remove(); }, 380);
-    }
-    document.getElementById("lt-nudge-toast-close").addEventListener("click", dismissNudge);
-    setTimeout(dismissNudge, 12000);
+    /* IN-APP "Still there?" popup removed per batch request.
+       The 15-minute system notification (AndroidBridge + web Notification)
+       stays; the floating overlay is the only thing removed. */
   }
 
   /* Keep a hidden tab from retaining a stale reminder when the timer changes
