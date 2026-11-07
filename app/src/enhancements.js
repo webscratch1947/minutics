@@ -7388,6 +7388,18 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      open, plus a forced push the moment the page is backgrounded (home
      button / tab switch — exactly when JS timers may be about to stop). */
   setInterval(function () { syncNotifStateBridge(false); }, 60000);
+  /* Push today's tracked minutes to the home-screen Activity widget. */
+  setInterval(function () {
+    try {
+      var b = window.AndroidBridge;
+      if (b && typeof b.updateActivityWidget === "function") {
+        var entries = (typeof catLogEntries === "function" ? catLogEntries() : []).filter(function (e) { return e.date === (typeof today === "function" ? today() : ""); });
+        var mins = 0;
+        entries.forEach(function (e) { mins += Number(e.minutes) || 0; });
+        b.updateActivityWidget(mins);
+      }
+    } catch (e) {}
+  }, 60000);
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") syncNotifStateBridge(true);
   });

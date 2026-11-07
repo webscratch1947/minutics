@@ -965,6 +965,23 @@ export function mk({
             })
           ]
         }),
+        jsxs("div", {
+          className: "flex gap-2 mt-3",
+          children: [
+            jsx("button", {
+              type: "button",
+              onClick: () => { try { if (window.AndroidBridge && window.AndroidBridge.requestPinWidget) window.AndroidBridge.requestPinWidget("doom"); } catch {} },
+              className: "flex-1 py-2.5 rounded-xl bg-[#6D28D9] text-white text-[12px] font-bold",
+              children: "Add Doom widget"
+            }),
+            jsx("button", {
+              type: "button",
+              onClick: () => { try { if (window.AndroidBridge && window.AndroidBridge.requestPinWidget) window.AndroidBridge.requestPinWidget("activity"); } catch {} },
+              className: "flex-1 py-2.5 rounded-xl bg-[#157347] text-white text-[12px] font-bold",
+              children: "Add Activity widget"
+            })
+          ]
+        }),
         jsx("p", {
           className: "text-[11.5px] text-[#9AA1AE] text-center mt-3 leading-relaxed",
           children: "Skip if you'd rather add them later."
