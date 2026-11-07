@@ -3,8 +3,9 @@ import { jsx, jsxs } from 'react/jsx-runtime';
 import { createPortal } from 'react-dom';
 import { saveProfile } from './lib/profile.js';
 import { getCurrency, getCurrencySymbol } from './lib/currency.js';
+import { PermissionsStep, isAndroidNative } from './permissions_onboarding.js';
 
-const STEPS = ["welcome", "name", "dob", "salary"];
+const BASE_STEPS = ["welcome", "name", "dob", "salary"];
 const IMGS = {
   welcome: "./assets/onboarding/welcome.png",
   name: "./assets/onboarding/name.png",
@@ -284,6 +285,13 @@ export function mk({
      or boot the app, they only hand control back to the welcome screen. */
   preview: pv
 }) {
+  /* Android-only permissions step, right after the welcome page. On the web
+     (no AndroidBridge) the wizard keeps its original four steps. */
+  const ANDROID_NATIVE = isAndroidNative();
+  const STEPS = ANDROID_NATIVE
+    ? ["welcome", "permissions", "name", "dob", "salary"]
+    : BASE_STEPS;
+  const [permsReady, setPermsReady] = useState(!ANDROID_NATIVE);
   const [t, n] = useState("welcome"), [r, o] = useState(""), [s, i] = useState(""), [l, a] = useState(85), [dY, setDY] = useState(""), [dM, setDM] = useState(""), [dD, setDD] = useState(""), [sal, setSal] = useState(""), u = (() => {
     if (!s) return null;
     const g = new Date(s),
@@ -571,14 +579,41 @@ export function mk({
     className: ONB_V2
       ? "onb2-art absolute inset-0"
       : "relative w-full max-w-[330px] mx-auto h-[42vh]",
-    children: STEPS.map((step) => jsx("img", {
-      src: IMGS[step],
-      alt: "",
-      draggable: false,
-      "aria-hidden": step !== t,
-      className: "absolute inset-0 w-full h-full object-contain select-none",
-      style: { visibility: step === t ? "visible" : "hidden" }
-    }, step))
+    children: STEPS.map((step) => step === "permissions"
+      ? jsxs("div", {
+          key: step,
+          className: "absolute inset-0 flex flex-col items-center justify-center gap-3 px-6",
+          style: { visibility: step === t ? "visible" : "hidden" }
+        }, [
+          jsx("div", {
+            style: {
+              width: 104, height: 104, borderRadius: 30,
+              background: "linear-gradient(145deg,#DCFCE7,#F1ECE0)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 18px 40px -18px rgba(21,115,71,.55)"
+            },
+            children: jsx("svg", {
+              width: 54, height: 54, viewBox: "0 0 24 24", fill: "none",
+              stroke: "#157347", strokeWidth: 1.7, strokeLinecap: "round", strokeLinejoin: "round",
+              children: [
+                jsx("path", { d: "M12 3l7 3v5c0 4.4-3 8.1-7 10-4-1.9-7-5.6-7-10V6l7-3z" }),
+                jsx("path", { d: "M9 12l2 2 4-4" })
+              ]
+            })
+          }),
+          jsx("p", {
+            style: { fontSize: 13, fontWeight: 700, color: "#5B6478", textAlign: "center", margin: 0 },
+            children: "Your data stays on your phone."
+          })
+        ])
+      : jsx("img", {
+          src: IMGS[step],
+          alt: "",
+          draggable: false,
+          "aria-hidden": step !== t,
+          className: "absolute inset-0 w-full h-full object-contain select-none",
+          style: { visibility: step === t ? "visible" : "hidden" }
+        }, step))
   });
   /* v6 hero stage: header row on top, then the illustration. The whole
      hero sits in a FIXED size band (owner: "the DOB is fucking so big
@@ -676,7 +711,18 @@ export function mk({
     });
     /* No arrow on the redesigned CTA (owner: "why is there a arrow for
        every button"); v1/live keeps its original label untouched. */
-    footer = nextBtn(() => go("name"), false, ONB_V2 ? "Get Started" : "Get Started \u2192");
+    footer = nextBtn(() => go(ANDROID_NATIVE ? "permissions" : "name"), false, ONB_V2 ? "Get Started" : "Get Started \u2192");
+  }
+
+  if (t === "permissions") {
+    body = jsx(PermissionsStep, { onChange: setPermsReady });
+    footer = jsxs("div", { className: "flex flex-col gap-2", children: [
+      nextBtn(() => go("name"), !permsReady, ONB_V2 ? "Next" : "Next \u2192"),
+      jsx("p", {
+        className: "text-[11.5px] text-center text-[#9AA1AE] leading-relaxed px-2",
+        children: "All six permissions are required. They keep your reminders alive and power Doom scroll stopper."
+      })
+    ] });
   }
 
   if (t === "name") {

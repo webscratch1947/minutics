@@ -470,34 +470,6 @@ function announceUserChanged() {
   try { window.dispatchEvent(new CustomEvent("lt-user-changed")); } catch (e) {}
 }
 
-/* ── Post-login/register notification permission ─────────────────────────
-   The app's safety net — Time Waste budget alerts and the "Still there?"
-   idle nudge — only reaches the user when the app is CLOSED as a NATIVE
-   notification (the WebView suspends every JS timer the moment the app is
-   backgrounded). On Android 13+ that needs the POST_NOTIFICATIONS runtime
-   grant, and nothing asked early enough: the only request used to fire
-   inside showNotification() when the FIRST alert was already due — the
-   alert itself was lost and the user never understood why nothing came
-   later. Ask right after a genuine login / register (and demo start),
-   once the app UI is on screen. No-op on the web (no AndroidBridge) and
-   when permission is already granted; the native side owns the actual
-   dialog + the permanently-denied → settings fallback. */
-function maybeAskNotificationPermission() {
-  try {
-    var b = window.AndroidBridge;
-    if (!b || typeof b.getNotificationPermission !== "function") return;
-    if (b.getNotificationPermission() === "granted") return;
-    setTimeout(function () {
-      try {
-        var bb = window.AndroidBridge;
-        if (bb && typeof bb.requestNotificationPermission === "function") {
-          bb.requestNotificationPermission();
-        }
-      } catch (e) {}
-    }, 1200); /* after the gate drops and the first screen has painted */
-  } catch (e) {}
-}
-
 /* ── Early Access Demo engine ──────────────────────────────────────────── */
 function isDemoActive() {
   try {
@@ -632,7 +604,6 @@ function enterDemo(isNew) {
       try { history.pushState({}, "", "/"); window.dispatchEvent(new PopStateEvent("popstate")); } catch (e) {}
     }
     /* Starting a demo IS this demo build's login/register — same ask. */
-    maybeAskNotificationPermission();
   }
   hideBootSplash();
   var g = document.getElementById("lt-auth-gate");
@@ -2127,10 +2098,9 @@ function handleAuthUser(user) {
        the watch kicks us out the moment another device takes the claim. */
     if (genuineLogin) {
       try { claimSessionNow(); } catch (e) {}
-      /* The background-alert grant belongs to this moment: login/register is
-         when the user is paying attention, and without POST_NOTIFICATIONS
-         every closed-app notification dies silently. */
-      maybeAskNotificationPermission();
+      /* Notification permission is now collected by the onboarding
+         permissions step (right after the welcome page), so the old
+         post-setup ask is intentionally gone. */
     }
     try { startSessionWatch(); } catch (e) {}
     /* Fill the real e-mail (attribute fetch — covers UUID-username accounts       whose ID token has no email claim) and reconcile the subscription with       the AWS ledger: restore the purchased plan after a storage wipe / on a       new device, or heal the ledger with this device's purchase. */

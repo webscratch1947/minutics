@@ -3070,6 +3070,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       grid.appendChild(makeTile("prodscore", "\uD83D\uDCCA", "Productivity Score", "Your 0-100 score for today, from real logged time.", "#EEF2FF", "#4F46E5", false, "productivity"));
       grid.appendChild(makeTile("focus",    "\uD83C\uDFA7", "Focus Mode",         "25-min focus timer with ambient sounds.",             "#ECFDF5", "#059669", false, "time"));
       grid.appendChild(makeTile("wastebudget", "\u26A0\uFE0F", "Time Waste Budget", "Set a daily waste limit and get a red alert.",       "#FEF2F2", "#DC2626", false, "time"));
+      grid.appendChild(makeTile("doomscroll", "\uD83D\uDCF1", "Doom scroll stopper", "See how many reels and shorts you watched today.", "#EDE9FE", "#6D28D9", false, "time"));
       grid.appendChild(makeTile("achievements", "\uD83C\uDFC1", "Achievements",   "Milestones and badges you've unlocked.",             "#FFF7ED", "#C2410C", false, "productivity"));
       grid.appendChild(makeTile("bucketlist",   "\uD83C\uDF1F", "Bucket List",    "Your dreams and goals — check them off for life.",   "#F5F3FF", "#6D28D9", false, "productivity"));
       grid.appendChild(makeTile("sixjars",     "\uD83E\uDEB4", "6 Jars",         "Split your salary into 6 purposeful money jars.",    "#F0FDF4", "#166534", false, "finance", "assets/icons/jar-savings.png"));
@@ -6206,6 +6207,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     if (tool === "prodscore") openOverlay(renderProductivityScore);
     if (tool === "focus")     openOverlay(renderFocusMode);
     if (tool === "wastebudget") openOverlay(renderWasteBudget);
+    if (tool === "doomscroll")  openOverlay(renderDoomScroll);
     if (tool === "achievements") openOverlay(renderAchievements);
     if (tool === "bucketlist")   openOverlay(renderBucketList);
     if (tool === "sixjars")   openOverlay(renderSixJars);
@@ -8017,6 +8019,133 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       wasteMin += Math.max(0, Math.round((Date.now() - runningStart) / 60000));
     }
     return wasteMin;
+  }
+
+  /* ── Doom scroll stopper ───────────────────────────────────────────────── */
+  var _doomMode = "day";
+  var DOOM_APPS = [
+    { key: "instagram", name: "Instagram",   color: "#E1306C", bg: "#FCE7F3" },
+    { key: "snapchat",  name: "Snapchat",    color: "#D9A400", bg: "#FEF9C3" },
+    { key: "youtube",   name: "YouTube",     color: "#FF0000", bg: "#FEE2E2" },
+    { key: "facebook",  name: "Facebook",    color: "#1877F2", bg: "#DBEAFE" },
+    { key: "linkedin",  name: "LinkedIn",    color: "#0A66C2", bg: "#DBEAFE" },
+    { key: "twitter",   name: "X (Twitter)", color: "#111827", bg: "#F3F4F6" }
+  ];
+
+  function doomLogo(key, color) {
+    var head = '<svg width="20" height="20" viewBox="0 0 24 24" fill="' + color + '" aria-hidden="true">';
+    if (key === "instagram") {
+      return head +
+        '<path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.3 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .3-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.3-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.9c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.3 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 1.8c-3.1 0-3.5 0-4.7.1-1.1.1-1.5.2-1.8.3-.5.2-.8.4-1.1.7-.3.3-.5.6-.7 1.1-.1.3-.2.7-.3 1.8-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c.1 1.1.2 1.5.3 1.8.2.5.4.8.7 1.1.3.3.6.5 1.1.7.3.1.7.2 1.8.3 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1.1-.1 1.5-.2 1.8-.3.5-.2.8-.4 1.1-.7.3-.3.5-.6.7-1.1.1-.3.2-.7.3-1.8.1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c-.1-1.1-.2-1.5-.3-1.8-.2-.5-.4-.8-.7-1.1-.3-.3-.6-.5-1.1-.7-.3-.1-.7-.2-1.8-.3-1.2-.1-1.6-.1-4.7-.1zm0 3.1a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8zm0 8.1a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zm6.2-8.3a1.1 1.1 0 1 1-2.3 0 1.1 1.1 0 0 1 2.3 0z"/></svg>';
+    }
+    if (key === "snapchat") {
+      return head +
+        '<path d="M12 2c3 0 5 2.2 5 5.2 0 1.2-.2 2.3-.4 3.1.5.2 1.1.3 1.6.3.6 0 1.1-.2 1.4-.5.5-.4 1.1.1 1 .7-.1.9-1.6 1.6-2.6 1.9.4 1.5 1.7 3.2 3.4 3.6.5.1.6.8.1 1-.9.4-2 .7-2.5 1-.2.2-.2.5-.4.9-.2.4-.6.5-1.1.4-.6-.1-1.3-.2-2 .1-.7.3-1.3 1.1-2.1 1.1-.8 0-1.4-.8-2.1-1.1-.7-.3-1.4-.2-2-.1-.5.1-.9 0-1.1-.4-.2-.4-.2-.7-.4-.9-.5-.3-1.6-.6-2.5-1-.5-.2-.4-.9.1-1 1.7-.4 3-2.1 3.4-3.6-1-.3-2.5-1-2.6-1.9-.1-.6.5-1.1 1-.7.3.3.8.5 1.4.5.5 0 1.1-.1 1.6-.3-.2-.8-.4-1.9-.4-3.1C7 4.2 9 2 12 2z"/></svg>';
+    }
+    if (key === "youtube") {
+      return head +
+        '<path d="M23 12s0-3.8-.5-5.6c-.3-1-1-1.7-2-2C18.7 4 12 4 12 4s-6.7 0-8.5.4c-1 .3-1.7 1-2 2C1 8.2 1 12 1 12s0 3.8.5 5.6c.3 1 1 1.7 2 2C5.3 20 12 20 12 20s6.7 0 8.5-.4c1-.3 1.7-1 2-2 .5-1.8.5-5.6.5-5.6z"/>' +
+        '<path fill="#fff" d="M9.8 15.3V8.7l6 3.3-6 3.3z"/></svg>';
+    }
+    if (key === "facebook") {
+      return head +
+        '<path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.7l-.4 2.9h-2.3v7A10 10 0 0 0 22 12z"/></svg>';
+    }
+    if (key === "linkedin") {
+      return head +
+        '<path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.1c.5-1 1.8-2 3.7-2 4 0 4.7 2.6 4.7 6V21h-4v-5.3c0-1.3 0-2.9-1.8-2.9s-2.1 1.4-2.1 2.8V21H9z"/></svg>';
+    }
+    return head +
+      '<path d="M18.9 2H22l-7 8 8.2 12h-6.4l-5-7.3L6 22H2.9l7.5-8.6L2.5 2h6.6l4.5 6.6L18.9 2zm-1.1 18h1.7L7.2 3.9H5.4L17.8 20z"/></svg>';
+  }
+
+  function doomStats(spanDays) {
+    try {
+      var b = window.AndroidBridge;
+      if (b && typeof b.getDoomScrollStats === "function") {
+        var raw = b.getDoomScrollStats(spanDays);
+        var o = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (o && o.ok !== false) return o;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function renderDoomScroll() {
+    var native = false;
+    try { native = !!(window.AndroidBridge && window.AndroidBridge.getDoomScrollStats); } catch (e) {}
+    var span = _doomMode === "week" ? 7 : 1;
+    var stats = doomStats(span);
+    var apps = {};
+    if (stats) {
+      if (_doomMode === "week") apps = stats.totals || {};
+      else if (stats.days && stats.days[0]) apps = stats.days[0].apps || {};
+    }
+    var total = 0;
+    DOOM_APPS.forEach(function (a) { total += Number(apps[a.key] || 0) || 0; });
+    var max = 1;
+    DOOM_APPS.forEach(function (a) { max = Math.max(max, Number(apps[a.key] || 0) || 0); });
+    var sorted = DOOM_APPS.slice().sort(function (a, b) {
+      return (Number(apps[b.key] || 0) || 0) - (Number(apps[a.key] || 0) || 0);
+    });
+
+    var seg = function (mode, label) {
+      var on = _doomMode === mode;
+      return '<button type="button" data-doom-mode="' + mode + '" style="flex:1;border:none;border-radius:11px;padding:10px 8px;font:800 13px Inter,system-ui,sans-serif;cursor:pointer;' +
+        (on ? 'background:#fff;color:#111827;box-shadow:0 2px 8px rgba(15,23,42,.12);' : 'background:transparent;color:#6B7280;') +
+        '">' + label + '</button>';
+    };
+
+    var rows = sorted.map(function (a) {
+      var n = Number(apps[a.key] || 0) || 0;
+      var pct = Math.round((n / max) * 100);
+      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #F3F4F6;">' +
+        '<span style="width:38px;height:38px;border-radius:12px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' + doomLogo(a.key, a.color) + '</span>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:14px;font-weight:700;color:#111827">' + escapeHtml(a.name) + '</div>' +
+          '<div style="height:6px;background:#F3F4F6;border-radius:999px;margin-top:6px;overflow:hidden">' +
+            '<span style="display:block;height:100%;width:' + pct + '%;background:' + a.color + ';border-radius:999px;transition:width .3s"></span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-size:17px;font-weight:800;color:' + (n > 0 ? "#111827" : "#D1D5DB") + '">' + n + '</div>' +
+      '</div>';
+    }).join("");
+
+    var emptyHint = total === 0
+      ? '<p style="text-align:center;font-size:13px;color:#6B7280;margin:10px 0 0;line-height:1.5">' +
+          (native ? 'Nothing counted yet. Watch a reel or short for 3 seconds and it will appear here.'
+                  : 'Live counting runs in the Minutics Android app. This screen shows the same report once installed on your phone.') +
+        '</p>'
+      : '';
+
+    activeOverlay.innerHTML =
+      '<div class="lt-tool-shell">' +
+        toolHeader("Doom scroll stopper", "How many reels and shorts you actually watched \u2014 a view counts after 3 seconds on screen.") +
+        '<div style="display:flex;gap:6px;background:#F3F4F6;border-radius:14px;padding:4px;margin:0 0 14px;">' +
+          seg("day", "Today") + seg("week", "This week") +
+        '</div>' +
+        '<div class="lt-tool-card" style="text-align:center;background:linear-gradient(180deg,#F5F3FF,#fff);border-color:#DDD6FE;">' +
+          '<p class="lt-card-title">' + (_doomMode === "week" ? "Reels & shorts this week" : "Reels & shorts today") + '</p>' +
+          '<div style="font-size:44px;font-weight:800;color:#6D28D9;line-height:1.05;">' + total + '</div>' +
+          '<p style="font-size:12.5px;color:#6B7280;margin:4px 0 0;">counted after 3 seconds on screen</p>' +
+          emptyHint +
+        '</div>' +
+        '<div class="lt-tool-card">' +
+          '<p class="lt-card-title">By app</p>' +
+          rows +
+        '</div>' +
+        '<p style="font-size:12px;color:#9AA1AE;line-height:1.55;text-align:center;margin:14px 6px 0;">' +
+          'Works in Instagram, Snapchat, YouTube, Facebook, LinkedIn and X \u2014 both feed videos and full-screen reels count.' +
+        '</p>' +
+      '</div>';
+
+    var btns = activeOverlay.querySelectorAll("[data-doom-mode]");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener("click", function () {
+        _doomMode = this.getAttribute("data-doom-mode");
+        renderDoomScroll();
+      });
+    }
   }
 
   function renderWasteBudget() {
@@ -10030,16 +10159,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   }
 
   function maybeShowOverlayPermissionModal() {
-    if (!hasProfile()) return;          /* setup not finished yet */
-    if (overlayPermissionSkipped()) return;
-    try {
-      if (typeof window !== "undefined" && "Notification" in window) {
-        if (window.Notification.permission !== "default") return; /* already answered (granted or denied) */
-      } else {
-        return; /* Notifications not supported here at all */
-      }
-    } catch (e) { return; }
-    showOverlayPermissionModal();
+    /* REMOVED: notifications (and every other permission) are now collected
+       by the onboarding permissions step, so nothing asks again after setup. */
+    return;
   }
 
   /* Re-check periodically: covers the moment a brand-new user finishes the

@@ -7,7 +7,7 @@ import { getCurrency, getCurrencySymbol } from '../lib/currency.js';
 import { isPro } from '../lib/settings.js';
 import { cn } from '../lib/cn.js';
 import { ltAlert } from '../ui_dialog.js';
-import { Play as nk, Pencil as tk, Clock, Wallet, Calculator, TrendingUp, BookOpen, ListChecks, CalendarClock, Heart, Scale, ShoppingCart, BarChart3, Headphones, Hourglass, Trophy, Star, PiggyBank } from 'lucide-react';
+import { Play as nk, Pencil as tk, Clock, Wallet, Calculator, TrendingUp, BookOpen, ListChecks, CalendarClock, Heart, Scale, ShoppingCart, BarChart3, Headphones, Hourglass, Trophy, Star, PiggyBank, Smartphone } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,7 @@ var LT_TOOLS = [
   { id: "prodscore",   symbol: BarChart3,   label: "Productivity Score",        desc: "0-100 score for today from logged time",  category: "productivity", locked: false },
   { id: "focus",       symbol: Headphones,  label: "Focus Mode",                desc: "25-min focus timer with ambient sounds",  category: "time",         locked: false },
   { id: "wastebudget", symbol: Hourglass,   label: "Time Waste Budget",         desc: "Daily waste limit with red alert",        category: "time",         locked: false },
+  { id: "doomscroll",  symbol: Smartphone,  label: "Doom scroll stopper",       desc: "Reels and shorts watched today",          category: "time",         locked: false },
   { id: "achievements",symbol: Trophy,      label: "Achievements",              desc: "Milestones and badges unlocked",          category: "productivity", locked: false },
   { id: "bucketlist",  symbol: Star,        label: "Bucket List",               desc: "Dreams/goals \u2014 check off for life",  category: "productivity", locked: false },
   { id: "sixjars",     symbol: PiggyBank,   label: "6 Jars",                    desc: "Split salary into 6 money jars",          category: "finance",      locked: false }
