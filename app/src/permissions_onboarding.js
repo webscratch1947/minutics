@@ -143,6 +143,12 @@ function GuideSheet({ perm, index, onOpenSettings, onClose }) {
   var [closing, setClosing] = useState(false);
   var startY = useRef(null);
 
+  useEffect(function () {
+    var prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return function () { document.body.style.overflow = prev; };
+  }, []);
+
   function requestClose() {
     if (closing) return;
     setClosing(true);
@@ -167,6 +173,9 @@ function GuideSheet({ perm, index, onOpenSettings, onClose }) {
       role: 'dialog',
       'aria-modal': 'true',
       'data-perm-tutorial': perm.key,
+      onClick: function (e) {
+        if (e.target === e.currentTarget) requestClose();
+      },
       children: jsxs('div', {
         className: 'lt-guide-sheet',
         style: dragY ? { transform: 'translateY(' + dragY + 'px)', transition: 'none' } : undefined,
@@ -247,7 +256,7 @@ function ensurePermStyles() {
     '.lt-guide-title{flex:1;min-width:0}',
     '.lt-guide-eyebrow{font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#9AA1AE;margin:0 0 2px}',
     '.lt-guide-title h3{font-size:20px;font-weight:900;color:#14162E;margin:0;line-height:1.15}',
-    '.lt-guide-x{background:none;border:none;font-size:18px;color:#9AA1AE;cursor:pointer;padding:4px;flex-shrink:0}',
+    '.lt-guide-x{width:34px;height:34px;border-radius:999px;background:#F1ECE0;border:none;font-size:17px;color:#9AA1AE;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}',
     '.lt-guide-desc{font-size:13.5px;color:#5B6478;line-height:1.5;margin:4px 0 14px;padding:0 2px}',
 
     '.lt-guide-steps{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:8px;position:relative}',
