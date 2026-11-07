@@ -33,17 +33,6 @@ export const PERMISSION_ROWS = [
     ]
   },
   {
-    key: 'popup',
-    title: 'Display pop-up windows',
-    desc: 'Lets reminders appear while you are inside another app.',
-    icon: 'popup',
-    steps: [
-      'Tap Display pop-up windows.',
-      'Turn the switch on.',
-      'Go back to Minutics — this row turns green.'
-    ]
-  },
-  {
     key: 'background',
     title: 'Background',
     desc: 'Keeps your reminders alive when Minutics is closed.',
@@ -328,14 +317,6 @@ export function PermissionsStep({ onChange }) {
 
   var grantedCount = PERMISSION_ROWS.filter(function (r) { return status && status[r.key]; }).length;
 
-  /* "Display pop-up windows" is satisfied by "Display over other apps" on
-     most builds — once overlay is granted, hide that row from the screen
-     (it stays in the app logic). */
-  var visibleRows = PERMISSION_ROWS.filter(function (r) {
-    if (r.key === 'popup' && status && status.overlay) return false;
-    return true;
-  });
-
   return jsxs('div', { children: [
     jsx('h2', {
       className: 'text-[23px] leading-tight font-extrabold tracking-tight text-[#14162E] text-center mb-1',
@@ -348,7 +329,7 @@ export function PermissionsStep({ onChange }) {
         jsx('b', { children: grantedCount + ' of ' + PERMISSION_ROWS.length + ' done' })
       ]
     }),
-    jsx('div', { children: visibleRows.map(function (perm) {
+    jsx('div', { children: PERMISSION_ROWS.map(function (perm) {
       var on = !!(status && status[perm.key]);
       return jsxs('div', {
         className: 'lt-perm-row' + (on ? ' is-on' : ''),
