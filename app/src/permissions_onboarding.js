@@ -38,7 +38,6 @@ export const PERMISSION_ROWS = [
     desc: 'Lets reminders appear while you are inside another app.',
     icon: 'popup',
     steps: [
-      'Open Settings and tap Apps, then Minutics.',
       'Tap Display pop-up windows.',
       'Turn the switch on.',
       'Go back to Minutics — this row turns green.'
@@ -60,9 +59,8 @@ export const PERMISSION_ROWS = [
     desc: 'Restarts reminders automatically after a reboot.',
     icon: 'autostart',
     steps: [
-      'Open your phone’s Security app and find Auto Start.',
-      'Find Minutics in the list.',
-      'Turn its switch on.',
+      'Find Minutics in the Auto Start list.',
+      'Turn its Auto Start switch on.',
       'Go back to Minutics — this row turns green.'
     ]
   },
@@ -72,8 +70,8 @@ export const PERMISSION_ROWS = [
     desc: 'Counts reels and shorts for Doom scroll stopper.',
     icon: 'accessibility',
     steps: [
-      'Open Settings and tap Accessibility.',
-      'Tap Downloaded apps, then Minutics.',
+      'Tap Downloaded apps (or Installed services).',
+      'Tap Minutics.',
       'Turn the service on, then tap Allow.',
       'Go back to Minutics — this row turns green.'
     ]
