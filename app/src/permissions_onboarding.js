@@ -209,10 +209,6 @@ function GuideSheet({ perm, index, onOpenSettings, onClose }) {
           jsx('button', {
             type: 'button', className: 'lt-guide-primary', 'data-guide-open-settings': '1',
             onClick: onOpenSettings, children: 'Open Android settings'
-          }),
-          jsx('button', {
-            type: 'button', className: 'lt-guide-secondary', 'data-guide-gotit': '1',
-            onClick: requestClose, children: 'Got it, I’ll do it myself'
           })
         ]
       })
