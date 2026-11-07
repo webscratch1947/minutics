@@ -8,6 +8,7 @@ import { PermissionsStep, isAndroidNative } from './permissions_onboarding.js';
 const BASE_STEPS = ["welcome", "name", "dob", "salary"];
 const IMGS = {
   welcome: "./assets/onboarding/welcome.png",
+  permissions: "./assets/onboarding/permissions.png",
   name: "./assets/onboarding/name.png",
   dob: "./assets/onboarding/dob.png",
   salary: "./assets/onboarding/salary.png"
@@ -579,41 +580,14 @@ export function mk({
     className: ONB_V2
       ? "onb2-art absolute inset-0"
       : "relative w-full max-w-[330px] mx-auto h-[42vh]",
-    children: STEPS.map((step) => step === "permissions"
-      ? jsxs("div", {
-          key: step,
-          className: "absolute inset-0 flex flex-col items-center justify-center gap-3 px-6",
-          style: { visibility: step === t ? "visible" : "hidden" }
-        }, [
-          jsx("div", {
-            style: {
-              width: 104, height: 104, borderRadius: 30,
-              background: "linear-gradient(145deg,#DCFCE7,#F1ECE0)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 18px 40px -18px rgba(21,115,71,.55)"
-            },
-            children: jsx("svg", {
-              width: 54, height: 54, viewBox: "0 0 24 24", fill: "none",
-              stroke: "#157347", strokeWidth: 1.7, strokeLinecap: "round", strokeLinejoin: "round",
-              children: [
-                jsx("path", { d: "M12 3l7 3v5c0 4.4-3 8.1-7 10-4-1.9-7-5.6-7-10V6l7-3z" }),
-                jsx("path", { d: "M9 12l2 2 4-4" })
-              ]
-            })
-          }),
-          jsx("p", {
-            style: { fontSize: 13, fontWeight: 700, color: "#5B6478", textAlign: "center", margin: 0 },
-            children: "Your data stays on your phone."
-          })
-        ])
-      : jsx("img", {
-          src: IMGS[step],
-          alt: "",
-          draggable: false,
-          "aria-hidden": step !== t,
-          className: "absolute inset-0 w-full h-full object-contain select-none",
-          style: { visibility: step === t ? "visible" : "hidden" }
-        }, step))
+    children: STEPS.map((step) => jsx("img", {
+      src: IMGS[step],
+      alt: "",
+      draggable: false,
+      "aria-hidden": step !== t,
+      className: "absolute inset-0 w-full h-full object-contain select-none",
+      style: { visibility: step === t ? "visible" : "hidden" }
+    }, step))
   });
   /* v6 hero stage: header row on top, then the illustration. The whole
      hero sits in a FIXED size band (owner: "the DOB is fucking so big

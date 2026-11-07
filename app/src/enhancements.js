@@ -7352,19 +7352,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       });
     } catch (e) {}
   });
-  /* Notifications just got granted → once, also exempt the app from
-     battery optimization so the background 10-min checks survive the app
-     being closed (system dialog, one time, user-approved flow). */
-  window.addEventListener("minutics-notification-permission", function (ev) {
-    try {
-      var perm = ev && ev.detail && ev.detail.permission;
-      if (perm !== "granted") return;
-      if (localStorage.getItem("lt_batt_exempt_asked") === "1") return;
-      localStorage.setItem("lt_batt_exempt_asked", "1");
-      var b = window.AndroidBridge;
-      if (b && typeof b.requestIgnoreBatteryOptimizations === "function") b.requestIgnoreBatteryOptimizations();
-    } catch (e) {}
-  });
+  /* Background (battery-optimization) is now an explicit onboarding row with
+     its own guided settings screen. The old "notifications just got granted
+     → instantly throw the system battery dialog" path fired on the welcome /
+     register screen, so it is gone: never surprise the user with a system
+     prompt outside the permission step. */
 
   function nativeLastNudgeAt() {
     try {
