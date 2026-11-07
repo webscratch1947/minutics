@@ -191,6 +191,23 @@
         </svg>
       </div>
     </div>
+    <script>
+      (function () {
+        var splash = document.getElementById('lt-startup-splash');
+        if (!splash) return;
+        var dismissed = false;
+        function dismiss() {
+          if (dismissed) return;
+          dismissed = true;
+          splash.style.opacity = '0';
+          setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 550);
+        }
+        window.__ltSplashDismiss = dismiss;
+        window.__ltSplashPlaying = true;
+        setTimeout(dismiss, 4400);
+        setTimeout(dismiss, 7000);
+      })();
+    </script>
     <div id="root"></div>
   </body>
 </html>

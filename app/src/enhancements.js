@@ -40,6 +40,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       return;
     }
 
+    /* The splash is already self-dismissing via the inline script in
+       index.html (timers run from first paint, not from bundle load). Do
+       not re-adopt or re-time it here, or the animation appears to start
+       late. */
+    if (typeof window.__ltSplashDismiss === "function") return;
+
     /* ADOPT the coded splash index.html already rendered. Stale cached
        HTML can carry an older splash (the video splash, or the previous
        audio-carrying build): anything that isn't the current coded
@@ -8091,15 +8097,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var rows = sorted.map(function (a) {
       var n = Number(apps[a.key] || 0) || 0;
       var pct = Math.round((n / max) * 100);
-      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #F3F4F6;">' +
-        '<span style="width:38px;height:38px;border-radius:12px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' + doomLogo(a.key, a.color) + '</span>' +
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fff;border:1px solid #EEF0F4;border-radius:14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(15,23,42,.04);">' +
+        '<span style="width:40px;height:40px;border-radius:12px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)">' + doomLogo(a.key, a.color) + '</span>' +
         '<div style="flex:1;min-width:0">' +
-          '<div style="font-size:14px;font-weight:700;color:#111827">' + escapeHtml(a.name) + '</div>' +
-          '<div style="height:6px;background:#F3F4F6;border-radius:999px;margin-top:6px;overflow:hidden">' +
-            '<span style="display:block;height:100%;width:' + pct + '%;background:' + a.color + ';border-radius:999px;transition:width .3s"></span>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">' +
+            '<div style="font-size:14px;font-weight:700;color:#111827">' + escapeHtml(a.name) + '</div>' +
+            '<div style="font-size:16px;font-weight:800;color:' + (n > 0 ? a.color : "#D1D5DB") + '">' + n + '</div>' +
+          '</div>' +
+          '<div style="height:6px;background:#F3F4F6;border-radius:999px;overflow:hidden">' +
+            '<span style="display:block;height:100%;width:' + pct + '%;background:linear-gradient(90deg,' + a.color + ',' + a.color + 'cc);border-radius:999px;transition:width .4s ease"></span>' +
           '</div>' +
         '</div>' +
-        '<div style="font-size:17px;font-weight:800;color:' + (n > 0 ? "#111827" : "#D1D5DB") + '">' + n + '</div>' +
       '</div>';
     }).join("");
 
@@ -8113,17 +8121,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
         toolHeader("Doom scroll stopper", "How many reels and shorts you actually watched \u2014 a view counts after 3 seconds on screen.") +
-        '<div style="display:flex;gap:6px;background:#F3F4F6;border-radius:14px;padding:4px;margin:0 0 14px;">' +
+        '<div style="display:flex;gap:6px;background:#F3F4F6;border-radius:14px;padding:4px;margin:0 0 16px;">' +
           seg("day", "Today") + seg("week", "This week") +
         '</div>' +
-        '<div class="lt-tool-card" style="text-align:center;background:linear-gradient(180deg,#F5F3FF,#fff);border-color:#DDD6FE;">' +
-          '<p class="lt-card-title">' + (_doomMode === "week" ? "Reels & shorts this week" : "Reels & shorts today") + '</p>' +
-          '<div style="font-size:44px;font-weight:800;color:#6D28D9;line-height:1.05;">' + total + '</div>' +
-          '<p style="font-size:12.5px;color:#6B7280;margin:4px 0 0;">counted after 3 seconds on screen</p>' +
+        '<div class="lt-tool-card" style="text-align:center;background:linear-gradient(180deg,#F5F3FF 0%,#FFFFFF 100%);border-color:#DDD6FE;padding:22px 16px;">' +
+          '<p class="lt-card-title" style="margin-bottom:6px">' + (_doomMode === "week" ? "Reels & shorts this week" : "Reels & shorts today") + '</p>' +
+          '<div style="font-size:56px;font-weight:800;color:#6D28D9;line-height:1.0;letter-spacing:-.02em;">' + total + '</div>' +
+          '<p style="font-size:12.5px;color:#6B7280;margin:6px 0 0;">counted after 3 seconds on screen</p>' +
           emptyHint +
         '</div>' +
-        '<div class="lt-tool-card">' +
-          '<p class="lt-card-title">By app</p>' +
+        '<div style="margin-top:6px">' +
+          '<p class="lt-card-title" style="margin:4px 4px 10px">By app</p>' +
           rows +
         '</div>' +
         '<p style="font-size:12px;color:#9AA1AE;line-height:1.55;text-align:center;margin:14px 6px 0;">' +
