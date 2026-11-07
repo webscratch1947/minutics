@@ -290,11 +290,9 @@ export function mk({
      (no AndroidBridge) the wizard keeps its original four steps. */
   const ANDROID_NATIVE = isAndroidNative();
   const STEPS = ANDROID_NATIVE
-    ? ["welcome", "permissions", "name", "dob", "salary", "widget"]
+    ? ["welcome", "permissions", "name", "dob", "salary"]
     : BASE_STEPS;
   const [permsReady, setPermsReady] = useState(!ANDROID_NATIVE);
-  const [wDoom, setWDoom] = useState(true);
-  const [wAct, setWAct] = useState(true);
   const [t, n] = useState("welcome"), [r, o] = useState(""), [s, i] = useState(""), [l, a] = useState(85), [dY, setDY] = useState(""), [dM, setDM] = useState(""), [dD, setDD] = useState(""), [sal, setSal] = useState(""), u = (() => {
     if (!s) return null;
     const g = new Date(s),
@@ -926,80 +924,6 @@ export function mk({
             : "w-full py-3 text-sm font-bold text-white rounded-xl transition-colors active:opacity-80",
           style: ONB_V2 ? undefined : { background: "#DC2626" },
           children: "Skip for now"
-        })
-      ]
-    });
-  }
-
-  if (t === "widget") {
-    body = jsxs("div", {
-      children: [
-        bodyArt,
-        head2("Add a widget to your home screen"),
-        jsx("p", {
-          className: "text-[13px] text-[#5B6478] text-center leading-relaxed mb-3 px-1",
-          children: "Optional. Long-press your home screen, tap Widgets, then Minutics, and drag either onto your home screen. You can pick both."
-        }),
-        jsxs("div", {
-          className: "grid grid-cols-2 gap-3",
-          children: [
-            jsxs("label", {
-              className: "flex flex-col items-center gap-2 p-3 rounded-2xl border-2 cursor-pointer transition-all " + (wDoom ? "border-[#6D28D9] bg-[#F5F3FF]" : "border-[#E7E5DC] bg-white"),
-              children: [
-                jsx("img", { src: "./assets/onboarding/widget-doom.png", alt: "Doom scroll widget", className: "w-full rounded-xl" }),
-                jsxs("div", { className: "flex items-center gap-2 w-full", children: [
-                  jsx("input", { type: "checkbox", checked: wDoom, onChange: e => setWDoom(e.target.checked), className: "accent-[#6D28D9]" }),
-                  jsx("span", { className: "text-[12px] font-bold text-[#14162E]", children: "Doom scroll stopper" })
-                ] })
-              ]
-            }),
-            jsxs("label", {
-              className: "flex flex-col items-center gap-2 p-3 rounded-2xl border-2 cursor-pointer transition-all " + (wAct ? "border-[#157347] bg-[#F0FDF4]" : "border-[#E7E5DC] bg-white"),
-              children: [
-                jsx("img", { src: "./assets/onboarding/widget-activity.png", alt: "Activity widget", className: "w-full rounded-xl" }),
-                jsxs("div", { className: "flex items-center gap-2 w-full", children: [
-                  jsx("input", { type: "checkbox", checked: wAct, onChange: e => setWAct(e.target.checked), className: "accent-[#157347]" }),
-                  jsx("span", { className: "text-[12px] font-bold text-[#14162E]", children: "Activity tracker" })
-                ] })
-              ]
-            })
-          ]
-        }),
-        jsxs("div", {
-          className: "flex gap-2 mt-3",
-          children: [
-            jsx("button", {
-              type: "button",
-              onClick: () => { try { if (window.AndroidBridge && window.AndroidBridge.requestPinWidget) window.AndroidBridge.requestPinWidget("doom"); } catch {} },
-              className: "flex-1 py-2.5 rounded-xl bg-[#6D28D9] text-white text-[12px] font-bold",
-              children: "Add Doom widget"
-            }),
-            jsx("button", {
-              type: "button",
-              onClick: () => { try { if (window.AndroidBridge && window.AndroidBridge.requestPinWidget) window.AndroidBridge.requestPinWidget("activity"); } catch {} },
-              className: "flex-1 py-2.5 rounded-xl bg-[#157347] text-white text-[12px] font-bold",
-              children: "Add Activity widget"
-            })
-          ]
-        }),
-        jsx("p", {
-          className: "text-[11.5px] text-[#9AA1AE] text-center mt-3 leading-relaxed",
-          children: "Skip if you'd rather add them later."
-        })
-      ]
-    });
-    footer = jsxs("div", {
-      className: "flex flex-col gap-2",
-      children: [
-        nextBtn(() => { try { localStorage.setItem("lt_widgets_v1", JSON.stringify({ doom: wDoom, activity: wAct })); } catch {} finish(true); }, false, ONB_V2 ? "Done" : "Done \u2192"),
-        jsx("button", {
-          type: "button",
-          onClick: () => finish(true),
-          className: ONB_V2
-            ? "w-full py-3 text-sm font-bold text-[#DC2626] rounded-2xl transition-colors active:bg-black/5"
-            : "w-full py-3 text-sm font-bold text-white rounded-xl transition-colors active:opacity-80",
-          style: ONB_V2 ? undefined : { background: "#DC2626" },
-          children: "Skip widgets"
         })
       ]
     });
