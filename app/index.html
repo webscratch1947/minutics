@@ -204,8 +204,14 @@
         }
         window.__ltSplashDismiss = dismiss;
         window.__ltSplashPlaying = true;
-        setTimeout(dismiss, 4400);
-        setTimeout(dismiss, 7000);
+        var last = document.getElementById('lt-wordmark');
+        var fired = false;
+        function finish() { if (fired) return; fired = true; setTimeout(dismiss, 700); }
+        if (last) {
+          last.addEventListener('animationend', finish, { once: true });
+        }
+        setTimeout(function () { if (!fired) { fired = true; dismiss(); } }, 8000);
+        setTimeout(dismiss, 10000);
       })();
     </script>
     <div id="root"></div>

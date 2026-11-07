@@ -26,8 +26,8 @@ export const PERMISSION_ROWS = [
     desc: 'Shows reminder popups above your other apps.',
     icon: 'overlay',
     steps: [
-      'Open Settings and tap Apps, then Minutics.',
-      'Tap Display over other apps.',
+      'Find Minutics in this list.',
+      'Tap Minutics.',
       'Turn on Allow display over other apps.',
       'Go back to Minutics — this row turns green.'
     ]
@@ -139,19 +139,17 @@ function PermIcon({ name, size }) {
   ] }));
 }
 
-/* ── Beautiful text-only guide sheet ────────────────────────────────────── */
+/* ── Text guide sheet ───────────────────────────────────────────────────── */
 function GuideSheet({ perm, index, onOpenSettings, onClose }) {
-  var [active, setActive] = useState(0);
   var [dragY, setDragY] = useState(0);
+  var [closing, setClosing] = useState(false);
   var startY = useRef(null);
 
-  useEffect(function () {
-    setActive(0);
-    var iv = setInterval(function () {
-      setActive(function (s) { return (s + 1) % perm.steps.length; });
-    }, 2600);
-    return function () { clearInterval(iv); };
-  }, [perm.key]);
+  function requestClose() {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(function () { onClose(); }, 280);
+  }
 
   function onTouchStart(e) { try { startY.current = e.touches[0].clientY; } catch (err) {} }
   function onTouchMove(e) {
@@ -160,14 +158,14 @@ function GuideSheet({ perm, index, onOpenSettings, onClose }) {
     if (dy > 0) setDragY(dy);
   }
   function onTouchEnd() {
-    if (dragY > 70) onClose();
-    setDragY(0);
+    if (dragY > 120) requestClose();
+    else setDragY(0);
     startY.current = null;
   }
 
   return createPortal(
     jsx('div', {
-      className: 'lt-guide',
+      className: 'lt-guide' + (closing ? ' is-closing' : ''),
       role: 'dialog',
       'aria-modal': 'true',
       'data-perm-tutorial': perm.key,
@@ -189,14 +187,12 @@ function GuideSheet({ perm, index, onOpenSettings, onClose }) {
             ] }),
             jsx('button', {
               type: 'button', className: 'lt-guide-x', 'aria-label': 'Close tutorial',
-              'data-guide-close': '1', onClick: onClose, children: '\u2715'
+              'data-guide-close': '1', onClick: requestClose, children: '\u2715'
             })
           ] }),
           jsx('p', { className: 'lt-guide-desc', children: perm.desc }),
           jsx('ol', { className: 'lt-guide-steps', children: perm.steps.map(function (s, i) {
             return jsx('li', {
-              className: i === active ? 'is-active' : '',
-              onClick: function () { setActive(i); },
               children: jsxs('span', { children: [
                 jsx('b', { children: String(i + 1) }),
                 jsx('span', { children: s })
@@ -209,7 +205,7 @@ function GuideSheet({ perm, index, onOpenSettings, onClose }) {
           }),
           jsx('button', {
             type: 'button', className: 'lt-guide-secondary', 'data-guide-gotit': '1',
-            onClick: onClose, children: 'Got it, I’ll do it myself'
+            onClick: requestClose, children: 'Got it, I’ll do it myself'
           })
         ]
       })
@@ -237,8 +233,13 @@ function ensurePermStyles() {
     '.lt-perm-note{font-size:12px;color:#6B7280;text-align:center;line-height:1.45;margin:6px 4px 0}',
 
     '.lt-guide{position:fixed;inset:0;z-index:2147483200;background:rgba(9,13,22,.62);display:flex;align-items:flex-end;justify-content:center;animation:ltGuideFade .18s ease}',
+    '.lt-guide.is-closing{animation:ltGuideFadeOut .28s ease forwards}',
     '@keyframes ltGuideFade{from{opacity:0}to{opacity:1}}',
+    '@keyframes ltGuideFadeOut{to{opacity:0}}',
     '.lt-guide-sheet{width:100%;max-width:430px;max-height:94dvh;overflow:auto;background:linear-gradient(180deg,#F6F4EE 0%,#FFFFFF 100%);border-radius:26px 26px 0 0;padding:8px 20px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -18px 50px rgba(0,0,0,.4);animation:ltGuideUp .28s cubic-bezier(.22,.61,.36,1);touch-action:pan-y}',
+    '.lt-guide.is-closing .lt-guide-sheet{animation:ltGuideDown .28s cubic-bezier(.4,0,.6,1) forwards}',
+    '@keyframes ltGuideUp{from{transform:translateY(26px);opacity:.4}to{transform:none;opacity:1}}',
+    '@keyframes ltGuideDown{to{transform:translateY(100%);opacity:.6}}',
     '@media(min-width:520px){.lt-guide{align-items:center}.lt-guide-sheet{border-radius:26px;max-height:90dvh}}',
     '@keyframes ltGuideUp{from{transform:translateY(26px);opacity:.4}to{transform:none;opacity:1}}',
     '.lt-guide-grip{display:block;width:46px;height:5px;border-radius:999px;background:#C9C2B2;margin:2px auto 12px;cursor:grab;touch-action:none}',
@@ -280,7 +281,6 @@ function ensurePermStyles() {
 export function PermissionsStep({ onChange }) {
   var [status, setStatus] = useState(readStatus);
   var [tutorial, setTutorial] = useState(null);
-  var [mini, setMini] = useState(null);
   var statusRef = useRef(status);
   statusRef.current = status;
 
@@ -310,27 +310,17 @@ export function PermissionsStep({ onChange }) {
     };
   }, []);
 
-  useEffect(function () {
-    if (!mini) return;
-    if (status && status[mini.key]) {
-      setMini(null);
-    }
-  }, [status, mini]);
-
   var open = function (perm) {
     if (!needsGuide(perm.key)) {
       try { window.AndroidBridge.openPermissionSetting(perm.key); } catch (e) {}
-      setMini(null);
       return;
     }
     setTutorial(perm);
-    setMini(null);
   };
 
   var openSettings = function (perm) {
     try { window.AndroidBridge.openPermissionSetting(perm.key); } catch (e) {}
     setTutorial(null);
-    setMini(perm);
   };
 
   var grantedCount = PERMISSION_ROWS.filter(function (r) { return status && status[r.key]; }).length;
@@ -375,21 +365,7 @@ export function PermissionsStep({ onChange }) {
       perm: tutorial,
       index: PERMISSION_ROWS.findIndex(function (r) { return r.key === tutorial.key; }),
       onOpenSettings: function () { openSettings(tutorial); },
-      onClose: function () { setMini(tutorial); setTutorial(null); }
-    }) : null,
-    mini ? jsx('div', {
-      className: 'lt-perm-mini',
-      role: 'status',
-      'data-perm-mini': mini.key,
-      children: jsxs('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', width: '100%' }, children: [
-        jsx('span', { className: 'lt-perm-mini-icon', children: jsx(PermIcon, { name: mini.icon, size: 18 }) }),
-        jsxs('div', { className: 'lt-perm-mini-body', children: [
-          jsx('b', { children: mini.title }),
-          jsx('span', { children: 'Finish in Android settings, then come back.' })
-        ] }),
-        jsx('button', { type: 'button', className: 'lt-perm-mini-open', onClick: function () { open(mini); }, children: 'Open' }),
-        jsx('button', { type: 'button', className: 'lt-perm-mini-x', 'aria-label': 'Stop tutorial', onClick: function () { setMini(null); }, children: '\u2715' })
-      ] })
+      onClose: function () { setTutorial(null); }
     }) : null
   ] });
 }
