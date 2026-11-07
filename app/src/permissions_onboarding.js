@@ -3,20 +3,17 @@ import { jsx, jsxs } from 'react/jsx-runtime';
 import { createPortal } from 'react-dom';
 
 /* ── Android permissions onboarding ───────────────────────────────────────
-   Shown right after the welcome step, Android app only (window.AndroidBridge
-   is injected by MainActivity). Every row reflects the REAL system state via
-   AndroidBridge.getPermissionStatus(); the user cannot leave this step until
-   all of them are granted.
+   Shown right after the welcome step, Android app only. Every row reflects
+   the REAL system state via AndroidBridge.getPermissionStatus(); the user
+   cannot leave this step until all of them are granted.
 
-   Flow (owner fix): tapping Allow opens the FULL tutorial first — nothing
-   else happens. The real Android settings screen is opened only when the
-   user taps "Open Android settings" inside the tutorial, so the guide can
-   never flash for a second and disappear behind the system UI.
+   Tapping Allow opens the FULL tutorial first. The real Android settings
+   screen opens only from the tutorial's own button, so the guide is never
+   skipped behind the system UI. Permissions that are just a single system
+   dialog (Notifications, Background) skip the guide entirely.
 
-   Audio: Android WebView has no speechSynthesis, so the spoken walkthrough
-   is delegated to the native TextToSpeech bridge (speakGuide / stopGuideSpeech)
-   and loops there until the tutorial is closed or the permission is granted.
-   The web build keeps the Web Speech fallback. */ 
+   The tutorial sheet can be closed by tapping × or by dragging the top
+   handle downwards. */ 
 
 export function isAndroidNative() {
   try { return !!(window.AndroidBridge && window.AndroidBridge.getPermissionStatus); } catch { return false; }
@@ -31,9 +28,10 @@ export const PERMISSION_ROWS = [
     desc: 'Shows reminder popups above your other apps.',
     icon: 'overlay',
     steps: [
-      'Open Settings, then tap Apps, then Minutics.',
-      'Tap Display over other apps.',
-      'Turn on Allow display over other apps.'
+      'Search for Minutics in the list.',
+      'Tap Minutics.',
+      'Turn on Allow display over other apps.',
+      'Go back to Minutics — this row turns green.'
     ]
   },
   {
@@ -42,9 +40,9 @@ export const PERMISSION_ROWS = [
     desc: 'Lets reminders appear while you are inside another app.',
     icon: 'popup',
     steps: [
-      'Open Settings, then tap Apps, then Minutics.',
       'Tap Display pop-up windows.',
-      'Turn the switch on.'
+      'Turn the switch on.',
+      'Go back to Minutics — this row turns green.'
     ]
   },
   {
@@ -53,9 +51,8 @@ export const PERMISSION_ROWS = [
     desc: 'Keeps your reminders alive when Minutics is closed.',
     icon: 'battery',
     steps: [
-      'Open Settings, then tap Apps, then Minutics.',
-      'Tap Battery.',
-      'Choose Unrestricted.'
+      'Tap Allow on the Android prompt.',
+      'Go back to Minutics — this row turns green.'
     ]
   },
   {
@@ -64,9 +61,9 @@ export const PERMISSION_ROWS = [
     desc: 'Restarts reminders automatically after a reboot.',
     icon: 'autostart',
     steps: [
-      'Open your phone’s Security app and find Auto Start.',
-      'Find Minutics in the list.',
-      'Turn its switch on.'
+      'Find Minutics in the Auto Start list.',
+      'Turn its switch on.',
+      'Go back to Minutics — this row turns green.'
     ]
   },
   {
@@ -75,9 +72,10 @@ export const PERMISSION_ROWS = [
     desc: 'Counts reels and shorts for Doom scroll stopper.',
     icon: 'accessibility',
     steps: [
-      'Open Settings, then tap Accessibility.',
-      'Tap Downloaded apps, then Minutics Doom scroll stopper.',
-      'Turn the service on and allow it.'
+      'Tap Downloaded apps.',
+      'Tap Minutics Doom scroll stopper.',
+      'Turn the service on, then tap Allow.',
+      'Go back to Minutics — this row turns green.'
     ]
   },
   {
@@ -86,9 +84,8 @@ export const PERMISSION_ROWS = [
     desc: 'Sends routine reminders and your daily report.',
     icon: 'bell',
     steps: [
-      'Tap Allow on the Android notification prompt.',
-      'If you don’t see it, open Notifications in Minutics settings.',
-      'Turn on All Minutics notifications.'
+      'Tap Allow on the Android prompt.',
+      'Go back to Minutics — this row turns green.'
     ]
   }
 ];
@@ -106,78 +103,12 @@ function allGranted(s) {
   return PERMISSION_ROWS.every(function (r) { return !!s[r.key]; });
 }
 
-/* ── Spoken walkthrough (native TTS on Android, Web Speech on the web) ──── */
-function bridge() { try { return window.AndroidBridge || null; } catch (e) { return null; } }
-
-function nativeSpeechAvailable() {
-  var b = bridge();
-  return !!(b && typeof b.speakGuide === 'function');
+/* Permissions that are a single system dialog need no tutorial. */
+function needsGuide(key) {
+  return key !== 'notifications' && key !== 'background';
 }
 
-function nativeSpeak(text) {
-  var b = bridge();
-  if (b && typeof b.speakGuide === 'function') {
-    try { b.speakGuide(text); return true; } catch (e) {}
-  }
-  return false;
-}
-
-function nativeStop() {
-  var b = bridge();
-  if (b && typeof b.stopGuideSpeech === 'function') {
-    try { b.stopGuideSpeech(); } catch (e) {}
-  }
-}
-
-function webSpeechAvailable() {
-  try { return !!(window.speechSynthesis && window.SpeechSynthesisUtterance); } catch (e) { return false; }
-}
-
-export function guideSpeechAvailable() { return nativeSpeechAvailable() || webSpeechAvailable(); }
-
-function useGuideSpeech(text, active, audioOn) {
-  useEffect(function () {
-    if (!active || !audioOn || !text) {
-      nativeStop();
-      try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
-      return undefined;
-    }
-    /* Native first: WebView's speechSynthesis does not exist on Android. */
-    if (nativeSpeak(text)) {
-      return function () { nativeStop(); };
-    }
-    if (!webSpeechAvailable()) return undefined;
-    var cancelled = false;
-    var timer = null;
-    var say = function () {
-      if (cancelled) return;
-      try {
-        var u = new window.SpeechSynthesisUtterance(text);
-        u.rate = 0.95;
-        u.pitch = 1.02;
-        u.lang = 'en-US';
-        u.onend = function () { if (!cancelled) timer = setTimeout(say, 900); };
-        u.onerror = function () { if (!cancelled) timer = setTimeout(say, 1600); };
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(u);
-      } catch (e) {}
-    };
-    say();
-    return function () {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-      try { window.speechSynthesis.cancel(); } catch (e) {}
-    };
-  }, [text, active, audioOn]);
-}
-
-function narrationFor(perm) {
-  return perm.title + '. ' + perm.desc + ' ' + perm.steps.map(function (s, i) {
-    return 'Step ' + (i + 1) + '. ' + s;
-  }).join(' ');
-}
-
-/* ── Icons (inline SVG so no assets are needed) ─────────────────────────── */
+/* ── Icons ──────────────────────────────────────────────────────────────── */
 function PermIcon({ name, size }) {
   var s = size || 20;
   var common = { width: s, height: s, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -209,52 +140,33 @@ function PermIcon({ name, size }) {
   ] }));
 }
 
-function SpeakerIcon({ on, size }) {
-  var s = size || 16;
-  return jsxs('svg', {
-    width: s, height: s, viewBox: '0 0 24 24', fill: 'none',
-    stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
-    children: [
-      jsx('path', { d: 'M11 5 6 9H3v6h3l5 4V5z' }),
-      on
-        ? jsx('path', { d: 'M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13' })
-        : jsx('path', { d: 'M16 9l5 6M21 9l-5 6' })
-    ]
-  });
-}
-
-/* ── Animated Android settings walkthrough ──────────────────────────────── */
+/* ── Animated walkthrough scenes (match the real opened screen) ─────────── */
 function scenesFor(key) {
   switch (key) {
+    case 'overlay': return [
+      { type: 'list', title: 'Display over other apps', items: ['Minutics', 'WhatsApp', 'Instagram', 'YouTube'], target: 'Minutics', caption: 'Search for Minutics' },
+      { type: 'toggle', title: 'Minutics', label: 'Allow display over other apps', caption: 'Turn on Allow display over other apps' },
+      { type: 'done', caption: 'Go back to Minutics' }
+    ];
+    case 'popup': return [
+      { type: 'appinfo', target: 'Display pop-up windows', caption: 'Tap Display pop-up windows' },
+      { type: 'toggle', title: 'Display pop-up windows', label: 'Allow pop-up windows', caption: 'Turn the switch on' },
+      { type: 'done', caption: 'Go back to Minutics' }
+    ];
     case 'autostart': return [
-      { type: 'home', target: 'Security', caption: 'Open Settings, then Security' },
-      { type: 'list', title: 'Auto Start', items: ['Minutics', 'Instagram', 'WhatsApp', 'Spotify'], target: 'Minutics', caption: 'Find Minutics in the list' },
-      { type: 'toggle', title: 'Auto start', label: 'Allow auto start', caption: 'Turn the switch on' }
+      { type: 'list', title: 'Auto Start', items: ['Minutics', 'Instagram', 'WhatsApp', 'Spotify'], target: 'Minutics', caption: 'Find Minutics' },
+      { type: 'toggle', title: 'Auto start', label: 'Allow auto start', caption: 'Turn the switch on' },
+      { type: 'done', caption: 'Go back to Minutics' }
     ];
     case 'accessibility': return [
       { type: 'home', target: 'Accessibility', caption: 'Open Settings, then Accessibility' },
-      { type: 'list', title: 'Downloaded apps', items: ['Minutics Doom scroll stopper', 'TalkBack', 'Select to Speak', 'Switch Access', 'Voice Access'], target: 'Minutics Doom scroll stopper', caption: 'Choose Minutics Doom scroll stopper' },
-      { type: 'toggle', title: 'Minutics Doom scroll stopper', label: 'Use Minutics Doom scroll stopper', caption: 'Turn the service on' }
-    ];
-    case 'background': return [
-      { type: 'home', target: 'Apps', caption: 'Open Settings, then Apps' },
-      { type: 'appinfo', target: 'Battery', caption: 'Tap Battery' },
-      { type: 'battery', caption: 'Choose Unrestricted' }
-    ];
-    case 'notifications': return [
-      { type: 'home', target: 'Apps', caption: 'Open Settings, then Apps' },
-      { type: 'appinfo', target: 'Notifications', caption: 'Tap Notifications' },
-      { type: 'toggle', title: 'Notifications', label: 'All Minutics notifications', caption: 'Turn them on' }
-    ];
-    case 'overlay': return [
-      { type: 'home', target: 'Apps', caption: 'Open Settings, then Apps' },
-      { type: 'appinfo', target: 'Display over other apps', caption: 'Tap Display over other apps' },
-      { type: 'toggle', title: 'Display over other apps', label: 'Allow display over other apps', caption: 'Turn it on' }
+      { type: 'list', title: 'Downloaded apps', items: ['Minutics Doom scroll stopper', 'TalkBack', 'Select to Speak', 'Switch Access', 'Voice Access'], target: 'Minutics Doom scroll stopper', caption: 'Tap Minutics Doom scroll stopper' },
+      { type: 'dialog', caption: 'Tap Allow on the prompt' }
     ];
     default: return [
-      { type: 'home', target: 'Apps', caption: 'Open Settings, then Apps' },
-      { type: 'appinfo', target: 'Display pop-up windows', caption: 'Tap Display pop-up windows' },
-      { type: 'toggle', title: 'Display pop-up windows', label: 'Allow pop-up windows', caption: 'Turn it on' }
+      { type: 'appinfo', target: 'Permission', caption: 'Tap the permission' },
+      { type: 'toggle', title: 'Permission', label: 'Allow', caption: 'Turn the switch on' },
+      { type: 'done', caption: 'Go back to Minutics' }
     ];
   }
 }
@@ -325,6 +237,7 @@ function MockList({ scene }) {
       jsx('span', { className: 'lt-mock-back', children: '\u2039' }),
       jsx('b', { children: scene.title })
     ] }),
+    jsx('div', { className: 'lt-mock-search', children: 'Search' }),
     jsx('div', { className: 'lt-mock-list lt-mock-list-tall', children: scene.items.map(function (label) {
       var on = label === scene.target;
       return jsxs('div', { className: 'lt-mock-item' + (on ? ' is-target' : ''), children: [
@@ -332,30 +245,6 @@ function MockList({ scene }) {
         jsx('span', { className: 'lt-mock-chev', children: '\u203A' }),
         on ? jsx(TapFinger, {}) : null
       ] }, label);
-    }) })
-  ] });
-}
-
-function MockBattery({ scene }) {
-  var options = [
-    { label: 'Unrestricted', sub: 'Best for reminders', on: true },
-    { label: 'Optimized', sub: 'Android default', on: false },
-    { label: 'Restricted', sub: 'May delay alerts', on: false }
-  ];
-  return jsxs('div', { className: 'lt-mock-body', children: [
-    jsx(MockStatus, {}),
-    jsxs('div', { className: 'lt-mock-appbar', children: [
-      jsx('span', { className: 'lt-mock-back', children: '\u2039' }),
-      jsx('b', { children: 'Battery' })
-    ] }),
-    jsx('div', { className: 'lt-mock-list lt-mock-list-tall', children: options.map(function (o) {
-      return jsxs('div', { className: 'lt-mock-item lt-mock-option' + (o.on ? ' is-target is-picked' : ''), children: [
-        jsxs('span', { className: 'lt-mock-option-text', children: [
-          jsx('b', { children: o.label }),
-          jsx('i', { children: o.sub })
-        ] }),
-        o.on ? jsx('span', { className: 'lt-mock-radio', children: '\u2713' }) : jsx('span', { className: 'lt-mock-radio' })
-      ] }, o.label);
     }) })
   ] });
 }
@@ -381,11 +270,38 @@ function MockToggle({ scene }) {
   ] });
 }
 
+function MockDialog({ scene }) {
+  return jsxs('div', { className: 'lt-mock-body', children: [
+    jsx(MockStatus, {}),
+    jsxs('div', { className: 'lt-mock-dialog', children: [
+      jsx('b', { children: 'Minutics' }),
+      jsx('p', { children: 'Allow Minutics to perform this action?' }),
+      jsxs('div', { className: 'lt-mock-dialog-btns', children: [
+        jsx('span', { className: 'lt-mock-dialog-cancel', children: 'Deny' }),
+        jsxs('span', { className: 'lt-mock-dialog-ok', children: ['Allow', jsx(TapFinger, {})] })
+      ] })
+    ] })
+  ] });
+}
+
+function MockDone({ scene }) {
+  return jsxs('div', { className: 'lt-mock-body', children: [
+    jsx(MockStatus, {}),
+    jsxs('div', { className: 'lt-mock-done', children: [
+      jsx('span', { className: 'lt-mock-done-tick', children: '\u2713' }),
+      jsx('b', { children: 'Granted' }),
+      jsx('span', { children: 'Back to Minutics' })
+    ] })
+  ] });
+}
+
 function renderScene(scene) {
+  if (scene.type === 'home') return jsx(MockHome, { scene: scene });
   if (scene.type === 'appinfo') return jsx(MockAppInfo, { scene: scene });
   if (scene.type === 'list') return jsx(MockList, { scene: scene });
-  if (scene.type === 'battery') return jsx(MockBattery, { scene: scene });
   if (scene.type === 'toggle') return jsx(MockToggle, { scene: scene });
+  if (scene.type === 'dialog') return jsx(MockDialog, { scene: scene });
+  if (scene.type === 'done') return jsx(MockDone, { scene: scene });
   return jsx(MockHome, { scene: scene });
 }
 
@@ -401,9 +317,11 @@ function PhoneMock({ scenes, scene }) {
   ] });
 }
 
-/* ── Tutorial sheet (opens BEFORE the real settings screen) ─────────────── */
-function GuideSheet({ perm, index, audioOn, onToggleAudio, onOpenSettings, onClose }) {
+/* ── Tutorial sheet ─────────────────────────────────────────────────────── */
+function GuideSheet({ perm, index, onOpenSettings, onClose }) {
   var [scene, setScene] = useState(0);
+  var [dragY, setDragY] = useState(0);
+  var startY = useRef(null);
   var scenes = scenesFor(perm.key);
 
   useEffect(function () {
@@ -414,7 +332,19 @@ function GuideSheet({ perm, index, audioOn, onToggleAudio, onOpenSettings, onClo
     return function () { clearInterval(iv); };
   }, [perm.key]);
 
-  useGuideSpeech(narrationFor(perm), true, audioOn);
+  function onTouchStart(e) {
+    try { startY.current = e.touches[0].clientY; } catch (err) {}
+  }
+  function onTouchMove(e) {
+    if (startY.current == null) return;
+    var dy = e.touches[0].clientY - startY.current;
+    if (dy > 0) setDragY(dy);
+  }
+  function onTouchEnd() {
+    if (dragY > 70) onClose();
+    setDragY(0);
+    startY.current = null;
+  }
 
   return createPortal(
     jsx('div', {
@@ -422,75 +352,52 @@ function GuideSheet({ perm, index, audioOn, onToggleAudio, onOpenSettings, onClo
       role: 'dialog',
       'aria-modal': 'true',
       'data-perm-tutorial': perm.key,
-      children: jsxs('div', { className: 'lt-guide-sheet', children: [
-        jsx('span', { className: 'lt-guide-grip' }),
-        jsxs('div', { className: 'lt-guide-head', children: [
-          jsx('span', { className: 'lt-guide-icon', children: jsx(PermIcon, { name: perm.icon, size: 20 }) }),
-          jsxs('div', { className: 'lt-guide-title', children: [
-            jsx('p', { className: 'lt-guide-eyebrow', children: 'Permission ' + (index + 1) + ' of ' + PERMISSION_ROWS.length }),
-            jsx('h3', { children: perm.title })
+      children: jsxs('div', {
+        className: 'lt-guide-sheet',
+        style: dragY ? { transform: 'translateY(' + dragY + 'px)', transition: 'none' } : undefined,
+        children: [
+          jsx('span', {
+            className: 'lt-guide-grip',
+            onTouchStart: onTouchStart,
+            onTouchMove: onTouchMove,
+            onTouchEnd: onTouchEnd
+          }),
+          jsxs('div', { className: 'lt-guide-head', children: [
+            jsx('span', { className: 'lt-guide-icon', children: jsx(PermIcon, { name: perm.icon, size: 20 }) }),
+            jsxs('div', { className: 'lt-guide-title', children: [
+              jsx('p', { className: 'lt-guide-eyebrow', children: 'Permission ' + (index + 1) + ' of ' + PERMISSION_ROWS.length }),
+              jsx('h3', { children: perm.title })
+            ] }),
+            jsx('button', {
+              type: 'button', className: 'lt-guide-x', 'aria-label': 'Close tutorial',
+              'data-guide-close': '1', onClick: onClose, children: '\u2715'
+            })
           ] }),
+          jsx(PhoneMock, { scenes: scenes, scene: scene }),
+          jsx('div', { className: 'lt-guide-dots', children: scenes.map(function (_, i) {
+            return jsx('span', { className: 'lt-guide-dot' + (i === scene ? ' is-on' : '') }, i);
+          }) }),
+          jsx('p', { className: 'lt-guide-caption', children: scenes[scene] ? scenes[scene].caption : '' }),
+          jsx('ol', { className: 'lt-guide-steps', children: perm.steps.map(function (s, i) {
+            return jsx('li', {
+              className: i === scene ? 'is-active' : '',
+              children: jsxs('span', { children: [
+                jsx('b', { children: String(i + 1) }),
+                jsx('span', { children: s })
+              ] })
+            }, i);
+          }) }),
           jsx('button', {
-            type: 'button',
-            className: 'lt-guide-audio' + (audioOn ? ' is-on' : ''),
-            'data-guide-audio': '1',
-            'aria-label': audioOn ? 'Mute voice guide' : 'Unmute voice guide',
-            onClick: onToggleAudio,
-            children: jsx(SpeakerIcon, { on: audioOn })
+            type: 'button', className: 'lt-guide-primary', 'data-guide-open-settings': '1',
+            onClick: onOpenSettings, children: 'Open Android settings'
           }),
           jsx('button', {
-            type: 'button', className: 'lt-guide-x', 'aria-label': 'Close tutorial',
-            'data-guide-close': '1', onClick: onClose, children: '\u2715'
+            type: 'button', className: 'lt-guide-secondary', 'data-guide-gotit': '1',
+            onClick: onClose, children: 'Got it, I’ll do it myself'
           })
-        ] }),
-        jsx(PhoneMock, { scenes: scenes, scene: scene }),
-        jsx('div', { className: 'lt-guide-dots', children: scenes.map(function (_, i) {
-          return jsx('span', { className: 'lt-guide-dot' + (i === scene ? ' is-on' : '') }, i);
-        }) }),
-        jsx('p', { className: 'lt-guide-caption', children: scenes[scene] ? scenes[scene].caption : '' }),
-        jsx('ol', { className: 'lt-guide-steps', children: perm.steps.map(function (s, i) {
-          return jsx('li', {
-            className: i === scene ? 'is-active' : '',
-            children: jsxs('span', { children: [
-              jsx('b', { children: String(i + 1) }),
-              jsx('span', { children: s })
-            ] })
-          }, i);
-        }) }),
-        jsx('p', { className: 'lt-guide-audio-note', children: audioOn
-          ? 'Voice guide is playing on repeat.'
-          : 'Voice guide is muted. Tap the speaker to hear it.' }),
-        jsx('button', {
-          type: 'button', className: 'lt-guide-primary', 'data-guide-open-settings': '1',
-          onClick: onOpenSettings, children: 'Open Android settings'
-        }),
-        jsx('button', {
-          type: 'button', className: 'lt-guide-secondary', 'data-guide-gotit': '1',
-          onClick: onClose, children: 'Got it, I’ll do it myself'
-        })
-      ] })
+        ]
+      })
     }),
-    document.body
-  );
-}
-
-/* ── Small persistent card (after closing the guide) ────────────────────── */
-function MiniTutorial({ perm, audioOn, onOpen, onToggleAudio, onClose }) {
-  useGuideSpeech(narrationFor(perm), true, audioOn);
-  return createPortal(
-    jsxs('div', { className: 'lt-perm-mini', role: 'status', 'data-perm-mini': perm.key, children: [
-      jsx('span', { className: 'lt-perm-mini-icon', children: jsx(PermIcon, { name: perm.icon, size: 18 }) }),
-      jsxs('div', { className: 'lt-perm-mini-body', children: [
-        jsx('b', { children: perm.title }),
-        jsx('span', { children: audioOn ? 'Voice guide still playing' : 'Voice guide muted' })
-      ] }),
-      jsx('button', {
-        type: 'button', className: 'lt-perm-mini-audio', 'aria-label': audioOn ? 'Mute' : 'Unmute',
-        onClick: onToggleAudio, children: jsx(SpeakerIcon, { on: audioOn, size: 15 })
-      }),
-      jsx('button', { type: 'button', className: 'lt-perm-mini-open', onClick: onOpen, children: 'Open' }),
-      jsx('button', { type: 'button', className: 'lt-perm-mini-x', 'aria-label': 'Stop tutorial', onClick: onClose, children: '\u2715' })
-    ] }),
     document.body
   );
 }
@@ -513,24 +420,20 @@ function ensurePermStyles() {
     '.lt-perm-check{width:30px;height:30px;border-radius:999px;background:#157347;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;flex-shrink:0}',
     '.lt-perm-note{font-size:12px;color:#6B7280;text-align:center;line-height:1.45;margin:6px 4px 0}',
 
-    /* full tutorial sheet */
     '.lt-guide{position:fixed;inset:0;z-index:2147483200;background:rgba(9,13,22,.62);display:flex;align-items:flex-end;justify-content:center;animation:ltGuideFade .18s ease}',
     '@keyframes ltGuideFade{from{opacity:0}to{opacity:1}}',
-    '.lt-guide-sheet{width:100%;max-width:430px;max-height:94dvh;overflow:auto;background:#F6F4EE;border-radius:26px 26px 0 0;padding:8px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -18px 50px rgba(0,0,0,.4);animation:ltGuideUp .28s cubic-bezier(.22,.61,.36,1)}',
+    '.lt-guide-sheet{width:100%;max-width:430px;max-height:94dvh;overflow:auto;background:#F6F4EE;border-radius:26px 26px 0 0;padding:8px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -18px 50px rgba(0,0,0,.4);animation:ltGuideUp .28s cubic-bezier(.22,.61,.36,1);touch-action:pan-y}',
     '@media(min-width:520px){.lt-guide{align-items:center}.lt-guide-sheet{border-radius:26px;max-height:90dvh}}',
     '@keyframes ltGuideUp{from{transform:translateY(26px);opacity:.4}to{transform:none;opacity:1}}',
-    '.lt-guide-grip{display:block;width:40px;height:4px;border-radius:999px;background:#D8D2C4;margin:2px auto 10px}',
+    '.lt-guide-grip{display:block;width:46px;height:5px;border-radius:999px;background:#C9C2B2;margin:2px auto 10px;cursor:grab;touch-action:none}',
+    '.lt-guide-grip:active{cursor:grabbing;background:#A8A090}',
     '.lt-guide-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}',
     '.lt-guide-icon{width:40px;height:40px;border-radius:13px;background:#DCFCE7;color:#157347;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
     '.lt-guide-title{flex:1;min-width:0}',
     '.lt-guide-eyebrow{font-size:9.5px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#9AA1AE;margin:0 0 1px}',
     '.lt-guide-title h3{font-size:18px;font-weight:900;color:#14162E;margin:0;line-height:1.15}',
-    '.lt-guide-audio{width:34px;height:34px;border-radius:999px;border:1px solid #E2DDD0;background:#fff;color:#9AA1AE;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}',
-    '.lt-guide-audio.is-on{background:#157347;border-color:#157347;color:#fff;animation:ltAudioPulse 2.2s ease-in-out infinite}',
-    '@keyframes ltAudioPulse{0%,100%{box-shadow:0 0 0 0 rgba(21,115,71,.32)}50%{box-shadow:0 0 0 6px rgba(21,115,71,0)}}',
     '.lt-guide-x{background:none;border:none;font-size:17px;color:#9AA1AE;cursor:pointer;padding:4px;flex-shrink:0}',
 
-    /* phone mock */
     '.lt-guide-phone{position:relative;width:214px;height:192px;margin:0 auto 8px;border:5px solid #23262E;border-radius:24px;background:#F7F8FA;overflow:hidden;box-shadow:0 14px 30px -14px rgba(20,32,80,.45)}',
     '.lt-guide-notch{position:absolute;left:50%;top:3px;width:38px;height:5px;margin-left:-19px;border-radius:999px;background:#23262E;z-index:5}',
     '.lt-guide-screen{position:absolute;inset:0;overflow:hidden;border-radius:18px;background:#F7F8FA}',
@@ -575,8 +478,17 @@ function ensurePermStyles() {
     '.lt-mock-finger{position:absolute;right:9px;top:50%;width:15px;height:15px;margin-top:-7.5px;border-radius:999px;background:rgba(20,22,46,.9);box-shadow:0 2px 6px rgba(0,0,0,.35),0 0 0 2px rgba(255,255,255,.85);animation:ltMockTap 2.4s ease-in-out infinite;z-index:4}',
     '.lt-mock-finger:after{content:"";position:absolute;inset:4px;border-radius:999px;background:#fff;opacity:.9}',
     '@keyframes ltMockTap{0%,100%{transform:translate(8px,4px) scale(1);opacity:0}20%{transform:translate(2px,0) scale(1);opacity:1}42%{transform:translate(0,0) scale(.82);opacity:1}58%{transform:translate(0,0) scale(1);opacity:1}80%{transform:translate(2px,0) scale(1);opacity:.9}}',
+    '.lt-mock-dialog{margin:18px 10px 0;padding:10px 10px 8px;background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(20,32,80,.12)}',
+    '.lt-mock-dialog b{display:block;font-size:9px;font-weight:900;color:#14162E;margin-bottom:4px}',
+    '.lt-mock-dialog p{margin:0 0 8px;font-size:7px;color:#5B6478;line-height:1.35}',
+    '.lt-mock-dialog-btns{display:flex;justify-content:flex-end;gap:10px;font-size:7.5px;font-weight:800}',
+    '.lt-mock-dialog-cancel{color:#6B7280;padding:3px 6px}',
+    '.lt-mock-dialog-ok{color:#157347;padding:3px 6px;border-radius:6px;background:#ECFDF3;position:relative}',
+    '.lt-mock-done{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:4px}',
+    '.lt-mock-done-tick{width:30px;height:30px;border-radius:999px;background:#22C55E;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900}',
+    '.lt-mock-done b{font-size:10px;font-weight:900;color:#14162E}',
+    '.lt-mock-done span{font-size:7px;color:#6B7280}',
 
-    /* sheet content */
     '.lt-guide-dots{display:flex;justify-content:center;gap:5px;margin:2px 0 6px}',
     '.lt-guide-dot{width:6px;height:6px;border-radius:999px;background:#D5CFC1;transition:all .25s}',
     '.lt-guide-dot.is-on{width:16px;background:#157347}',
@@ -586,21 +498,9 @@ function ensurePermStyles() {
     '.lt-guide-steps li.is-active>span{background:#fff;color:#14162E;box-shadow:0 2px 8px rgba(20,32,80,.07)}',
     '.lt-guide-steps b{width:20px;height:20px;border-radius:999px;background:#E9E4D7;color:#7A8494;font-size:10.5px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all .25s}',
     '.lt-guide-steps li.is-active b{background:#157347;color:#fff}',
-    '.lt-guide-audio-note{font-size:10.5px;color:#9AA1AE;text-align:center;margin:0 0 9px}',
     '.lt-guide-primary{width:100%;border:none;border-radius:14px;padding:13px;background:#157347;color:#fff;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 8px 18px -10px rgba(21,115,71,.7)}',
     '.lt-guide-primary:active{transform:scale(.985)}',
-    '.lt-guide-secondary{width:100%;border:none;background:none;color:#7A8494;font-size:12.5px;font-weight:700;padding:10px 0 2px;cursor:pointer}',
-
-    /* mini card */
-    '.lt-perm-mini{position:fixed;left:12px;right:12px;bottom:86px;z-index:2147483200;display:flex;align-items:center;gap:9px;background:#14162E;color:#fff;border-radius:16px;padding:10px 11px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:ltPermMini .25s cubic-bezier(.22,.61,.36,1)}',
-    '@keyframes ltPermMini{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}',
-    '.lt-perm-mini-icon{width:32px;height:32px;border-radius:10px;background:rgba(34,197,94,.2);color:#4ADE80;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
-    '.lt-perm-mini-body{flex:1;min-width:0}',
-    '.lt-perm-mini-body b{display:block;font-size:12.5px;font-weight:800;line-height:1.2}',
-    '.lt-perm-mini-body span{display:block;font-size:10.5px;color:rgba(255,255,255,.62);margin-top:1px}',
-    '.lt-perm-mini-audio{width:28px;height:28px;border-radius:999px;border:none;background:rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}',
-    '.lt-perm-mini-open{border:none;border-radius:999px;padding:7px 12px;background:#22C55E;color:#06230F;font-size:11px;font-weight:900;cursor:pointer;flex-shrink:0}',
-    '.lt-perm-mini-x{background:none;border:none;color:rgba(255,255,255,.5);font-size:15px;cursor:pointer;padding:3px;flex-shrink:0}'
+    '.lt-guide-secondary{width:100%;border:none;background:none;color:#7A8494;font-size:12.5px;font-weight:700;padding:10px 0 2px;cursor:pointer}'
   ].join('');
   document.head.appendChild(st);
 }
@@ -610,7 +510,6 @@ export function PermissionsStep({ onChange }) {
   var [status, setStatus] = useState(readStatus);
   var [tutorial, setTutorial] = useState(null);
   var [mini, setMini] = useState(null);
-  var [audioOn, setAudioOn] = useState(true);
   var statusRef = useRef(status);
   statusRef.current = status;
 
@@ -629,8 +528,6 @@ export function PermissionsStep({ onChange }) {
     };
     window.addEventListener('ltPermissionsChanged', onChanged);
 
-    /* Backup poll — onResume fires the event, but some OEMs deliver it
-       before the settings toggle has settled. */
     var iv = setInterval(function () {
       var next = readStatus();
       if (JSON.stringify(next) !== JSON.stringify(statusRef.current)) update(next);
@@ -639,32 +536,29 @@ export function PermissionsStep({ onChange }) {
     return function () {
       window.removeEventListener('ltPermissionsChanged', onChanged);
       clearInterval(iv);
-      nativeStop();
     };
   }, []);
 
-  /* The mini card must disappear the moment the permission is granted, and
-     the voice guide must stop talking about a finished permission. */
   useEffect(function () {
     if (!mini) return;
     if (status && status[mini.key]) {
       setMini(null);
-      nativeStop();
-      try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
     }
   }, [status, mini]);
 
-  /* Tapping Allow shows the FULL guide. The real Android screen only opens
-     from the guide's own button — never on the same tap. */
-  var openGuide = function (perm) {
+  /* Permissions that are a single system dialog skip the guide entirely. */
+  var open = function (perm) {
+    if (!needsGuide(perm.key)) {
+      try { window.AndroidBridge.openPermissionSetting(perm.key); } catch (e) {}
+      setMini(null);
+      return;
+    }
     setTutorial(perm);
     setMini(null);
   };
 
   var openSettings = function (perm) {
     try { window.AndroidBridge.openPermissionSetting(perm.key); } catch (e) {}
-    /* The system screen is now on top. Keep the tutorial alive as the small
-       card so it is still there (with the voice guide) when the user returns. */
     setTutorial(null);
     setMini(perm);
   };
@@ -700,31 +594,32 @@ export function PermissionsStep({ onChange }) {
                 type: 'button',
                 className: 'lt-perm-allow',
                 'data-perm-allow': perm.key,
-                onClick: function () { openGuide(perm); },
+                onClick: function () { open(perm); },
                 children: 'Allow'
               })
         ]
       }, perm.key);
     }) }),
-    jsx('p', { className: 'lt-perm-note', children: 'You cannot continue until every row shows a green tick. Allow opens the full guide first — the Android screen opens from inside the guide.' }),
+    jsx('p', { className: 'lt-perm-note', children: 'You cannot continue until every row shows a green tick.' }),
     tutorial ? jsx(GuideSheet, {
       perm: tutorial,
       index: PERMISSION_ROWS.findIndex(function (r) { return r.key === tutorial.key; }),
-      audioOn: audioOn,
-      onToggleAudio: function () { setAudioOn(function (v) { return !v; }); },
       onOpenSettings: function () { openSettings(tutorial); },
       onClose: function () { setMini(tutorial); setTutorial(null); }
     }) : null,
-    mini ? jsx(MiniTutorial, {
-      perm: mini,
-      audioOn: audioOn,
-      onOpen: function () { openGuide(mini); },
-      onToggleAudio: function () { setAudioOn(function (v) { return !v; }); },
-      onClose: function () {
-        setMini(null);
-        nativeStop();
-        try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
-      }
+    mini ? jsx('div', {
+      className: 'lt-perm-mini',
+      role: 'status',
+      'data-perm-mini': mini.key,
+      children: jsxs('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', width: '100%' }, children: [
+        jsx('span', { className: 'lt-perm-mini-icon', children: jsx(PermIcon, { name: mini.icon, size: 18 }) }),
+        jsxs('div', { className: 'lt-perm-mini-body', children: [
+          jsx('b', { children: mini.title }),
+          jsx('span', { children: 'Finish in Android settings, then come back.' })
+        ] }),
+        jsx('button', { type: 'button', className: 'lt-perm-mini-open', onClick: function () { open(mini); }, children: 'Open' }),
+        jsx('button', { type: 'button', className: 'lt-perm-mini-x', 'aria-label': 'Stop tutorial', onClick: function () { setMini(null); }, children: '\u2715' })
+      ] })
     }) : null
   ] });
 }
