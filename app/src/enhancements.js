@@ -8107,8 +8107,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     var seg = function (mode, label) {
       var on = _doomMode === mode;
-      return '<button type="button" data-doom-mode="' + mode + '" style="flex:1;border:none;border-radius:11px;padding:10px 8px;font:800 13px Inter,system-ui,sans-serif;cursor:pointer;' +
-        (on ? 'background:#fff;color:#111827;box-shadow:0 2px 8px rgba(15,23,42,.12);' : 'background:transparent;color:#6B7280;') +
+      return '<button type="button" data-doom-mode="' + mode + '" class="' + (on ? 'lt-tool-primary' : '') + '" style="flex:1;border:1px solid hsl(var(--border));border-radius:10px;padding:10px 8px;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;' +
+        (on ? 'background:hsl(var(--primary));color:hsl(var(--primary-foreground));' : 'background:hsl(var(--card));color:hsl(var(--muted-foreground));') +
         '">' + label + '</button>';
     };
 
@@ -8143,25 +8143,26 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
         toolHeader("Doom scroll stopper", "Reels and shorts watched.") +
-        '<div style="display:flex;gap:4px;margin:0 0 16px;">' +
+        '<div class="lt-tool-card" style="text-align:center;">' +
+          '<p class="lt-card-title">' + (_doomMode === "week" ? "This week" : "Today") + '</p>' +
+          '<div style="font-size:44px;font-weight:800;font-variant-numeric:tabular-nums;color:#111827;">' + total + '</div>' +
+          '<p style="font-size:12px;color:#6B7280;margin:6px 0 0;">shorts &amp; reels (1s+ on screen)</p>' +
+          emptyHint +
+        '</div>' +
+        '<div style="display:flex;gap:6px;margin:0 0 12px;">' +
           seg("day", "Today") + seg("week", "This week") +
         '</div>' +
-        '<div style="text-align:center;padding:8px 0 16px;">' +
-          '<div style="font-size:48px;font-weight:700;color:#111827;line-height:1;">' + total + '</div>' +
-          '<div style="font-size:12px;color:#6B7280;margin-top:4px;">shorts &amp; reels (1s+ on screen)</div>' +
-          emptyHint +
-          emptyHint +
-        '</div>' +
-        '<div style="border-top:1px solid #E5E7EB;">' +
+        '<div class="lt-tool-card">' +
+          '<p class="lt-card-title">By app</p>' +
           sorted.map(function (a) {
             var n = Number(apps[a.key] || 0) || 0;
-            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #E5E7EB;">' +
-              '<span style="font-size:14px;color:#111827;">' + escapeHtml(a.name) + '</span>' +
-              '<span style="font-size:14px;font-weight:600;color:' + (n > 0 ? '#111827' : '#9CA3AF') + ';">' + n + '</span>' +
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid hsl(var(--border));">' +
+              '<span style="font-size:14px;color:hsl(var(--foreground));">' + escapeHtml(a.name) + '</span>' +
+              '<span style="font-size:14px;font-weight:600;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</span>' +
             '</div>';
           }).join("") +
         '</div>' +
-        '<p style="font-size:11px;color:#9CA3AF;line-height:1.5;text-align:center;margin:14px 0 0;">' +
+        '<p style="font-size:11px;color:hsl(var(--muted-foreground));line-height:1.5;text-align:center;margin:14px 6px 0;">' +
           'Instagram, Snapchat, YouTube, Facebook, LinkedIn, X.' +
         '</p>' +
       '</div>';
