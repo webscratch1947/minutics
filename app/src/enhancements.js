@@ -8129,7 +8129,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     var emptyHint = total === 0
       ? '<p style="text-align:center;font-size:13px;color:#6B7280;margin:10px 0 0;line-height:1.5">' +
-          (native ? 'Nothing counted yet. Watch a reel or short for 3 seconds and it will appear here.'
+          (native ? 'Nothing counted yet. Watch a reel or short for 1 second and it will appear here.'
                   : 'Live counting runs in the Minutics Android app. This screen shows the same report once installed on your phone.') +
         '</p>'
       : '';
@@ -8140,14 +8140,14 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
-        toolHeader("Doom scroll stopper", "How many reels and shorts you actually watched \u2014 a view counts after 3 seconds on screen.") +
+        toolHeader("Doom scroll stopper", "How many reels and shorts you actually watched \u2014 a view counts after 1 second on screen.") +
         '<div style="display:flex;gap:6px;background:#F3F4F6;border-radius:14px;padding:4px;margin:0 0 16px;">' +
           seg("day", "Today") + seg("week", "This week") +
         '</div>' +
         '<div class="lt-tool-card" style="text-align:center;background:linear-gradient(180deg,#F5F3FF 0%,#FFFFFF 100%);border-color:#DDD6FE;padding:22px 16px;">' +
           '<p class="lt-card-title" style="margin-bottom:6px">' + (_doomMode === "week" ? "Reels & shorts this week" : "Reels & shorts today") + '</p>' +
           '<div style="font-size:56px;font-weight:800;color:#6D28D9;line-height:1.0;letter-spacing:-.02em;">' + total + '</div>' +
-          '<p style="font-size:12.5px;color:#6B7280;margin:6px 0 0;">counted after 3 seconds on screen</p>' +
+          '<p style="font-size:12.5px;color:#6B7280;margin:6px 0 0;">counted after 1 second on screen</p>' +
           emptyHint +
         '</div>' +
         '<div style="margin-top:6px">' +
