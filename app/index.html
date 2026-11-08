@@ -8,11 +8,6 @@
       .fixed.bottom-0 { padding-bottom: env(safe-area-inset-bottom, 0px) !important; }
       #root { display: none; background: #Fdfbf7; }
       body.lt-authed #root { display: block; }
-      /* Neutral cream at the very first paint — the user's own splash video
-         is the ONLY splash. Fades via hideBootSplash() when a real screen
-         is ready; the CSS animation is an independent failsafe (never stuck). */
-      #lt-boot-splash { position: fixed; inset: 0; z-index: 2147483646; background: #FDFBF7; pointer-events: none; opacity: 1; transition: opacity .45s ease; animation: lt-boot-failsafe .45s ease 5s forwards; }
-      @keyframes lt-boot-failsafe { to { opacity: 0; visibility: hidden; } }
     </style>
     <title>Minutics</title>
     <meta name="description" content="Minutics — Make every minute count." />
@@ -43,7 +38,7 @@
           if (local && new URLSearchParams(location.search).get("onboarding") === "new") {
             window.__ltOnbPreview = true;
             var s = document.createElement("style");
-            s.textContent = "#lt-boot-splash,#lt-startup-splash{display:none!important;}";
+            s.textContent = "#lt-startup-splash{display:none!important;}";
             document.head.appendChild(s);
           }
         } catch (e) {}
@@ -55,7 +50,7 @@
     <link rel="stylesheet" href="./src/styles/main.css">
   </head>
   <body>
-    <div id="lt-boot-splash"></div>
+    <div id="root"></div>
     <!-- Splash: the coded Minutics emblem animation (traced 1:1 from the real
          logo). Static markup paints at HTML PARSE, before the app bundle, and
          the CSS animation runs straight from that first frame — nothing (no

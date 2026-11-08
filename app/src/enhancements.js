@@ -34,8 +34,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       try {
         var pSplash = document.getElementById("lt-startup-splash");
         if (pSplash && pSplash.parentNode) pSplash.parentNode.removeChild(pSplash);
-        var pBoot = document.getElementById("lt-boot-splash");
-        if (pBoot && pBoot.parentNode) pBoot.parentNode.removeChild(pBoot);
       } catch (e) {}
       return;
     }
@@ -8032,6 +8030,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   }
 
   /* ── Doom scroll stopper ───────────────────────────────────────────────── */
+  function ltPermUseOn(key) {
+    try {
+      var m = JSON.parse(localStorage.getItem("lt_perm_use_v1") || "{}");
+      return m[key] !== false;
+    } catch (e) { return true; }
+  }
   var _doomMode = "day";
   var DOOM_APPS = [
     { key: "instagram", name: "Instagram",   color: "#E1306C", bg: "#FCE7F3" },
@@ -8129,6 +8133,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
                   : 'Live counting runs in the Minutics Android app. This screen shows the same report once installed on your phone.') +
         '</p>'
       : '';
+    if (!ltPermUseOn("accessibility")) {
+      emptyHint = '<p style="text-align:center;font-size:13px;color:#B45309;margin:10px 0 0;line-height:1.5">' +
+        'Counting is paused. Accessibility is turned off in Settings \u2192 Permissions — switch it back on to count again.</p>';
+    }
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +

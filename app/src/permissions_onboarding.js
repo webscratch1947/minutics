@@ -56,13 +56,14 @@ export const PERMISSION_ROWS = [
   {
     key: 'accessibility',
     title: 'Accessibility',
-    desc: 'Counts reels and shorts for Doom scroll stopper.',
+    optional: true,
+    desc: 'Optional — only the Doom scroll stopper needs it, to count reels and shorts you watch.',
     icon: 'accessibility',
     steps: [
-      'Tap Downloaded apps (or Installed services).',
+      'This is optional. Skip it if you do not want the Doom scroll stopper.',
+      'Want the counter? Tap Downloaded apps (or Installed services).',
       'Tap Minutics.',
-      'Turn the service on, then tap Allow.',
-      'Go back to Minutics — this row turns green.'
+      'Turn the service on, then tap Allow.'
     ]
   },
   {
@@ -87,7 +88,7 @@ function readStatus() {
 
 function allGranted(s) {
   if (!s) return false;
-  return PERMISSION_ROWS.every(function (r) { return !!s[r.key]; });
+  return PERMISSION_ROWS.every(function (r) { return r.optional || !!s[r.key]; });
 }
 
 function needsGuide(key) {
@@ -219,6 +220,7 @@ function ensurePermStyles() {
     '.lt-perm-row-body{flex:1;min-width:0}',
     '.lt-perm-row-body b{display:block;font-size:14px;color:#14162E;font-weight:800;line-height:1.25}',
     '.lt-perm-row-body span{display:block;font-size:12px;color:#6B7280;margin-top:2px;line-height:1.35}',
+    '.lt-perm-row-body .lt-perm-opt-badge{display:inline-block;font-size:9.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#B45309;background:#FEF3C7;border:1px solid #FDE68A;border-radius:999px;padding:2px 8px;margin-top:3px}',
     '.lt-perm-allow{border:none;border-radius:999px;padding:9px 16px;font-size:12.5px;font-weight:800;color:#fff;background:#157347;cursor:pointer;flex-shrink:0}',
     '.lt-perm-allow:active{transform:scale(.97)}',
     '.lt-perm-check{width:30px;height:30px;border-radius:999px;background:#157347;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;flex-shrink:0}',
@@ -338,6 +340,9 @@ export function PermissionsStep({ onChange }) {
           jsx('span', { className: 'lt-perm-row-icon', children: jsx(PermIcon, { name: perm.icon }) }),
           jsxs('div', { className: 'lt-perm-row-body', children: [
             jsx('b', { children: perm.title }),
+            perm.optional
+              ? jsx('span', { className: 'lt-perm-opt-badge', children: 'Optional' })
+              : null,
             jsx('span', { children: perm.desc })
           ] }),
           on
@@ -352,7 +357,7 @@ export function PermissionsStep({ onChange }) {
         ]
       }, perm.key);
     }) }),
-    jsx('p', { className: 'lt-perm-note', children: 'You cannot continue until every row shows a green tick.' }),
+    jsx('p', { className: 'lt-perm-note', children: 'Required rows must show a green tick. Accessibility is optional — only the Doom scroll stopper needs it.' }),
     tutorial ? jsx(GuideSheet, {
       perm: tutorial,
       index: PERMISSION_ROWS.findIndex(function (r) { return r.key === tutorial.key; }),

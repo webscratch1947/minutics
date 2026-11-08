@@ -248,6 +248,62 @@ export function SettingsScreen() {
   var tgTestLoading = _tgTestLoadingState[0];
   var setTgTestLoading = _tgTestLoadingState[1];
 
+  /* ── permission usage toggles (Settings → Permissions) ── */
+  var _permUseState = useState(function () {
+    var m = readJson("lt_perm_use_v1", {});
+    return { overlay: m.overlay !== false, autostart: m.autostart !== false, accessibility: m.accessibility !== false };
+  });
+  var permUse = _permUseState[0];
+  var setPermUse = _permUseState[1];
+
+  /* ── live Android permission status (overlay/autostart/accessibility) ── */
+  var _permStatusState = useState({ overlay: false, autostart: false, accessibility: false });
+  var permStatus = _permStatusState[0];
+  var setPermStatus = _permStatusState[1];
+  useEffect(function () {
+    function refresh() {
+      try {
+        if (window.AndroidBridge && window.AndroidBridge.getPermissionStatus) {
+          var raw = window.AndroidBridge.getPermissionStatus();
+          var o = typeof raw === "string" ? JSON.parse(raw) : raw;
+          if (o) setPermStatus(o);
+        }
+      } catch (e) {}
+    }
+    refresh();
+    var iv = window.setInterval(refresh, 2000);
+    return function () { window.clearInterval(iv); };
+  }, []);
+
+  function handlePermToggle(key) {
+    var next = {};
+    for (var k in permUse) next[k] = permUse[k];
+    next[key] = !next[key];
+    setPermUse(next);
+    writeJson("lt_perm_use_v1", next);
+    if (key === "accessibility") {
+      try {
+        if (window.AndroidBridge && window.AndroidBridge.setDoomScrollEnabled) {
+          window.AndroidBridge.setDoomScrollEnabled(next.accessibility);
+        }
+      } catch (e) {}
+    }
+    if (next[key]) {
+      /* Turning a permission ON with the system-side grant still missing
+         opens the matching Android screen (same keys the onboarding uses). */
+      var need = key === "overlay" ? !permStatus.overlay
+               : key === "autostart" ? !permStatus.autostart
+               : !permStatus.accessibility;
+      if (need) {
+        try {
+          if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
+            window.AndroidBridge.openPermissionSetting(key);
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
   /* ── handlers ── */
   /* The layout editor AND its Settings entry (Layout card / Reset button)
      are both gone — no editor means nothing to reset. Stale saved layouts
@@ -763,84 +819,138 @@ export function SettingsScreen() {
         ]
       }),
 
-      /* ─── Features ─── */
+      /* ─── Permissions ───
+         Every permission the app can use, with an on/off toggle each.
+         Off = Minutics stops using that permission's features (it never
+         asks for it again and disables whatever depends on it). Turning a
+         toggle back on re-enables the feature (and opens the Android
+         setting if the system permission itself is still missing). */
       jsxs("div", {
         className: "mx-4",
         children: [
-          jsx(SectionHeader, { children: "Features" }),
-          !window.AndroidBridge ? jsx(Card, {
-            children: jsx(CardRow, {
-              label: "Notifications",
-              desc: "Please install our official app to use this feature"
-            })
-          }) : jsx(Card, {
-            children: jsx(CardRow, {
-              label: "Notifications",
-              desc: notifTestStatus === "sent"
-                ? "Test notification sent"
-                : notifTestStatus === "error"
-                  ? "Could not send test notification"
-                : notifPermission === "granted"
-                ? "Notifications are enabled"
-                : notifPermission === "denied"
-                  ? "Blocked — enable in system settings"
-                  : "Allow reminders and app alerts",
-              children: jsxs("div", {
-                className: "flex items-center gap-3",
-                children: [
-                  jsx("button", {
-                    onClick: function () {
-                      if (notifPermission === "granted") {
-                        var next = !notifEnabled;
-                        setNotifEnabled(next);
-                        localStorage.setItem("lt_alert_notifs_on_v1", next ? "on" : "off");
-                      } else if (notifPermission === "denied") {
-                        window.AndroidBridge.requestNotificationPermission();
-                      } else {
-                        window.AndroidBridge.requestNotificationPermission();
-                      }
-                    },
-                    style: {
-                      position: "relative",
-                      width: "48px",
-                      height: "28px",
-                      borderRadius: "14px",
-                      border: "none",
-                      cursor: "pointer",
-                      background: notifPermission === "granted" && notifEnabled ? "#22c55e" : notifPermission === "denied" ? "#ef4444" : "#d1d5db",
-                      transition: "background 0.3s ease",
-                      padding: 0,
-                      flexShrink: 0
-                    },
-                    children: jsx("span", {
-                      style: {
-                        position: "absolute",
-                        top: "3px",
-                        left: notifPermission === "granted" && notifEnabled ? "23px" : "3px",
-                        width: "22px",
-                        height: "22px",
-                        borderRadius: "50%",
-                        background: "#fff",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                        transition: "left 0.3s ease"
-                      }
-                    })
-                  }),
-                  jsx("button", {
-                    onClick: function () {
-                      try { window.AndroidBridge.showTestNotification(); } catch (e) {}
-                      setNotifTestStatus("sent");
-                    },
-                    disabled: notifPermission !== "granted",
-                    className: [
-                      "rounded-lg border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition",
-                      notifPermission === "granted" ? "active:bg-primary/10" : "opacity-40 cursor-not-allowed"
-                    ].join(" "),
-                    children: "Test"
+          jsx(SectionHeader, { children: "Permissions" }),
+          jsx(Card, {
+            children: jsxs(Fragment, {
+              children: [
+                /* Notifications (moved here from the old Features card) */
+                !window.AndroidBridge ? jsx(CardRow, {
+                  label: "Notifications",
+                  desc: "Please install our official app to use this feature"
+                }) : jsx(CardRow, {
+                  label: "Notifications",
+                  desc: notifTestStatus === "sent"
+                    ? "Test notification sent"
+                    : notifTestStatus === "error"
+                      ? "Could not send test notification"
+                    : notifPermission === "granted"
+                    ? "Notifications are enabled"
+                    : notifPermission === "denied"
+                      ? "Blocked — enable in system settings"
+                      : "Allow reminders and app alerts",
+                  children: jsxs("div", {
+                    className: "flex items-center gap-3",
+                    children: [
+                      jsx("button", {
+                        onClick: function () {
+                          if (notifPermission === "granted") {
+                            var next = !notifEnabled;
+                            setNotifEnabled(next);
+                            localStorage.setItem("lt_alert_notifs_on_v1", next ? "on" : "off");
+                          } else if (notifPermission === "denied") {
+                            window.AndroidBridge.requestNotificationPermission();
+                          } else {
+                            window.AndroidBridge.requestNotificationPermission();
+                          }
+                        },
+                        style: {
+                          position: "relative",
+                          width: "48px",
+                          height: "28px",
+                          borderRadius: "14px",
+                          border: "none",
+                          cursor: "pointer",
+                          background: notifPermission === "granted" && notifEnabled ? "#22c55e" : notifPermission === "denied" ? "#ef4444" : "#d1d5db",
+                          transition: "background 0.3s ease",
+                          padding: 0,
+                          flexShrink: 0
+                        },
+                        children: jsx("span", {
+                          style: {
+                            position: "absolute",
+                            top: "3px",
+                            left: notifPermission === "granted" && notifEnabled ? "23px" : "3px",
+                            width: "22px",
+                            height: "22px",
+                            borderRadius: "50%",
+                            background: "#fff",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                            transition: "left 0.3s ease"
+                          }
+                        })
+                      }),
+                      jsx("button", {
+                        onClick: function () {
+                          try { window.AndroidBridge.showTestNotification(); } catch (e) {}
+                          setNotifTestStatus("sent");
+                        },
+                        disabled: notifPermission !== "granted",
+                        className: [
+                          "rounded-lg border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition",
+                          notifPermission === "granted" ? "active:bg-primary/10" : "opacity-40 cursor-not-allowed"
+                        ].join(" "),
+                        children: "Test"
+                      })
+                    ]
                   })
-                ]
-              })
+                }),
+                jsx(Divider, {}),
+                /* Reminder popups — "Display over other apps" */
+                jsx(CardRow, {
+                  label: "Reminder popups",
+                  desc: permUse.overlay
+                    ? (permStatus.overlay
+                        ? "Allowed — popups show above your other apps"
+                        : "On — but not allowed yet, tap the switch to allow")
+                    : "Off — reminders stay inside the app only",
+                  children: jsx(Toggle, {
+                    enabled: permUse.overlay,
+                    onToggle: function () { handlePermToggle("overlay"); }
+                  })
+                }),
+                jsx(Divider, {}),
+                /* Auto Start */
+                jsx(CardRow, {
+                  label: "Auto Start",
+                  desc: permUse.autostart
+                    ? (permStatus.autostart
+                        ? "Allowed — reminders restart after a reboot"
+                        : "On — but not allowed yet, tap the switch to allow")
+                    : "Off — reminders may not recover after a reboot",
+                  children: jsx(Toggle, {
+                    enabled: permUse.autostart,
+                    onToggle: function () { handlePermToggle("autostart"); }
+                  })
+                }),
+                jsx(Divider, {}),
+                /* Accessibility — optional, feeds the Doom scroll stopper */
+                jsx(CardRow, {
+                  label: "Accessibility",
+                  desc: permUse.accessibility
+                    ? (permStatus.accessibility
+                        ? "Allowed — the Doom scroll stopper is counting"
+                        : "On — but not allowed yet, tap the switch to allow")
+                    : "Off — the Doom scroll stopper is not counting",
+                  children: jsx(Toggle, {
+                    enabled: permUse.accessibility,
+                    onToggle: function () { handlePermToggle("accessibility"); }
+                  })
+                })
+              ]
             })
+          }),
+          jsx("p", {
+            className: "px-1 mt-2.5 text-[11px] leading-relaxed text-muted-foreground",
+            children: "These toggles control what Minutics itself uses. To fully remove a permission, revoke it in your phone's settings."
           })
         ]
       }),

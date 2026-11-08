@@ -484,12 +484,20 @@ function uiEditorBind() {
    by the shell (always mounted), also used by enhancements overlays. */
 const SHELL_CSS = [
   /* Rainbow backdrop for the swipe viewport — mirrors body.lt-authed's fixed
-     gradient so the slide never reveals flat cream behind the panes. */
-  '.lt-swipe-bg{background-color:#FDFBF7;background-image:radial-gradient(620px 440px at -4% -2%, rgba(134,239,190,.42), transparent 60%),radial-gradient(560px 520px at 104% 10%, rgba(255,197,138,.4), transparent 58%),radial-gradient(600px 500px at -6% 104%, rgba(147,197,253,.38), transparent 60%),radial-gradient(520px 440px at 104% 102%, rgba(253,224,71,.3), transparent 58%);background-attachment:fixed}',
+     gradient so the slide never reveals flat cream behind the panes.
+     NOTE: no background-attachment:fixed here — a fixed attachment forces a
+     full repaint of the gradient every animation frame in the WebView, which
+     made every tab slide stutter. The gradient is painted on this element
+     once and stays put while panes slide over it. */
+  '.lt-swipe-bg{background-color:#FDFBF7;background-image:radial-gradient(620px 440px at -4% -2%, rgba(134,239,190,.42), transparent 60%),radial-gradient(560px 520px at 104% 10%, rgba(255,197,138,.4), transparent 58%),radial-gradient(600px 500px at -6% 104%, rgba(147,197,253,.38), transparent 60%),radial-gradient(520px 440px at 104% 102%, rgba(253,224,71,.3), transparent 58%)}',
+  '/* Tab slide keyframes: BOTH panes animate — the incoming one slides in,\n   the outgoing one slides out, so one side leaves while the other arrives. */',
   '@keyframes lt-page-in-r{from{transform:translateX(100%)}to{transform:translateX(0)}}',
   '@keyframes lt-page-in-l{from{transform:translateX(-100%)}to{transform:translateX(0)}}',
+  '@keyframes lt-page-out-l{from{transform:translateX(0)}to{transform:translateX(-100%)}}',
+  '@keyframes lt-page-out-r{from{transform:translateX(0)}to{transform:translateX(100%)}}',
   '.lt-page-in-r{animation:lt-page-in-r .3s cubic-bezier(.22,.61,.36,1)}',
   '.lt-page-in-l{animation:lt-page-in-l .3s cubic-bezier(.22,.61,.36,1)}',
+  '.lt-page-anim{will-change:transform;backface-visibility:hidden}',
   '@keyframes lt-sheet-up{from{transform:translateY(100%)}to{transform:translateY(0)}}',
   '@keyframes lt-fade-in{from{opacity:0}to{opacity:1}}',
   '.lt-sheet-in{animation:lt-sheet-up .26s cubic-bezier(.22,.61,.36,1)}',
@@ -508,7 +516,8 @@ const SHELL_CSS = [
 
 /* ── Shell ─────────────────────────────────────────────────────────────
    - demo countdown lives in the top bar (see demoClockText)
-   - smooth slide animation on every tab switch (tap)                   */
+   - real two-pane slide on every tab switch (tap): the outgoing screen
+     stays mounted and slides away while the incoming one slides in       */
 export function ak({ profile }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -526,6 +535,30 @@ export function ak({ profile }) {
   }
   const enterDir = animRef.current.dir;
 
+  /* ── Two-pane slide ─────────────────────────────────────────────────
+     The PREVIOUS screen is kept alive for the 300 ms the animation runs:
+     it renders as an absolutely-positioned pane that slides out while the
+     new screen slides in — so you see one side leaving and the other
+     arriving (the old "one pane over an empty viewport" read as a white
+     flash / a broken slide). The leaving pane drops its listeners after
+     the out-animation ends (or a safety timer) so nothing lingers. */
+  const lastRouteRef = useRef(null);
+  const seqRef = useRef(0);
+  const [leaving, setLeaving] = useState(null);
+
+  const prevRoute = lastRouteRef.current;
+  if (leaving === null && prevRoute && prevRoute.path !== pathname && prevRoute.el) {
+    /* Render-phase update (allowed, guarded): keep the outgoing screen for
+       this one commit so both panes animate together. */
+    seqRef.current += 1;
+    setLeaving({
+      seq: seqRef.current,
+      pathname: prevRoute.path,
+      el: prevRoute.el,
+      dir: enterDir
+    });
+  }
+
   /* ── UI layout editor: REMOVED (fully) ──────────────────────────────────
      The hold-and-drop swap never worked reliably (drops landed in the
      wrong slot, boxes flashed before swapping), so the editor was dropped
@@ -540,6 +573,15 @@ export function ak({ profile }) {
     children: jsx(AppRoutes, { profile })
   }), [pathname, profile]);
 
+  /* Keep the ref pointing at the CURRENT route at all times (except when a
+     leaving pane was just captured — then the new route is recorded here). */
+  lastRouteRef.current = { path: pathname, el: pageEl };
+  useEffect(() => {
+    if (!leaving) return;
+    const t = setTimeout(() => setLeaving(null), 450);
+    return () => clearTimeout(t);
+  }, [leaving && leaving.seq]);
+
   return jsxs('div', {
     className: 'relative mx-auto max-w-[430px] w-full h-[100dvh] overflow-hidden bg-transparent flex flex-col',
     children: [
@@ -551,21 +593,36 @@ export function ak({ profile }) {
         /* Slide viewport: paints the authed body's fixed rainbow so the
            page sits on the same gradient as the rest of the app. */
         className: 'relative flex-1 min-h-0 overflow-hidden lt-swipe-bg',
-        children: jsx('div', {
-          key: pathname,
-          className: cn('h-full', enterDir === 1 ? 'lt-page-in-r' : enterDir === -1 ? 'lt-page-in-l' : ''),
-          /* Strip the enter-animation class the moment it finishes: the
-             animation (transform != none) is itself a stacking context —
-             while it exists every in-page z-index (sheets z-60, modals
-             z-80) is capped under the bottom nav's z-50. */
-          onAnimationEnd: (e) => {
-            const n = e.animationName;
-            if (n === 'lt-page-in-r' || n === 'lt-page-in-l') {
-              e.currentTarget.classList.remove('lt-page-in-r', 'lt-page-in-l');
-            }
-          },
-          children: pageEl
-        })
+        children: [
+          leaving ? jsx('div', {
+            key: 'out' + leaving.seq,
+            className: 'absolute inset-0 h-full lt-page-anim',
+            style: {
+              animation: leaving.dir === 1
+                ? 'lt-page-out-l .3s cubic-bezier(.22,.61,.36,1) both'
+                : 'lt-page-out-r .3s cubic-bezier(.22,.61,.36,1) both'
+            },
+            onAnimationEnd: () => setLeaving(null),
+            children: leaving.el
+          }) : null,
+          jsx('div', {
+            key: pathname,
+            className: cn('h-full relative', enterDir === 1 ? 'lt-page-in-r' : enterDir === -1 ? 'lt-page-in-l' : ''),
+            style: (leaving || enterDir) ? { willChange: 'transform' } : undefined,
+            /* Strip the enter-animation class the moment it finishes: the
+               animation (transform != none) is itself a stacking context —
+               while it exists every in-page z-index (sheets z-60, modals
+               z-80) is capped under the bottom nav's z-50. */
+            onAnimationEnd: (e) => {
+              const n = e.animationName;
+              if (n === 'lt-page-in-r' || n === 'lt-page-in-l') {
+                e.currentTarget.classList.remove('lt-page-in-r', 'lt-page-in-l');
+                e.currentTarget.style.willChange = '';
+              }
+            },
+            children: pageEl
+          })
+        ]
       }),
       jsx(ck, {})
     ]
