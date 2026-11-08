@@ -490,14 +490,11 @@ const SHELL_CSS = [
      made every tab slide stutter. The gradient is painted on this element
      once and stays put while panes slide over it. */
   '.lt-swipe-bg{background-color:#FDFBF7;background-image:radial-gradient(620px 440px at -4% -2%, rgba(134,239,190,.42), transparent 60%),radial-gradient(560px 520px at 104% 10%, rgba(255,197,138,.4), transparent 58%),radial-gradient(600px 500px at -6% 104%, rgba(147,197,253,.38), transparent 60%),radial-gradient(520px 440px at 104% 102%, rgba(253,224,71,.3), transparent 58%)}',
-  '/* Tab slide keyframes: BOTH panes animate — the incoming one slides in,\n   the outgoing one slides out, so one side leaves while the other arrives. */',
+  '/* Tab slide keyframes: only the incoming pane slides in (single pane,\n     no two-pane overlap — keeps the slide light on low-end WebViews). */',
   '@keyframes lt-page-in-r{from{transform:translateX(100%)}to{transform:translateX(0)}}',
   '@keyframes lt-page-in-l{from{transform:translateX(-100%)}to{transform:translateX(0)}}',
-  '@keyframes lt-page-out-l{from{transform:translateX(0)}to{transform:translateX(-100%)}}',
-  '@keyframes lt-page-out-r{from{transform:translateX(0)}to{transform:translateX(100%)}}',
   '.lt-page-in-r{animation:lt-page-in-r .3s cubic-bezier(.22,.61,.36,1)}',
   '.lt-page-in-l{animation:lt-page-in-l .3s cubic-bezier(.22,.61,.36,1)}',
-  '.lt-page-anim{will-change:transform;backface-visibility:hidden}',
   '@keyframes lt-sheet-up{from{transform:translateY(100%)}to{transform:translateY(0)}}',
   '@keyframes lt-fade-in{from{opacity:0}to{opacity:1}}',
   '.lt-sheet-in{animation:lt-sheet-up .26s cubic-bezier(.22,.61,.36,1)}',
@@ -535,37 +532,6 @@ export function ak({ profile }) {
   }
   const enterDir = animRef.current.dir;
 
-  /* ── Two-pane slide ─────────────────────────────────────────────────
-     The PREVIOUS screen is kept alive for the 300 ms the animation runs:
-     it renders as an absolutely-positioned pane that slides out while the
-     new screen slides in — so you see one side leaving and the other
-     arriving (the old "one pane over an empty viewport" read as a white
-     flash / a broken slide). The leaving pane drops its listeners after
-     the out-animation ends (or a safety timer) so nothing lingers. */
-  const lastRouteRef = useRef(null);
-  const seqRef = useRef(0);
-  const [leaving, setLeaving] = useState(null);
-
-  const prevRoute = lastRouteRef.current;
-  if (leaving === null && prevRoute && prevRoute.path !== pathname && prevRoute.el) {
-    /* Render-phase update (allowed, guarded): keep the outgoing screen for
-       this one commit so both panes animate together. */
-    seqRef.current += 1;
-    setLeaving({
-      seq: seqRef.current,
-      pathname: prevRoute.path,
-      el: prevRoute.el,
-      dir: enterDir
-    });
-  }
-
-  /* ── UI layout editor: REMOVED (fully) ──────────────────────────────────
-     The hold-and-drop swap never worked reliably (drops landed in the
-     wrong slot, boxes flashed before swapping), so the editor was dropped
-     entirely — and with no editor there is nothing to keep applying or
-     reset: applyUiLayout's interval/route loop is gone and the saved
-     order store is wiped once at startup (UI_ORDER_KEY below). */
-
   /* The page tree is memoized on the route: switching tabs re-mounts the
      new screen once, with the enter slide animation. */
   const pageEl = useMemo(() => jsx('main', {
@@ -573,26 +539,16 @@ export function ak({ profile }) {
     children: jsx(AppRoutes, { profile })
   }), [pathname, profile]);
 
-  /* Keep the ref pointing at the CURRENT route at all times (except when a
-     leaving pane was just captured — then the new route is recorded here). */
-  lastRouteRef.current = { path: pathname, el: pageEl };
+  /* Park the enhancement engine during any route change: the new screen
+     mounts real elements mid-flight, and a full-DOM pass at that moment
+     re-rasters the page (the "super lag"). The engine already defers every
+     pass while body[data-lt-swipe] is set and re-runs its retry timers
+     once the flag clears — so the new tab's tiles still land right after. */
   useEffect(() => {
-    if (!leaving) return;
-    /* Park the enhancement engine during the slide: route changes mount
-       real elements MID-FLIGHT, and a full-DOM pass at that moment
-       re-rasters both moving panes (the "not a slide" stutter / lag).
-       The engine already defers every pass while body[data-lt-swipe] is
-       set and re-runs its retry timers once the flag clears — so the new
-       tab's tiles still land right after the slide finishes. */
     document.body.dataset.ltSwipe = '1';
-    /* Safety net (animation is 300 ms): 380 ms covers any missed
-       animationend without leaving a stale pane hanging around. */
-    const t = setTimeout(() => setLeaving(null), 380);
-    return () => {
-      clearTimeout(t);
-      try { delete document.body.dataset.ltSwipe; } catch (e) {}
-    };
-  }, [leaving && leaving.seq]);
+    const t = setTimeout(() => { try { delete document.body.dataset.ltSwipe; } catch (e) {} }, 400);
+    return () => { clearTimeout(t); try { delete document.body.dataset.ltSwipe; } catch (e) {} };
+  }, [pathname]);
 
   return jsxs('div', {
     className: 'relative mx-auto max-w-[430px] w-full h-[100dvh] overflow-hidden bg-transparent flex flex-col',
@@ -602,47 +558,25 @@ export function ak({ profile }) {
       jsx(HC, {}),
       jsx(LTTopNav, {}),
       jsx('div', {
-        /* Slide viewport: paints the authed body's fixed rainbow so the
-           page sits on the same gradient as the rest of the app. */
+        /* Slide viewport: paints the authed body's rainbow so the page sits
+           on the same gradient as the rest of the app. */
         className: 'relative flex-1 min-h-0 overflow-hidden lt-swipe-bg',
-        children: [
-          leaving ? jsx('div', {
-            key: 'out' + leaving.seq,
-            className: 'absolute inset-0 h-full lt-page-anim',
-            style: {
-              pointerEvents: 'none',
-              animation: leaving.dir === 1
-                ? 'lt-page-out-l .3s cubic-bezier(.22,.61,.36,1) both'
-                : 'lt-page-out-r .3s cubic-bezier(.22,.61,.36,1) both'
-            },
-            /* IMPORTANT: only react to OUR own out-animation on THIS pane.
-               animationend BUBBLES — every little pulse/spinner inside the
-               outgoing screen fires it too, and the unguarded handler used
-               to unmount the leaving pane mid-slide (the "broken slide"). */
-            onAnimationEnd: (e) => {
-              if ((e.animationName === 'lt-page-out-l' || e.animationName === 'lt-page-out-r')
-                && e.target === e.currentTarget) setLeaving(null);
-            },
-            children: leaving.el
-          }) : null,
-          jsx('div', {
-            key: pathname,
-            className: cn('h-full relative', enterDir === 1 ? 'lt-page-in-r' : enterDir === -1 ? 'lt-page-in-l' : ''),
-            style: (leaving || enterDir) ? { willChange: 'transform' } : undefined,
-            /* Strip the enter-animation class the moment it finishes: the
-               animation (transform != none) is itself a stacking context —
-               while it exists every in-page z-index (sheets z-60, modals
-               z-80) is capped under the bottom nav's z-50. */
-            onAnimationEnd: (e) => {
-              const n = e.animationName;
-              if (n === 'lt-page-in-r' || n === 'lt-page-in-l') {
-                e.currentTarget.classList.remove('lt-page-in-r', 'lt-page-in-l');
-                e.currentTarget.style.willChange = '';
-              }
-            },
-            children: pageEl
-          })
-        ]
+        children: jsx('div', {
+          key: pathname,
+          className: cn('h-full', enterDir === 1 ? 'lt-page-in-r' : enterDir === -1 ? 'lt-page-in-l' : ''),
+          /* Strip the enter-animation class the moment it finishes: the
+             animation (transform != none) is itself a stacking context —
+             while it exists every in-page z-index (sheets z-60, modals
+             z-80) is capped under the bottom nav's z-50. */
+          onAnimationEnd: (e) => {
+            const n = e.animationName;
+            if (n === 'lt-page-in-r' || n === 'lt-page-in-l') {
+              e.currentTarget.classList.remove('lt-page-in-r', 'lt-page-in-l');
+              e.currentTarget.style.willChange = '';
+            }
+          },
+          children: pageEl
+        })
       }),
       jsx(ck, {})
     ]
