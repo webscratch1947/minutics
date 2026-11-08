@@ -539,17 +539,6 @@ export function ak({ profile }) {
     children: jsx(AppRoutes, { profile })
   }), [pathname, profile]);
 
-  /* Park the enhancement engine during any route change: the new screen
-     mounts real elements mid-flight, and a full-DOM pass at that moment
-     re-rasters the page (the "super lag"). The engine already defers every
-     pass while body[data-lt-swipe] is set and re-runs its retry timers
-     once the flag clears — so the new tab's tiles still land right after. */
-  useEffect(() => {
-    document.body.dataset.ltSwipe = '1';
-    const t = setTimeout(() => { try { delete document.body.dataset.ltSwipe; } catch (e) {} }, 400);
-    return () => { clearTimeout(t); try { delete document.body.dataset.ltSwipe; } catch (e) {} };
-  }, [pathname]);
-
   return jsxs('div', {
     className: 'relative mx-auto max-w-[430px] w-full h-[100dvh] overflow-hidden bg-transparent flex flex-col',
     children: [
