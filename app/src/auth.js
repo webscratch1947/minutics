@@ -934,7 +934,9 @@ function injectStyles() {
     }
     .lt-auth-pw-toggle svg { width: 20px; height: 20px; }
     .lt-auth-hint { margin: 10px 0 0; font-size: 12px; color: #9AA0B0; }
-    .lt-auth-frow { display: flex; justify-content: flex-end; margin-top: 12px; }
+    .lt-auth-frow { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 8px; }
+.lt-auth-showpw { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #4F46E5; cursor: pointer; user-select: none; }
+.lt-auth-showpw input { width: 15px; height: 15px; accent-color: #4F46E5; cursor: pointer; }
     .lt-auth-forgot { font-size: 13px; font-weight: 700; color: #4F46E5; cursor: pointer; text-underline-offset: 2px; }
     .lt-auth-forgot:hover { text-decoration: underline; }
     .lt-auth-submit {
@@ -1259,11 +1261,11 @@ function renderGate(mode) {
               '<label class="lt-auth-flabel" for="lt-auth-password">Password</label>' +
               '<input type="password" id="lt-auth-password" placeholder="Enter your password" autocomplete="' + (isSignup ? "new-password" : "current-password") + '" required>' +
             '</div>' +
-            '<button type="button" class="lt-auth-pw-toggle" id="lt-auth-pw-toggle" aria-label="Show password">' + EYE_ICON + '</button>' +
+            '<button type="button" class="lt-auth-pw-toggle" id="lt-auth-pw-toggle" aria-label="Show password" style="display:' + (isSignup ? "flex" : "none") + '">' + EYE_ICON + '</button>' +
           '</div>' +
           '<p class="lt-auth-hint" id="lt-auth-pw-hint" style="display:' + (isSignup ? "block" : "none") + '">Password must be 8+ characters with an uppercase letter, a lowercase letter and a number</p>' +
           '<div class="lt-auth-frow" id="lt-auth-forgot-row" style="display:' + (isSignup ? "none" : "flex") + '">' +
-            '<button type="button" class="lt-auth-forgot" id="lt-auth-forgot-link">Forgot password?</button>' +
+            '<label class="lt-auth-showpw"><input type="checkbox" id="lt-auth-showpw"> Show password</label>' + '<button type="button" class="lt-auth-forgot" id="lt-auth-forgot-link">Forgot password?</button>' +
           '</div>' +
           '<button class="lt-auth-submit" type="submit" id="lt-auth-submit">' +
             '<span class="lt-auth-spinner"></span>' +
@@ -1305,6 +1307,7 @@ function renderGate(mode) {
       toSignup ? "new-password" : "current-password";
     document.getElementById("lt-auth-pw-hint").style.display = toSignup ? "block" : "none";
     document.getElementById("lt-auth-forgot-row").style.display = toSignup ? "none" : "flex";
+    document.getElementById("lt-auth-pw-toggle").style.display = toSignup ? "flex" : "none";
     submitLabel.textContent = toSignup ? "Sign up" : "Login";
     hideError();
   }
@@ -1327,6 +1330,12 @@ function renderGate(mode) {
     pwToggle.innerHTML = showing ? EYE_ICON : EYE_OFF_ICON;
     pwToggle.setAttribute("aria-label", showing ? "Show password" : "Hide password");
   });
+  var showPwCb = document.getElementById("lt-auth-showpw");
+  if (showPwCb) {
+    showPwCb.addEventListener("change", function () {
+      pwInput.type = showPwCb.checked ? "text" : "password";
+    });
+  }
 
   var demoBtn = document.getElementById("lt-auth-demo-btn");
   if (demoBtn) {
