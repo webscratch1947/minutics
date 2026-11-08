@@ -8140,22 +8140,27 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
-        toolHeader("Doom scroll stopper", "Reels and shorts watched today.") +
-        '<div style="display:flex;gap:4px;background:#F3F4F6;border-radius:12px;padding:4px;margin:0 0 16px;">' +
+        toolHeader("Doom scroll stopper", "Reels and shorts watched.") +
+        '<div style="display:flex;gap:4px;margin:0 0 16px;">' +
           seg("day", "Today") + seg("week", "This week") +
         '</div>' +
-        '<div class="lt-tool-card" style="text-align:center;padding:20px 16px;">' +
-          '<p class="lt-card-title" style="margin-bottom:4px">' + (_doomMode === "week" ? "This week" : "Today") + '</p>' +
-          '<div style="font-size:44px;font-weight:800;color:#111827;line-height:1.0;letter-spacing:-.02em;">' + total + '</div>' +
-          '<p style="font-size:12px;color:#6B7280;margin:6px 0 0;">shorts &amp; reels counted after 1s on screen</p>' +
+        '<div style="text-align:center;padding:8px 0 16px;">' +
+          '<div style="font-size:48px;font-weight:700;color:#111827;line-height:1;">' + total + '</div>' +
+          '<div style="font-size:12px;color:#6B7280;margin-top:4px;">shorts &amp; reels (1s+ on screen)</div>' +
+          emptyHint +
           emptyHint +
         '</div>' +
-        '<div style="margin-top:8px">' +
-          '<p class="lt-card-title" style="margin:4px 4px 8px">By app</p>' +
-          rows +
+        '<div style="border-top:1px solid #E5E7EB;">' +
+          sorted.map(function (a) {
+            var n = Number(apps[a.key] || 0) || 0;
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #E5E7EB;">' +
+              '<span style="font-size:14px;color:#111827;">' + escapeHtml(a.name) + '</span>' +
+              '<span style="font-size:14px;font-weight:600;color:' + (n > 0 ? '#111827' : '#9CA3AF') + ';">' + n + '</span>' +
+            '</div>';
+          }).join("") +
         '</div>' +
-        '<p style="font-size:11px;color:#9AA1AE;line-height:1.5;text-align:center;margin:14px 6px 0;">' +
-          'Counts in Instagram, Snapchat, YouTube, Facebook, LinkedIn and X.' +
+        '<p style="font-size:11px;color:#9CA3AF;line-height:1.5;text-align:center;margin:14px 0 0;">' +
+          'Instagram, Snapchat, YouTube, Facebook, LinkedIn, X.' +
         '</p>' +
       '</div>';
 
