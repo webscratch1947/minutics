@@ -8144,7 +8144,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       '<div class="lt-tool-shell">' +
         toolHeader("Doom scroll stopper", "Reels and shorts watched.") +
         '<div style="display:flex;align-items:baseline;gap:8px;margin:0 0 12px;">' +
-          '<div style="font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;color:#111827;">' + total + '</div>' +
+          (total > 0 ? '<div style="font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;color:#111827;">' + total + '</div>' : '') +
           emptyHint +
         '</div>' +
         '<div style="display:flex;gap:6px;margin:0 0 12px;">' +
