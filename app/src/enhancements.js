@@ -8143,22 +8143,21 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
         toolHeader("Doom scroll stopper", "Reels and shorts watched.") +
-        '<div class="lt-tool-card" style="text-align:center;">' +
-          '<p class="lt-card-title">' + (_doomMode === "week" ? "This week" : "Today") + '</p>' +
-          '<div style="font-size:44px;font-weight:800;font-variant-numeric:tabular-nums;color:#111827;">' + total + '</div>' +
-          '<p style="font-size:12px;color:#6B7280;margin:6px 0 0;">shorts &amp; reels (1s+ on screen)</p>' +
+        '<div style="text-align:center;margin:0 0 12px;">' +
+          '<div style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;color:#111827;">' + total + '</div>' +
+          '<div style="font-size:11px;color:#6B7280;margin-top:2px;">shorts &amp; reels (1s+ on screen)</div>' +
           emptyHint +
         '</div>' +
         '<div style="display:flex;gap:6px;margin:0 0 12px;">' +
           seg("day", "Today") + seg("week", "This week") +
         '</div>' +
-        '<div class="lt-tool-card">' +
-          '<p class="lt-card-title">By app</p>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">' +
           sorted.map(function (a) {
             var n = Number(apps[a.key] || 0) || 0;
-            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid hsl(var(--border));">' +
-              '<span style="font-size:14px;color:hsl(var(--foreground));">' + escapeHtml(a.name) + '</span>' +
-              '<span style="font-size:14px;font-weight:600;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</span>' +
+            return '<div style="border:1px solid hsl(var(--border));border-radius:12px;padding:10px 6px;text-align:center;background:hsl(var(--card));">' +
+              '<div style="width:28px;height:28px;border-radius:8px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;margin:0 auto 4px;">' + doomLogo(a.key, a.color) + '</div>' +
+              '<div style="font-size:16px;font-weight:700;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</div>' +
+              '<div style="font-size:10px;color:hsl(var(--muted-foreground));margin-top:2px;">' + escapeHtml(a.name) + '</div>' +
             '</div>';
           }).join("") +
         '</div>' +
