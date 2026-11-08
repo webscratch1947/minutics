@@ -289,9 +289,16 @@ export function SettingsScreen() {
   }, []);
 
   function handlePermToggle(key) {
+    /* Click semantics follow what the switch SHOWS, not hidden flags:
+       - switch is ON (green = granted AND in use) → click turns it off;
+       - switch is OFF (grey, "not allowed yet") → click turns it on and,
+         when the system-side grant is missing, jumps to the matching
+         Android settings screen. Never the other way round. */
+    var granted = !!permStatus[key];
+    var wasActive = granted && permUse[key] === true;
     var next = {};
     for (var k in permUse) next[k] = permUse[k];
-    next[key] = !next[key];
+    next[key] = wasActive ? false : true;
     setPermUse(next);
     writeJson("lt_perm_use_v1", next);
     if (key === "accessibility") {
@@ -301,19 +308,12 @@ export function SettingsScreen() {
         }
       } catch (e) {}
     }
-    if (next[key]) {
-      /* Turning a permission ON with the system-side grant still missing
-         opens the matching Android screen (same keys the onboarding uses). */
-      var need = key === "overlay" ? !permStatus.overlay
-               : key === "autostart" ? !permStatus.autostart
-               : !permStatus.accessibility;
-      if (need) {
-        try {
-          if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
-            window.AndroidBridge.openPermissionSetting(key);
-          }
-        } catch (e) {}
-      }
+    if (!wasActive && !granted) {
+      try {
+        if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
+          window.AndroidBridge.openPermissionSetting(key);
+        }
+      } catch (e) {}
     }
   }
 

@@ -578,10 +578,20 @@ export function ak({ profile }) {
   lastRouteRef.current = { path: pathname, el: pageEl };
   useEffect(() => {
     if (!leaving) return;
+    /* Park the enhancement engine during the slide: route changes mount
+       real elements MID-FLIGHT, and a full-DOM pass at that moment
+       re-rasters both moving panes (the "not a slide" stutter / lag).
+       The engine already defers every pass while body[data-lt-swipe] is
+       set and re-runs its retry timers once the flag clears — so the new
+       tab's tiles still land right after the slide finishes. */
+    document.body.dataset.ltSwipe = '1';
     /* Safety net (animation is 300 ms): 380 ms covers any missed
        animationend without leaving a stale pane hanging around. */
     const t = setTimeout(() => setLeaving(null), 380);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      try { delete document.body.dataset.ltSwipe; } catch (e) {}
+    };
   }, [leaving && leaving.seq]);
 
   return jsxs('div', {

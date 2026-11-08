@@ -62,32 +62,32 @@
           @font-face{font-family:'Poppins';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/poppins-700-latin.woff2) format('woff2');}
           #lt-startup-splash-anim svg{width:100%;height:100%;max-width:min(560px,88vw);max-height:88vh;}
 #lt-startup-splash-anim *{will-change:transform,opacity;}
-          #lt-splash-emblem{transform-box:view-box;transform-origin:256px 250px;opacity:0;transform:scale(.88) translateY(10px);animation:ltSp1 .9s cubic-bezier(.18,.86,.28,1) .1s forwards;}
+          #lt-splash-emblem{transform-box:view-box;transform-origin:256px 250px;opacity:0;transform:scale(.88) translateY(10px);animation:ltSp1 .5s cubic-bezier(.18,.86,.28,1) .05s forwards;}
           @keyframes ltSp1{to{opacity:1;transform:scale(1) translateY(0)}}
           #lt-hourHand,#lt-minHand{transform-box:view-box;transform-origin:256px 244px;}
-          #lt-hourHand{animation:ltSp2 .8s cubic-bezier(.25,.8,.3,1) .08s both;}
-          #lt-minHand{animation:ltSp3 .9s cubic-bezier(.25,.8,.3,1) .08s both;}
+          #lt-hourHand{animation:ltSp2 .45s cubic-bezier(.25,.8,.3,1) .04s both;}
+          #lt-minHand{animation:ltSp3 .5s cubic-bezier(.25,.8,.3,1) .04s both;}
           /* Hands do one full 360° turn, landing exactly where they end today
              (the traced logo pose) with a small damped overshoot settle. The
              turn is fast (~0.9s, heavy ease-out) so no horizontal dwell. */
           @keyframes ltSp2{from{transform:rotate(-360deg);}62%{transform:rotate(3.5deg);}84%{transform:rotate(-1.5deg);}to{transform:rotate(0deg);}}
           @keyframes ltSp3{from{transform:rotate(-360deg);}62%{transform:rotate(6deg);}85%{transform:rotate(-2.5deg);}to{transform:rotate(0deg);}}
-          .lt-bar{transform-box:fill-box;transform-origin:bottom;animation:ltSp4 .5s cubic-bezier(.2,.75,.25,1) both;}
+          .lt-bar{transform-box:fill-box;transform-origin:bottom;animation:ltSp4 .3s cubic-bezier(.2,.75,.25,1) both;}
           .lt-b1{animation-delay:.35s}.lt-b2{animation-delay:.41s}.lt-b3{animation-delay:.47s}.lt-b4{animation-delay:.53s}
           .lt-b5{animation-delay:.59s}.lt-b6{animation-delay:.66s}.lt-b7{animation-delay:.73s}.lt-b8{animation-delay:.81s}
           @keyframes ltSp4{from{transform:scaleY(0);}to{transform:scaleY(1);}}
-          #lt-growthLine{stroke-dasharray:230;stroke-dashoffset:230;animation:ltSp5 .9s cubic-bezier(.35,.6,.3,1) 1.15s both;}
+          #lt-growthLine{stroke-dasharray:230;stroke-dashoffset:230;animation:ltSp5 .55s cubic-bezier(.35,.6,.3,1) .65s both;}
           @keyframes ltSp5{to{stroke-dashoffset:0;}}
-          .lt-gdot{transform-box:fill-box;transform-origin:center;animation:ltSp6 .32s cubic-bezier(.2,1.5,.4,1) both;}
+          .lt-gdot{transform-box:fill-box;transform-origin:center;animation:ltSp6 .2s cubic-bezier(.2,1.5,.4,1) both;}
           .lt-d1{animation-delay:1.18s}.lt-d2{animation-delay:1.38s}.lt-d3{animation-delay:1.58s}.lt-d4{animation-delay:1.82s}
           @keyframes ltSp6{from{transform:scale(0);}to{transform:scale(1);}}
-          #lt-growthHead{transform-box:fill-box;transform-origin:30% 90%;animation:ltSp7 .4s cubic-bezier(.2,1.4,.4,1) 2.02s both;}
+          #lt-growthHead{transform-box:fill-box;transform-origin:30% 90%;animation:ltSp7 .25s cubic-bezier(.2,1.4,.4,1) 1.15s both;}
           @keyframes ltSp7{from{transform:scale(0) rotate(-30deg);}to{transform:scale(1) rotate(0deg);}}
-          #lt-sheen{animation:ltSp8 1.5s ease-in-out 2.15s both;}
+          #lt-sheen{animation:ltSp8 .8s ease-in-out 1.25s both;}
           @keyframes ltSp8{0%{transform:translateX(-300px) skewX(-18deg);opacity:0;}18%{opacity:.9;}82%{opacity:.9;}100%{transform:translateX(320px) skewX(-18deg);opacity:0;}}
-          #lt-badge{transform-box:fill-box;transform-origin:center;animation:ltSp9 .6s ease 2.5s both;}
+          #lt-badge{transform-box:fill-box;transform-origin:center;animation:ltSp9 .35s ease 1.45s both;}
           @keyframes ltSp9{0%{transform:scale(1);}35%{transform:scale(1.09);}70%{transform:scale(.985);}100%{transform:scale(1);}}
-          #lt-wordmark{opacity:0;animation:ltSp10 .7s ease 2.62s both;}
+          #lt-wordmark{opacity:0;animation:ltSp10 .4s ease 1.55s both;}
           @keyframes ltSp10{from{opacity:0;letter-spacing:.32em;}to{opacity:1;letter-spacing:.155em;}}
           @media (prefers-reduced-motion:reduce){
             #lt-splash-emblem,#lt-hourHand,#lt-minHand,.lt-bar,#lt-growthLine,.lt-gdot,#lt-growthHead,#lt-badge,#lt-wordmark{animation:none!important;opacity:1!important;transform:none!important;stroke-dashoffset:0!important;}
@@ -193,18 +193,18 @@
           if (dismissed) return;
           dismissed = true;
           splash.style.opacity = '0';
-          setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 550);
+          setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 350);
         }
         window.__ltSplashDismiss = dismiss;
         window.__ltSplashPlaying = true;
         var last = document.getElementById('lt-wordmark');
         var fired = false;
-        function finish() { if (fired) return; fired = true; setTimeout(dismiss, 500); }
+        function finish() { if (fired) return; fired = true; setTimeout(dismiss, 250); }
         if (last) {
           last.addEventListener('animationend', finish, { once: true });
         }
-        setTimeout(function () { if (!fired) { fired = true; dismiss(); } }, 5000);
-        setTimeout(dismiss, 8000);
+        setTimeout(function () { if (!fired) { fired = true; dismiss(); } }, 3000);
+        setTimeout(dismiss, 3500);
       })();
     </script>
     <div id="root"></div>
