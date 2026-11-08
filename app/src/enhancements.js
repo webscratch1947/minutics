@@ -8153,9 +8153,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<div style="display:flex;flex-wrap:wrap;gap:6px;">' +
           sorted.map(function (a) {
             var n = Number(apps[a.key] || 0) || 0;
-            return '<div style="display:inline-flex;align-items:center;gap:10px;border:1px solid hsl(var(--border));border-radius:0;padding:8px 16px;background:hsl(var(--card));clip-path:polygon(8% 0%,100% 0%,92% 100%,0% 100%);">' +
-              '<div style="width:28px;height:28px;border-radius:5px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + doomLogo(a.key, a.color) + '</div>' +
-              '<span style="font-size:18px;font-weight:700;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</span>' +
+            return '<div style="display:inline-flex;align-items:center;gap:12px;border:1px solid hsl(var(--border));border-radius:0;padding:10px 20px;background:hsl(var(--card));clip-path:polygon(8% 0%,100% 0%,92% 100%,0% 100%);">' +
+              '<div style="width:36px;height:36px;border-radius:6px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + doomLogo(a.key, a.color) + '</div>' +
+              '<span style="font-size:22px;font-weight:700;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</span>' +
             '</div>';
           }).join("") +
         '</div>' +
