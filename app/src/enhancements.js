@@ -8150,12 +8150,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           '<p style="font-size:12px;color:#6B7280;margin:6px 0 0;">shorts &amp; reels counted after 1s on screen</p>' +
           emptyHint +
         '</div>' +
-        (total > 0
-          ? '<div style="margin-top:8px">' +
-              '<p class="lt-card-title" style="margin:4px 4px 8px">By app</p>' +
-              rows +
-            '</div>'
-          : '') +
+        '<div style="margin-top:8px">' +
+          '<p class="lt-card-title" style="margin:4px 4px 8px">By app</p>' +
+          rows +
+        '</div>' +
         '<p style="font-size:11px;color:#9AA1AE;line-height:1.5;text-align:center;margin:14px 6px 0;">' +
           'Counts in Instagram, Snapchat, YouTube, Facebook, LinkedIn and X.' +
         '</p>' +
