@@ -4947,7 +4947,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     { id: "creator", name: "Content Creator", emoji: "🎬", desc: "Ideate, shoot, edit, publish — with an engagement window after.",
       slots: [["Scripting & ideas","09:00","10:30","💡"],["Shooting","11:00","13:00","🎬"],["Editing","15:00","17:30","🎞️"],["Publish & engage","19:00","20:00","📱"]] },
     { id: "sales", name: "Sales Executive", emoji: "📞", desc: "Cold-call blocks, demos, follow-ups and research to feed the pipeline.",
-      slots: [["Cold call block","09:30","11:30","📞"],["Product demos","12:00","13:30","📊"],["Pipeline follow-up","15:00","16:30","🔨"],["Prospect research","17:00","18:00","🔍"]] }
+      slots: [["Cold call block","09:30","11:30","📞"],["Product demos","12:00","13:30","📊"],["Pipeline follow-up","15:00","16:30","🔨"],["Prospect research","17:00","18:00","🔍"]] },
+    { id: "mgr", name: "MGR Routine", emoji: "🧭", desc: "Daily productivity & business execution — dev, clients, growth and wrap-up.",
+      slots: [["Morning Startup","08:00","09:30","🌅"],["Core Development & Operations","10:00","13:30","💻"],["Lunch & Rest Break","13:30","14:30","🍽️"],["Client & Business Growth","15:00","17:30","📈"],["Evening Wrap-Up & Planning","18:00","19:00","🌙"]] }
   ];
 
   function ltToast(msg) {
