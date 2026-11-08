@@ -54,6 +54,16 @@ export const PERMISSION_ROWS = [
     ]
   },
   {
+    key: 'notifications',
+    title: 'Notifications',
+    desc: 'Sends routine reminders and your daily report.',
+    icon: 'bell',
+    steps: [
+      'Tap Allow on the Android prompt.',
+      'Go back to Minutics — this row turns green.'
+    ]
+  },
+  {
     key: 'accessibility',
     title: 'Accessibility',
     optional: true,
@@ -64,16 +74,6 @@ export const PERMISSION_ROWS = [
       'Want the counter? Tap Downloaded apps (or Installed services).',
       'Tap Minutics.',
       'Turn the service on, then tap Allow.'
-    ]
-  },
-  {
-    key: 'notifications',
-    title: 'Notifications',
-    desc: 'Sends routine reminders and your daily report.',
-    icon: 'bell',
-    steps: [
-      'Tap Allow on the Android prompt.',
-      'Go back to Minutics — this row turns green.'
     ]
   }
 ];

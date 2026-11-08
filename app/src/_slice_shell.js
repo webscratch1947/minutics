@@ -578,7 +578,9 @@ export function ak({ profile }) {
   lastRouteRef.current = { path: pathname, el: pageEl };
   useEffect(() => {
     if (!leaving) return;
-    const t = setTimeout(() => setLeaving(null), 450);
+    /* Safety net (animation is 300 ms): 380 ms covers any missed
+       animationend without leaving a stale pane hanging around. */
+    const t = setTimeout(() => setLeaving(null), 380);
     return () => clearTimeout(t);
   }, [leaving && leaving.seq]);
 
@@ -598,11 +600,19 @@ export function ak({ profile }) {
             key: 'out' + leaving.seq,
             className: 'absolute inset-0 h-full lt-page-anim',
             style: {
+              pointerEvents: 'none',
               animation: leaving.dir === 1
                 ? 'lt-page-out-l .3s cubic-bezier(.22,.61,.36,1) both'
                 : 'lt-page-out-r .3s cubic-bezier(.22,.61,.36,1) both'
             },
-            onAnimationEnd: () => setLeaving(null),
+            /* IMPORTANT: only react to OUR own out-animation on THIS pane.
+               animationend BUBBLES — every little pulse/spinner inside the
+               outgoing screen fires it too, and the unguarded handler used
+               to unmount the leaving pane mid-slide (the "broken slide"). */
+            onAnimationEnd: (e) => {
+              if ((e.animationName === 'lt-page-out-l' || e.animationName === 'lt-page-out-r')
+                && e.target === e.currentTarget) setLeaving(null);
+            },
             children: leaving.el
           }) : null,
           jsx('div', {

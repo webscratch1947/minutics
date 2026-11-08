@@ -694,7 +694,7 @@ export function mk({
       nextBtn(() => go("name"), !permsReady, ONB_V2 ? "Next" : "Next \u2192"),
       jsx("p", {
         className: "text-[11.5px] text-center text-[#9AA1AE] leading-relaxed px-2",
-        children: "All six permissions are required. They keep your reminders alive and power Doom scroll stopper."
+        children: "Accessibility is optional — only the Doom scroll stopper needs it. Everything else keeps your reminders alive."
       })
     ] });
   }

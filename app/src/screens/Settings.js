@@ -63,17 +63,30 @@ var PLANS = {
 function Toggle(props) {
   return jsx("button", {
     onClick: props.onToggle,
-    className: [
-      "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent",
-      "transition-colors duration-200 ease-in-out focus:outline-none",
-      props.enabled ? "bg-primary" : "bg-gray-300"
-    ].join(" "),
+    style: {
+      position: "relative",
+      width: "48px",
+      height: "28px",
+      borderRadius: "14px",
+      border: "none",
+      cursor: "pointer",
+      padding: 0,
+      flexShrink: 0,
+      background: props.enabled ? "#157347" : "#d1d5db",
+      transition: "background .25s ease"
+    },
     children: jsx("span", {
-      className: [
-        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0",
-        "transition duration-200 ease-in-out",
-        props.enabled ? "translate-x-5" : "translate-x-0"
-      ].join(" ")
+      style: {
+        position: "absolute",
+        top: "3px",
+        left: props.enabled ? "23px" : "3px",
+        width: "22px",
+        height: "22px",
+        borderRadius: "50%",
+        background: "#fff",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+        transition: "left .25s ease"
+      }
     })
   });
 }
@@ -832,7 +845,9 @@ export function SettingsScreen() {
           jsx(Card, {
             children: jsxs(Fragment, {
               children: [
-                /* Notifications (moved here from the old Features card) */
+                /* Notifications — same switch style as every other row.
+                   ON switch = the phone-side permission is actually granted
+                   AND Minutics is allowed to use it. */
                 !window.AndroidBridge ? jsx(CardRow, {
                   label: "Notifications",
                   desc: "Please install our official app to use this feature"
@@ -842,61 +857,37 @@ export function SettingsScreen() {
                     ? "Test notification sent"
                     : notifTestStatus === "error"
                       ? "Could not send test notification"
-                    : notifPermission === "granted"
-                    ? "Notifications are enabled"
+                    : (notifPermission === "granted" && notifEnabled)
+                    ? "Allowed — reminders and your daily report"
                     : notifPermission === "denied"
                       ? "Blocked — enable in system settings"
-                      : "Allow reminders and app alerts",
+                      : notifEnabled
+                        ? "Not allowed yet — tap the switch to allow"
+                        : "Off — Minutics stays quiet",
                   children: jsxs("div", {
                     className: "flex items-center gap-3",
                     children: [
-                      jsx("button", {
-                        onClick: function () {
+                      jsx(Toggle, {
+                        enabled: notifPermission === "granted" && notifEnabled,
+                        onToggle: function () {
                           if (notifPermission === "granted") {
                             var next = !notifEnabled;
                             setNotifEnabled(next);
                             localStorage.setItem("lt_alert_notifs_on_v1", next ? "on" : "off");
-                          } else if (notifPermission === "denied") {
-                            window.AndroidBridge.requestNotificationPermission();
                           } else {
                             window.AndroidBridge.requestNotificationPermission();
                           }
-                        },
-                        style: {
-                          position: "relative",
-                          width: "48px",
-                          height: "28px",
-                          borderRadius: "14px",
-                          border: "none",
-                          cursor: "pointer",
-                          background: notifPermission === "granted" && notifEnabled ? "#22c55e" : notifPermission === "denied" ? "#ef4444" : "#d1d5db",
-                          transition: "background 0.3s ease",
-                          padding: 0,
-                          flexShrink: 0
-                        },
-                        children: jsx("span", {
-                          style: {
-                            position: "absolute",
-                            top: "3px",
-                            left: notifPermission === "granted" && notifEnabled ? "23px" : "3px",
-                            width: "22px",
-                            height: "22px",
-                            borderRadius: "50%",
-                            background: "#fff",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                            transition: "left 0.3s ease"
-                          }
-                        })
+                        }
                       }),
                       jsx("button", {
                         onClick: function () {
                           try { window.AndroidBridge.showTestNotification(); } catch (e) {}
                           setNotifTestStatus("sent");
                         },
-                        disabled: notifPermission !== "granted",
+                        disabled: notifPermission !== "granted" || !notifEnabled,
                         className: [
                           "rounded-lg border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition",
-                          notifPermission === "granted" ? "active:bg-primary/10" : "opacity-40 cursor-not-allowed"
+                          (notifPermission === "granted" && notifEnabled) ? "active:bg-primary/10" : "opacity-40 cursor-not-allowed"
                         ].join(" "),
                         children: "Test"
                       })
@@ -904,16 +895,18 @@ export function SettingsScreen() {
                   })
                 }),
                 jsx(Divider, {}),
-                /* Reminder popups — "Display over other apps" */
+                /* Reminder popups — "Display over other apps".
+                   The switch shows ON only when Android has actually granted
+                   it AND Minutics is allowed to use it. */
                 jsx(CardRow, {
                   label: "Reminder popups",
                   desc: permUse.overlay
                     ? (permStatus.overlay
                         ? "Allowed — popups show above your other apps"
-                        : "On — but not allowed yet, tap the switch to allow")
+                        : "Not allowed yet — tap the switch to allow")
                     : "Off — reminders stay inside the app only",
                   children: jsx(Toggle, {
-                    enabled: permUse.overlay,
+                    enabled: permUse.overlay && permStatus.overlay,
                     onToggle: function () { handlePermToggle("overlay"); }
                   })
                 }),
@@ -924,10 +917,10 @@ export function SettingsScreen() {
                   desc: permUse.autostart
                     ? (permStatus.autostart
                         ? "Allowed — reminders restart after a reboot"
-                        : "On — but not allowed yet, tap the switch to allow")
+                        : "Not allowed yet — tap the switch to allow")
                     : "Off — reminders may not recover after a reboot",
                   children: jsx(Toggle, {
-                    enabled: permUse.autostart,
+                    enabled: permUse.autostart && permStatus.autostart,
                     onToggle: function () { handlePermToggle("autostart"); }
                   })
                 }),
@@ -938,10 +931,10 @@ export function SettingsScreen() {
                   desc: permUse.accessibility
                     ? (permStatus.accessibility
                         ? "Allowed — the Doom scroll stopper is counting"
-                        : "On — but not allowed yet, tap the switch to allow")
+                        : "Not allowed yet — optional, tap the switch to allow")
                     : "Off — the Doom scroll stopper is not counting",
                   children: jsx(Toggle, {
-                    enabled: permUse.accessibility,
+                    enabled: permUse.accessibility && permStatus.accessibility,
                     onToggle: function () { handlePermToggle("accessibility"); }
                   })
                 })
