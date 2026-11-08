@@ -8121,7 +8121,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             '<div style="font-size:16px;font-weight:800;color:' + (n > 0 ? a.color : "#D1D5DB") + '">' + n + '</div>' +
           '</div>' +
           '<div style="height:6px;background:#F3F4F6;border-radius:999px;overflow:hidden">' +
-            '<span style="display:block;height:100%;width:' + pct + '%;background:linear-gradient(90deg,' + a.color + ',' + a.color + 'cc);border-radius:999px;transition:width .4s ease"></span>' +
+            '<span style="display:block;height:100%;width:' + pct + '%;background:' + a.color + ';border-radius:999px;"></span>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -8140,22 +8140,24 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
-        toolHeader("Doom scroll stopper", "How many reels and shorts you actually watched \u2014 a view counts after 1 second on screen.") +
-        '<div style="display:flex;gap:6px;background:#F3F4F6;border-radius:14px;padding:4px;margin:0 0 16px;">' +
+        toolHeader("Doom scroll stopper", "Reels and shorts watched today.") +
+        '<div style="display:flex;gap:4px;background:#F3F4F6;border-radius:12px;padding:4px;margin:0 0 16px;">' +
           seg("day", "Today") + seg("week", "This week") +
         '</div>' +
-        '<div class="lt-tool-card" style="text-align:center;background:linear-gradient(180deg,#F5F3FF 0%,#FFFFFF 100%);border-color:#DDD6FE;padding:22px 16px;">' +
-          '<p class="lt-card-title" style="margin-bottom:6px">' + (_doomMode === "week" ? "Reels & shorts this week" : "Reels & shorts today") + '</p>' +
-          '<div style="font-size:56px;font-weight:800;color:#6D28D9;line-height:1.0;letter-spacing:-.02em;">' + total + '</div>' +
-          '<p style="font-size:12.5px;color:#6B7280;margin:6px 0 0;">counted after 1 second on screen</p>' +
+        '<div class="lt-tool-card" style="text-align:center;padding:20px 16px;">' +
+          '<p class="lt-card-title" style="margin-bottom:4px">' + (_doomMode === "week" ? "This week" : "Today") + '</p>' +
+          '<div style="font-size:44px;font-weight:800;color:#111827;line-height:1.0;letter-spacing:-.02em;">' + total + '</div>' +
+          '<p style="font-size:12px;color:#6B7280;margin:6px 0 0;">shorts &amp; reels counted after 1s on screen</p>' +
           emptyHint +
         '</div>' +
-        '<div style="margin-top:6px">' +
-          '<p class="lt-card-title" style="margin:4px 4px 10px">By app</p>' +
-          rows +
-        '</div>' +
-        '<p style="font-size:12px;color:#9AA1AE;line-height:1.55;text-align:center;margin:14px 6px 0;">' +
-          'Works in Instagram, Snapchat, YouTube, Facebook, LinkedIn and X \u2014 both feed videos and full-screen reels count.' +
+        (total > 0
+          ? '<div style="margin-top:8px">' +
+              '<p class="lt-card-title" style="margin:4px 4px 8px">By app</p>' +
+              rows +
+            '</div>'
+          : '') +
+        '<p style="font-size:11px;color:#9AA1AE;line-height:1.5;text-align:center;margin:14px 6px 0;">' +
+          'Counts in Instagram, Snapchat, YouTube, Facebook, LinkedIn and X.' +
         '</p>' +
       '</div>';
 
