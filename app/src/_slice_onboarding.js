@@ -911,7 +911,7 @@ export function mk({
     footer = jsxs("div", {
       className: "flex flex-col gap-2",
       children: [
-        nextBtn(() => go("widget"), !(salaryNum > 0), ONB_V2 ? "Next" : "Next \u2192"),
+        nextBtn(() => finish(true), !(salaryNum > 0), ONB_V2 ? "Done" : "Done \u2192"),
         jsx("button", {
           type: "button",
           onClick: () => finish(false),
