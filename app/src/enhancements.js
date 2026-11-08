@@ -8154,9 +8154,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<div style="display:flex;flex-wrap:wrap;gap:6px;">' +
           sorted.map(function (a) {
             var n = Number(apps[a.key] || 0) || 0;
-            return '<div style="display:inline-flex;align-items:center;gap:4px;border:1px solid hsl(var(--border));border-radius:0;padding:4px 8px;background:hsl(var(--card));clip-path:polygon(8% 0%,100% 0%,92% 100%,0% 100%);">' +
+            return '<div style="display:inline-flex;align-items:center;gap:6px;border:1px solid hsl(var(--border));border-radius:0;padding:4px 10px;background:hsl(var(--card));clip-path:polygon(8% 0%,100% 0%,92% 100%,0% 100%);">' +
               '<div style="width:16px;height:16px;border-radius:3px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + doomLogo(a.key, a.color) + '</div>' +
-              '<span style="font-size:11px;color:hsl(var(--muted-foreground));">' + escapeHtml(a.name) + '</span>' +
               '<span style="font-size:12px;font-weight:700;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</span>' +
             '</div>';
           }).join("") +
