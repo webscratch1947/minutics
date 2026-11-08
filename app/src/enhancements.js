@@ -8143,27 +8143,24 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
         toolHeader("Doom scroll stopper", "Reels and shorts watched.") +
-        '<div style="text-align:center;margin:0 0 12px;">' +
-          '<div style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;color:#111827;">' + total + '</div>' +
-          '<div style="font-size:11px;color:#6B7280;margin-top:2px;">shorts &amp; reels (1s+ on screen)</div>' +
+        '<div style="display:flex;align-items:baseline;gap:8px;margin:0 0 12px;">' +
+          '<div style="font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;color:#111827;">' + total + '</div>' +
+          '<div style="font-size:11px;color:#6B7280;">shorts &amp; reels (1s+)</div>' +
           emptyHint +
         '</div>' +
         '<div style="display:flex;gap:6px;margin:0 0 12px;">' +
           seg("day", "Today") + seg("week", "This week") +
         '</div>' +
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;">' +
           sorted.map(function (a) {
             var n = Number(apps[a.key] || 0) || 0;
-            return '<div style="border:1px solid hsl(var(--border));border-radius:12px;padding:10px 6px;text-align:center;background:hsl(var(--card));">' +
-              '<div style="width:28px;height:28px;border-radius:8px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;margin:0 auto 4px;">' + doomLogo(a.key, a.color) + '</div>' +
-              '<div style="font-size:16px;font-weight:700;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</div>' +
-              '<div style="font-size:10px;color:hsl(var(--muted-foreground));margin-top:2px;">' + escapeHtml(a.name) + '</div>' +
+            return '<div style="display:inline-flex;align-items:center;gap:6px;border:1px solid hsl(var(--border));border-radius:8px;padding:6px 10px;background:hsl(var(--card));">' +
+              '<div style="width:20px;height:20px;border-radius:5px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + doomLogo(a.key, a.color) + '</div>' +
+              '<span style="font-size:12px;color:hsl(var(--muted-foreground));">' + escapeHtml(a.name) + '</span>' +
+              '<span style="font-size:13px;font-weight:700;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</span>' +
             '</div>';
           }).join("") +
         '</div>' +
-        '<p style="font-size:11px;color:hsl(var(--muted-foreground));line-height:1.5;text-align:center;margin:14px 6px 0;">' +
-          'Instagram, Snapchat, YouTube, Facebook, LinkedIn, X.' +
-        '</p>' +
       '</div>';
 
     var btns = activeOverlay.querySelectorAll("[data-doom-mode]");
