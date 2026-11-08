@@ -1394,7 +1394,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       ".lt-rlib-name{margin:0;font-size:14px;font-weight:800;color:hsl(var(--foreground))}",
       ".lt-rlib-desc{margin:3px 0 0;font-size:11px;line-height:1.45;color:hsl(var(--muted-foreground));font-weight:500}",
       ".lt-rlib-slots{margin:11px 0 10px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#b45309;text-transform:uppercase}",
-      ".lt-rlib-apply{margin-top:auto;border:none;border-radius:999px;padding:11px 18px;font:inherit;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:#78350F;background:linear-gradient(135deg,#FCD34D,#F59E0B);cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 20px -8px rgba(245,158,11,.55);transition:transform .08s ease,background .15s ease}",
+      ".lt-rlib-apply{margin-top:auto;border:none;border-radius:999px;padding:11px 18px;font:inherit;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:#fff;background:#111114;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 20px -8px rgba(0,0,0,.35);transition:transform .08s ease,background .15s ease}",
       ".lt-rlib-apply:active{transform:scale(.96)}",
       ".lt-rlib-apply.applied{background:hsl(var(--muted));color:hsl(var(--muted-foreground));box-shadow:none;cursor:default}",
       /* Toast (library apply confirmation) */
@@ -4928,6 +4928,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      and there is never an overlap error). The active preset is remembered
      and its box shows an "✓ Applied" state. */
   var ROUTINE_PRESETS = [
+{ id: "mgr", name: "MGR Routine (Recommended)", emoji: "🧭", desc: "Daily productivity & business execution — dev, clients, growth and wrap-up.",
+      slots: [["Morning Startup","08:00","09:30","🌅"],["Core Development & Operations","10:00","13:30","💻"],["Lunch & Rest Break","13:30","14:30","🍽️"],["Client & Business Growth","15:00","17:30","📈"],["Evening Wrap-Up & Planning","18:00","19:00","🌙"]] },
     { id: "businessman", name: "Businessman", emoji: "💼", desc: "Board meetings, client lunches and evening strategy — a classic corporate day.",
       slots: [["Morning workout","06:00","06:45","🏋️"],["Office & meetings","09:00","13:00","💼"],["Lunch break","13:00","14:00","🍽️"],["Deep work & planning","15:00","18:00","📊"],["Family time","20:00","21:30","👨‍👩‍👧"]] },
     { id: "realestate", name: "Real Estate Agent", emoji: "🏠", desc: "Site visits, client showings and same-day follow-ups keep the pipeline moving.",
@@ -4947,9 +4949,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     { id: "creator", name: "Content Creator", emoji: "🎬", desc: "Ideate, shoot, edit, publish — with an engagement window after.",
       slots: [["Scripting & ideas","09:00","10:30","💡"],["Shooting","11:00","13:00","🎬"],["Editing","15:00","17:30","🎞️"],["Publish & engage","19:00","20:00","📱"]] },
     { id: "sales", name: "Sales Executive", emoji: "📞", desc: "Cold-call blocks, demos, follow-ups and research to feed the pipeline.",
-      slots: [["Cold call block","09:30","11:30","📞"],["Product demos","12:00","13:30","📊"],["Pipeline follow-up","15:00","16:30","🔨"],["Prospect research","17:00","18:00","🔍"]] },
-    { id: "mgr", name: "MGR Routine", emoji: "🧭", desc: "Daily productivity & business execution — dev, clients, growth and wrap-up.",
-      slots: [["Morning Startup","08:00","09:30","🌅"],["Core Development & Operations","10:00","13:30","💻"],["Lunch & Rest Break","13:30","14:30","🍽️"],["Client & Business Growth","15:00","17:30","📈"],["Evening Wrap-Up & Planning","18:00","19:00","🌙"]] }
+      slots: [["Cold call block","09:30","11:30","📞"],["Product demos","12:00","13:30","📊"],["Pipeline follow-up","15:00","16:30","🔨"],["Prospect research","17:00","18:00","🔍"]] }
   ];
 
   function ltToast(msg) {
