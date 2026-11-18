@@ -9057,7 +9057,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
               )
           ) +
           '<button id="lt-plans-close" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);border-radius:12px;color:hsl(230 40% 16%);padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;font-family:inherit;transition:background .15s">Close</button>' +
-          '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">Test mode \u2014 no real payment will be taken</p>' +
+          '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">' + (window.AndroidBridge && typeof window.AndroidBridge.purchasePlan === "function" ? "Purchases are processed securely via Google Play Billing." : "Test mode — no real payment will be taken") + '</p>' +
         '</div>' +
       '</div>';
     var plansHost = activeOverlay && document.body.contains(activeOverlay) ? activeOverlay : document.body;
@@ -9127,7 +9127,44 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     modal.addEventListener("click", function (e) { if (!plansTap(e)) return; if (e.target === modal) modal.remove(); });
   }
 
+  function setPlanFromPurchase(planId) {
+    try { setPlan(planId); } catch (e) {}
+    try { refreshPlanGatedUI(); } catch (e) {}
+    try { if (window.LTAuth && window.LTAuth.syncPlan) window.LTAuth.syncPlan(planId); } catch (e) {}
+  }
+  /* Native Play Billing delivers completed purchases here. */
+  window.onMinuticsPurchase = function (planId) {
+    if (!planId) return;
+    setPlanFromPurchase(planId);
+    try { showMinuticsPurchaseToast("Purchase complete — welcome to " + planId.charAt(0).toUpperCase() + planId.slice(1) + "!"); } catch (e) {}
+  };
+  window.onMinuticsRestore = function (planId) {
+    if (!planId) return;
+    setPlanFromPurchase(planId);
+  };
+  window.onMinuticsPurchaseError = function (planId, message) {
+    try { showUpgradePrompt(message || "Purchase could not be completed."); } catch (e) { alert(message || "Purchase failed."); }
+  };
+  function showMinuticsPurchaseToast(msg) {
+    try { window.LTToast && window.LTToast(msg); } catch (e) {}
+    try {
+      var t = document.createElement("div");
+      t.textContent = msg;
+      t.style.cssText = "position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#111114;color:#fff;padding:10px 16px;border-radius:12px;z-index:2147483000;font:600 13px Inter,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.28)";
+      document.body.appendChild(t);
+      setTimeout(function () { t.style.opacity = "0"; setTimeout(function(){ t.remove(); }, 300); }, 2600);
+    } catch (e) {}
+  }
+
   function showDummyCheckoutForPlan(planId) {
+    /* Real purchase route — Play Billing on Android. Falls through to the
+       test-mode dummy flow on web/demo so the product page still works. */
+    try {
+      if (window.AndroidBridge && typeof window.AndroidBridge.purchasePlan === "function") {
+        window.AndroidBridge.purchasePlan(planId);
+        return;
+      }
+    } catch (e) {}
     /* Block purchasing another plan while a subscription is active */
     if (isPro() && isSubscription()) {
       showUpgradePrompt("You already have an active " + getPlanName() + " subscription. Cancel it first to switch plans.");
