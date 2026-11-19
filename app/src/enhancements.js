@@ -708,6 +708,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var num = (Number(v) || 0).toLocaleString(cur.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return cur.symbol + num;
   }
+  /* Whole-rupee variant — no decimals (saves space in tight cards). */
+  function money0(v) {
+    var cur = getCurrency();
+    var num = Math.round(Number(v) || 0).toLocaleString(cur.locale, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return cur.symbol + num;
+  }
 
   /* ── Calculator "Recent" history: 10-minute auto-expiry ───────────────────
      Every calculation stores a history row with an ISO savedAt stamp. These
@@ -3360,9 +3366,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
        Settings) pass an id here so their ← Back steps back ONE level instead
        of the default data-lt-action="close" which tears down the whole tool.
        Passing backId === false hides the Back button entirely. */
-    var backAttrs = backId === undefined ? 'data-lt-action="close"'
-                     : backId === false ? null
-                     : 'id="' + backId + '"';
+    var backAttrs = backId === false
+      ? null
+      : (backId ? 'id="' + backId + '"' : 'data-lt-action="close"');
     var backHtml = backAttrs ? '<button class="lt-tool-close" ' + backAttrs + '>\u2190 Back</button>' : '';
     return (
       '<div class="lt-tool-top">' +
@@ -8459,6 +8465,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           notifyWasteOver(mins, cfg.minutes);
           syncNotifStateBridge(true);
         }
+        /* Keep native state warm every minute while the app lives on, so the
+           background guard always has up-to-date minute counts when the app
+           is closed/screened-off. syncNotifStateBridge always pushes mins. */
+        syncNotifStateBridge(true);
       } catch (e) {}
     };
     setInterval(check, 60000);
@@ -9733,14 +9743,25 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return Math.min(92, (day / last) * 92);
   }
 
+  /* Whole months elapsed since the 6 Jars were configured (0 if set up this month).
+     Used to accumulate each jar's "so far" amount month-by-month. */
+  function monthsSinceJarsSetup(config) {
+    var s = (config && config.setupDate) || today();
+    var start;
+    try { start = new Date(s.replace(/-/g, "/")); } catch (e) { start = new Date(); }
+    var now = new Date();
+    var months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+    return Math.max(0, months);
+  }
+
   /* Render a single jar card HTML string.
      Primary number = monthly allocation (salary × pct%).
      Sub-label = estimated amount received so far this month. */
-  function buildJarCard(jar, monthlySalary, idx) {
+  function buildJarCard(jar, monthlySalary, idx, monthsSinceSetup) {
     var monthly     = monthlySalary * jar.pct / 100;
-    var fillPct     = currentMonthFillPct();
-    /* Amount received so far this month (pro-rated by day) */
-    var soFarAmt    = monthly * (fillPct / 92);
+    var fillPct     = Math.min(100, monthsSinceSetup);
+    /* Accumulated over whole months since setup */
+    var soFarAmt    = monthly * monthsSinceSetup;
     var delay       = (idx * 0.18).toFixed(2);
     return (
       '<div class="lt-jar-card">' +
@@ -9754,8 +9775,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '</div>' +
         '<span class="lt-jar-pct-pill" style="background:' + jar.color + '">' + jar.pct + '%</span>' +
         '<p class="lt-jar-name">' + escapeHtml(jar.name) + '</p>' +
-        '<p class="lt-jar-saved">' + money(monthly) + '/mo</p>' +
-        '<p class="lt-jar-monthly">~' + money(soFarAmt) + ' so far</p>' +
+        '<p class="lt-jar-saved">' + money0(monthly) + '/mo</p>' +
+        '<p class="lt-jar-monthly">' + money0(soFarAmt) + ' accumulated</p>' +
       '</div>'
     );
   }
@@ -9776,7 +9797,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var totalPct = config.jars.reduce(function (s, j) { return s + (Number(j.pct) || 0); }, 0);
 
     var salaryValHtml = monthlySalary
-      ? '<span class="lt-jars-sum-val">' + money(monthlySalary) + '</span>'
+      ? '<span class="lt-jars-sum-val">' + money0(monthlySalary) + '</span>'
       : '<span class="lt-jars-sum-val lt-jars-sum-empty">\u2014</span>';
 
     /* Actions live directly UNDER the summary — one clean row, left = Jar
@@ -9799,7 +9820,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         summaryActions +
         (monthlySalary
           ? '<div class="lt-jars-grid">' +
-              config.jars.map(function (jar, i) { return buildJarCard(jar, monthlySalary, i); }).join("") +
+              config.jars.map(function (jar, i) { return buildJarCard(jar, monthlySalary, i, monthsSinceJarsSetup(config)); }).join("") +
             '</div>'
           : '<div class="lt-tool-card" style="text-align:center;padding:24px 16px;margin-bottom:16px">' +
               '<div style="display:flex;justify-content:center;align-items:center;margin-bottom:10px"><img src="assets/icons/jar-savings.png" style="width:64px;height:64px;object-fit:contain;opacity:.7"/></div>' +
