@@ -7802,7 +7802,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       else if (PRODSCORE_BOOST.indexOf(e.category) !== -1) boostMin += m;
     });
     if (tracked) { boostMin += tracked.boostMin; wasteMin += tracked.wasteMin; }
-    var score = Math.round(50 + boostMin * 0.4 - wasteMin * 0.5);
+    var score = Math.round(50 + boostMin * 0.5 - wasteMin * 0.5);
     score = Math.min(100, Math.max(0, score));
     return { score: score, boostMin: Math.round(boostMin), wasteMin: Math.round(wasteMin) };
   }
@@ -7859,10 +7859,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             '<div style="font-size:48px;font-weight:800;color:' + color + ';">' + idx.score + '<span style="font-size:20px;color:#9CA3AF;">/100</span></div>' +
           '</div>' +
           '<div class="lt-tool-card">' +
-            '<div class="lt-history-row"><span>Productive minutes (work/study/fitness)</span><strong>+' + escapeHtml(String(idx.boostMin)) + '</strong></div>' +
+            '<div class="lt-history-row"><span>Productive minutes</span><strong>+' + escapeHtml(String(idx.boostMin)) + '</strong></div>' +
             '<div class="lt-history-row"><span>Time Waste minutes</span><strong style="color:#DC2626;">-' + escapeHtml(String(idx.wasteMin)) + '</strong></div>' +
           '</div>' +
-          '<div class="lt-tool-card lt-empty">Score starts at 50 each day: +0.4 per productive minute, -0.5 per wasted minute, clamped 0-100. Tracked timer/stopwatch time counts too.</div>' +
+          '<div class="lt-tool-card lt-empty">Score starts at 50 each day: +0.5 per productive minute, -0.5 per wasted minute, clamped 0-100. Tracked timer/stopwatch time counts too.</div>' +
         '</div>';
     } catch (err) {
       console.error("[ProductivityScore] failed", err);

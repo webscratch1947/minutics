@@ -727,10 +727,6 @@ export function SettingsScreen() {
                 })
               ]
             })
-          }),
-          jsx("p", {
-            className: "px-1 mt-2.5 text-[11px] leading-relaxed text-muted-foreground",
-            children: "Note: Name, email and subscription are never included in the downloaded data — they stay tied to your login and can't be shared or copied from a file."
           })
         ]
       }),
