@@ -694,10 +694,6 @@ export function SettingsScreen() {
                 })
               ]
             })
-          }),
-          jsx("p", {
-            className: "px-1 mt-2.5 text-[11px] leading-relaxed font-medium text-amber-600",
-            children: "Your subscription is saved to your account in the cloud — if you delete this app's local storage (clear app data / reinstall), just sign back in and your plan is restored automatically."
           })
         ]
       }),

@@ -1216,7 +1216,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       /* Closing mirror: tools and their shells slide out together. */
       "#lt-overlay-root[data-lt-closing] .lt-tool-shell{animation:lt-shell-out .2s ease-in forwards}",
       "@keyframes lt-shell-out{to{opacity:0;transform:translateY(10px)}}",
-      ".lt-tool-shell{max-width:700px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top, 0px)) 16px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%}",
+      ".lt-tool-shell{max-width:700px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top, 0px)) 18px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%;overflow-x:clip}",
       /* Classic borderless header — Back link on top, plain kicker, title, description */
       ".lt-tool-top{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin:0 0 18px;color:#111114}",
       ".lt-tool-kicker{display:inline-flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 7px}",
@@ -1292,7 +1292,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       ".lt-gram-feed{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}",
       ".lt-gram-feed::-webkit-scrollbar{display:none}",
       /* Each slide */
-      ".lt-gram-slide{height:100vh;scroll-snap-align:start;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}",
+      ".lt-gram-slide{height:100vh;scroll-snap-align:start;scroll-snap-stop:always;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}",
       ".lt-gram-img{width:100%;height:100%;object-fit:contain;display:block;-webkit-user-drag:none;user-select:none}",
       /* Right action bar */
       ".lt-gram-actions{position:absolute;right:12px;bottom:100px;display:flex;flex-direction:column;align-items:center;gap:22px;z-index:5}",
@@ -1790,7 +1790,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       "#lt-fv-modal-overlay,#lt-fv-share-overlay,#lt-fv-report-overlay{animation:lt-tool-in .3s cubic-bezier(.22,.61,.36,1)}",
       "#lt-fv-modal-overlay.lt-fv-out,#lt-fv-report-overlay.lt-fv-out,#lt-fv-share-overlay.lt-fv-out{animation:lt-tool-out .24s ease-in forwards;pointer-events:none}",
       ".lt-fv-modal-head{position:sticky;top:0;z-index:2;width:100%;max-width:480px;display:flex;align-items:center;gap:10px;padding:14px 16px 10px;background:#FDFBF7;box-sizing:border-box}",
-      ".lt-fv-back{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid rgba(55,48,163,.18);background:#fff;color:#3730A3;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(55,48,163,.08);-webkit-tap-highlight-color:transparent}",
+      ".lt-fv-back{flex:0 0 auto;width:36px;height:36px;border-radius:50%;border:none;background:#111114;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.18);-webkit-tap-highlight-color:transparent}",
       ".lt-fv-back:active{opacity:.7}",
       ".lt-fv-modal-head h3{color:#1E1B4B;font-size:15.5px;font-weight:800;margin:0}",
       ".lt-fv-modal-head p{color:rgba(55,48,163,.6);font-size:11.5px;font-weight:700;margin:1px 0 0}",
@@ -5031,7 +5031,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       routineEditingId = null;
       routineEditingEmoji = "";
       renderRoutine();
-      ltToast("“" + preset.name + "” routine applied");
     });
   }
 
@@ -5644,7 +5643,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             clockButtonHtml("lt-task-time", "") +
           '</div>' +
         '</div>' +
-        '<p class="lt-sheet-group-hint">Both optional \u2014 day + time is an exact deadline, time alone means today, day alone means before that day starts.</p>' +
         '<div class="lt-tasks-sheet-row" style="border-top:none;padding-top:0">' +
           '<input id="lt-task-notes" class="lt-tasks-sheet-notes" type="text" placeholder="Optional notes\u2026">' +
         '</div>' +
@@ -6080,7 +6078,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
               field("Work hours / day", "hours", stored.hours || "8", "e.g. 8", "number") +
               field("Work days / month", "days", stored.days || "22", "e.g. 22", "number") +
             '</div>' +
-            '<div class="lt-form-actions"><button class="lt-tool-primary" type="submit">Save & Calculate</button></div>' +
+            '<div class="lt-form-actions" style="gap:10px;align-items:center">' +
+              (stored.perMinute ? '<button class="lt-tool-secondary" type="button" data-lt-tv-clear style="min-width:90px">Clear</button>' : '') +
+              '<button class="lt-tool-primary" type="submit">Save & Calculate</button>' +
+            '</div>' +
           '</form>' +
         '</div>' +
         '<div id="lt-tv-calc-result" class="lt-tool-card' + (stored.perMinute ? '' : ' lt-empty') + '">' +
@@ -6105,6 +6106,14 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           '</div>' +
         '</div>' +
       '</div>';
+
+    /* Clear handler — wipe the saved config so they can set it up again. */
+    var clearBtn = activeOverlay.querySelector("[data-lt-tv-clear]");
+    if (clearBtn) clearBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      try { writeJson(TIMEVALUE_KEY, null); } catch (e) {}
+      renderTimeValueCalc();
+    });
 
     /* Save handler */
     var form = activeOverlay.querySelector("[data-lt-tv-form]");
@@ -6794,7 +6803,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       '</div>';
     overlay.innerHTML =
       '<div class="lt-fv-modal-head">' +
-        '<button class="lt-fv-back" id="lt-fv-report-close" aria-label="Back">\u2190</button>' +
+        '<button class="lt-fv-back" id="lt-fv-report-close" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>' +
         '<div><h3>Full view</h3><p>' + escapeHtml(dateText) + '</p></div>' +
       '</div>' +
       '<div id="lt-fv-report-body">' +
@@ -6883,7 +6892,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     overlay.id = "lt-fv-share-overlay";
     overlay.innerHTML =
       '<div class="lt-fv-modal-head">' +
-        '<button class="lt-fv-back" id="lt-fv-share-close" aria-label="Back">\u2190</button>' +
+        '<button class="lt-fv-back" id="lt-fv-share-close" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button>' +
         '<div><h3>Share</h3><p>' + escapeHtml(dateText) + '</p></div>' +
       '</div>' +
       '<div class="lt-fv-card-wrap" id="lt-fv-card-wrap"><div class="lt-fv-loading">Building your day\u2019s graphic\u2026</div></div>' +
@@ -7761,42 +7770,90 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     });
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
-     FEATURE — Productivity Score (0-100), computed from today's real logged
-     time: Work / Self-dev / Fitness add points, Time Waste subtracts.
-  ══════════════════════════════════════════════════════════════════════════ */
+  /* Keyword sets for scoring the user's ACTUAL tracked activities (block
+     timer + stopwatch). Activities with no match count as neutral. */
+  var PRODSCORE_GAINS = ["work", "business", "study", "learn", "learning", "read", "write", "writing", "code", "coding", "project", "deep work", "exercise", "fitness", "gym", "walk", "run", "running", "meditat", "mindful", "yoga", "creat", "hobby", "skill", "develop", "practice", "research", "plan", "journal", "language"];
+  var PRODSCORE_LOSSES = ["waste", "doom", "scroll", "reel", "short", "instagram", "tiktok", "youtube", "facebook", "snapchat", "twitter", "x (twitter", "netflix", "prime video", "tv", "movie", "gaming", "game", "games", "nothing", "idle", "sleeping late", "binge"];
 
-   var PRODSCORE_BOOST = ["Job", "Business", "Study / Learning", "Exercise / Fitness", "Creative / Hobby", "Health / Self-care"];
+  function nameMatches(name, list) {
+    if (!name) return false;
+    var n = String(name).toLowerCase();
+    for (var i = 0; i < list.length; i++) if (n.indexOf(list[i]) !== -1) return true;
+    return false;
+  }
 
-  function computeProductivityIndex(entries) {
+  /* Combine two sources of truth:
+       1. tagged category entries (category modal)
+       2. tracked blocks from the stopwatch / timer (activity names)
+     so the score stays live even if the user never tags a category. */
+  function computeProductivityIndex(entries, tracked) {
     var boostMin = 0, wasteMin = 0;
     entries.forEach(function (e) {
       var m = Number(e.minutes) || 0;
       if (WASTE_CATEGORIES.indexOf(e.category) !== -1) wasteMin += m;
       else if (PRODSCORE_BOOST.indexOf(e.category) !== -1) boostMin += m;
     });
+    if (tracked) { boostMin += tracked.boostMin; wasteMin += tracked.wasteMin; }
     var score = Math.round(50 + boostMin * 0.4 - wasteMin * 0.5);
     score = Math.min(100, Math.max(0, score));
-    return { score: score, boostMin: boostMin, wasteMin: wasteMin };
+    return { score: score, boostMin: Math.round(boostMin), wasteMin: Math.round(wasteMin) };
+  }
+
+  function computeTrackedMinutesToday() {
+    try {
+      var raw = localStorage.getItem(NATIVE_DB_KEY);
+      var db = raw ? JSON.parse(raw) : { activities: [], blocks: [] };
+      var activities = Array.isArray(db.activities) ? db.activities : [];
+      var blocks = Array.isArray(db.blocks) ? db.blocks : [];
+      var nameById = {};
+      activities.forEach(function (a) { nameById[a.id] = a.name || ""; });
+      var boost = 0, waste = 0;
+      blocks.forEach(function (b) {
+        if (!b || !b.startTime) return;
+        var s = new Date(b.startTime).getTime();
+        if (!isFinite(s)) return;
+        if (localDayKey() !== localDayKeyFromTime(s)) return;
+        var e = b.endTime ? new Date(b.endTime).getTime() : Date.now();
+        if (!isFinite(e) || e < s) e = Date.now();
+        var mins = (e - s) / 60000;
+        var nm = nameById[b.activityId] || "";
+        /* Don't double-count: if a name gains nothing and loses nothing, it
+           stays neutral (Sleep/Eating etc.). */
+        if (nameMatches(nm, PRODSCORE_LOSSES)) waste += mins;
+        else if (nameMatches(nm, PRODSCORE_GAINS)) boost += mins;
+      });
+      return { boostMin: Math.round(boost), wasteMin: Math.round(waste) };
+    } catch (e) {
+      return { boostMin: 0, wasteMin: 0 };
+    }
+  }
+
+  function localDayKeyFromTime(ts) {
+    try {
+      var d = new Date(ts);
+      var p = function (n) { return String(n).padStart(2, "0"); };
+      return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    } catch (e) { return ""; }
   }
 
   function renderProductivityScore() {
     var entries = catLogEntries().filter(function (e) { return e.date === today(); });
-    var idx = computeProductivityIndex(entries);
+    var tracked = computeTrackedMinutesToday();
+    var idx = computeProductivityIndex(entries, tracked);
     var color = idx.score >= 70 ? "#059669" : idx.score >= 40 ? "#D97706" : "#DC2626";
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
-        toolHeader("Productivity Score", "Your score for today, based on time actually logged.") +
+        toolHeader("Productivity Score", "Your score for today, based on time actually tracked.") +
         '<div class="lt-tool-card" style="text-align:center;">' +
           '<p class="lt-card-title">Today\u2019s score</p>' +
           '<div style="font-size:48px;font-weight:800;color:' + color + ';">' + idx.score + '<span style="font-size:20px;color:#9CA3AF;">/100</span></div>' +
         '</div>' +
         '<div class="lt-tool-card">' +
-          '<div class="lt-history-row"><span>Work / Self-dev / Fitness minutes</span><strong>+' + escapeHtml(String(idx.boostMin)) + '</strong></div>' +
+          '<div class="lt-history-row"><span>Productive minutes (work/study/fitness)</span><strong>+' + escapeHtml(String(idx.boostMin)) + '</strong></div>' +
           '<div class="lt-history-row"><span>Time Waste minutes</span><strong style="color:#DC2626;">-' + escapeHtml(String(idx.wasteMin)) + '</strong></div>' +
         '</div>' +
-        '<div class="lt-tool-card lt-empty">Score starts at 50 each day: +0.4 per productive minute, -0.5 per wasted minute, clamped 0-100.</div>' +
+        '<div class="lt-tool-card lt-empty">Score starts at 50 each day: +0.4 per productive minute, -0.5 per wasted minute, clamped 0-100. Tracked timer/stopwatch time counts too.</div>' +
       '</div>';
   }
 
@@ -8142,6 +8199,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
+        /* Pill above the header: Active (green) = counting, Inactive (red) = off */
+        (window.AndroidBridge && typeof window.AndroidBridge.getDoomScrollEnabled === "function"
+          ? '<div style="display:flex;justify-content:flex-end;margin:-8px 0 -4px"><span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:' + (ltPermUseOn("accessibility") ? '#DCFCE7;color:#166534' : '#FEE2E2;color:#991B1B') + '">' + (ltPermUseOn("accessibility") ? "\u25CF ACTIVE" : "\u25CF INACTIVE") + '</span></div>'
+          : '') +
         toolHeader("Doom scroll stopper", "Reels and shorts watched.") +
         '<div style="margin:0 0 12px;">' +
           (total > 0 ? '<div style="font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;color:#111827;margin-bottom:4px;">' + total + '</div>' : '') +
@@ -8174,6 +8235,22 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var cfg = readJson(WASTE_BUDGET_KEY, { minutes: 45 });
     var wasteMin = computeWasteMinutesToday();
     var over = wasteMin > cfg.minutes;
+    /* Owner often reports "the budget never came" — show the exact live
+       grant state (this tool opens normally without pretending) plus a
+       test-alert button so it can be verified right here. */
+    var permSummary = "Native permission state unknown.";
+    try {
+      if (window.AndroidBridge && typeof window.AndroidBridge.getPermissionStatus === "function") {
+        var ps = window.AndroidBridge.getPermissionStatus();
+        if (typeof ps === "string") ps = JSON.parse(ps);
+        if (ps) {
+          permSummary = "Notifications: " + (ps.notifications ? "granted" : "NOT granted") +
+            " \u00B7 Display over other apps: " + (ps.overlay ? "granted" : "NOT granted");
+        }
+      } else {
+        permSummary = "This tool works fully in the Android app.";
+      }
+    } catch (e) { permSummary = "Could not read permission state."; }
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
@@ -8184,6 +8261,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           '<p data-lt-waste-status style="color:' + (over ? "#DC2626" : "#6B7280") + ';font-weight:' + (over ? "700" : "400") + ';">' +
             (over ? "\u26A0\uFE0F Over your " + cfg.minutes + " min budget!" : "Budget: " + cfg.minutes + " min/day") +
           '</p>' +
+        '</div>' +
+        '<div class="lt-tool-card">' +
+          '<p class="lt-card-title">Alerts</p>' +
+          '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.45">' + permSummary + '</p>' +
+          '<p style="font-size:11px;color:#9CA3AF;margin:0 0 10px;line-height:1.45">Your notifications arrive even with the app closed \u2014 the 15-minute background alarm fires the same alert. Resets at midnight.</p>' +
+          '<button type="button" data-lt-waste-test class="lt-tool-primary" style="width:100%">Test alert</button>' +
         '</div>' +
         '<div class="lt-tool-card">' +
           '<p class="lt-card-title">Daily budget</p>' +
@@ -8199,6 +8282,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       var minutes = Math.max(1, Number(this.querySelector('[name="minutes"]').value) || 45);
       writeJson(WASTE_BUDGET_KEY, { minutes: minutes });
       renderWasteBudget();
+    });
+    /* Diagnostics/self-test: fire the same over-limit path the real watcher
+       uses, WITHOUT consuming today's one-per-day alert. */
+    var testBtn = activeOverlay.querySelector("[data-lt-waste-test]");
+    if (testBtn) testBtn.addEventListener("click", function () {
+      notifyWasteOver(Math.max(1, wasteMin), 1);
+      syncNotifStateBridge(true);
     });
 
     /* Keep the number live while this card is on screen, but only pay
@@ -8465,63 +8555,108 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   function saveBucketItems(items) { writeJson(BUCKET_KEY, items); }
 
   function renderBucketList() {
+    function openAddSheet() {
+      var sheet = document.getElementById("lt-bl-sheet");
+      if (!sheet) return;
+      sheet.classList.add("open");
+      setTimeout(function () {
+        var inp = document.getElementById("lt-bl-input");
+        if (inp) inp.focus();
+      }, 100);
+    }
+    function closeAddSheet() {
+      var sheet = document.getElementById("lt-bl-sheet");
+      if (!sheet) return;
+      sheet.classList.remove("open");
+    }
+
     function rebuild() {
       var items = bucketItems();
       activeOverlay.innerHTML =
-        '<div class="lt-tool-shell">' +
+        '<div class="lt-tool-shell" style="padding-bottom:120px">' +
           toolHeader("Bucket List", "Your dreams and goals \u2014 check them off as you live them.") +
-          '<div style="margin-bottom:12px">' +
-            '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">' +
-              '<input id="lt-bl-input" type="text" placeholder="Add a dream or goal\u2026" style="border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none;width:100%;box-sizing:border-box">' +
-              '<div style="display:flex;gap:8px;align-items:center">' +
-                '<label style="font-size:12px;font-weight:600;color:hsl(var(--muted-foreground))">Target date (optional):</label>' +
-                '<input id="lt-bl-date" type="date" style="border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;outline:none">' +
-              '</div>' +
-              '<button id="lt-bl-add" type="button" class="lt-tool-primary" style="align-self:flex-end;padding:9px 20px">Add Dream</button>' +
-            '</div>' +
-          '</div>' +
           '<div id="lt-bl-list">' +
-            (items.length === 0 ? '<p style="text-align:center;color:hsl(var(--muted-foreground));font-size:13px;margin:24px 0">No dreams yet \u2014 add one above!</p>' :
-              items.map(function (item) {
-                var dateStr = item.date ? ' <span style="font-size:11px;color:hsl(var(--muted-foreground));margin-left:8px">\uD83D\uDCC5 ' + item.date + '</span>' : "";
-                return (
-                  '<div class="lt-tool-card" style="display:flex;align-items:center;gap:10px;opacity:' + (item.done ? ".55" : "1") + '">' +
-                    '<button type="button" data-bl-done="' + item.id + '" style="flex-shrink:0;width:22px;height:22px;border-radius:50%;border:2px solid ' + (item.done ? "#4cd97b" : "hsl(var(--border))") + ';background:' + (item.done ? "#4cd97b" : "transparent") + ';cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:900">' + (item.done ? "\u2713" : "") + '</button>' +
-                    '<span style="flex:1;font-size:14px;font-weight:600;text-decoration:' + (item.done ? "line-through" : "none") + '">' + escapeHtml(item.text) + dateStr + '</span>' +
-                    '<button type="button" data-bl-del="' + item.id + '" style="flex-shrink:0;border:none;background:none;color:#ff4d4d;font-size:18px;cursor:pointer;line-height:1">\u00d7</button>' +
-                  '</div>'
-                );
-              }).join("")
+            (items.length === 0
+              ? '<div style="text-align:center;padding:32px 16px"><div style="font-size:40px;margin-bottom:8px">\u2728</div><p style="color:hsl(var(--muted-foreground));font-size:14px;margin:0">No dreams yet.<br>Tap the button below to add your first dream.</p></div>'
+              : items.map(function (item) {
+                  var dateStr = item.date ? '<span style="flex-shrink:0;font-size:11px;color:hsl(var(--muted-foreground));display:inline-flex;align-items:center;gap:4px">\uD83D\uDCC5 ' + escapeHtml(item.date) + '</span>' : "";
+                  return (
+                    '<div class="lt-tool-card" style="display:flex;align-items:center;gap:10px;opacity:' + (item.done ? ".55" : "1") + ';margin-bottom:10px">' +
+                      '<button type="button" data-bl-done="' + item.id + '" style="flex-shrink:0;width:24px;height:24px;border-radius:50%;border:2px solid ' + (item.done ? "#22c55e" : "hsl(var(--border))") + ';background:' + (item.done ? "#22c55e" : "transparent") + ';cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:900;padding:0;line-height:0">' + (item.done ? "\u2713" : "") + '</button>' +
+                      '<div style="flex:1;min-width:0">' +
+                        '<div style="font-size:15px;font-weight:600;color:hsl(var(--foreground));line-height:1.35;text-decoration:' + (item.done ? "line-through" : "none") + '">' + escapeHtml(item.text) + '</div>' +
+                        (dateStr ? '<div style="margin-top:4px">' + dateStr + '</div>' : '') +
+                      '</div>' +
+                      '<button type="button" data-bl-del="' + item.id + '" style="flex-shrink:0;border:none;background:none;color:#dc2626;font-size:20px;cursor:pointer;line-height:1;padding:4px;opacity:.85">\u00d7</button>' +
+                    '</div>'
+                  );
+                }).join("")
             ) +
           '</div>' +
-        '</div>';
+        '</div>' +
+        /* Bottom sheet — same family as My Tasks / Routine */
+        '<div id="lt-bl-sheet-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:100;"></div>' +
+        '<div class="lt-tasks-sheet" id="lt-bl-sheet" style="position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;max-width:480px;margin:0 auto;border-radius:26px 26px 0 0">' +
+          '<div class="lt-sheet-grip" style="width:44px;height:4px;border-radius:99px;background:hsl(var(--mutedForeground,rgba(0,0,0,.16)));margin:0 auto 16px;"></div>' +
+          '<p style="font-size:18px;font-weight:800;color:hsl(var(--foreground));margin:0 0 4px">Add a dream</p>' +
+          '<input id="lt-bl-input" type="text" placeholder="Sky-diving, learn sitar, see the Taj Mahal..." style="width:100%;box-sizing:border-box;border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:12px;padding:12px 14px;font-size:15px;font-family:inherit;outline:none;margin-top:4px">' +
+          '<div style="display:flex;gap:8px;align-items:center;margin:12px 0 16px">' +
+            '<label style="font-size:12px;font-weight:600;color:hsl(var(--muted-foreground))">Target date (optional)</label>' +
+            '<input id="lt-bl-date" type="date" style="border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none">' +
+          '</div>' +
+          '<div class="lt-form-actions" style="gap:10px;justify-content:flex-end;flex-wrap:nowrap;margin-top:6px">' +
+            '<button class="lt-tool-secondary" type="button" id="lt-bl-cancel" style="flex:1 1 auto;min-width:0">Cancel</button>' +
+            '<button class="lt-tool-primary" type="button" id="lt-bl-save" style="flex:1 1 auto;min-width:0">Add dream</button>' +
+          '</div>' +
+        '</div>' +
+        /* Floating +Add button */
+        '<button type="button" id="lt-bl-fab" style="position:absolute;right:18px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:100;width:60px;height:60px;border-radius:50%;border:none;background:#111114;color:#fff;font-size:26px;line-height:1;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.28);">+</button>';
 
-      document.getElementById("lt-bl-add").addEventListener("click", function () {
-        var inp  = document.getElementById("lt-bl-input");
+      var fab = document.getElementById("lt-bl-fab");
+      var overlay = document.getElementById("lt-bl-sheet-overlay");
+      var sheet = document.getElementById("lt-bl-sheet");
+      if (fab) fab.addEventListener("click", openAddSheet);
+      if (overlay) overlay.addEventListener("click", closeAddSheet);
+      function setOpen(open) {
+        if (sheet) sheet.style.transform = open ? "translateY(0)" : "translateY(110%)";
+        if (overlay) {
+          overlay.style.opacity = open ? "1" : "0";
+          overlay.style.pointerEvents = open ? "auto" : "none";
+        }
+      }
+      var cancelBtn = document.getElementById("lt-bl-cancel");
+      if (cancelBtn) cancelBtn.addEventListener("click", function () { closeAddSheet(); });
+      var saveBtn = document.getElementById("lt-bl-save");
+      if (saveBtn) saveBtn.addEventListener("click", function () {
+        var inp = document.getElementById("lt-bl-input");
         var datI = document.getElementById("lt-bl-date");
         var text = (inp && inp.value.trim()) || "";
-        if (!text) { inp && (inp.style.borderColor = "#ff4d4d"); return; }
+        if (!text) { if (inp) inp.style.borderColor = "#dc2626"; return; }
         var items2 = bucketItems();
         items2.unshift({ id: genId(), text: text, date: datI && datI.value ? datI.value : "", done: false, createdAt: new Date().toISOString() });
         saveBucketItems(items2);
         rebuild();
+        openAddSheet();
       });
+      /* Inside the opened sheet, watch its visibility via inline transform
+         every time rebuild replaces the DOM — sheet always starts closed. */
+      setOpen(false);
 
       if (activeOverlay._blClickFn) {
         activeOverlay.removeEventListener("click", activeOverlay._blClickFn);
         activeOverlay._blClickFn = null;
       }
       activeOverlay._blClickFn = function (e) {
-        var doneBtn = e.target.closest("[data-bl-done]");
+        var t = e.target; if (!t) return;
+        var doneBtn = t.closest && t.closest("[data-bl-done]");
+        var delBtn  = t.closest && t.closest("[data-bl-del]");
         if (doneBtn) {
           var id = doneBtn.getAttribute("data-bl-done");
-          var items3 = bucketItems();
-          items3 = items3.map(function (it) { return it.id === id ? Object.assign({}, it, { done: !it.done }) : it; });
+          var items3 = bucketItems().map(function (it) { return it.id === id ? Object.assign({}, it, { done: !it.done }) : it; });
           saveBucketItems(items3);
           rebuild();
           return;
         }
-        var delBtn = e.target.closest("[data-bl-del]");
         if (delBtn) {
           var id2 = delBtn.getAttribute("data-bl-del");
           saveBucketItems(bucketItems().filter(function (it) { return it.id !== id2; }));
@@ -9569,7 +9704,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             '<p class="lt-card-subtitle">Set your monthly salary above to see it split across the 6 jars.</p>' +
           '</div>'
         ) +
-        '<button class="lt-jars-settings-btn" id="lt-jars-open-settings">\u2699\uFE0F\u2003Jar Settings</button>' +
+        (monthlySalary
+          ? '<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:2px">' +
+              '<button class="lt-jars-settings-btn" id="lt-jars-open-settings" style="flex:1;margin-bottom:0">\u2699\uFE0F\u2003Jar Settings</button>' +
+              '<button class="lt-jars-edit-salary-btn lt-jars-edit-salary-btn--small" id="lt-jars-edit-salary-inline" style="flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border-radius:12px;font-size:13px">\u270F\uFE0F Edit salary</button>' +
+            '</div>'
+          : '<button class="lt-jars-settings-btn" id="lt-jars-open-settings">\u2699\uFE0F\u2003Jar Settings</button>')
       '</div>';
 
     if (monthlySalary) triggerJarAnimation();
@@ -9578,6 +9718,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     if (settingsBtn) settingsBtn.addEventListener("click", renderJarSettings);
     var editSalaryBtn = document.getElementById("lt-jars-edit-salary");
     if (editSalaryBtn) editSalaryBtn.addEventListener("click", renderJarSalaryEdit);
+    var editSalaryInline = document.getElementById("lt-jars-edit-salary-inline");
+    if (editSalaryInline) editSalaryInline.addEventListener("click", renderJarSalaryEdit);
   }
 
   /* Small in-place sheet for setting/editing the 6 Jars monthly salary.
@@ -9686,7 +9828,15 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         btn.addEventListener('click', function () {
           var idx = Number(btn.getAttribute('data-idx'));
           var cfg = getJarsConfig();
-          if (cfg.jars.length <= 1) { ltAlert("You need at least one jar."); return; }
+          if (cfg.jars.length <= 1) {
+            var msgEl = document.getElementById("lt-jar-total-msg");
+            if (msgEl) {
+              msgEl.textContent = "You need at least one jar.";
+              msgEl.style.color = "#ef4444";
+              msgEl.style.fontWeight = "800";
+            }
+            return;
+          }
           cfg.jars.splice(idx, 1);
           saveJarsConfig(cfg);
           refreshRows();
@@ -9697,8 +9847,24 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     updateTotalLabel();
     bindEvents();
 
+    function goBackToJars() {
+      /* Remove our back-stack entry (once only) and re-render. */
+      if (window.LTBackStack && window.LTBackStack.length) {
+        var i = window.LTBackStack.indexOf(goBackToJars);
+        if (i >= 0) window.LTBackStack.splice(i, 1);
+      }
+      renderSixJars();
+      return true;
+    }
+    if (window.LTBackStack) {
+      window.LTBackStack = (window.LTBackStack || []).filter(function (h) { return h !== goBackToJars; });
+      window.LTBackStack.push(goBackToJars);
+    } else {
+      window.LTBackStack = [goBackToJars];
+    }
+
     var backBtn = document.getElementById("lt-jar-back");
-    if (backBtn) backBtn.addEventListener("click", renderSixJars);
+    if (backBtn) backBtn.addEventListener("click", goBackToJars);
 
     var addBtn = document.getElementById("lt-jar-add");
     if (addBtn) addBtn.addEventListener("click", function () {
@@ -9734,7 +9900,20 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       });
       var total = newJars.reduce(function (s, j) { return s + j.pct; }, 0);
       if (total <= 0 || total > 100) {
-        ltAlert("Percentages must add up to 100% or less. Currently: " + total + "%");
+        /* In-tool error banner — NOT app-wide popover, it lives inside the
+           jar settings card. */
+        var msgEl = document.getElementById("lt-jar-total-msg");
+        if (msgEl) {
+          msgEl.textContent = "\u26A0\uFE0F Percentages must add up to 100% or less. Currently: " + total + "%";
+          msgEl.style.color = "#ef4444";
+          msgEl.style.fontWeight = "800";
+          var card = activeOverlay.querySelector(".lt-tool-card");
+          if (card) {
+            card.style.animation = "none";
+            void card.offsetHeight; /* reflow */
+            card.style.animation = "lt-shell-in .3s cubic-bezier(.22,.61,.36,1)";
+          }
+        }
         return;
       }
       saveJarsConfig({ jars: newJars, setupDate: cfg.setupDate || today() });
@@ -9744,6 +9923,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
   /* Expose back-button handler for Android's onBackPressed */
   window.LTHandleBack = function () {
+    /* Nested back stack for tools with internal screens (e.g. Jar Settings).
+       Consumers pop a handler (it runs renderSixJars etc.) before we close
+       the outer overlay. */
+    if (window.LTBackStack && window.LTBackStack.length) {
+      var h = window.LTBackStack.pop();
+      try { if (h) return h() === true; } catch (e) { /* fall through */ }
+    }
     /* Category tag sheet first — it sits above every other overlay. */
     if (catModalRoot) {
       closeCategoryModal("cancel");

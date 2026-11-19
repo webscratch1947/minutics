@@ -621,26 +621,25 @@ export function mk({
     children: text
   });
 
-  /* v2 CTA: SOLID green rounded button (no gradient, no pill — those
-     belong to the login screens, which the owner wants kept out of the
-     onboarding); CLEAN WARM GRAY when disabled (never the washed-out
-     pale green the owner flagged). v1 keeps the original flat button. */
+  /* v2 CTA: BLACK full pill button with black text-white everywhere
+     (owner), disabled = CLEAN WARM GRAY. v1 flat black. */
+  const BLACK = "#111114";
   const nextBtn = (onClick, disabled, text) => jsx("button", {
     type: "button",
     onClick: onClick,
     disabled: disabled,
     className: ONB_V2
-      ? "w-full py-3 rounded-xl font-bold text-[15px] transition-all active:scale-[.98]"
-      : "w-full py-4 rounded-xl font-bold text-base text-white transition-opacity",
+      ? "w-full py-3 rounded-full font-bold text-[15px] text-white transition-all active:scale-[.98]"
+      : "w-full py-4 rounded-full font-bold text-base text-white transition-opacity",
     style: ONB_V2
       ? (disabled
           ? { background: "#E9E4D7", color: "#9AA1AE", boxShadow: "none", cursor: "default" }
           : {
-              background: GREEN,
+              background: BLACK,
               color: "#fff",
-              boxShadow: "0 6px 14px -8px rgba(21,115,71,.5)"
+              boxShadow: "0 8px 18px -10px rgba(17,17,20,.45)"
             })
-      : { background: GREEN, opacity: disabled ? 0.4 : 1 },
+      : { background: BLACK, opacity: disabled ? 0.4 : 1 },
     children: text
   });
 
@@ -685,18 +684,12 @@ export function mk({
     });
     /* No arrow on the redesigned CTA (owner: "why is there a arrow for
        every button"); v1/live keeps its original label untouched. */
-    footer = nextBtn(() => go(ANDROID_NATIVE ? "permissions" : "name"), false, ONB_V2 ? "Get Started" : "Get Started \u2192");
+    footer = nextBtn(() => go(ANDROID_NATIVE ? "permissions" : "name"), false, ONB_V2 ? "Get Started" : "Get Started");
   }
 
   if (t === "permissions") {
     body = jsx(PermissionsStep, { onChange: setPermsReady });
-    footer = jsxs("div", { className: "flex flex-col gap-2", children: [
-      nextBtn(() => go("name"), !permsReady, ONB_V2 ? "Next" : "Next \u2192"),
-      jsx("p", {
-        className: "text-[11.5px] text-center text-[#9AA1AE] leading-relaxed px-2",
-        children: "Accessibility is optional — only the Doom scroll stopper needs it. Everything else keeps your reminders alive."
-      })
-    ] });
+    footer = nextBtn(() => go("name"), !permsReady, ONB_V2 ? "Next" : "Next");
   }
 
   if (t === "name") {
@@ -720,7 +713,7 @@ export function mk({
         }) })
       ]
     });
-    footer = nextBtn(() => go("dob"), !r.trim(), ONB_V2 ? "Next" : "Next \u2192");
+    footer = nextBtn(() => go("dob"), !r.trim(), ONB_V2 ? "Next" : "Next");
   }
 
   if (t === "dob") {
@@ -864,7 +857,7 @@ export function mk({
         ]})
       ]
     });
-    footer = nextBtn(() => go("salary"), !dobValid, ONB_V2 ? "Next" : "Next \u2192");
+    footer = nextBtn(() => go("salary"), !dobValid, ONB_V2 ? "Next" : "Next");
   }
 
   if (t === "salary") {
@@ -911,18 +904,21 @@ export function mk({
     footer = jsxs("div", {
       className: "flex flex-col gap-2",
       children: [
-        nextBtn(() => finish(true), !(salaryNum > 0), ONB_V2 ? "Done" : "Done \u2192"),
+        nextBtn(() => finish(true), !(salaryNum > 0), ONB_V2 ? "Done" : "Done"),
         jsx("button", {
           type: "button",
           onClick: () => finish(false),
-          /* v2: a quiet ghost link (the red block competed with the real
-             CTA) — RED on the salary step (owner: "in the salary make the
-             skip text red"); earlier steps keep the quiet gray. v1 keeps
-             the original red button. */
+          /* Owner: small compact Skip — red bg, white text, different font
+             family, pill ends. */
           className: ONB_V2
-            ? "w-full py-3 text-sm font-bold text-[#DC2626] rounded-2xl transition-colors active:bg-black/5"
-            : "w-full py-3 text-sm font-bold text-white rounded-xl transition-colors active:opacity-80",
-          style: ONB_V2 ? undefined : { background: "#DC2626" },
+            ? "self-center px-6 py-1.5 text-[11px] font-black uppercase text-white rounded-full transition-all active:scale-[.96]"
+            : "self-center px-6 py-1.5 text-xs font-black uppercase text-white rounded-full transition-colors",
+          style: {
+            background: "#DC2626",
+            fontFamily: "'Georgia', 'Times New Roman', serif",
+            letterSpacing: "0.08em",
+            width: "auto"
+          },
           children: "Skip for now"
         })
       ]

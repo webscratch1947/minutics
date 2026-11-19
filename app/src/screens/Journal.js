@@ -425,9 +425,10 @@ export function JournalScreen() {
                         className: "font-mono text-sm font-bold text-muted-foreground whitespace-nowrap shrink-0",
                         children: dg.totalSeconds > 0 ? formatDuration(dg.totalSeconds) : "00:00"
                       }),
-                      // Expand indicator (static, flips instantly)
+                      // Expand indicator (vertically centered with the row text)
                       jsx("span", {
-                        className: "text-muted-foreground text-[17px] font-black leading-none",
+                        className: "text-muted-foreground text-[19px] font-black leading-none",
+                        style: { display: "inline-flex", alignItems: "center", justifyContent: "center", height: "20px", marginTop: "1px" },
                         children: isOpen ? "\u25BE" : "\u25B8"
                       })
                     ]

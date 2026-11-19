@@ -357,7 +357,7 @@ export function PermissionsStep({ onChange }) {
         ]
       }, perm.key);
     }) }),
-    jsx('p', { className: 'lt-perm-note', children: 'Required rows must show a green tick. Accessibility is optional — only the Doom scroll stopper needs it.' }),
+    null,
     tutorial ? jsx(GuideSheet, {
       perm: tutorial,
       index: PERMISSION_ROWS.findIndex(function (r) { return r.key === tutorial.key; }),
