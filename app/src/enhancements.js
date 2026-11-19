@@ -8669,16 +8669,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       if (!sheet || !overlay) return;
       /* Hide the FAB while the sheet is open — the sheet has its own CTA. */
       if (fab) fab.style.display = "none";
+      /* Force the backdrop on. */
+      overlay.style.display = "block";
+      overlay.style.pointerEvents = "auto";
+      overlay.style.opacity = "1";
+      /* Hidden start, then animate in — the transition MUST start from a
+         distinct frame so it actually plays. */
       sheet.style.transform = "translateY(110%)";
       sheet.style.transition = "transform .35s cubic-bezier(.32,.72,0,1)";
-      overlay.style.pointerEvents = "auto";
-      overlay.style.opacity = "0";
-      /* Reflow so the browser registers the off-screen transform before
-         reversing it — otherwise the transition never starts. */
       void sheet.offsetHeight;
       requestAnimationFrame(function () {
         sheet.style.transform = "translateY(0)";
-        overlay.style.opacity = "1";
       });
       setTimeout(function () {
         var inp = document.getElementById("lt-bl-input");
@@ -8692,7 +8693,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       if (!sheet || !overlay) return;
       sheet.style.transform = "translateY(110%)";
       overlay.style.opacity = "0";
+      /* pointer-events off so nobody can tap through, and check with display so
+         it actually disappears from the AX tree. */
       overlay.style.pointerEvents = "none";
+      overlay.style.display = "none";
       if (fab) fab.style.display = "";
     }
 
@@ -8722,7 +8726,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '</div>' +
         /* Bottom sheet — same pattern as My Tasks: lt-tasks-sheet on the
            panel + absolute backdrop for the tap-outside-to-close surface. */
-        '<div id="lt-bl-sheet-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:90"></div>' +
+        '<div id="lt-bl-sheet-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;display:none;transition:opacity .3s ease;z-index:90"></div>' +
         '<div class="lt-tasks-sheet" id="lt-bl-sheet" style="position:fixed;bottom:0;left:0;right:0;z-index:100;max-width:480px;margin:0 auto">' +
           '<div class="lt-sheet-grip" style="width:44px;height:4px;border-radius:99px;background:hsl(var(--mutedForeground,rgba(0,0,0,.16)));margin:0 auto 16px;"></div>' +
           '<p style="font-size:18px;font-weight:800;color:hsl(var(--foreground));margin:0 0 4px">Add a dream</p>' +
@@ -8745,14 +8749,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       if (fab) fab.addEventListener("click", openAddSheet);
       if (overlay) overlay.addEventListener("click", closeAddSheet);
       function setOpen(open) {
-        if (sheet) {
-          sheet.style.transition = "transform .35s cubic-bezier(.32,.72,0,1)";
-          sheet.style.transform = open ? "translateY(0)" : "translateY(110%)";
-        }
-        if (overlay) {
-          overlay.style.opacity = open ? "1" : "0";
-          overlay.style.pointerEvents = open ? "auto" : "none";
-        }
+        if (open) openAddSheet();
+        else closeAddSheet();
       }
       var cancelBtn = document.getElementById("lt-bl-cancel");
       if (cancelBtn) cancelBtn.addEventListener("click", function () { closeAddSheet(); });
