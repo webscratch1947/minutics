@@ -425,11 +425,17 @@ export function JournalScreen() {
                         className: "font-mono text-sm font-bold text-muted-foreground whitespace-nowrap shrink-0",
                         children: dg.totalSeconds > 0 ? formatDuration(dg.totalSeconds) : "00:00"
                       }),
-                      // Expand indicator (vertically centered with the row text)
+                      // Expand indicator: clean SVG chevron, truly centered
                       jsx("span", {
-                        className: "text-muted-foreground text-[19px] font-black leading-none",
-                        style: { display: "inline-flex", alignItems: "center", justifyContent: "center", height: "20px", marginTop: "1px" },
-                        children: isOpen ? "\u25BE" : "\u25B8"
+                        style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: "18px", height: "18px", flexShrink: 0 },
+                        children: jsx("svg", {
+                          width: 12, height: 12, viewBox: "0 0 24 24", fill: "none",
+                          stroke: "currentColor", "stroke-width": 2.8, "stroke-linecap": "round", "stroke-linejoin": "round",
+                          style: { color: "hsl(var(--muted-foreground))", transition: "transform .18s ease", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" },
+                          children: jsxs(Fragment, { children: [
+                            jsx("polyline", { points: "9 6 15 12 9 18" })
+                          ] })
+                        })
                       })
                     ]
                   })

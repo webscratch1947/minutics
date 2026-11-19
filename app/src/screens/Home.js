@@ -2811,7 +2811,40 @@ export function ActivityScreen({ profile }) {
     });
   };
 
+  /* "Time Waste budget over for today?" — decided purely from localStorage
+     so the React gate can mirror the enhancements-level computation. */
+  function wasteBudgetOver() {
+    try {
+      const day = new Date().toISOString().slice(0, 10);
+      const blocked = localStorage.getItem('lt_waste_blocked_v1');
+      if (blocked === day) return true;
+      const cfg = JSON.parse(localStorage.getItem('lt_waste_budget_v1') || '{}');
+      const limit = Number(cfg && cfg.minutes) || 45;
+      const entries = JSON.parse(localStorage.getItem('lt_category_log_v1') || '[]');
+      let mins = 0;
+      for (const e of entries) {
+        const cat = (e && e.category) || '';
+        const match = ['Time Waste', 'Social Media', 'Entertainment'].some((w) => cat.toLowerCase().indexOf(w.toLowerCase()) !== -1);
+        if (match && ((e && (e.ldate || e.date)) === day)) mins += Number(e.minutes) || 0;
+      }
+      return mins >= limit;
+    } catch (e) { return false; }
+  }
+
   const startTimer = (activity) => {
+    /* If the day's Time Waste budget is crossed, block starting any
+       time-waste activity and point the user at the budget tool. */
+    try {
+      const nm = String((activity && activity.name) || '').toLowerCase();
+      const isWaste = ['time waste', 'social media', 'entertain', 'doom'].some(w => nm.includes(w));
+      if (isWaste && wasteBudgetOver()) {
+        const continueBtn = window.confirm(
+          "Your Time Waste budget for today is over.\n\nOpen Time Waste Budget tool to raise your limit?"
+        );
+        if (continueBtn) window.location.hash = '#/life-hub';
+        return;
+      }
+    } catch (e) {}
     const doCreate = () => {
       createBlock.mutate({
         data: { activityId: activity.id, startTime: new Date().toISOString() }

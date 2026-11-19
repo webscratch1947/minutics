@@ -1216,7 +1216,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       /* Closing mirror: tools and their shells slide out together. */
       "#lt-overlay-root[data-lt-closing] .lt-tool-shell{animation:lt-shell-out .2s ease-in forwards}",
       "@keyframes lt-shell-out{to{opacity:0;transform:translateY(10px)}}",
-      ".lt-tool-shell{max-width:700px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top, 0px)) 18px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%;overflow-x:clip}",
+      ".lt-tool-shell{max-width:700px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top, 0px)) 20px calc(100px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;width:100%;overflow-x:clip}",
       /* Classic borderless header — Back link on top, plain kicker, title, description */
       ".lt-tool-top{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin:0 0 18px;color:#111114}",
       ".lt-tool-kicker{display:inline-flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:hsl(var(--muted-foreground));font-weight:700;margin:0 0 7px}",
@@ -1435,7 +1435,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       ".lt-tasks-sheet-dismiss{position:absolute;top:0;left:0;right:0;bottom:0;z-index:29;background:rgba(0,0,0,.25)}",
 
       /* ── 6 Jars System ───────────────────────────────────────────────── */
-      ".lt-jars-summary{display:flex;gap:12px;margin-bottom:16px}",
+      ".lt-jars-summary{display:flex;gap:10px;margin-bottom:12px}",
       ".lt-jars-sum-item{flex:1;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:13px;box-shadow:0 1px 3px rgba(0,0,0,.04)}",
       ".lt-jars-sum-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:hsl(var(--muted-foreground));margin:0 0 4px}",
       ".lt-jars-sum-val{display:block;font-size:18px;font-weight:900;color:hsl(var(--foreground));margin:0}",
@@ -3358,13 +3358,15 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   function toolHeader(title, description, backId) {
     /* backId: optional. Sub-pages (e.g. 6 Jars → Monthly Salary / Jar
        Settings) pass an id here so their ← Back steps back ONE level instead
-       of the default data-lt-action="close" which tears down the whole tool. */
-    var backAttrs = backId
-      ? 'id="' + backId + '"'
-      : 'data-lt-action="close"';
+       of the default data-lt-action="close" which tears down the whole tool.
+       Passing backId === false hides the Back button entirely. */
+    var backAttrs = backId === undefined ? 'data-lt-action="close"'
+                     : backId === false ? null
+                     : 'id="' + backId + '"';
+    var backHtml = backAttrs ? '<button class="lt-tool-close" ' + backAttrs + '>\u2190 Back</button>' : '';
     return (
       '<div class="lt-tool-top">' +
-        '<button class="lt-tool-close" ' + backAttrs + '>\u2190 Back</button>' +
+        backHtml +
         '<div>' +
           '<p class="lt-tool-kicker">Life Hub</p>' +
           '<h1 class="lt-tool-heading">' + escapeHtml(title) + '</h1>' +
@@ -7837,24 +7839,37 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   }
 
   function renderProductivityScore() {
-    var entries = catLogEntries().filter(function (e) { return e.date === today(); });
-    var tracked = computeTrackedMinutesToday();
-    var idx = computeProductivityIndex(entries, tracked);
-    var color = idx.score >= 70 ? "#059669" : idx.score >= 40 ? "#D97706" : "#DC2626";
+    try {
+      var entries = catLogEntries().filter(function (e) { return e.date === today(); });
+      var tracked = computeTrackedMinutesToday();
+      var idx = computeProductivityIndex(entries, tracked);
+      var color = idx.score >= 70 ? "#059669" : idx.score >= 40 ? "#D97706" : "#DC2626";
 
-    activeOverlay.innerHTML =
-      '<div class="lt-tool-shell">' +
-        toolHeader("Productivity Score", "Your score for today, based on time actually tracked.") +
-        '<div class="lt-tool-card" style="text-align:center;">' +
-          '<p class="lt-card-title">Today\u2019s score</p>' +
-          '<div style="font-size:48px;font-weight:800;color:' + color + ';">' + idx.score + '<span style="font-size:20px;color:#9CA3AF;">/100</span></div>' +
-        '</div>' +
-        '<div class="lt-tool-card">' +
-          '<div class="lt-history-row"><span>Productive minutes (work/study/fitness)</span><strong>+' + escapeHtml(String(idx.boostMin)) + '</strong></div>' +
-          '<div class="lt-history-row"><span>Time Waste minutes</span><strong style="color:#DC2626;">-' + escapeHtml(String(idx.wasteMin)) + '</strong></div>' +
-        '</div>' +
-        '<div class="lt-tool-card lt-empty">Score starts at 50 each day: +0.4 per productive minute, -0.5 per wasted minute, clamped 0-100. Tracked timer/stopwatch time counts too.</div>' +
-      '</div>';
+      activeOverlay.innerHTML =
+        '<div class="lt-tool-shell">' +
+          toolHeader("Productivity Score", "Your score for today, based on time actually tracked.") +
+          '<div class="lt-tool-card" style="text-align:center;">' +
+            '<p class="lt-card-title">Today\u2019s score</p>' +
+            '<div style="font-size:48px;font-weight:800;color:' + color + ';">' + idx.score + '<span style="font-size:20px;color:#9CA3AF;">/100</span></div>' +
+          '</div>' +
+          '<div class="lt-tool-card">' +
+            '<div class="lt-history-row"><span>Productive minutes (work/study/fitness)</span><strong>+' + escapeHtml(String(idx.boostMin)) + '</strong></div>' +
+            '<div class="lt-history-row"><span>Time Waste minutes</span><strong style="color:#DC2626;">-' + escapeHtml(String(idx.wasteMin)) + '</strong></div>' +
+          '</div>' +
+          '<div class="lt-tool-card lt-empty">Score starts at 50 each day: +0.4 per productive minute, -0.5 per wasted minute, clamped 0-100. Tracked timer/stopwatch time counts too.</div>' +
+        '</div>';
+    } catch (err) {
+      console.error("[ProductivityScore] failed", err);
+      try {
+        activeOverlay.innerHTML =
+          '<div class="lt-tool-shell">' +
+            toolHeader("Productivity Score", "Unable to compute score right now.") +
+            '<div class="lt-tool-card" style="text-align:center;">' +
+              '<p style="font-size:13px;color:#6B7280;margin:0;line-height:1.45">Could not compute your score this time. Try again after logging some time.</p>' +
+            '</div>' +
+          '</div>';
+      } catch (e2) {}
+    }
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -8095,6 +8110,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       return m[key] !== false;
     } catch (e) { return true; }
   }
+  function isAndroidNative() {
+    try {
+      if (window.AndroidBridge && typeof window.AndroidBridge.getPermissionStatus === "function") return true;
+      if (window.AndroidBridge && typeof window.AndroidBridge.getDoomScrollEnabled === "function") return true;
+      return false;
+    } catch (e) { return false; }
+  }
   var _doomMode = "day";
   var DOOM_APPS = [
     { key: "instagram", name: "Instagram",   color: "#E1306C", bg: "#FCE7F3" },
@@ -8199,24 +8221,37 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
-        /* Pill above the header: Active (green) = counting, Inactive (red) = off */
-        (window.AndroidBridge && typeof window.AndroidBridge.getDoomScrollEnabled === "function"
-          ? '<div style="display:flex;justify-content:flex-end;margin:-8px 0 -4px"><span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:' + (ltPermUseOn("accessibility") ? '#DCFCE7;color:#166534' : '#FEE2E2;color:#991B1B') + '">' + (ltPermUseOn("accessibility") ? "\u25CF ACTIVE" : "\u25CF INACTIVE") + '</span></div>'
+        /* Status row only on-device: Back on the left, live INACTIVE/ACTIVE
+           pill on the right. */
+        (isAndroidNative()
+          ? (() => {
+              var granted = false;
+              try {
+                var ps = window.AndroidBridge && typeof window.AndroidBridge.getPermissionStatus === "function"
+                  ? window.AndroidBridge.getPermissionStatus() : null;
+                if (ps) { var o = JSON.parse(ps) || {}; granted = !!o.accessibility; }
+              } catch (e) {}
+              var on = granted;
+              return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px">' +
+                '<button class="lt-tool-close" data-lt-action="close" style="height:40px;padding:0 14px">\u2190 Back</button>' +
+                '<span style="font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:6px 14px;border-radius:999px;background:' + (on ? '#DCFCE7;color:#166534' : '#FEE2E2;color:#991B1B') + ';white-space:nowrap">' + (on ? "\u25CF ACTIVE" : "\u25CF INACTIVE") + '</span>' +
+              '</div>';
+            })()
           : '') +
-        toolHeader("Doom scroll stopper", "Reels and shorts watched.") +
-        '<div style="margin:0 0 12px;">' +
+        toolHeader("Doom scroll stopper", "Reels and shorts watched.", isAndroidNative() ? false : undefined) +
+        '<div style="margin:0 0 12px;min-height:0">' +
           (total > 0 ? '<div style="font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;color:#111827;margin-bottom:4px;">' + total + '</div>' : '') +
           emptyHint +
         '</div>' +
         '<div style="display:flex;gap:6px;margin:0 0 12px;">' +
           seg("day", "Today") + seg("week", "This week") +
         '</div>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:6px;">' +
+        '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">' +
           sorted.map(function (a) {
             var n = Number(apps[a.key] || 0) || 0;
-            return '<div style="display:inline-flex;align-items:center;gap:12px;border:1px solid hsl(var(--border));border-radius:0;padding:10px 20px;background:hsl(var(--card));clip-path:polygon(8% 0%,100% 0%,92% 100%,0% 100%);">' +
-              '<div style="width:36px;height:36px;border-radius:6px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + doomLogo(a.key, a.color) + '</div>' +
-              '<span style="font-size:22px;font-weight:700;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</span>' +
+            return '<div style="display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid hsl(var(--border));border-radius:0;padding:12px 10px;background:hsl(var(--card));clip-path:polygon(7% 0%,100% 0%,93% 100%,0% 100%);min-width:0;overflow:hidden">' +
+              '<div style="width:34px;height:34px;border-radius:6px;background:' + a.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + doomLogo(a.key, a.color) + '</div>' +
+              '<span style="font-size:18px;font-weight:700;color:' + (n > 0 ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))') + ';">' + n + '</span>' +
             '</div>';
           }).join("") +
         '</div>' +
@@ -8287,6 +8322,31 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
        uses, WITHOUT consuming today's one-per-day alert. */
     var testBtn = activeOverlay.querySelector("[data-lt-waste-test]");
     if (testBtn) testBtn.addEventListener("click", function () {
+      /* No permissions → in-app toast telling them where to enable instead
+         of pestering them with Android permission dialogs. */
+      var ps = null;
+      try {
+        if (window.AndroidBridge && typeof window.AndroidBridge.getPermissionStatus === "function") {
+          var raw = window.AndroidBridge.getPermissionStatus();
+          ps = typeof raw === "string" ? JSON.parse(raw) : raw;
+        }
+      } catch (e) {}
+      if (ps) {
+        if (!ps.notifications) {
+          showSimpleToast(
+            "Notifications off",
+            "Enable Notifications in Settings → Permissions — and Display over other apps for the full-screen alert."
+          );
+          return;
+        }
+        if (!ps.overlay) {
+          showSimpleToast(
+            "Display over other apps off",
+            "Enable Display over other apps in Settings → Permissions — required for the alert over any app."
+          );
+          return;
+        }
+      }
       notifyWasteOver(Math.max(1, wasteMin), 1);
       syncNotifStateBridge(true);
     });
@@ -8393,6 +8453,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         if (mins > cfg.minutes && _wasteNotifiedDay !== day) {
           _wasteNotifiedDay = day;
           writeJson(WASTE_NOTIFIED_DAY_KEY, day);
+          /* Also mark the day as "blocked" — starting a Time Waste
+             activity is then gated at the Activity screen too. */
+          try { localStorage.setItem("lt_waste_blocked_v1", day); } catch (e) {}
           notifyWasteOver(mins, cfg.minutes);
           syncNotifStateBridge(true);
         }
@@ -8401,6 +8464,18 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     setInterval(check, 60000);
     document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
     setTimeout(check, 4000);
+  })();
+  /* TimeWasteGuard overlay → see charge in Account: open the tool too.
+     The native overlay writes lt_overlay_open_tool=wastebudget when tapped. */
+  (function watchOverlayOpenTool() {
+    setInterval(function () {
+      try {
+        var t = localStorage.getItem("lt_overlay_open_tool");
+        if (!t) return;
+        localStorage.setItem("lt_overlay_open_tool", "");
+        if (t === "wastebudget") openOverlay(renderWasteBudget);
+      } catch (e) {}
+    }, 800);
   })();
 
   /* ── Primary tool actions turn green for ~3.5s after they succeed ──
@@ -8557,17 +8632,36 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   function renderBucketList() {
     function openAddSheet() {
       var sheet = document.getElementById("lt-bl-sheet");
-      if (!sheet) return;
-      sheet.classList.add("open");
+      var overlay = document.getElementById("lt-bl-sheet-overlay");
+      var fab = document.getElementById("lt-bl-fab");
+      if (!sheet || !overlay) return;
+      /* Hide the FAB while the sheet is open — the sheet has its own CTA. */
+      if (fab) fab.style.display = "none";
+      sheet.style.transform = "translateY(110%)";
+      sheet.style.transition = "transform .35s cubic-bezier(.32,.72,0,1)";
+      overlay.style.pointerEvents = "auto";
+      overlay.style.opacity = "0";
+      /* Reflow so the browser registers the off-screen transform before
+         reversing it — otherwise the transition never starts. */
+      void sheet.offsetHeight;
+      requestAnimationFrame(function () {
+        sheet.style.transform = "translateY(0)";
+        overlay.style.opacity = "1";
+      });
       setTimeout(function () {
         var inp = document.getElementById("lt-bl-input");
         if (inp) inp.focus();
-      }, 100);
+      }, 160);
     }
     function closeAddSheet() {
       var sheet = document.getElementById("lt-bl-sheet");
-      if (!sheet) return;
-      sheet.classList.remove("open");
+      var overlay = document.getElementById("lt-bl-sheet-overlay");
+      var fab = document.getElementById("lt-bl-fab");
+      if (!sheet || !overlay) return;
+      sheet.style.transform = "translateY(110%)";
+      overlay.style.opacity = "0";
+      overlay.style.pointerEvents = "none";
+      if (fab) fab.style.display = "";
     }
 
     function rebuild() {
@@ -8594,9 +8688,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             ) +
           '</div>' +
         '</div>' +
-        /* Bottom sheet — same family as My Tasks / Routine */
-        '<div id="lt-bl-sheet-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:100;"></div>' +
-        '<div class="lt-tasks-sheet" id="lt-bl-sheet" style="position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;max-width:480px;margin:0 auto;border-radius:26px 26px 0 0">' +
+        /* Bottom sheet — same pattern as My Tasks: lt-tasks-sheet on the
+           panel + absolute backdrop for the tap-outside-to-close surface. */
+        '<div id="lt-bl-sheet-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:90"></div>' +
+        '<div class="lt-tasks-sheet" id="lt-bl-sheet" style="position:absolute;bottom:0;left:0;right:0;z-index:100;max-width:480px;margin:0 auto">' +
           '<div class="lt-sheet-grip" style="width:44px;height:4px;border-radius:99px;background:hsl(var(--mutedForeground,rgba(0,0,0,.16)));margin:0 auto 16px;"></div>' +
           '<p style="font-size:18px;font-weight:800;color:hsl(var(--foreground));margin:0 0 4px">Add a dream</p>' +
           '<input id="lt-bl-input" type="text" placeholder="Sky-diving, learn sitar, see the Taj Mahal..." style="width:100%;box-sizing:border-box;border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:12px;padding:12px 14px;font-size:15px;font-family:inherit;outline:none;margin-top:4px">' +
@@ -8618,7 +8713,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       if (fab) fab.addEventListener("click", openAddSheet);
       if (overlay) overlay.addEventListener("click", closeAddSheet);
       function setOpen(open) {
-        if (sheet) sheet.style.transform = open ? "translateY(0)" : "translateY(110%)";
+        if (sheet) {
+          sheet.style.transition = "transform .35s cubic-bezier(.32,.72,0,1)";
+          sheet.style.transform = open ? "translateY(0)" : "translateY(110%)";
+        }
         if (overlay) {
           overlay.style.opacity = open ? "1" : "0";
           overlay.style.pointerEvents = open ? "auto" : "none";
@@ -9677,39 +9775,36 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var config   = getJarsConfig();
     var totalPct = config.jars.reduce(function (s, j) { return s + (Number(j.pct) || 0); }, 0);
 
-    /* Big primary "Set salary" button when nothing is set yet; once a salary
-       exists it shrinks down to a small edit button next to the amount. */
     var salaryValHtml = monthlySalary
       ? '<span class="lt-jars-sum-val">' + money(monthlySalary) + '</span>'
       : '<span class="lt-jars-sum-val lt-jars-sum-empty">\u2014</span>';
-    var editBtnHtml = monthlySalary
-      ? '<button class="lt-jars-edit-salary-btn lt-jars-edit-salary-btn--small" id="lt-jars-edit-salary">\u270F\uFE0F Edit</button>'
-      : '<button class="lt-jars-edit-salary-btn lt-jars-edit-salary-btn--big" id="lt-jars-edit-salary">Set Monthly Salary</button>';
+
+    /* Actions live directly UNDER the summary — one clean row, left = Jar
+       Settings, right = Edit salary. A single tap-target each. */
+    var summaryActions =
+      '<div style="display:flex;gap:8px;align-items:stretch;margin:0 0 14px">' +
+        '<button class="lt-jars-settings-btn" id="lt-jars-open-settings" style="flex:1;margin-bottom:0;width:auto">\u2699\uFE0F\u2003Jar Settings</button>' +
+        (monthlySalary
+          ? '<button class="lt-jars-edit-salary-btn lt-jars-edit-salary-btn--small" id="lt-jars-edit-salary" style="flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border-radius:12px;font-size:13px;margin:0">\u270F\uFE0F Edit salary</button>'
+          : '<button class="lt-jars-edit-salary-btn lt-jars-edit-salary-btn--small" id="lt-jars-edit-salary" style="flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border-radius:12px;font-size:13px;margin:0;background:#111114;color:#fff">\u270F\uFE0F Set salary</button>') +
+      '</div>';
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
         toolHeader("6 Jars", "Your monthly salary split across your purposeful jars.") +
         '<div class="lt-jars-summary">' +
           '<div class="lt-jars-sum-item"><span class="lt-jars-sum-label">Monthly Salary</span>' + salaryValHtml + '</div>' +
-          '<div class="lt-jars-sum-item"><span class="lt-jars-sum-label">Allocated</span><span class="lt-jars-sum-val">' + totalPct + '% of salary</span></div>' +
+          '<div class="lt-jars-sum-item"><span class="lt-jars-sum-label">Allocated</span><span class="lt-jars-sum-val" style="font-size:15px">' + totalPct + '% of salary</span></div>' +
         '</div>' +
-        '<div style="margin:-6px 0 16px">' + editBtnHtml + '</div>' +
-        (monthlySalary ?
-          '<div class="lt-jars-grid">' +
-            config.jars.map(function (jar, i) { return buildJarCard(jar, monthlySalary, i); }).join("") +
-          '</div>'
-        :
-          '<div class="lt-tool-card" style="text-align:center;padding:24px 16px;margin-bottom:16px">' +
-            '<div style="display:flex;justify-content:center;align-items:center;margin-bottom:10px"><img src="assets/icons/jar-savings.png" style="width:64px;height:64px;object-fit:contain;opacity:.7"/></div>' +
-            '<p class="lt-card-subtitle">Set your monthly salary above to see it split across the 6 jars.</p>' +
-          '</div>'
-        ) +
+        summaryActions +
         (monthlySalary
-          ? '<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:2px">' +
-              '<button class="lt-jars-settings-btn" id="lt-jars-open-settings" style="flex:1;margin-bottom:0">\u2699\uFE0F\u2003Jar Settings</button>' +
-              '<button class="lt-jars-edit-salary-btn lt-jars-edit-salary-btn--small" id="lt-jars-edit-salary-inline" style="flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border-radius:12px;font-size:13px">\u270F\uFE0F Edit salary</button>' +
+          ? '<div class="lt-jars-grid">' +
+              config.jars.map(function (jar, i) { return buildJarCard(jar, monthlySalary, i); }).join("") +
             '</div>'
-          : '<button class="lt-jars-settings-btn" id="lt-jars-open-settings">\u2699\uFE0F\u2003Jar Settings</button>')
+          : '<div class="lt-tool-card" style="text-align:center;padding:24px 16px;margin-bottom:16px">' +
+              '<div style="display:flex;justify-content:center;align-items:center;margin-bottom:10px"><img src="assets/icons/jar-savings.png" style="width:64px;height:64px;object-fit:contain;opacity:.7"/></div>' +
+              '<p class="lt-card-subtitle">Set your monthly salary above to see it split across the 6 jars.</p>' +
+            '</div>')
       '</div>';
 
     if (monthlySalary) triggerJarAnimation();
@@ -9718,8 +9813,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     if (settingsBtn) settingsBtn.addEventListener("click", renderJarSettings);
     var editSalaryBtn = document.getElementById("lt-jars-edit-salary");
     if (editSalaryBtn) editSalaryBtn.addEventListener("click", renderJarSalaryEdit);
-    var editSalaryInline = document.getElementById("lt-jars-edit-salary-inline");
-    if (editSalaryInline) editSalaryInline.addEventListener("click", renderJarSalaryEdit);
   }
 
   /* Small in-place sheet for setting/editing the 6 Jars monthly salary.
