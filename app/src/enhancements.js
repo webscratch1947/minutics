@@ -8462,6 +8462,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           /* Also mark the day as "blocked" — starting a Time Waste
              activity is then gated at the Activity screen too. */
           try { localStorage.setItem("lt_waste_blocked_v1", day); } catch (e) {}
+          /* Force-stop any in-flight Time Waste timer: clears the WebView's
+             running-timer markers so the activity stops being counted as
+             an open timer. (React reads Firestore blocks fresh on next
+             mount; the live time-trace stops here.) */
+          try {
+            var _pending = readJson(PENDING_TIMER_CAT_KEY, null);
+            if (_pending && _pending.category === "Time Waste" && Number(readJson(RUNNING_TIMER_KEY, 0)) > 0) {
+              writeJson(PENDING_TIMER_CAT_KEY, null);
+              writeJson(RUNNING_TIMER_KEY, 0);
+            }
+          } catch (e) {}
           notifyWasteOver(mins, cfg.minutes);
           syncNotifStateBridge(true);
         }
@@ -8700,8 +8711,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '</div>' +
         /* Bottom sheet — same pattern as My Tasks: lt-tasks-sheet on the
            panel + absolute backdrop for the tap-outside-to-close surface. */
-        '<div id="lt-bl-sheet-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:90"></div>' +
-        '<div class="lt-tasks-sheet" id="lt-bl-sheet" style="position:absolute;bottom:0;left:0;right:0;z-index:100;max-width:480px;margin:0 auto">' +
+        '<div id="lt-bl-sheet-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:90"></div>' +
+        '<div class="lt-tasks-sheet" id="lt-bl-sheet" style="position:fixed;bottom:0;left:0;right:0;z-index:100;max-width:480px;margin:0 auto">' +
           '<div class="lt-sheet-grip" style="width:44px;height:4px;border-radius:99px;background:hsl(var(--mutedForeground,rgba(0,0,0,.16)));margin:0 auto 16px;"></div>' +
           '<p style="font-size:18px;font-weight:800;color:hsl(var(--foreground));margin:0 0 4px">Add a dream</p>' +
           '<input id="lt-bl-input" type="text" placeholder="Sky-diving, learn sitar, see the Taj Mahal..." style="width:100%;box-sizing:border-box;border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:12px;padding:12px 14px;font-size:15px;font-family:inherit;outline:none;margin-top:4px">' +
@@ -8715,7 +8726,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           '</div>' +
         '</div>' +
         /* Floating +Add button */
-        '<button type="button" id="lt-bl-fab" style="position:absolute;right:18px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:100;width:60px;height:60px;border-radius:50%;border:none;background:#111114;color:#fff;font-size:26px;line-height:1;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.28);">+</button>';
+        '<button type="button" id="lt-bl-fab" style="position:fixed;right:18px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:100;width:60px;height:60px;border-radius:50%;border:none;background:#111114;color:#fff;font-size:26px;line-height:1;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.28);">+</button>';
 
       var fab = document.getElementById("lt-bl-fab");
       var overlay = document.getElementById("lt-bl-sheet-overlay");
