@@ -7198,6 +7198,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       try { profile = !!localStorage.getItem("lifetime_profile"); } catch (e) {}
       var nudgeData = readJson(NUDGE_KEY, {});
       var wasteCfg = readJson(WASTE_BUDGET_KEY, { minutes: 45 });
+      var ps = null;
+      try {
+        if (window.AndroidBridge && typeof window.AndroidBridge.getPermissionStatus === "function") {
+          var raw = window.AndroidBridge.getPermissionStatus();
+          ps = typeof raw === "string" ? JSON.parse(raw) : raw;
+        }
+      } catch (e) {}
       var snap = {
         profile: profile,
         running: !!getNativeRunningBlock(),
@@ -7206,6 +7213,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         wasteMins: computeWasteMinutesToday(),
         wasteLimit: wasteCfg && wasteCfg.minutes > 0 ? wasteCfg.minutes : 0,
         wasteDay: localDayKey(),
+        /* Native AlarmManager/receiver checks these to decide whether to
+           actually fire when the app is closed — "off" means off. */
+        overlay: ps ? !!ps.overlay : true,
+        notifications: ps ? !!ps.notifications : true,
         /* Day the WEB side already alerted for — native/SW keep the newer of
            the two so the budget alert fires exactly once per day. */
         wasteNotifiedDay: (typeof _wasteNotifiedDay === "string" ? _wasteNotifiedDay : "") || ""
