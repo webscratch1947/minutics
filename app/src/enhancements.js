@@ -8750,6 +8750,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   /* TimeWasteGuard overlay → see charge in Account: open the tool too.
      The native overlay writes lt_overlay_open_tool=wastebudget when tapped. */
   (function watchOverlayOpenTool() {
+    /* Called directly by the native deep link with retries — more reliable
+       than waiting for a localStorage poll after the WebView was frozen. */
+    window.__ltOpenTool = function (t) {
+      try {
+        if (t === "wastebudget") openOverlay(renderWasteBudget);
+      } catch (e) {}
+    };
     setInterval(function () {
       try {
         var t = localStorage.getItem("lt_overlay_open_tool");
