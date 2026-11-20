@@ -273,6 +273,10 @@ export function SettingsScreen() {
   var _permStatusState = useState({ overlay: false, autostart: false, accessibility: false });
   var permStatus = _permStatusState[0];
   var setPermStatus = _permStatusState[1];
+  /* Xiaomi/Redmi/POCO need an extra OEM "background popup" grant. */
+  var _miuiState = useState(false);
+  var isMiui = _miuiState[0];
+  var setMiui = _miuiState[1];
   useEffect(function () {
     function refresh() {
       try {
@@ -280,6 +284,11 @@ export function SettingsScreen() {
           var raw = window.AndroidBridge.getPermissionStatus();
           var o = typeof raw === "string" ? JSON.parse(raw) : raw;
           if (o) setPermStatus(o);
+        }
+      } catch (e) {}
+      try {
+        if (window.AndroidBridge && window.AndroidBridge.isMiuiDevice) {
+          setMiui(!!window.AndroidBridge.isMiuiDevice());
         }
       } catch (e) {}
     }
@@ -902,6 +911,22 @@ export function SettingsScreen() {
                     onToggle: function () { handlePermToggle("overlay"); }
                   })
                 }),
+                isMiui ? jsx(CardRow, {
+                  label: "Xiaomi background popups",
+                  desc: "Required on MIUI/HyperOS so the popup can appear over other apps. Tap Open, then enable \"Display pop-up windows while running in background\".",
+                  children: jsx("button", {
+                    type: "button",
+                    onClick: function () {
+                      try {
+                        if (window.AndroidBridge && window.AndroidBridge.openOemPopupSettings) {
+                          window.AndroidBridge.openOemPopupSettings();
+                        }
+                      } catch (e) {}
+                    },
+                    className: "rounded-lg border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/10",
+                    children: "Open"
+                  })
+                }) : null,
                 jsx(Divider, {}),
                 /* Auto Start */
                 jsx(CardRow, {

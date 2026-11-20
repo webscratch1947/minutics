@@ -29,6 +29,7 @@ export const PERMISSION_ROWS = [
       'Find Minutics in this list.',
       'Tap Minutics.',
       'Turn on Allow display over other apps.',
+      'On Xiaomi/HyperOS also enable "Display pop-up windows while running in background" in Other permissions.',
       'Go back to Minutics — this row turns green.'
     ]
   },

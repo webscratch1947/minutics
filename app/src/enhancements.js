@@ -8431,10 +8431,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           );
           return;
         }
-        if (!ps.overlay) {
+        if (!ps.overlay && !ps.accessibility) {
+          var miuiTest = false;
+          try {
+            miuiTest = !!(window.AndroidBridge && window.AndroidBridge.isMiuiDevice
+              && window.AndroidBridge.isMiuiDevice());
+          } catch (e) {}
           showSimpleToast(
-            "Display over other apps off",
-            "Enable Display over other apps in Settings → Permissions — required for the alert over any app."
+            miuiTest ? "Popup permission off" : "Display over other apps off",
+            miuiTest
+              ? "On Xiaomi/HyperOS enable Display over other apps AND \"Display pop-up windows while running in background\" in App info → Other permissions."
+              : "Enable Display over other apps in Settings → Permissions — required for the alert over any app."
           );
           return;
         }
@@ -8508,6 +8515,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   var _wasteNotifiedDay = readJson(WASTE_NOTIFIED_DAY_KEY, "");
   /* Once-per-day in-app hint when the popup permission is missing. */
   var _overlayHintDay = "";
+  var _popupBlockedHintDay = "";
 
   function notifyWasteOver(mins, limit) {
     var body = "You've spent " + mins + " min on Time Waste \u2014 your " + limit + " min daily limit is crossed. Resets at midnight.";
@@ -8540,6 +8548,55 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         }, 5200);
       } catch (e) {}
     }
+  }
+
+  /* Native rejected both popup window types (MIUI/HyperOS background-popup
+     toggle off). Show a persistent, one-tap fix banner instead of leaving the
+     user with a notification. */
+  function showPopupBlockedBanner() {
+    try {
+      if (document.getElementById("lt-popup-blocked")) return;
+      var miui = false;
+      try {
+        miui = !!(window.AndroidBridge && window.AndroidBridge.isMiuiDevice
+          && window.AndroidBridge.isMiuiDevice());
+      } catch (e) {}
+      var b = document.createElement("div");
+      b.id = "lt-popup-blocked";
+      b.style.cssText = "position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:2147483647;background:#111114;color:#fff;padding:13px 14px;border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.42);font:600 12.5px/1.4 Inter,system-ui,sans-serif;display:flex;gap:10px;align-items:center";
+      var txt = document.createElement("div");
+      txt.style.flex = "1";
+      txt.textContent = miui
+        ? "Popup blocked by MIUI. Enable \"Display pop-up windows while running in background\" in App info \u2192 Other permissions."
+        : "Popup blocked. Allow \"Display over other apps\" for Minutics.";
+      var fix = document.createElement("button");
+      fix.type = "button";
+      fix.textContent = "Fix";
+      fix.style.cssText = "flex:none;background:#C0392B;color:#fff;border:0;border-radius:10px;padding:9px 14px;font:800 12px Inter,system-ui,sans-serif";
+      fix.onclick = function () {
+        try {
+          if (window.AndroidBridge && window.AndroidBridge.openOemPopupSettings) {
+            window.AndroidBridge.openOemPopupSettings();
+          }
+        } catch (e) {}
+        try {
+          if (window.AndroidBridge && window.AndroidBridge.clearPopupBlocked) {
+            window.AndroidBridge.clearPopupBlocked();
+          }
+        } catch (e) {}
+        try { b.remove(); } catch (e) {}
+      };
+      var x = document.createElement("button");
+      x.type = "button";
+      x.textContent = "\u2715";
+      x.setAttribute("aria-label", "Dismiss");
+      x.style.cssText = "flex:none;background:transparent;color:#9CA3AF;border:0;font:700 16px Inter,system-ui,sans-serif;padding:4px 6px";
+      x.onclick = function () { try { b.remove(); } catch (e) {} };
+      b.appendChild(txt);
+      b.appendChild(fix);
+      b.appendChild(x);
+      document.body.appendChild(b);
+    } catch (e) {}
   }
 
   (function startWasteBudgetWatch() {
@@ -8589,13 +8646,37 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             syncNotifStateBridge(true);
           }
           /* If the popup grant is missing, say so in-app instead of letting
-             the user think the alert was "notification only" by design. */
+             the user think the alert was "notification only" by design.
+             The accessibility service can draw its own overlay type, so it
+             is a valid fallback when SAW is off. */
           if (_overlayHintDay !== day) {
             var ps = readPermStatus();
-            if (ps && !ps.overlay) {
+            if (ps && !ps.overlay && !ps.accessibility) {
               _overlayHintDay = day;
-              ltToast("Turn on \"Display over other apps\" for Minutics to see the popup");
+              var miuiNow = false;
+              try {
+                miuiNow = !!(window.AndroidBridge && window.AndroidBridge.isMiuiDevice
+                  && window.AndroidBridge.isMiuiDevice());
+              } catch (e) {}
+              ltToast(miuiNow
+                ? "Enable \"Display pop-up windows while running in background\" in App info → Other permissions"
+                : "Turn on \"Display over other apps\" for Minutics to see the popup");
             }
+          }
+        }
+        /* Native sets this when BOTH window types were rejected. Offer a
+           one-tap path to the OEM screen that unblocks it. Checked outside
+           the over-budget branch so it also shows after the budget is raised. */
+        if (_popupBlockedHintDay !== day) {
+          var blocked = false;
+          try {
+            if (window.AndroidBridge && window.AndroidBridge.getPopupBlocked) {
+              blocked = !!window.AndroidBridge.getPopupBlocked();
+            }
+          } catch (e) {}
+          if (blocked) {
+            _popupBlockedHintDay = day;
+            showPopupBlockedBanner();
           }
         }
         /* Keep native state warm while the app lives on. Throttled (false) so
