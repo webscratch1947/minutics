@@ -6394,10 +6394,16 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       function startTimerAfterOptionalTag() {
         if (timerStartedForPrompt) return;
         timerStartedForPrompt = true;
-        writeJson(RUNNING_TIMER_KEY, Date.now());
+        /* Do NOT write RUNNING_TIMER_KEY here — the real start does that.
+           Writing it first made a cancelled/blocked start look like a live
+           activity, which caused the fake "add" notifications. */
         suppressTimerGate = true;
         realStartBtn.click();
-        setTimeout(showProductivityToast, 200);
+        /* Energy nudge only for a REAL running activity, never on a tap that
+           was blocked by the budget gate. */
+        setTimeout(function () {
+          try { if (getNativeRunningBlock()) showProductivityToast(); } catch (e) {}
+        }, 700);
       }
       /* Ask for the optional category at start. The timer starts whether the
          user saves a tag, taps X, or leaves the picker open and backgrounds
