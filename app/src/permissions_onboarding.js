@@ -35,16 +35,15 @@ export const PERMISSION_ROWS = [
   {
     key: 'otherPermissions',
     title: 'Allow other permission',
-    desc: 'One more Xiaomi switch so the popup can show above other apps.',
+    desc: 'Xiaomi keeps extra popup switches inside Minutics app info.',
     icon: 'popup',
-    manual: true,
     miuiOnly: true,
-    settingsKey: 'overlay',
+    settingsKey: 'details',
     steps: [
-      'On the next screen, scroll all the way down.',
-      'Tap "Allow other permission" (or "Other permissions").',
-      'Find Minutics, then turn its switch on.',
-      'Go back to Minutics and tap "I did it" below.'
+      'Minutics app info opens on the next screen.',
+      'Scroll all the way down and tap "Other permissions".',
+      'Turn on the popup switches listed there.',
+      'Go back to Minutics — this row turns green.'
     ]
   },
   {
@@ -52,15 +51,14 @@ export const PERMISSION_ROWS = [
     title: 'Pop-up in background',
     desc: 'Lets the Time Waste alert appear even when Minutics is closed.',
     icon: 'popup',
-    manual: true,
     miuiOnly: true,
-    settingsKey: 'popup',
+    settingsKey: 'details',
     steps: [
-      'The next screen opens Minutics\' app info page.',
-      'Tap "Other permissions" (on some phones just "Permissions").',
-      'Scroll down and find "Display pop-up windows while running in background".',
-      'Turn it ON. If you also see "Display pop-up windows", turn that on too.',
-      'Go back to Minutics and tap "I did it" below.'
+      'Minutics app info opens on the next screen.',
+      'Scroll down and tap "Other permissions".',
+      'Turn ON "Display pop-up windows while running in background".',
+      'Also turn on "Display pop-up windows" if you see it.',
+      'Go back to Minutics — this row turns green.'
     ]
   },
   {
@@ -169,7 +167,7 @@ function PermIcon({ name, size }) {
 }
 
 /* ── Text guide sheet ───────────────────────────────────────────────────── */
-function GuideSheet({ perm, index, total, onOpenSettings, onConfirm, onClose }) {
+function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
   var [dragY, setDragY] = useState(0);
   var [closing, setClosing] = useState(false);
   var startY = useRef(null);
@@ -238,15 +236,9 @@ function GuideSheet({ perm, index, total, onOpenSettings, onConfirm, onClose }) 
             }, i);
           }) }),
           jsx('button', {
-            type: 'button',
-            className: perm.manual ? 'lt-guide-secondary' : 'lt-guide-primary',
-            'data-guide-open-settings': '1',
+            type: 'button', className: 'lt-guide-primary', 'data-guide-open-settings': '1',
             onClick: onOpenSettings, children: 'Open Android settings'
-          }),
-          perm.manual ? jsx('button', {
-            type: 'button', className: 'lt-guide-primary', 'data-guide-confirm': '1',
-            onClick: onConfirm, children: 'I did it \u2713'
-          }) : null
+          })
         ]
       })
     }),
@@ -363,22 +355,6 @@ export function PermissionsStep({ onChange }) {
   var openSettings = function (perm) {
     var key = perm.settingsKey || perm.key;
     try { window.AndroidBridge.openPermissionSetting(key); } catch (e) {}
-    /* Manual OEM steps keep the guide open so "I did it" is still there when
-       the user comes back from the settings screen. */
-    if (!perm.manual) setTutorial(null);
-  };
-
-  /* OEM switches have no public read API — the user confirms them in the
-     guide and the native side remembers it. */
-  var confirmManual = function (perm) {
-    try {
-      if (window.AndroidBridge && window.AndroidBridge.confirmPermissionSetting) {
-        window.AndroidBridge.confirmPermissionSetting(perm.key);
-      }
-    } catch (e) {}
-    var next = Object.assign({}, statusRef.current);
-    next[perm.key] = true;
-    update(next);
     setTutorial(null);
   };
 
@@ -428,7 +404,6 @@ export function PermissionsStep({ onChange }) {
       index: rows.findIndex(function (r) { return r.key === tutorial.key; }),
       total: rows.length,
       onOpenSettings: function () { openSettings(tutorial); },
-      onConfirm: function () { confirmManual(tutorial); },
       onClose: function () { setTutorial(null); }
     }) : null
   ] });
