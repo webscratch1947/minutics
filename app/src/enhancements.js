@@ -8476,13 +8476,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       /* Raising the limit clears today's "already alerted / blocked" state,
          so the alert can fire again when the NEW limit is crossed and the
          activity gate stops saying "budget over" while there is time left. */
-      if (minutes > old) {
+      if (minutes !== old) {
         try { localStorage.removeItem("lt_waste_blocked_v1"); } catch (e) {}
         _wasteNotifiedDay = "";
         writeJson(WASTE_NOTIFIED_DAY_KEY, "");
+        /* Give native the exact current numbers in ONE call. Clearing native
+           counters and waiting for the next sync used to lose wasteSince, so
+           a still-running timer stopped projecting and never re-alerted. */
         try {
-          if (window.AndroidBridge && window.AndroidBridge.resetWasteNotifiedDay) {
-            window.AndroidBridge.resetWasteNotifiedDay();
+          if (window.AndroidBridge && window.AndroidBridge.setWasteBudget) {
+            window.AndroidBridge.setWasteBudget(minutes, wasteRunningStart(),
+                wasteBaseMinutesToday(), localDayKey());
           }
         } catch (e) {}
         syncNotifStateBridge(true);
@@ -8508,58 +8512,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         }
       } catch (e) {}
     });
-    /* Diagnostics/self-test: fire the same over-limit path the real watcher
-       uses, WITHOUT consuming today's one-per-day alert. */
-    var testBtn = activeOverlay.querySelector("[data-lt-waste-test]");
-    if (testBtn) testBtn.addEventListener("click", function () {
-      /* No permissions → in-app toast telling them where to enable instead
-         of pestering them with Android permission dialogs. */
-      var ps = null;
-      try {
-        if (window.AndroidBridge && typeof window.AndroidBridge.getPermissionStatus === "function") {
-          var raw = window.AndroidBridge.getPermissionStatus();
-          ps = typeof raw === "string" ? JSON.parse(raw) : raw;
-        }
-      } catch (e) {}
-      if (ps) {
-        if (!ps.notifications) {
-          showSimpleToast(
-            "Notifications off",
-            "Enable Notifications in Settings → Permissions — and Display over other apps for the full-screen alert."
-          );
-          return;
-        }
-        if (!ps.overlay && !ps.accessibility) {
-          var miuiTest = false;
-          try {
-            miuiTest = !!(window.AndroidBridge && window.AndroidBridge.isMiuiDevice
-              && window.AndroidBridge.isMiuiDevice());
-          } catch (e) {}
-          showSimpleToast(
-            miuiTest ? "Popup permission off" : "Display over other apps off",
-            miuiTest
-              ? "On Xiaomi/HyperOS enable Display over other apps AND \"Open new windows while running in the background\" in App info → Other permissions."
-              : "Enable Display over other apps in Settings → Permissions — required for the alert over any app."
-          );
-          return;
-        }
-      }
-      /* Exercise the REAL path — same overlay + notification the background
-         guard uses — instead of posting a bare notification. Never marks
-         today's alert as consumed. */
-      var testMins  = Math.max(1, Number(wasteMin) || 0);
-      var testLimit = Math.max(1, Number(cfg.minutes) || 45);
-      var fired = false;
-      try {
-        if (window.AndroidBridge && typeof window.AndroidBridge.showWasteAlert === "function") {
-          window.AndroidBridge.showWasteAlert(testMins, testLimit);
-          fired = true;
-        }
-      } catch (e) {}
-      if (!fired) notifyWasteOver(testMins, testLimit);
-      syncNotifStateBridge(true);
-    });
-
     /* Keep the number live while this card is on screen, but only pay
        the cost of ticking (re-reading storage) when a waste timer is
        actually running — a flat number doesn't need to redraw every
@@ -8801,25 +8753,27 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   /* TimeWasteGuard overlay → see charge in Account: open the tool too.
      The native overlay writes lt_overlay_open_tool=wastebudget when tapped. */
   (function watchOverlayOpenTool() {
-    /* One open per deep link. The native side retries until the WebView is
-       ready; without this guard every retry re-ran the open animation. */
-    function openWasteToolFromDeepLink() {
-      if (window.__ltDeepLinkOpen) return;
-      window.__ltDeepLinkOpen = true;
-      window.__ltDeepLinkUntil = Date.now() + 2500;
-      try { localStorage.setItem("lt_overlay_open_tool", ""); } catch (e) {}
-      try { openOverlay(renderWasteBudget); } catch (e) {}
-      setTimeout(function () { window.__ltDeepLinkOpen = false; }, 3000);
-    }
+    /* One open per deep link. Native retries until JS is ready and stops only
+       when we report real success, so no repeated open/close animation. */
     window.__ltOpenTool = function (t) {
-      if (t === "wastebudget") openWasteToolFromDeepLink();
+      if (t !== "wastebudget") return false;
+      try {
+        if (typeof openOverlay !== "function" || typeof renderWasteBudget !== "function") return false;
+        if (window.__ltDeepLinkOpen) return true;
+        window.__ltDeepLinkOpen = true;
+        window.__ltDeepLinkUntil = Date.now() + 4000;
+        try { localStorage.setItem("lt_overlay_open_tool", ""); } catch (e) {}
+        openOverlay(renderWasteBudget);
+        setTimeout(function () { window.__ltDeepLinkOpen = false; }, 5000);
+        return true;
+      } catch (e) { return false; }
     };
     setInterval(function () {
       try {
         var t = localStorage.getItem("lt_overlay_open_tool");
         if (!t) return;
         localStorage.setItem("lt_overlay_open_tool", "");
-        if (t === "wastebudget") openWasteToolFromDeepLink();
+        if (t === "wastebudget") window.__ltOpenTool(t);
       } catch (e) {}
     }, 800);
   })();

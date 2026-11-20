@@ -138,6 +138,18 @@ function getAlertPermission() {
    SettingsScreen
    ═══════════════════════════════════════════════════════════════ */
 
+function PermStatusBadge({ on }) {
+  return jsx("span", {
+    style: {
+      borderRadius: 999, padding: "5px 11px", fontSize: 11, fontWeight: 800,
+      whiteSpace: "nowrap",
+      background: on ? "#DCFCE7" : "#FEE2E2",
+      color: on ? "#157347" : "#B91C1C"
+    },
+    children: on ? "Active" : "Not active"
+  });
+}
+
 export function SettingsScreen() {
   /* ── plan re-render trigger ── */
   var _planTick = useState(0);
@@ -849,46 +861,10 @@ export function SettingsScreen() {
                   desc: "Please install our official app to use this feature"
                 }) : jsx(CardRow, {
                   label: "Notifications",
-                  desc: notifTestStatus === "sent"
-                    ? "Test notification sent"
-                    : notifTestStatus === "error"
-                      ? "Could not send test notification"
-                    : (notifPermission === "granted" && notifEnabled)
+                  desc: notifPermission === "granted"
                     ? "Allowed — reminders and your daily report"
-                    : notifPermission === "denied"
-                      ? "Blocked — enable in system settings"
-                      : notifEnabled
-                        ? "Not allowed yet — tap the switch to allow"
-                        : "Off — Minutics stays quiet",
-                  children: jsxs("div", {
-                    className: "flex items-center gap-3",
-                    children: [
-                      jsx(Toggle, {
-                        enabled: notifPermission === "granted" && notifEnabled,
-                        onToggle: function () {
-                          if (notifPermission === "granted") {
-                            var next = !notifEnabled;
-                            setNotifEnabled(next);
-                            localStorage.setItem("lt_alert_notifs_on_v1", next ? "on" : "off");
-                          } else {
-                            window.AndroidBridge.requestNotificationPermission();
-                          }
-                        }
-                      }),
-                      jsx("button", {
-                        onClick: function () {
-                          try { window.AndroidBridge.showTestNotification(); } catch (e) {}
-                          setNotifTestStatus("sent");
-                        },
-                        disabled: notifPermission !== "granted" || !notifEnabled,
-                        className: [
-                          "rounded-lg border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary transition",
-                          (notifPermission === "granted" && notifEnabled) ? "active:bg-primary/10" : "opacity-40 cursor-not-allowed"
-                        ].join(" "),
-                        children: "Test"
-                      })
-                    ]
-                  })
+                    : "Not allowed — enable in system settings",
+                  children: jsx(PermStatusBadge, { on: notifPermission === "granted" })
                 }),
                 jsx(Divider, {}),
                 /* Reminder popups — "Display over other apps".
@@ -896,15 +872,8 @@ export function SettingsScreen() {
                    it AND Minutics is allowed to use it. */
                 jsx(CardRow, {
                   label: "Reminder popups",
-                  desc: permUse.overlay
-                    ? (permStatus.overlay
-                        ? "Allowed — popups show above your other apps"
-                        : "Not allowed yet — tap the switch to allow")
-                    : "Off — reminders stay inside the app only",
-                  children: jsx(Toggle, {
-                    enabled: permUse.overlay && permStatus.overlay,
-                    onToggle: function () { handlePermToggle("overlay"); }
-                  })
+                  desc: permStatus.overlay ? "Allowed — popups show above your other apps" : "Not allowed — enable Display over other apps",
+                  children: jsx(PermStatusBadge, { on: !!permStatus.overlay })
                 }),
                 /* Real background-popup permission state (MIUI AppOps on Xiaomi,
                    overlay grant elsewhere). No fake toggle. */
@@ -913,53 +882,28 @@ export function SettingsScreen() {
                   desc: permStatus.popup
                     ? "Active — alerts can appear while Minutics is closed"
                     : "Not active — enable \"Open new windows while running in the background\" in Other permissions",
-                  children: jsx("button", {
-                    type: "button",
-                    onClick: function () {
-                      try {
-                        if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
-                          window.AndroidBridge.openPermissionSetting("popup");
-                        }
-                      } catch (e) {}
-                    },
-                    className: "rounded-lg border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/10",
-                    children: "Open"
-                  })
+                  children: jsx(PermStatusBadge, { on: !!permStatus.popup })
                 }),
                 jsx(Divider, {}),
                 /* Auto Start */
                 jsx(CardRow, {
                   label: "Auto Start",
-                  desc: permUse.autostart
-                    ? (permStatus.autostart
-                        ? "Allowed — reminders restart after a reboot"
-                        : "Not allowed yet — tap the switch to allow")
-                    : "Off — reminders may not recover after a reboot",
-                  children: jsx(Toggle, {
-                    enabled: permUse.autostart && permStatus.autostart,
-                    onToggle: function () { handlePermToggle("autostart"); }
-                  })
+                  desc: permStatus.autostart ? "Allowed — reminders restart after a reboot" : "Not allowed — enable Auto Start for Minutics",
+                  children: jsx(PermStatusBadge, { on: !!permStatus.autostart })
                 }),
                 jsx(Divider, {}),
                 /* Accessibility — optional, feeds the Doom scroll stopper */
                 jsx(CardRow, {
                   label: "Accessibility",
-                  desc: permUse.accessibility
-                    ? (permStatus.accessibility
-                        ? "Allowed — the Doom scroll stopper is counting"
-                        : "Not allowed yet — optional, tap the switch to allow")
-                    : "Off — the Doom scroll stopper is not counting",
-                  children: jsx(Toggle, {
-                    enabled: permUse.accessibility && permStatus.accessibility,
-                    onToggle: function () { handlePermToggle("accessibility"); }
-                  })
+                  desc: permStatus.accessibility ? "Allowed — the Doom scroll stopper is counting" : "Not allowed — optional, for the Doom scroll stopper",
+                  children: jsx(PermStatusBadge, { on: !!permStatus.accessibility })
                 })
               ]
             })
           }),
           jsx("p", {
             className: "px-1 mt-2.5 text-[11px] leading-relaxed text-muted-foreground",
-            children: "These toggles control what Minutics itself uses. To fully remove a permission, revoke it in your phone's settings."
+            children: "These show the real permission state. To change one, use the onboarding guide or your phone's settings."
           })
         ]
       }),
