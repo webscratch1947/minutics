@@ -910,13 +910,13 @@ export function mk({
           onClick: () => finish(false),
           /* Owner: small compact Skip — red bg, white text, different font
              family, pill ends. */
-          className: ONB_V2
-            ? "self-center px-6 py-1.5 text-[11px] font-black uppercase text-white rounded-full transition-all active:scale-[.96]"
-            : "self-center px-6 py-1.5 text-xs font-black uppercase text-white rounded-full transition-colors",
+          className: "self-center px-6 py-2 text-[12px] font-bold rounded-full transition-all active:scale-[.96]",
           style: {
-            background: "#DC2626",
-            fontFamily: "'Georgia', 'Times New Roman', serif",
-            letterSpacing: "0.08em",
+            background: "#FFFFFF",
+            color: "#157347",
+            border: "1px solid #BBF7D0",
+            fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+            letterSpacing: "0",
             width: "auto"
           },
           children: "Skip for now"

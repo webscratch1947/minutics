@@ -673,6 +673,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   /* Exposed so dataTransfer.js can mirror Load-Data writes into native
      storage (readJson prefers the bridge — stale native = stale data). */
   window.LT_NATIVE_KEYS = NATIVE_BRIDGE_KEYS;
+  /* Settings toggles call this so an off switch takes effect immediately. */
+  window.__ltSyncNotifState = function () {
+    try { syncNotifStateBridge(true); } catch (e) {}
+  };
 
   function hasBridge() {
     return typeof window.AndroidBridge !== "undefined" &&
@@ -7205,6 +7209,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     try {
       var profile = false;
       try { profile = !!localStorage.getItem("lifetime_profile"); } catch (e) {}
+      var pu = readJson("lt_perm_use_v1", {});
       var nudgeData = readJson(NUDGE_KEY, {});
       var wasteCfg = readJson(WASTE_BUDGET_KEY, { minutes: 45 });
       var ps = null;
@@ -7236,6 +7241,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
            actually fire when the app is closed — "off" means off. */
         overlay: ps ? !!ps.overlay : true,
         notifications: ps ? !!ps.notifications : true,
+        /* In-app usage switches: off = native stops using that channel. */
+        useOverlay: pu.overlay !== false,
+        useNotifications: pu.notifications !== false,
+        useAutostart: pu.autostart !== false,
         /* Day the WEB side already alerted for — native/SW keep the newer of
            the two so the budget alert fires exactly once per day. */
         wasteNotifiedDay: (typeof _wasteNotifiedDay === "string" ? _wasteNotifiedDay : "") || ""
@@ -8412,6 +8421,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       popup.ready = (canOverlayNow || canA11yNow) && !popup.blocked;
     } catch (e) {}
 
+    var puAlerts = readJson("lt_perm_use_v1", {});
+    var alertsActive = !!(psPop && psPop.notifications
+        && (psPop.overlay || psPop.accessibility) && psPop.popup)
+        && puAlerts.notifications !== false && puAlerts.overlay !== false
+        && !popup.blocked;
+
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
         toolHeader("Time Waste Budget", "Set a daily limit for Time Waste and get an alert when you go over.") +
@@ -8433,10 +8448,16 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             '<button type="button" data-lt-waste-fix class="lt-tool-primary" style="width:100%">Turn on popup alerts</button>' +
           '</div>') +
         '<div class="lt-tool-card">' +
-          '<p class="lt-card-title">Alerts</p>' +
-          '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.45">' + permSummary + '</p>' +
-          '<p style="font-size:11px;color:#9CA3AF;margin:0 0 10px;line-height:1.45">Your notifications arrive even with the app closed \u2014 the alert fires the moment your tracked Time Waste minutes reach the budget, even with Minutics closed. Resets at midnight.</p>' +
-          '<button type="button" data-lt-waste-test class="lt-tool-primary" style="width:100%">Test alert</button>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">' +
+            '<div>' +
+              '<p class="lt-card-title">Alerts</p>' +
+              '<p style="font-size:11.5px;color:#6B7280;margin:3px 0 0;line-height:1.45">Full-screen alert + notification when your Time Waste minutes reach the budget. Resets at midnight.</p>' +
+            '</div>' +
+            '<span style="flex:none;border-radius:999px;padding:6px 12px;font-size:11px;font-weight:800;white-space:nowrap;background:' +
+              (alertsActive ? '#DCFCE7;color:#157347' : '#FEE2E2;color:#B91C1C') + '">' +
+              (alertsActive ? 'Active' : 'Not active') +
+            '</span>' +
+          '</div>' +
         '</div>' +
         '<div class="lt-tool-card">' +
           '<p class="lt-card-title">Daily budget</p>' +

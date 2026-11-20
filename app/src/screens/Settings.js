@@ -264,19 +264,16 @@ export function SettingsScreen() {
   /* ── permission usage toggles (Settings → Permissions) ── */
   var _permUseState = useState(function () {
     var m = readJson("lt_perm_use_v1", {});
-    return { overlay: m.overlay !== false, autostart: m.autostart !== false, accessibility: m.accessibility !== false };
+    return { overlay: m.overlay !== false, autostart: m.autostart !== false,
+             accessibility: m.accessibility !== false, notifications: m.notifications !== false };
   });
   var permUse = _permUseState[0];
   var setPermUse = _permUseState[1];
 
-  /* ── live Android permission status (overlay/autostart/accessibility) ── */
-  var _permStatusState = useState({ overlay: false, autostart: false, accessibility: false });
+  /* Real permission state — no on/off switch here. */
+  var _permStatusState = useState({ overlay: false, autostart: false, accessibility: false, popup: false });
   var permStatus = _permStatusState[0];
   var setPermStatus = _permStatusState[1];
-  /* Xiaomi/Redmi/POCO need an extra OEM "background popup" grant. */
-  var _miuiState = useState(false);
-  var isMiui = _miuiState[0];
-  var setMiui = _miuiState[1];
   useEffect(function () {
     function refresh() {
       try {
@@ -284,11 +281,6 @@ export function SettingsScreen() {
           var raw = window.AndroidBridge.getPermissionStatus();
           var o = typeof raw === "string" ? JSON.parse(raw) : raw;
           if (o) setPermStatus(o);
-        }
-      } catch (e) {}
-      try {
-        if (window.AndroidBridge && window.AndroidBridge.isMiuiDevice) {
-          setMiui(!!window.AndroidBridge.isMiuiDevice());
         }
       } catch (e) {}
     }
@@ -310,6 +302,9 @@ export function SettingsScreen() {
     next[key] = wasActive ? false : true;
     setPermUse(next);
     writeJson("lt_perm_use_v1", next);
+    /* Push the switch to native immediately so "off" really stops the channel
+       before the next 5-second sync. */
+    try { if (window.__ltSyncNotifState) window.__ltSyncNotifState(); } catch (e) {}
     if (key === "accessibility") {
       try {
         if (window.AndroidBridge && window.AndroidBridge.setDoomScrollEnabled) {
@@ -911,22 +906,26 @@ export function SettingsScreen() {
                     onToggle: function () { handlePermToggle("overlay"); }
                   })
                 }),
-                isMiui ? jsx(CardRow, {
-                  label: "Xiaomi background popups",
-                  desc: "Required on Xiaomi/HyperOS so the popup can appear over other apps. Tap Open, then in Other permissions enable \"Open new windows while running in the background\".",
+                /* Real background-popup permission state (MIUI AppOps on Xiaomi,
+                   overlay grant elsewhere). No fake toggle. */
+                jsx(CardRow, {
+                  label: "Background pop-ups",
+                  desc: permStatus.popup
+                    ? "Active — alerts can appear while Minutics is closed"
+                    : "Not active — enable \"Open new windows while running in the background\" in Other permissions",
                   children: jsx("button", {
                     type: "button",
                     onClick: function () {
                       try {
-                        if (window.AndroidBridge && window.AndroidBridge.openOemPopupSettings) {
-                          window.AndroidBridge.openOemPopupSettings();
+                        if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
+                          window.AndroidBridge.openPermissionSetting("popup");
                         }
                       } catch (e) {}
                     },
                     className: "rounded-lg border border-primary/20 px-3 py-1.5 text-xs font-semibold text-primary active:bg-primary/10",
                     children: "Open"
                   })
-                }) : null,
+                }),
                 jsx(Divider, {}),
                 /* Auto Start */
                 jsx(CardRow, {
