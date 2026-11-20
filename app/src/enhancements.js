@@ -8379,7 +8379,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<div class="lt-tool-card">' +
           '<p class="lt-card-title">Alerts</p>' +
           '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.45">' + permSummary + '</p>' +
-          '<p style="font-size:11px;color:#9CA3AF;margin:0 0 10px;line-height:1.45">Your notifications arrive even with the app closed \u2014 the 10-minute background alarm fires the same alert. Resets at midnight.</p>' +
+          '<p style="font-size:11px;color:#9CA3AF;margin:0 0 10px;line-height:1.45">Your notifications arrive even with the app closed \u2014 the alert fires the moment your tracked Time Waste minutes reach the budget, even with Minutics closed. Resets at midnight.</p>' +
           '<button type="button" data-lt-waste-test class="lt-tool-primary" style="width:100%">Test alert</button>' +
         '</div>' +
         '<div class="lt-tool-card">' +
@@ -8541,7 +8541,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           _wasteNotifiedDay = nativeDay;
           writeJson(WASTE_NOTIFIED_DAY_KEY, nativeDay);
         }
-        if (mins > cfg.minutes) {
+        if (mins >= cfg.minutes) {
           /* Block starting NEW Time Waste activities for the rest of the day.
              Set outside the notify branch so the gate also engages when the
              NATIVE alarm was the side that actually alerted. */
@@ -8574,15 +8574,15 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             syncNotifStateBridge(true);
           }
         }
-        /* Keep native state warm every minute while the app lives on, so the
-           background guard always has up-to-date minute counts when the app
-           is closed/screened-off. syncNotifStateBridge always pushes mins. */
-        syncNotifStateBridge(true);
+        /* Keep native state warm while the app lives on. Throttled (false) so
+           a 5s watcher tick does not write prefs every time — the crossing
+           alarm is still re-armed on every actual sync. */
+        syncNotifStateBridge(false);
       } catch (e) {}
     };
-    setInterval(check, 60000);
+    setInterval(check, 5000);
     document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
-    setTimeout(check, 4000);
+    setTimeout(check, 2000);
   })();
   /* TimeWasteGuard overlay → see charge in Account: open the tool too.
      The native overlay writes lt_overlay_open_tool=wastebudget when tapped. */
