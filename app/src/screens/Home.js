@@ -2815,11 +2815,19 @@ export function ActivityScreen({ profile }) {
      so the React gate can mirror the enhancements-level computation. */
   function wasteBudgetOver() {
     try {
-      const day = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const day = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0');
       const blocked = localStorage.getItem('lt_waste_blocked_v1');
       if (blocked === day) return true;
       const cfg = JSON.parse(localStorage.getItem('lt_waste_budget_v1') || '{}');
       const limit = Number(cfg && cfg.minutes) || 45;
+      /* One shared computation (category tags + Home timer blocks + the live
+         running block) — exactly the number the alert watcher uses. */
+      if (typeof window !== 'undefined' && typeof window.LTWasteMinutesToday === 'function') {
+        return (Number(window.LTWasteMinutesToday()) || 0) >= limit;
+      }
       const entries = JSON.parse(localStorage.getItem('lt_category_log_v1') || '[]');
       let mins = 0;
       for (const e of entries) {

@@ -7211,6 +7211,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         idleSince: nudgeData.noActivitySince || 0,
         lastNudge: nudgeData.lastNudge || 0,
         wasteMins: computeWasteMinutesToday(),
+        /* Start time of the waste timer that is running RIGHT NOW (0 when
+           idle). Native projects minutes from this, so the alert still fires
+           after the WebView is gone. */
+        wasteSince: wasteRunningStart(),
         wasteLimit: wasteCfg && wasteCfg.minutes > 0 ? wasteCfg.minutes : 0,
         wasteDay: localDayKey(),
         /* Native AlarmManager/receiver checks these to decide whether to
@@ -7237,10 +7241,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
          first would clobber the very lastNudge / wasteNotifiedDay values
          we are about to adopt. */
       try {
-        var pendingCat = readJson(PENDING_TIMER_CAT_KEY, null);
-        var runStart = Number(readJson(RUNNING_TIMER_KEY, 0));
-        var wasteRunning = !!(pendingCat && pendingCat.category &&
-          WASTE_CATEGORIES.indexOf(pendingCat.category) !== -1 && runStart > 0);
+        var wasteSinceNow = wasteRunningStart();
         adoptBgSnapshot(function () {
           var n2 = readJson(NUDGE_KEY, {});
           writeBgSnapshot({
@@ -7252,7 +7253,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             wasteLimit: snap.wasteLimit,
             wasteDay: snap.wasteDay,
             wasteNotifiedDay: (typeof _wasteNotifiedDay === "string" ? _wasteNotifiedDay : "") || snap.wasteNotifiedDay,
-            runningWasteSince: wasteRunning ? runStart : 0,
+            runningWasteSince: wasteSinceNow,
             wasteCheckedAt: now,
             updatedAt: now
           });
@@ -8105,20 +8106,74 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      picking "Time Waste" or the "Time Waste / Scrolling" Social Media
      sub-category appeared to do nothing, because nothing is written to
      the log until the timer is actually stopped (see pollRunningTimer). */
+  /* Tracked blocks (Home timer / stopwatch) that count as Time Waste today.
+     Returns { mins, runningStart } — runningStart is the epoch start of a
+     still-running waste block (0 when none), so the NATIVE alarm can keep
+     counting forward after the WebView has been killed. */
+  function wasteBlocksToday() {
+    var out = { mins: 0, runningStart: 0 };
+    try {
+      var db = JSON.parse(localStorage.getItem(NATIVE_DB_KEY) || "null") || {};
+      var activities = Array.isArray(db.activities) ? db.activities : [];
+      var blocks = Array.isArray(db.blocks) ? db.blocks : [];
+      var byId = {};
+      activities.forEach(function (a) { if (a && a.id) byId[a.id] = a; });
+      var day = localDayKey();
+      blocks.forEach(function (b) {
+        if (!b || !b.startTime) return;
+        var s = new Date(b.startTime).getTime();
+        if (!isFinite(s) || localDayKeyFromTime(s) !== day) return;
+        var act = byId[b.activityId] || {};
+        var nm = act.name || b.name || "";
+        var cat = act.category || b.category || "";
+        var isWaste = nameMatches(nm, PRODSCORE_LOSSES) ||
+                      WASTE_CATEGORIES.indexOf(cat) !== -1;
+        if (!isWaste) return;
+        var e = b.endTime ? new Date(b.endTime).getTime() : Date.now();
+        if (!isFinite(e) || e < s) e = Date.now();
+        out.mins += (e - s) / 60000;
+        if (!b.endTime && s > out.runningStart) out.runningStart = s;
+      });
+    } catch (e) {}
+    return out;
+  }
+
+  /* Epoch start of a waste timer that is still running (0 when idle).
+     Sent to native so it can project minutes while the app is closed. */
+  function wasteRunningStart() {
+    try {
+      var pending = readJson(PENDING_TIMER_CAT_KEY, null);
+      var runStart = Number(readJson(RUNNING_TIMER_KEY, 0));
+      if (pending && pending.category && WASTE_CATEGORIES.indexOf(pending.category) !== -1 && runStart > 0) {
+        return runStart;
+      }
+    } catch (e) {}
+    return wasteBlocksToday().runningStart || 0;
+  }
+
   function computeWasteMinutesToday() {
     var day = localDayKey();
     var entries = catLogEntries().filter(function (e) { return (e.ldate || e.date) === day; });
-    var wasteMin = entries.reduce(function (s, e) {
+    var catMins = entries.reduce(function (s, e) {
       return WASTE_CATEGORIES.indexOf(e.category) !== -1 ? s + (Number(e.minutes) || 0) : s;
     }, 0);
 
+    /* A category-tagged timer that is still running is not in the log yet. */
     var pending = readJson(PENDING_TIMER_CAT_KEY, null);
-    var runningStart = Number(readJson(RUNNING_TIMER_KEY, 0));
-    if (pending && pending.category && WASTE_CATEGORIES.indexOf(pending.category) !== -1 && runningStart > 0) {
-      wasteMin += Math.max(0, Math.round((Date.now() - runningStart) / 60000));
+    var liveStart = wasteRunningStart();
+    if (pending && pending.category && WASTE_CATEGORIES.indexOf(pending.category) !== -1 && liveStart > 0) {
+      catMins += Math.max(0, (Date.now() - liveStart) / 60000);
     }
-    return wasteMin;
+
+    /* Two independent ways to record waste — category tags and Home timer
+       blocks. Take the larger, never the sum, so the same minutes are not
+       counted twice when both exist. */
+    var tracked = wasteBlocksToday();
+    return Math.round(Math.max(catMins, tracked.mins));
   }
+
+  /* React screens (Home's startTimer gate) need the same number. */
+  try { window.LTWasteMinutesToday = computeWasteMinutesToday; } catch (e) {}
 
   /* ── Doom scroll stopper ───────────────────────────────────────────────── */
   function ltPermUseOn(key) {
@@ -8317,7 +8372,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<div class="lt-tool-card">' +
           '<p class="lt-card-title">Alerts</p>' +
           '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.45">' + permSummary + '</p>' +
-          '<p style="font-size:11px;color:#9CA3AF;margin:0 0 10px;line-height:1.45">Your notifications arrive even with the app closed \u2014 the 15-minute background alarm fires the same alert. Resets at midnight.</p>' +
+          '<p style="font-size:11px;color:#9CA3AF;margin:0 0 10px;line-height:1.45">Your notifications arrive even with the app closed \u2014 the 10-minute background alarm fires the same alert. Resets at midnight.</p>' +
           '<button type="button" data-lt-waste-test class="lt-tool-primary" style="width:100%">Test alert</button>' +
         '</div>' +
         '<div class="lt-tool-card">' +
@@ -8364,7 +8419,19 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           return;
         }
       }
-      notifyWasteOver(Math.max(1, wasteMin), 1);
+      /* Exercise the REAL path — same overlay + notification the background
+         guard uses — instead of posting a bare notification. Never marks
+         today's alert as consumed. */
+      var testMins  = Math.max(1, Number(wasteMin) || 0);
+      var testLimit = Math.max(1, Number(cfg.minutes) || 45);
+      var fired = false;
+      try {
+        if (window.AndroidBridge && typeof window.AndroidBridge.showWasteAlert === "function") {
+          window.AndroidBridge.showWasteAlert(testMins, testLimit);
+          fired = true;
+        }
+      } catch (e) {}
+      if (!fired) notifyWasteOver(testMins, testLimit);
       syncNotifStateBridge(true);
     });
 
@@ -8467,25 +8534,28 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           _wasteNotifiedDay = nativeDay;
           writeJson(WASTE_NOTIFIED_DAY_KEY, nativeDay);
         }
-        if (mins > cfg.minutes && _wasteNotifiedDay !== day) {
-          _wasteNotifiedDay = day;
-          writeJson(WASTE_NOTIFIED_DAY_KEY, day);
-          /* Also mark the day as "blocked" — starting a Time Waste
-             activity is then gated at the Activity screen too. */
+        if (mins > cfg.minutes) {
+          /* Block starting NEW Time Waste activities for the rest of the day.
+             Set outside the notify branch so the gate also engages when the
+             NATIVE alarm was the side that actually alerted. */
           try { localStorage.setItem("lt_waste_blocked_v1", day); } catch (e) {}
-          /* Force-stop any in-flight Time Waste timer: clears the WebView's
-             running-timer markers so the activity stops being counted as
-             an open timer. (React reads Firestore blocks fresh on next
-             mount; the live time-trace stops here.) */
-          try {
-            var _pending = readJson(PENDING_TIMER_CAT_KEY, null);
-            if (_pending && _pending.category === "Time Waste" && Number(readJson(RUNNING_TIMER_KEY, 0)) > 0) {
-              writeJson(PENDING_TIMER_CAT_KEY, null);
-              writeJson(RUNNING_TIMER_KEY, 0);
-            }
-          } catch (e) {}
-          notifyWasteOver(mins, cfg.minutes);
-          syncNotifStateBridge(true);
+          if (_wasteNotifiedDay !== day) {
+            _wasteNotifiedDay = day;
+            writeJson(WASTE_NOTIFIED_DAY_KEY, day);
+            /* Force-stop any in-flight Time Waste timer: clears the WebView's
+               running-timer markers so the activity stops being counted as
+               an open timer. (React reads Firestore blocks fresh on next
+               mount; the live time-trace stops here.) */
+            try {
+              var _pending = readJson(PENDING_TIMER_CAT_KEY, null);
+              if (_pending && _pending.category === "Time Waste" && Number(readJson(RUNNING_TIMER_KEY, 0)) > 0) {
+                writeJson(PENDING_TIMER_CAT_KEY, null);
+                writeJson(RUNNING_TIMER_KEY, 0);
+              }
+            } catch (e) {}
+            notifyWasteOver(mins, cfg.minutes);
+            syncNotifStateBridge(true);
+          }
         }
         /* Keep native state warm every minute while the app lives on, so the
            background guard always has up-to-date minute counts when the app
