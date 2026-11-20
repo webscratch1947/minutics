@@ -7414,6 +7414,19 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return "";
   }
 
+  /* Live Android grant state (not the last synced snapshot), so the alert
+     can tell the user why the popup did not appear. */
+  function readPermStatus() {
+    try {
+      var b = window.AndroidBridge;
+      if (b && typeof b.getPermissionStatus === "function") {
+        var raw = b.getPermissionStatus();
+        return typeof raw === "string" ? JSON.parse(raw) : (raw || null);
+      }
+    } catch (e) {}
+    return null;
+  }
+
   /* Steady 60s heartbeat so native has fresh state no matter which tab is
      open, plus a forced push the moment the page is backgrounded (home
      button / tab switch — exactly when JS timers may be about to stop). */
@@ -8493,6 +8506,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      so each new local day re-arms the alert. */
   var WASTE_NOTIFIED_DAY_KEY = "lt_waste_notified_day_v1";
   var _wasteNotifiedDay = readJson(WASTE_NOTIFIED_DAY_KEY, "");
+  /* Once-per-day in-app hint when the popup permission is missing. */
+  var _overlayHintDay = "";
 
   function notifyWasteOver(mins, limit) {
     var body = "You've spent " + mins + " min on Time Waste \u2014 your " + limit + " min daily limit is crossed. Resets at midnight.";
@@ -8572,6 +8587,15 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             } catch (e) {}
             if (!nativeFired) notifyWasteOver(mins, cfg.minutes);
             syncNotifStateBridge(true);
+          }
+          /* If the popup grant is missing, say so in-app instead of letting
+             the user think the alert was "notification only" by design. */
+          if (_overlayHintDay !== day) {
+            var ps = readPermStatus();
+            if (ps && !ps.overlay) {
+              _overlayHintDay = day;
+              ltToast("Turn on \"Display over other apps\" for Minutics to see the popup");
+            }
           }
         }
         /* Keep native state warm while the app lives on. Throttled (false) so
