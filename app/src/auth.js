@@ -406,6 +406,14 @@ function snapshotAccount(uid) {
 }
 function clearAppKeys() {
   appKeys().forEach(function (k) { localStorage.removeItem(k); });
+  /* Native alarms hold their OWN copy of the running timer / idle clock /
+     waste budget. Without this, logging out while a timer runs would keep
+     notifying the next account with the previous account's data. */
+  try {
+    if (window.AndroidBridge && window.AndroidBridge.resetNotificationState) {
+      window.AndroidBridge.resetNotificationState();
+    }
+  } catch (e) {}
 }
 function restoreAccount(uid) {
   clearAppKeys();

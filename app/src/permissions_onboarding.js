@@ -33,20 +33,6 @@ export const PERMISSION_ROWS = [
     ]
   },
   {
-    key: 'otherPermissions',
-    title: 'Allow other permission',
-    desc: 'Xiaomi keeps extra popup switches inside Minutics app info.',
-    icon: 'popup',
-    miuiOnly: true,
-    settingsKey: 'details',
-    steps: [
-      'Minutics app info opens on the next screen.',
-      'Scroll all the way down and tap "Other permissions".',
-      'Tap "Allow" on the screen that opens.',
-      'Go back to Minutics — this row turns green.'
-    ]
-  },
-  {
     key: 'popup',
     title: 'Pop-up in background',
     desc: 'Lets the Time Waste alert appear even when Minutics is closed.',
@@ -56,8 +42,8 @@ export const PERMISSION_ROWS = [
     steps: [
       'Minutics app info opens on the next screen.',
       'Scroll down and tap "Other permissions".',
-      'Find "Open new windows while running in the background" and turn it ON.',
-      'Tap Allow on the confirmation dialog if one appears.',
+      'Tap "Open new windows while running in the background".',
+      'On the next screen tap "Always allow", then go back.',
       'Go back to Minutics — this row turns green.'
     ]
   },

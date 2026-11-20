@@ -7124,39 +7124,42 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      Works even when the app is closed (via AndroidBridge notification when
      hidden, and the native alarm path on Android; web uses the hidden-tab
      Notification with a fixed tag so it replaces rather than stacks). */
-  var _lastActivityCheckMin = -1;
+  var _activityCheckState = readJson("lt_activity_check_v1", {});
+  function activityTimeLabel(mins) {
+    if (mins < 60) return mins + " min";
+    var h = Math.floor(mins / 60), r = mins % 60;
+    if (!r) return h + (h === 1 ? " hour" : " hours");
+    return h + (h === 1 ? " hour" : " hours") + " " + r + " min";
+  }
   function maybeNotifyActivityCheck() {
     try {
-      var nativeRunning = getNativeRunningBlock();
-      var startedAt = Number(readJson(RUNNING_TIMER_KEY, 0));
-      var timerIsRunning = !!nativeRunning || startedAt > 0;
-      if (!timerIsRunning) { _lastActivityCheckMin = -1; return; }
-      var elapsedMin = startedAt ? Math.floor((Date.now() - startedAt) / 60000) : 0;
-      if (elapsedMin < 30) { _lastActivityCheckMin = -1; return; }
-      var intervalMin = Math.floor(elapsedMin / 30) * 30; /* 30, 60, 90, ... */
-      if (intervalMin === _lastActivityCheckMin) return;
-      _lastActivityCheckMin = intervalMin;
-
+      /* On Android the native receiver owns this one — it runs with the app
+         closed. Only the plain web build uses this path. */
+      if (window.AndroidBridge) return;
+      var running = getNativeRunningBlock();
+      var startedAt = running ? new Date(running.startTime).getTime()
+        : Number(readJson(RUNNING_TIMER_KEY, 0));
+      if (!running && !(startedAt > 0)) {
+        if (_activityCheckState.session) {
+          _activityCheckState = {};
+          writeJson("lt_activity_check_v1", _activityCheckState);
+        }
+        return;
+      }
+      var elapsedMin = Math.floor((Date.now() - startedAt) / 60000);
+      if (elapsedMin < 30) return;
+      var bucket = Math.floor(elapsedMin / 30) * 30;
+      if (_activityCheckState.session === startedAt && _activityCheckState.bucket === bucket) return;
       var pending = readJson(PENDING_TIMER_CAT_KEY, null);
-      var activityName = (pending && (pending.activityName || pending.label || pending.category)) || "this activity";
-      var msg = "Are you still doing this activity : " + activityName;
-
-      /* Hidden / background: native bridge on Android, web Notification. */
-      if (document.visibilityState !== "visible" &&
-          typeof window !== "undefined" && window.AndroidBridge &&
-          typeof window.AndroidBridge.showNotification === "function") {
-        try { window.AndroidBridge.showNotification("Are you still doing this activity?", msg); } catch (e) {}
-        return;
+      var name = (pending && (pending.activityName || pending.label || pending.category)) || "this activity";
+      if ("Notification" in window && window.Notification.permission === "granted") {
+        new window.Notification("Still on this activity?", {
+          body: name + " has been on for " + activityTimeLabel(bucket) + " — still doing it?",
+          tag: "minutics-activity-check", icon: window.location.origin + "/favicon.png"
+        });
       }
-      if (typeof window !== "undefined" && "Notification" in window &&
-          window.Notification.permission === "granted") {
-        try {
-          new window.Notification("Are you still doing this activity?", {
-            body: msg, tag: "minutics-activity-check", icon: window.location.origin + "/favicon.png"
-          });
-        } catch (e) {}
-        return;
-      }
+      _activityCheckState = { session: startedAt, bucket: bucket };
+      writeJson("lt_activity_check_v1", _activityCheckState);
     } catch (e) {}
   }
   setInterval(maybeNotifyActivityCheck, 30000);
@@ -7205,9 +7208,14 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           ps = typeof raw === "string" ? JSON.parse(raw) : raw;
         }
       } catch (e) {}
+      var runningBlock = getNativeRunningBlock();
+      var runningSince = runningBlock
+        ? new Date(runningBlock.startTime).getTime()
+        : Number(readJson(RUNNING_TIMER_KEY, 0));
       var snap = {
         profile: profile,
-        running: !!getNativeRunningBlock(),
+        running: !!runningBlock || runningSince > 0,
+        runningSince: runningSince > 0 ? runningSince : 0,
         idleSince: nudgeData.noActivitySince || 0,
         lastNudge: nudgeData.lastNudge || 0,
         wasteMins: computeWasteMinutesToday(),
@@ -7248,6 +7256,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           writeBgSnapshot({
             profile: snap.profile,
             running: snap.running,
+            runningSince: snap.runningSince,
             idleSince: n2.noActivitySince || snap.idleSince,
             lastNudge: n2.lastNudge || snap.lastNudge,
             wasteMins: snap.wasteMins,
@@ -8754,7 +8763,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
        than waiting for a localStorage poll after the WebView was frozen. */
     window.__ltOpenTool = function (t) {
       try {
-        if (t === "wastebudget") openOverlay(renderWasteBudget);
+        if (t === "wastebudget") {
+          /* Returning from the alert Activity fires a popstate, which would
+             immediately close the tool we are about to open. */
+          window.__ltDeepLinkUntil = Date.now() + 2500;
+          openOverlay(renderWasteBudget);
+        }
       } catch (e) {}
     };
     setInterval(function () {
@@ -10352,6 +10366,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   /* Also listen for popstate so Android back button works for SPA navigation
      even when LTHandleBack is not called directly by the WebView */
   window.addEventListener("popstate", function () {
+    /* A deep link from the alert is opening a tool — ignore the popstate
+       caused by handing control back from the full-screen alert. */
+    if (window.__ltDeepLinkUntil && Date.now() < window.__ltDeepLinkUntil) return;
     if (catModalRoot) {
       closeCategoryModal("popstate");
       return;
