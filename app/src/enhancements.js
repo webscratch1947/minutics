@@ -8372,12 +8372,30 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         if (typeof ps === "string") ps = JSON.parse(ps);
         if (ps) {
           permSummary = "Notifications: " + (ps.notifications ? "granted" : "NOT granted") +
-            " \u00B7 Display over other apps: " + (ps.overlay ? "granted" : "NOT granted");
+            " \u00B7 Display over other apps: " + (ps.overlay ? "granted" : "NOT granted") +
+            " \u00B7 Accessibility: " + (ps.accessibility ? "on" : "off");
         }
       } else {
         permSummary = "This tool works fully in the Android app.";
       }
     } catch (e) { permSummary = "Could not read permission state."; }
+
+    /* Whether a full-screen alert can actually reach the screen. Checked when
+       the tool opens, so the user is asked BEFORE the first alert instead of
+       being told afterwards that it failed. */
+    var popup = { ready: true, miui: false, blocked: false };
+    try {
+      var psPop = window.AndroidBridge && window.AndroidBridge.getPermissionStatus
+        ? window.AndroidBridge.getPermissionStatus() : null;
+      if (typeof psPop === "string") psPop = JSON.parse(psPop);
+      var canOverlayNow = !!(psPop && psPop.overlay);
+      var canA11yNow = !!(psPop && psPop.accessibility);
+      popup.miui = !!(window.AndroidBridge && window.AndroidBridge.isMiuiDevice
+        && window.AndroidBridge.isMiuiDevice());
+      popup.blocked = !!(window.AndroidBridge && window.AndroidBridge.getPopupBlocked
+        && window.AndroidBridge.getPopupBlocked());
+      popup.ready = (canOverlayNow || canA11yNow) && !popup.blocked;
+    } catch (e) {}
 
     activeOverlay.innerHTML =
       '<div class="lt-tool-shell">' +
@@ -8389,6 +8407,16 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             (over ? "\u26A0\uFE0F Over your " + cfg.minutes + " min budget!" : "Budget: " + cfg.minutes + " min/day") +
           '</p>' +
         '</div>' +
+        (popup.ready ? '' :
+          '<div class="lt-tool-card" style="background:#FEF2F2;border-color:#FCA5A5">' +
+            '<p class="lt-card-title" style="color:#B91C1C">Full-screen alert is off</p>' +
+            '<p style="font-size:12px;color:#7F1D1D;margin:0 0 10px;line-height:1.45">' +
+              (popup.miui
+                ? 'Xiaomi blocks popups from the background until you turn on \u201CDisplay pop-up windows while running in background\u201D for Minutics. It is one switch \u2014 without it you only get a notification.'
+                : 'Allow \u201CDisplay over other apps\u201D for Minutics so the alert can appear on top of other apps.') +
+            '</p>' +
+            '<button type="button" data-lt-waste-fix class="lt-tool-primary" style="width:100%">Turn on popup alerts</button>' +
+          '</div>') +
         '<div class="lt-tool-card">' +
           '<p class="lt-card-title">Alerts</p>' +
           '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.45">' + permSummary + '</p>' +
@@ -8409,6 +8437,25 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       var minutes = Math.max(1, Number(this.querySelector('[name="minutes"]').value) || 45);
       writeJson(WASTE_BUDGET_KEY, { minutes: minutes });
       renderWasteBudget();
+    });
+    /* Proactive setup: take the user straight to the one switch that makes
+       the popup possible, instead of hoping they tap a notification later. */
+    var fixPopupBtn = activeOverlay.querySelector("[data-lt-waste-fix]");
+    if (fixPopupBtn) fixPopupBtn.addEventListener("click", function () {
+      try {
+        if (popup.miui && window.AndroidBridge && window.AndroidBridge.openOemPopupSettings) {
+          window.AndroidBridge.openOemPopupSettings();
+        } else if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
+          window.AndroidBridge.openPermissionSetting("overlay");
+        }
+      } catch (e) {}
+      /* They are about to grant it — drop the stale failure flag so the card
+         disappears once they come back. */
+      try {
+        if (window.AndroidBridge && window.AndroidBridge.clearPopupBlocked) {
+          window.AndroidBridge.clearPopupBlocked();
+        }
+      } catch (e) {}
     });
     /* Diagnostics/self-test: fire the same over-limit path the real watcher
        uses, WITHOUT consuming today's one-per-day alert. */
