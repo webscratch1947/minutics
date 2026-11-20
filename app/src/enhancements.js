@@ -8444,7 +8444,22 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     activeOverlay.querySelector("[data-lt-waste-form]").addEventListener("submit", function (e) {
       e.preventDefault();
       var minutes = Math.max(1, Number(this.querySelector('[name="minutes"]').value) || 45);
+      var old = Number((cfg && cfg.minutes) || 45);
       writeJson(WASTE_BUDGET_KEY, { minutes: minutes });
+      /* Raising the limit clears today's "already alerted / blocked" state,
+         so the alert can fire again when the NEW limit is crossed and the
+         activity gate stops saying "budget over" while there is time left. */
+      if (minutes > old) {
+        try { localStorage.removeItem("lt_waste_blocked_v1"); } catch (e) {}
+        _wasteNotifiedDay = "";
+        writeJson(WASTE_NOTIFIED_DAY_KEY, "");
+        try {
+          if (window.AndroidBridge && window.AndroidBridge.resetWasteNotifiedDay) {
+            window.AndroidBridge.resetWasteNotifiedDay();
+          }
+        } catch (e) {}
+        syncNotifStateBridge(true);
+      }
       renderWasteBudget();
     });
     /* Proactive setup: take the user straight to the one switch that makes
@@ -8759,24 +8774,25 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   /* TimeWasteGuard overlay → see charge in Account: open the tool too.
      The native overlay writes lt_overlay_open_tool=wastebudget when tapped. */
   (function watchOverlayOpenTool() {
-    /* Called directly by the native deep link with retries — more reliable
-       than waiting for a localStorage poll after the WebView was frozen. */
+    /* One open per deep link. The native side retries until the WebView is
+       ready; without this guard every retry re-ran the open animation. */
+    function openWasteToolFromDeepLink() {
+      if (window.__ltDeepLinkOpen) return;
+      window.__ltDeepLinkOpen = true;
+      window.__ltDeepLinkUntil = Date.now() + 2500;
+      try { localStorage.setItem("lt_overlay_open_tool", ""); } catch (e) {}
+      try { openOverlay(renderWasteBudget); } catch (e) {}
+      setTimeout(function () { window.__ltDeepLinkOpen = false; }, 3000);
+    }
     window.__ltOpenTool = function (t) {
-      try {
-        if (t === "wastebudget") {
-          /* Returning from the alert Activity fires a popstate, which would
-             immediately close the tool we are about to open. */
-          window.__ltDeepLinkUntil = Date.now() + 2500;
-          openOverlay(renderWasteBudget);
-        }
-      } catch (e) {}
+      if (t === "wastebudget") openWasteToolFromDeepLink();
     };
     setInterval(function () {
       try {
         var t = localStorage.getItem("lt_overlay_open_tool");
         if (!t) return;
         localStorage.setItem("lt_overlay_open_tool", "");
-        if (t === "wastebudget") openOverlay(renderWasteBudget);
+        if (t === "wastebudget") openWasteToolFromDeepLink();
       } catch (e) {}
     }, 800);
   })();

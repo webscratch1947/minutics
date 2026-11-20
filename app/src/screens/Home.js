@@ -2849,7 +2849,12 @@ export function ActivityScreen({ profile }) {
         const continueBtn = window.confirm(
           "Your Time Waste budget for today is over.\n\nOpen Time Waste Budget tool to raise your limit?"
         );
-        if (continueBtn) window.location.hash = '#/life-hub';
+        if (continueBtn) {
+          try {
+            if (window.__ltOpenTool) window.__ltOpenTool('wastebudget');
+            else window.location.hash = '#/life-hub';
+          } catch (e) { window.location.hash = '#/life-hub'; }
+        }
         return;
       }
     } catch (e) {}
