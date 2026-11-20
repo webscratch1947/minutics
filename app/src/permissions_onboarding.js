@@ -29,8 +29,38 @@ export const PERMISSION_ROWS = [
       'Find Minutics in this list.',
       'Tap Minutics.',
       'Turn on Allow display over other apps.',
-      'On Xiaomi/HyperOS also enable "Display pop-up windows while running in background" in Other permissions.',
       'Go back to Minutics — this row turns green.'
+    ]
+  },
+  {
+    key: 'otherPermissions',
+    title: 'Allow other permission',
+    desc: 'One more Xiaomi switch so the popup can show above other apps.',
+    icon: 'popup',
+    manual: true,
+    miuiOnly: true,
+    settingsKey: 'overlay',
+    steps: [
+      'On the next screen, scroll all the way down.',
+      'Tap "Allow other permission" (or "Other permissions").',
+      'Find Minutics, then turn its switch on.',
+      'Go back to Minutics and tap "I did it" below.'
+    ]
+  },
+  {
+    key: 'popup',
+    title: 'Pop-up in background',
+    desc: 'Lets the Time Waste alert appear even when Minutics is closed.',
+    icon: 'popup',
+    manual: true,
+    miuiOnly: true,
+    settingsKey: 'popup',
+    steps: [
+      'The next screen opens Minutics\' app info page.',
+      'Tap "Other permissions" (on some phones just "Permissions").',
+      'Scroll down and find "Display pop-up windows while running in background".',
+      'Turn it ON. If you also see "Display pop-up windows", turn that on too.',
+      'Go back to Minutics and tap "I did it" below.'
     ]
   },
   {
@@ -87,9 +117,19 @@ function readStatus() {
   } catch (e) { return {}; }
 }
 
-function allGranted(s) {
+function visibleRows() {
+  var miui = false;
+  try {
+    miui = !!(window.AndroidBridge && window.AndroidBridge.isMiuiDevice
+      && window.AndroidBridge.isMiuiDevice());
+  } catch (e) {}
+  return PERMISSION_ROWS.filter(function (r) { return !r.miuiOnly || miui; });
+}
+
+function allGranted(s, rows) {
   if (!s) return false;
-  return PERMISSION_ROWS.every(function (r) { return r.optional || !!s[r.key]; });
+  var list = rows || PERMISSION_ROWS;
+  return list.every(function (r) { return r.optional || !!s[r.key]; });
 }
 
 function needsGuide(key) {
@@ -129,7 +169,7 @@ function PermIcon({ name, size }) {
 }
 
 /* ── Text guide sheet ───────────────────────────────────────────────────── */
-function GuideSheet({ perm, index, onOpenSettings, onClose }) {
+function GuideSheet({ perm, index, total, onOpenSettings, onConfirm, onClose }) {
   var [dragY, setDragY] = useState(0);
   var [closing, setClosing] = useState(false);
   var startY = useRef(null);
@@ -180,7 +220,7 @@ function GuideSheet({ perm, index, onOpenSettings, onClose }) {
           jsxs('div', { className: 'lt-guide-head', children: [
             jsx('span', { className: 'lt-guide-icon', children: jsx(PermIcon, { name: perm.icon, size: 20 }) }),
             jsxs('div', { className: 'lt-guide-title', children: [
-              jsx('p', { className: 'lt-guide-eyebrow', children: 'Permission ' + (index + 1) + ' of ' + PERMISSION_ROWS.length }),
+              jsx('p', { className: 'lt-guide-eyebrow', children: 'Permission ' + (index + 1) + ' of ' + (total || PERMISSION_ROWS.length) }),
               jsx('h3', { children: perm.title })
             ] }),
             jsx('button', {
@@ -198,9 +238,15 @@ function GuideSheet({ perm, index, onOpenSettings, onClose }) {
             }, i);
           }) }),
           jsx('button', {
-            type: 'button', className: 'lt-guide-primary', 'data-guide-open-settings': '1',
+            type: 'button',
+            className: perm.manual ? 'lt-guide-secondary' : 'lt-guide-primary',
+            'data-guide-open-settings': '1',
             onClick: onOpenSettings, children: 'Open Android settings'
-          })
+          }),
+          perm.manual ? jsx('button', {
+            type: 'button', className: 'lt-guide-primary', 'data-guide-confirm': '1',
+            onClick: onConfirm, children: 'I did it \u2713'
+          }) : null
         ]
       })
     }),
@@ -278,14 +324,15 @@ export function PermissionsStep({ onChange }) {
   var [tutorial, setTutorial] = useState(null);
   var statusRef = useRef(status);
   statusRef.current = status;
+  var rows = visibleRows();
+  var update = function (next) {
+    statusRef.current = next;
+    setStatus(next);
+    if (onChange) onChange(allGranted(next, rows));
+  };
 
   useEffect(function () {
     ensurePermStyles();
-    var update = function (next) {
-      statusRef.current = next;
-      setStatus(next);
-      if (onChange) onChange(allGranted(next));
-    };
     update(readStatus());
 
     var onChanged = function (e) {
@@ -314,11 +361,28 @@ export function PermissionsStep({ onChange }) {
   };
 
   var openSettings = function (perm) {
-    try { window.AndroidBridge.openPermissionSetting(perm.key); } catch (e) {}
+    var key = perm.settingsKey || perm.key;
+    try { window.AndroidBridge.openPermissionSetting(key); } catch (e) {}
+    /* Manual OEM steps keep the guide open so "I did it" is still there when
+       the user comes back from the settings screen. */
+    if (!perm.manual) setTutorial(null);
+  };
+
+  /* OEM switches have no public read API — the user confirms them in the
+     guide and the native side remembers it. */
+  var confirmManual = function (perm) {
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.confirmPermissionSetting) {
+        window.AndroidBridge.confirmPermissionSetting(perm.key);
+      }
+    } catch (e) {}
+    var next = Object.assign({}, statusRef.current);
+    next[perm.key] = true;
+    update(next);
     setTutorial(null);
   };
 
-  var grantedCount = PERMISSION_ROWS.filter(function (r) { return status && status[r.key]; }).length;
+  var grantedCount = rows.filter(function (r) { return status && status[r.key]; }).length;
 
   return jsxs('div', { children: [
     jsx('h2', {
@@ -332,7 +396,7 @@ export function PermissionsStep({ onChange }) {
         jsx('b', { children: grantedCount + ' of ' + PERMISSION_ROWS.length + ' done' })
       ]
     }),
-    jsx('div', { children: PERMISSION_ROWS.map(function (perm) {
+    jsx('div', { children: rows.map(function (perm) {
       var on = !!(status && status[perm.key]);
       return jsxs('div', {
         className: 'lt-perm-row' + (on ? ' is-on' : ''),
@@ -361,8 +425,10 @@ export function PermissionsStep({ onChange }) {
     null,
     tutorial ? jsx(GuideSheet, {
       perm: tutorial,
-      index: PERMISSION_ROWS.findIndex(function (r) { return r.key === tutorial.key; }),
+      index: rows.findIndex(function (r) { return r.key === tutorial.key; }),
+      total: rows.length,
       onOpenSettings: function () { openSettings(tutorial); },
+      onConfirm: function () { confirmManual(tutorial); },
       onClose: function () { setTutorial(null); }
     }) : null
   ] });
