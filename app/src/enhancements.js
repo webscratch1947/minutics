@@ -7211,9 +7211,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         idleSince: nudgeData.noActivitySince || 0,
         lastNudge: nudgeData.lastNudge || 0,
         wasteMins: computeWasteMinutesToday(),
-        /* Start time of the waste timer that is running RIGHT NOW (0 when
-           idle). Native projects minutes from this, so the alert still fires
-           after the WebView is gone. */
+        /* Minutes already finished today + the running timer's start. Native
+           projects base + (now - since) so it neither double-counts the live
+           segment nor forgets earlier sessions after the WebView dies. */
+        wasteBaseMins: wasteBaseMinutesToday(),
         wasteSince: wasteRunningStart(),
         wasteLimit: wasteCfg && wasteCfg.minutes > 0 ? wasteCfg.minutes : 0,
         wasteDay: localDayKey(),
@@ -8151,25 +8152,31 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return wasteBlocksToday().runningStart || 0;
   }
 
-  function computeWasteMinutesToday() {
+  /* Waste minutes already FINISHED today — excludes any timer that is still
+     running, so the live segment can be added exactly once. */
+  function wasteBaseMinutesToday() {
     var day = localDayKey();
     var entries = catLogEntries().filter(function (e) { return (e.ldate || e.date) === day; });
     var catMins = entries.reduce(function (s, e) {
       return WASTE_CATEGORIES.indexOf(e.category) !== -1 ? s + (Number(e.minutes) || 0) : s;
     }, 0);
 
-    /* A category-tagged timer that is still running is not in the log yet. */
-    var pending = readJson(PENDING_TIMER_CAT_KEY, null);
-    var liveStart = wasteRunningStart();
-    if (pending && pending.category && WASTE_CATEGORIES.indexOf(pending.category) !== -1 && liveStart > 0) {
-      catMins += Math.max(0, (Date.now() - liveStart) / 60000);
-    }
-
     /* Two independent ways to record waste — category tags and Home timer
        blocks. Take the larger, never the sum, so the same minutes are not
        counted twice when both exist. */
     var tracked = wasteBlocksToday();
-    return Math.round(Math.max(catMins, tracked.mins));
+    var trackedBase = tracked.mins;
+    if (tracked.runningStart > 0) {
+      trackedBase -= Math.max(0, (Date.now() - tracked.runningStart) / 60000);
+    }
+    return Math.max(0, Math.round(Math.max(catMins, trackedBase)));
+  }
+
+  function computeWasteMinutesToday() {
+    var total = wasteBaseMinutesToday();
+    var since = wasteRunningStart();
+    if (since > 0) total += Math.max(0, (Date.now() - since) / 60000);
+    return Math.round(total);
   }
 
   /* React screens (Home's startTimer gate) need the same number. */
