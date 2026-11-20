@@ -913,7 +913,7 @@ export function SettingsScreen() {
                 }),
                 isMiui ? jsx(CardRow, {
                   label: "Xiaomi background popups",
-                  desc: "Required on MIUI/HyperOS so the popup can appear over other apps. Tap Open, then enable \"Display pop-up windows while running in background\".",
+                  desc: "Required on Xiaomi/HyperOS so the popup can appear over other apps. Tap Open, then in Other permissions enable \"Open new windows while running in the background\".",
                   children: jsx("button", {
                     type: "button",
                     onClick: function () {

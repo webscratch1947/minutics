@@ -8412,7 +8412,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             '<p class="lt-card-title" style="color:#B91C1C">Full-screen alert is off</p>' +
             '<p style="font-size:12px;color:#7F1D1D;margin:0 0 10px;line-height:1.45">' +
               (popup.miui
-                ? 'Xiaomi blocks popups from the background until you turn on \u201CDisplay pop-up windows while running in background\u201D for Minutics. It is one switch \u2014 without it you only get a notification.'
+                ? 'Xiaomi blocks popups from the background until you turn on \u201COpen new windows while running in the background\u201D in Other permissions. One switch \u2014 without it you only get a notification.'
                 : 'Allow \u201CDisplay over other apps\u201D for Minutics so the alert can appear on top of other apps.') +
             '</p>' +
             '<button type="button" data-lt-waste-fix class="lt-tool-primary" style="width:100%">Turn on popup alerts</button>' +
@@ -8487,7 +8487,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           showSimpleToast(
             miuiTest ? "Popup permission off" : "Display over other apps off",
             miuiTest
-              ? "On Xiaomi/HyperOS enable Display over other apps AND \"Display pop-up windows while running in background\" in App info → Other permissions."
+              ? "On Xiaomi/HyperOS enable Display over other apps AND \"Open new windows while running in the background\" in App info → Other permissions."
               : "Enable Display over other apps in Settings → Permissions — required for the alert over any app."
           );
           return;
@@ -8614,7 +8614,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       var txt = document.createElement("div");
       txt.style.flex = "1";
       txt.textContent = miui
-        ? "Popup blocked by MIUI. Enable \"Display pop-up windows while running in background\" in App info \u2192 Other permissions."
+        ? "Popup blocked by Xiaomi. Enable \"Open new windows while running in the background\" in App info \u2192 Other permissions."
         : "Popup blocked. Allow \"Display over other apps\" for Minutics.";
       /* Show the real addView failure so a report is exact instead of a guess. */
       try {
@@ -8717,7 +8717,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
                   && window.AndroidBridge.isMiuiDevice());
               } catch (e) {}
               ltToast(miuiNow
-                ? "Enable \"Display pop-up windows while running in background\" in App info → Other permissions"
+                ? "Enable \"Open new windows while running in the background\" in App info → Other permissions"
                 : "Turn on \"Display over other apps\" for Minutics to see the popup");
             }
           }

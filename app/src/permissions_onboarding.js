@@ -42,7 +42,7 @@ export const PERMISSION_ROWS = [
     steps: [
       'Minutics app info opens on the next screen.',
       'Scroll all the way down and tap "Other permissions".',
-      'Turn on the popup switches listed there.',
+      'Tap "Allow" on the screen that opens.',
       'Go back to Minutics — this row turns green.'
     ]
   },
@@ -56,8 +56,8 @@ export const PERMISSION_ROWS = [
     steps: [
       'Minutics app info opens on the next screen.',
       'Scroll down and tap "Other permissions".',
-      'Turn ON "Display pop-up windows while running in background".',
-      'Also turn on "Display pop-up windows" if you see it.',
+      'Find "Open new windows while running in the background" and turn it ON.',
+      'Tap Allow on the confirmation dialog if one appears.',
       'Go back to Minutics — this row turns green.'
     ]
   },
