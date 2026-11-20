@@ -8569,6 +8569,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       txt.textContent = miui
         ? "Popup blocked by MIUI. Enable \"Display pop-up windows while running in background\" in App info \u2192 Other permissions."
         : "Popup blocked. Allow \"Display over other apps\" for Minutics.";
+      /* Show the real addView failure so a report is exact instead of a guess. */
+      try {
+        var perr = window.AndroidBridge && window.AndroidBridge.getPopupError
+          ? String(window.AndroidBridge.getPopupError() || "") : "";
+        if (perr) {
+          var sub = document.createElement("div");
+          sub.style.cssText = "margin-top:5px;font:500 10.5px/1.35 ui-monospace,monospace;color:#8B95AD;word-break:break-word";
+          sub.textContent = perr;
+          txt.appendChild(sub);
+        }
+      } catch (e) {}
       var fix = document.createElement("button");
       fix.type = "button";
       fix.textContent = "Fix";
