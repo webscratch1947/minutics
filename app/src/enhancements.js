@@ -7862,8 +7862,15 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       if (nameMatches(e.category, WASTE_CATEGORIES)) wasteMin += m;
       else if (nameMatches(e.category, PRODSCORE_BOOST)) boostMin += m;
     });
-    if (tracked) { boostMin += tracked.boostMin; wasteMin += tracked.wasteMin; }
-    var score = Math.round(50 + boostMin * 0.5 - wasteMin * 0.5);
+    /* Category tags and tracked timer blocks are two views of the SAME time.
+       Take the larger of each bucket (never the sum) — exactly how the Time
+       Waste number avoids double-counting. */
+    if (tracked) {
+      boostMin = Math.max(boostMin, tracked.boostMin || 0);
+      wasteMin = Math.max(wasteMin, tracked.wasteMin || 0);
+    }
+    var raw = 50 + boostMin * 0.5 - wasteMin * 0.5;
+    var score = Math.round(raw);
     score = Math.min(100, Math.max(0, score));
     return { score: score, boostMin: Math.round(boostMin), wasteMin: Math.round(wasteMin) };
   }
@@ -7931,7 +7938,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             '<div class="lt-history-row"><span>Productive minutes</span><strong>+' + escapeHtml(String(idx.boostMin)) + '</strong></div>' +
             '<div class="lt-history-row"><span>Time Waste minutes</span><strong style="color:#DC2626;">-' + escapeHtml(String(idx.wasteMin)) + '</strong></div>' +
           '</div>' +
-          '<div class="lt-tool-card lt-empty">Score starts at 50 each day: +0.5 per productive minute, -0.5 per wasted minute, clamped 0-100. Tracked timer/stopwatch time counts too.</div>' +
+          '<div class="lt-tool-card lt-empty">Score starts at 50 each day: +0.5 per productive minute, -0.5 per wasted minute, clamped 0-100. Category tags and tracked timer minutes are merged, never double-counted.</div>' +
         '</div>';
     } catch (err) {
       console.error("[ProductivityScore] failed", err);
