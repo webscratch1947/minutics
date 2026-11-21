@@ -8390,7 +8390,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   function renderWasteBudget() {
     var cfg = readJson(WASTE_BUDGET_KEY, { minutes: 45 });
     var wasteMin = computeWasteMinutesToday();
-    var over = wasteMin > cfg.minutes;
+    /* Reaching the limit IS over — same rule the alert uses everywhere else. */
+    var over = wasteMin >= cfg.minutes;
     /* Owner often reports "the budget never came" — show the exact live
        grant state (this tool opens normally without pretending) plus a
        test-alert button so it can be verified right here. */
@@ -8538,7 +8539,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         }
         var cfgNow = readJson(WASTE_BUDGET_KEY, { minutes: 45 });
         var minsNow = computeWasteMinutesToday();
-        var overNow = minsNow > cfgNow.minutes;
+        var overNow = minsNow >= cfgNow.minutes;
         card.style.background = overNow ? "#FEF2F2" : "";
         card.style.borderColor = overNow ? "#FCA5A5" : "";
         var minsEl = card.querySelector("[data-lt-waste-mins]");
