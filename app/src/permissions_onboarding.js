@@ -60,7 +60,8 @@ export const PERMISSION_ROWS = [
   {
     key: 'autostart',
     title: 'Auto Start',
-    desc: 'Restarts reminders automatically after a reboot.',
+    optional: true,
+    desc: 'Optional — some phones have this; we cannot read whether it is on, so coming back from settings never counts as granting it.',
     icon: 'autostart',
     steps: [
       'Find Minutics in the Auto Start list.',

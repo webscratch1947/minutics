@@ -165,7 +165,8 @@ var SETTINGS_GUIDES = {
 
 function PermGuide({ permKey, onClose, onOpen }) {
   var g = SETTINGS_GUIDES[permKey] || { title: 'Permission', steps: [] };
-  /* Use the phone's real permission names from native detection. */
+  /* Per-brand guides: hide steps for permissions that don't exist on this
+     phone (e.g. Xiaomi "open new windows" on LG / stock Android). */
   try {
     if (window.AndroidBridge && window.AndroidBridge.getDeviceProfile) {
       var pr = JSON.parse(window.AndroidBridge.getDeviceProfile());
@@ -176,12 +177,24 @@ function PermGuide({ permKey, onClose, onOpen }) {
       } else if (permKey === 'popup' && pr.popupName) {
         steps = steps.map(function (s) {
           return s.replace('Open new windows while running in the background', pr.popupName)
-                  .replace('Other permissions', pr.autostartName === 'Auto Start' ? 'Other permissions' : 'Permissions');
+                  .replace('Other permissions', 'Other permissions');
         });
         g = { title: pr.popupName, steps: steps };
-      } else if (permKey === 'autostart' && pr.autostartName) {
-        steps = steps.map(function (s) { return s.replace('Auto Start', pr.autostartName); });
-        g = { title: pr.autostartName, steps: steps };
+      } else if (permKey === 'autostart') {
+        if (pr.miui) {
+          g = { title: 'Autostart', steps: [
+            'The Auto Start screen will open.',
+            'Find Minutics and turn Autostart ON.',
+            'Come back — we re-read the real state, nothing is assumed.'
+          ]};
+        } else {
+          g = { title: (pr.autostartName || 'Battery'), steps: [
+            'This phone has no Auto Start switch to read.',
+            'On the next screen open Battery / Battery optimization.',
+            'Set Minutics to Unrestricted / Do not optimize.',
+            'Come back — we re-read the real battery state.'
+          ]};
+        }
       }
     }
   } catch (e) {}
@@ -960,12 +973,16 @@ export function SettingsScreen() {
                   children: jsx(PermStatusBadge, { on: !!permStatus.popup, onClick: function(){ openPermWithGuide("popup"); } })
                 }) : null,
                 jsx(Divider, {}),
-                /* Auto Start */
-                jsx(CardRow, {
-                  label: "Auto Start",
-                  desc: permStatus.autostart ? "Allowed — reminders restart after a reboot" : "Not allowed — enable Auto Start for Minutics",
-                  children: jsx(PermStatusBadge, { on: !!permStatus.autostart, onClick: function(){ openPermWithGuide("autostart"); } })
-                }),
+                 /* Auto Start � Android has no read API for OEM autostart. */
+                 jsx(CardRow, {
+                   label: "Auto Start",
+                   desc: permStatus.autostartState === 1
+                     ? "Allowed � reminders restart after a reboot"
+                     : permStatus.autostartState === -1
+                       ? "Off � open the phone setting to turn it on"
+                       : "Can't verify on this phone � tap to open its setting",
+                   children: jsx(PermStatusBadge, { on: !!permStatus.autostart, onClick: function(){ openPermWithGuide("autostart"); } })
+                 }),
                 jsx(Divider, {}),
                 /* Accessibility — optional, feeds the Doom scroll stopper */
                 jsx(CardRow, {
