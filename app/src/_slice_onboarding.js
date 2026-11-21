@@ -203,7 +203,7 @@ function SheetPicker({ title, display, value, options, onPick }) {
             role: "listbox",
             "aria-label": title,
             onClick: g => g.stopPropagation(),
-            className: "relative w-[88%] max-w-[350px] max-h-[60vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-3 pb-5",
+            className: "relative w-[calc(100vw-20px)] max-w-[560px] max-h-[74vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-3 pb-5",
             style: { animation: "ltPkIn .24s cubic-bezier(.2,.9,.3,1) both", boxShadow: "0 24px 60px rgba(2,32,72,.35)" },
             children: [
               jsx("div", { className: "px-1.5 pb-2.5 pt-1 text-[11px] font-black uppercase tracking-[.18em] text-gray-400", children: title }),

@@ -165,6 +165,26 @@ var SETTINGS_GUIDES = {
 
 function PermGuide({ permKey, onClose, onOpen }) {
   var g = SETTINGS_GUIDES[permKey] || { title: 'Permission', steps: [] };
+  /* Use the phone's real permission names from native detection. */
+  try {
+    if (window.AndroidBridge && window.AndroidBridge.getDeviceProfile) {
+      var pr = JSON.parse(window.AndroidBridge.getDeviceProfile());
+      var steps = g.steps.slice();
+      if (permKey === 'overlay' && pr.overlayName) {
+        steps = steps.map(function (s) { return s.replace('Display over other apps', pr.overlayName); });
+        g = { title: pr.overlayName, steps: steps };
+      } else if (permKey === 'popup' && pr.popupName) {
+        steps = steps.map(function (s) {
+          return s.replace('Open new windows while running in the background', pr.popupName)
+                  .replace('Other permissions', pr.autostartName === 'Auto Start' ? 'Other permissions' : 'Permissions');
+        });
+        g = { title: pr.popupName, steps: steps };
+      } else if (permKey === 'autostart' && pr.autostartName) {
+        steps = steps.map(function (s) { return s.replace('Auto Start', pr.autostartName); });
+        g = { title: pr.autostartName, steps: steps };
+      }
+    }
+  } catch (e) {}
   return createPortal(
     jsx('div', { className: 'fixed inset-0 z-[9999] flex items-end justify-center bg-black/60', onClick: onClose, children:
     jsx('div', { className: 'w-full max-w-[430px] bg-white rounded-t-3xl p-5 pb-8', onClick: function(e){ e.stopPropagation(); }, children:
