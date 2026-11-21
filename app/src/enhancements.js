@@ -7245,9 +7245,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         useOverlay: pu.overlay !== false,
         useNotifications: pu.notifications !== false,
         useAutostart: pu.autostart !== false,
-        /* Day the WEB side already alerted for — native/SW keep the newer of
-           the two so the budget alert fires exactly once per day. */
-        wasteNotifiedDay: (typeof _wasteNotifiedDay === "string" ? _wasteNotifiedDay : "") || ""
+        /* Web/service-worker mirror only — native keeps its own latch. */
+        wasteNotifiedDay: (typeof _wasteNotifiedDay === "string" ? _wasteNotifiedDay : "") || "",
+        wasteNotifiedLimit: _wasteNotifiedLimit || 0
       };
 
       /* Android: feed the native 10-min alarm chain. */
@@ -7338,6 +7338,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             _wasteNotifiedDay = s.wasteNotifiedDay;
             writeJson(WASTE_NOTIFIED_DAY_KEY, s.wasteNotifiedDay);
           }
+        }
+        if (s && Number(s.wasteNotifiedLimit) > 0
+            && Number(s.wasteNotifiedLimit) !== _wasteNotifiedLimit) {
+          _wasteNotifiedLimit = Number(s.wasteNotifiedLimit);
+          writeJson(WASTE_NOTIFIED_LIMIT_KEY, _wasteNotifiedLimit);
         }
       } catch (e) {}
       if (cb) { try { cb(); } catch (e) {} }
@@ -8479,7 +8484,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       if (minutes !== old) {
         try { localStorage.removeItem("lt_waste_blocked_v1"); } catch (e) {}
         _wasteNotifiedDay = "";
+        _wasteNotifiedLimit = 0;
         writeJson(WASTE_NOTIFIED_DAY_KEY, "");
+        writeJson(WASTE_NOTIFIED_LIMIT_KEY, 0);
         /* Give native the exact current numbers in ONE call. Clearing native
            counters and waiting for the next sync used to lose wasteSince, so
            a still-running timer stopped projecting and never re-alerted. */
@@ -8562,7 +8569,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      window itself resets at local midnight every 24h (localDayKey above),
      so each new local day re-arms the alert. */
   var WASTE_NOTIFIED_DAY_KEY = "lt_waste_notified_day_v1";
+  var WASTE_NOTIFIED_LIMIT_KEY = "lt_waste_notified_limit_v1";
   var _wasteNotifiedDay = readJson(WASTE_NOTIFIED_DAY_KEY, "");
+  var _wasteNotifiedLimit = Number(readJson(WASTE_NOTIFIED_LIMIT_KEY, 0)) || 0;
   /* Once-per-day in-app hint when the popup permission is missing. */
   var _overlayHintDay = "";
   var _popupBlockedHintDay = "";
@@ -8667,32 +8676,28 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         if (!cfg || !(cfg.minutes > 0)) return;
         var day = localDayKey();
         var mins = computeWasteMinutesToday();
-        /* The NATIVE 15-min alarm may have alerted for today while the app
-           was backgrounded — adopt its day so web doesn't duplicate it. */
+        /* Native is authoritative for the latch (day + LIMIT). */
         var nativeDay = nativeWasteNotifiedDay();
-        if (nativeDay && nativeDay !== _wasteNotifiedDay && nativeDay >= day) {
+        var nativeLimit = 0;
+        try {
+          if (window.AndroidBridge && window.AndroidBridge.getNotificationLastWasteLimit) {
+            nativeLimit = Number(window.AndroidBridge.getNotificationLastWasteLimit()) || 0;
+          }
+        } catch (e) {}
+        if (nativeDay >= day && nativeLimit > 0) {
           _wasteNotifiedDay = nativeDay;
+          _wasteNotifiedLimit = nativeLimit;
           writeJson(WASTE_NOTIFIED_DAY_KEY, nativeDay);
+          writeJson(WASTE_NOTIFIED_LIMIT_KEY, nativeLimit);
         }
         if (mins >= cfg.minutes) {
-          /* Block starting NEW Time Waste activities for the rest of the day.
-             Set outside the notify branch so the gate also engages when the
-             NATIVE alarm was the side that actually alerted. */
-          try { localStorage.setItem("lt_waste_blocked_v1", day); } catch (e) {}
-          if (_wasteNotifiedDay !== day) {
+          /* Gate is keyed to the LIMIT, not the day — raising it reopens. */
+          try { localStorage.setItem("lt_waste_blocked_v1", String(cfg.minutes)); } catch (e) {}
+          if (_wasteNotifiedDay !== day || _wasteNotifiedLimit !== cfg.minutes) {
             _wasteNotifiedDay = day;
+            _wasteNotifiedLimit = cfg.minutes;
             writeJson(WASTE_NOTIFIED_DAY_KEY, day);
-            /* Force-stop any in-flight Time Waste timer: clears the WebView's
-               running-timer markers so the activity stops being counted as
-               an open timer. (React reads Firestore blocks fresh on next
-               mount; the live time-trace stops here.) */
-            try {
-              var _pending = readJson(PENDING_TIMER_CAT_KEY, null);
-              if (_pending && _pending.category === "Time Waste" && Number(readJson(RUNNING_TIMER_KEY, 0)) > 0) {
-                writeJson(PENDING_TIMER_CAT_KEY, null);
-                writeJson(RUNNING_TIMER_KEY, 0);
-              }
-            } catch (e) {}
+            writeJson(WASTE_NOTIFIED_LIMIT_KEY, cfg.minutes);
             /* Prefer the native path: it shows the full-screen overlay AND the
                notification in one shot, exactly like the background guard.
                Falls back to a plain notification on web/desktop. */
