@@ -2848,14 +2848,23 @@ export function ActivityScreen({ profile }) {
       const nm = String((activity && activity.name) || '').toLowerCase();
       const isWaste = ['time waste', 'social media', 'entertain', 'doom'].some(w => nm.includes(w));
       if (isWaste && wasteBudgetOver()) {
-        const continueBtn = window.confirm(
-          "Your Time Waste budget for today is over.\n\nOpen Time Waste Budget tool to raise your limit?"
-        );
-        if (continueBtn) {
-          try {
-            if (window.__ltOpenTool) window.__ltOpenTool('wastebudget');
-            else window.location.hash = '#/life-hub';
-          } catch (e) { window.location.hash = '#/life-hub'; }
+        /* In-app code dialog — never window.confirm (that's the browser popup). */
+        if (typeof window.__ltConfirm === 'function') {
+          window.__ltConfirm({
+            title: 'Time waste limit reached',
+            message: 'You already crossed today’s Time Waste budget. Raise the limit to keep tracking.',
+            confirmLabel: 'Open budget tool',
+            cancelLabel: 'Not now',
+            danger: false,
+            onConfirm: function () {
+              try {
+                if (window.__ltOpenTool) window.__ltOpenTool('wastebudget');
+                else window.location.hash = '#/life-hub';
+              } catch (e) { window.location.hash = '#/life-hub'; }
+            }
+          });
+        } else if (window.__ltOpenTool) {
+          window.__ltOpenTool('wastebudget');
         }
         return;
       }

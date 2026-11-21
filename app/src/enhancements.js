@@ -8758,29 +8758,60 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   /* TimeWasteGuard overlay → see charge in Account: open the tool too.
      The native overlay writes lt_overlay_open_tool=wastebudget when tapped. */
   (function watchOverlayOpenTool() {
-    /* One open per deep link. Native retries until JS is ready and stops only
-       when we report real success, so no repeated open/close animation. */
-    window.__ltOpenTool = function (t) {
-      if (t !== "wastebudget") return false;
+    var KEY = "lt_overlay_open_tool";
+    var AT_KEY = "lt_overlay_open_tool_at";
+    var MAX_AGE = 30000;
+
+    function openBudgetTool() {
       try {
         if (typeof openOverlay !== "function" || typeof renderWasteBudget !== "function") return false;
         if (window.__ltDeepLinkOpen) return true;
         window.__ltDeepLinkOpen = true;
-        window.__ltDeepLinkUntil = Date.now() + 4000;
-        try { localStorage.setItem("lt_overlay_open_tool", ""); } catch (e) {}
+        window.__ltDeepLinkUntil = Date.now() + 8000;
         openOverlay(renderWasteBudget);
-        setTimeout(function () { window.__ltDeepLinkOpen = false; }, 5000);
+        /* Keep the marker until the tool is CONFIRMED on screen. A reload or
+           a late popstate can otherwise close it while we have already
+           cleared the marker — that was the intermittent failure. */
+        setTimeout(function () {
+          var root = document.getElementById("lt-overlay-root");
+          var open = !!(root && root.querySelector("[data-lt-waste-form]"));
+          if (open) {
+            try { localStorage.removeItem(KEY); localStorage.removeItem(AT_KEY); } catch (e) {}
+          }
+          window.__ltDeepLinkOpen = false;
+        }, 1200);
         return true;
-      } catch (e) { return false; }
-    };
-    setInterval(function () {
+      } catch (e) {
+        window.__ltDeepLinkOpen = false;
+        return false;
+      }
+    }
+
+    window.__ltOpenTool = function (t) {
+      if (t !== "wastebudget") return false;
       try {
-        var t = localStorage.getItem("lt_overlay_open_tool");
-        if (!t) return;
-        localStorage.setItem("lt_overlay_open_tool", "");
-        if (t === "wastebudget") window.__ltOpenTool(t);
+        localStorage.setItem(KEY, t);
+        localStorage.setItem(AT_KEY, String(Date.now()));
       } catch (e) {}
-    }, 800);
+      return openBudgetTool();
+    };
+
+    function tick() {
+      try {
+        var t = localStorage.getItem(KEY);
+        if (!t) return;
+        var at = Number(localStorage.getItem(AT_KEY) || 0);
+        if (at && Date.now() - at > MAX_AGE) {
+          localStorage.removeItem(KEY);
+          localStorage.removeItem(AT_KEY);
+          return;
+        }
+        if (t === "wastebudget") openBudgetTool();
+      } catch (e) {}
+    }
+    setInterval(tick, 600);
+    setTimeout(tick, 100);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) tick(); });
   })();
 
   /* ── Primary tool actions turn green for ~3.5s after they succeed ──
