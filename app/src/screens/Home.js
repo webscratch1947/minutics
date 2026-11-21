@@ -2702,19 +2702,26 @@ function fmtMins(totalSec) {
   return rem > 0 ? h + 'h ' + rem + ' min' : h + 'h';
 }
 
-function calcFocusScore(statsActivities) {
-  if (!statsActivities || statsActivities.length === 0) return 100;
-  const penaltyNames = ['Time Waste', 'Social Media', 'Entertainment'];
-  const boostNames = ['Work', 'Study', 'Exercise', 'Creative', 'Health'];
-  let penaltyMin = 0, boostMin = 0;
-  statsActivities.forEach(function (a) {
-    const m = Math.round(a.totalSeconds / 60);
-    const name = (a.activityName || '').toLowerCase();
-    if (penaltyNames.some(p => name.includes(p.toLowerCase()))) penaltyMin += m;
-    else if (boostNames.some(b => name.includes(b.toLowerCase()))) boostMin += m;
-  });
-  var score = 100 - penaltyMin + (boostMin * 0.25);
-  return Math.min(100, Math.max(0, Math.round(score)));
+/* Productivity score — shared with the Life Hub tool (50 base, +0.5 per
+   productive minute, -0.5 per waste minute, resets at local midnight). */
+function useProductivityScore() {
+  const [score, setScore] = useState(50);
+  useEffect(function () {
+    var refresh = function () {
+      try {
+        var fn = window.LTProductivityScoreToday;
+        if (typeof fn === 'function') {
+          var idx = fn();
+          if (idx && typeof idx.score === 'number') setScore(idx.score);
+        }
+      } catch (e) {}
+    };
+    refresh();
+    var iv = setInterval(refresh, 5000);
+    document.addEventListener('visibilitychange', refresh);
+    return function () { clearInterval(iv); document.removeEventListener('visibilitychange', refresh); };
+  }, []);
+  return score;
 }
 
 function StatCard({ icon, iconBg, label, value, suffix, danger }) {
@@ -2770,7 +2777,7 @@ export function ActivityScreen({ profile }) {
     return streak;
   })();
 
-  const focusScore = calcFocusScore(todayEntries);
+  const prodScore = useProductivityScore();
   const dateLabel = new Date().toLocaleDateString(undefined, {
     weekday: 'long', month: 'short', day: 'numeric', year: 'numeric'
   });
@@ -2936,7 +2943,7 @@ export function ActivityScreen({ profile }) {
         children: [
           jsx(StatCard, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
           jsx(StatCard, { icon: '📋', iconBg: '#FEF3C7', label: 'Day Streak', value: streakDays }),
-          jsx(StatCard, { icon: '🎯', iconBg: '#FEE2E2', label: 'Focus Score', value: focusScore, suffix: '/100' }),
+          jsx(StatCard, { icon: '📊', iconBg: '#EEF2FF', label: 'Productivity Score', value: prodScore, suffix: '/100' }),
           jsx(StatCard, { icon: '🔥', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
         ]
       }),

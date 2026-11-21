@@ -7837,11 +7837,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      timer + stopwatch). Activities with no match count as neutral. */
   var PRODSCORE_GAINS = ["work", "business", "study", "learn", "learning", "read", "write", "writing", "code", "coding", "project", "deep work", "exercise", "fitness", "gym", "walk", "run", "running", "meditat", "mindful", "yoga", "creat", "hobby", "skill", "develop", "practice", "research", "plan", "journal", "language"];
   var PRODSCORE_LOSSES = ["waste", "doom", "scroll", "reel", "short", "instagram", "tiktok", "youtube", "facebook", "snapchat", "twitter", "x (twitter", "netflix", "prime video", "tv", "movie", "gaming", "game", "games", "nothing", "idle", "sleeping late", "binge"];
+  /* Productive CATEGORY names from the picker (and older names still in
+     saved logs). Keep in sync with CATEGORIES / WASTE_CATEGORIES above. */
+  var PRODSCORE_BOOST = ["work / productivity", "productivity", "work", "study / learning", "study", "learn", "learning", "exercise", "fitness", "health", "creative", "create", "read", "journal", "skill", "deep work"];
 
   function nameMatches(name, list) {
     if (!name) return false;
     var n = String(name).toLowerCase();
-    for (var i = 0; i < list.length; i++) if (n.indexOf(list[i]) !== -1) return true;
+    for (var i = 0; i < list.length; i++) {
+      var needle = String(list[i]).toLowerCase();
+      if (n.indexOf(needle) !== -1) return true;
+    }
     return false;
   }
 
@@ -7853,8 +7859,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var boostMin = 0, wasteMin = 0;
     entries.forEach(function (e) {
       var m = Number(e.minutes) || 0;
-      if (WASTE_CATEGORIES.indexOf(e.category) !== -1) wasteMin += m;
-      else if (PRODSCORE_BOOST.indexOf(e.category) !== -1) boostMin += m;
+      if (nameMatches(e.category, WASTE_CATEGORIES)) wasteMin += m;
+      else if (nameMatches(e.category, PRODSCORE_BOOST)) boostMin += m;
     });
     if (tracked) { boostMin += tracked.boostMin; wasteMin += tracked.wasteMin; }
     var score = Math.round(50 + boostMin * 0.5 - wasteMin * 0.5);
@@ -7899,11 +7905,19 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     } catch (e) { return ""; }
   }
 
+  /* Single shared computation — Home card and Life Hub tool both use this.
+     Day key is LOCAL so it resets at 12:00 AM like the Time Waste budget. */
+  function productivityIndexToday() {
+    var dayKey = localDayKey();
+    var entries = catLogEntries().filter(function (e) {
+      return (e && (e.ldate || e.date)) === dayKey;
+    });
+    return computeProductivityIndex(entries, computeTrackedMinutesToday());
+  }
+
   function renderProductivityScore() {
     try {
-      var entries = catLogEntries().filter(function (e) { return e.date === today(); });
-      var tracked = computeTrackedMinutesToday();
-      var idx = computeProductivityIndex(entries, tracked);
+      var idx = productivityIndexToday();
       var color = idx.score >= 70 ? "#059669" : idx.score >= 40 ? "#D97706" : "#DC2626";
 
       activeOverlay.innerHTML =
@@ -8223,6 +8237,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
   /* React screens (Home's startTimer gate) need the same number. */
   try { window.LTWasteMinutesToday = computeWasteMinutesToday; } catch (e) {}
+  /* Shared productivity score for the Home card — same source as the tool. */
+  try { window.LTProductivityScoreToday = productivityIndexToday; } catch (e) {}
 
   /* ── Doom scroll stopper ───────────────────────────────────────────────── */
   function ltPermUseOn(key) {
