@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
+import { createPortal } from 'react-dom';
 import { getProfile } from '../lib/profile.js';
 import { getTelegramSettings, saveTelegramSettings, sendTelegramReport, checkTelegramTokenInUse } from '../lib/telegram.js';
 import { getCurrency, setCurrency } from '../lib/currency.js';
@@ -138,19 +139,65 @@ function getAlertPermission() {
    SettingsScreen
    ═══════════════════════════════════════════════════════════════ */
 
-function PermStatusBadge({ on }) {
-  return jsx("span", {
+/* Permission guide shown from Settings before jumping to the system screen. */
+var SETTINGS_GUIDES = {
+  notifications: {
+    title: 'Notifications',
+    steps: ['Open the screen that appears.', 'Turn Minutics notifications ON (or OFF).', 'Come back to Minutics.']
+  },
+  overlay: {
+    title: 'Display over other apps',
+    steps: ['Find Minutics in the list.', 'Tap it.', 'Turn "Allow display over other apps" ON (or OFF).', 'Come back to Minutics.']
+  },
+  popup: {
+    title: 'Pop-up in background',
+    steps: ['Minutics app info opens.', 'Tap "Other permissions".', 'Tap "Open new windows while running in the background".', 'Choose "Always allow" (or deny), then come back.']
+  },
+  autostart: {
+    title: 'Auto Start',
+    steps: ['Find Minutics in the Auto Start list.', 'Turn its switch ON (or OFF).', 'Come back to Minutics.']
+  },
+  accessibility: {
+    title: 'Accessibility',
+    steps: ['Tap "Downloaded apps" (or Installed services).', 'Tap Minutics.', 'Turn the service ON (or OFF) and confirm.']
+  }
+};
+
+function PermGuide({ permKey, onClose, onOpen }) {
+  var g = SETTINGS_GUIDES[permKey] || { title: 'Permission', steps: [] };
+  return createPortal(
+    jsx('div', { className: 'fixed inset-0 z-[9999] flex items-end justify-center bg-black/60', onClick: onClose, children:
+    jsx('div', { className: 'w-full max-w-[430px] bg-white rounded-t-3xl p-5 pb-8', onClick: function(e){ e.stopPropagation(); }, children:
+      jsxs(Fragment, { children: [
+        jsx('div', { className: 'w-11 h-1 rounded-full bg-gray-300 mx-auto mb-4' }),
+        jsx('h3', { className: 'text-lg font-extrabold text-[#14162E] m-0 mb-1', children: g.title }),
+        jsx('ol', { className: 'my-4 pl-5 text-sm text-[#5B6478] leading-6', children: g.steps.map(function(s,i){ return jsx('li', { children: s }, i); }) }),
+        jsx('button', { type: 'button', className: 'w-full rounded-full bg-[#157347] text-white font-bold py-3', onClick: onOpen, children: 'Open Android settings' }),
+        jsx('button', { type: 'button', className: 'w-full bg-transparent text-[#8A8578] font-semibold py-3', onClick: onClose, children: 'Close' })
+      ] })
+    })
+    })
+  , document.body);
+}
+
+function PermStatusBadge({ on, label, onClick }) {
+  return jsx("button", {
+    type: "button",
+    onClick: onClick,
     style: {
-      borderRadius: 999, padding: "5px 11px", fontSize: 11, fontWeight: 800,
-      whiteSpace: "nowrap",
-      background: on ? "#DCFCE7" : "#FEE2E2",
-      color: on ? "#157347" : "#B91C1C"
+      borderRadius: 999, padding: "6px 13px", fontSize: 11, fontWeight: 800,
+      whiteSpace: "nowrap", cursor: "pointer", border: "0",
+      background: on ? "#FEE2E2" : "#DCFCE7",
+      color: on ? "#B91C1C" : "#157347"
     },
-    children: on ? "Active" : "Not active"
+    children: on ? "Off" : "On"
   });
 }
 
 export function SettingsScreen() {
+  var [permGuide, setPermGuide] = useState(null);
+  var openPermWithGuide = function (key) { setPermGuide(key); };
+
   /* ── plan re-render trigger ── */
   var _planTick = useState(0);
   useEffect(function () {
@@ -864,7 +911,7 @@ export function SettingsScreen() {
                   desc: notifPermission === "granted"
                     ? "Allowed — reminders and your daily report"
                     : "Not allowed — enable in system settings",
-                  children: jsx(PermStatusBadge, { on: notifPermission === "granted" })
+                  children: jsx(PermStatusBadge, { on: notifPermission === "granted", onClick: function(){ openPermWithGuide("notifications"); } })
                 }),
                 jsx(Divider, {}),
                 /* Reminder popups — "Display over other apps".
@@ -873,7 +920,7 @@ export function SettingsScreen() {
                 jsx(CardRow, {
                   label: "Reminder popups",
                   desc: permStatus.overlay ? "Allowed — popups show above your other apps" : "Not allowed — enable Display over other apps",
-                  children: jsx(PermStatusBadge, { on: !!permStatus.overlay })
+                  children: jsx(PermStatusBadge, { on: !!permStatus.overlay, onClick: function(){ openPermWithGuide("overlay"); } })
                 }),
                 /* Real background-popup permission state (MIUI AppOps on Xiaomi,
                    overlay grant elsewhere). No fake toggle. */
@@ -882,31 +929,44 @@ export function SettingsScreen() {
                   desc: permStatus.popup
                     ? "Active — alerts can appear while Minutics is closed"
                     : "Not active — enable \"Open new windows while running in the background\" in Other permissions",
-                  children: jsx(PermStatusBadge, { on: !!permStatus.popup })
+                  children: jsx(PermStatusBadge, { on: !!permStatus.popup, onClick: function(){ openPermWithGuide("popup"); } })
                 }),
                 jsx(Divider, {}),
                 /* Auto Start */
                 jsx(CardRow, {
                   label: "Auto Start",
                   desc: permStatus.autostart ? "Allowed — reminders restart after a reboot" : "Not allowed — enable Auto Start for Minutics",
-                  children: jsx(PermStatusBadge, { on: !!permStatus.autostart })
+                  children: jsx(PermStatusBadge, { on: !!permStatus.autostart, onClick: function(){ openPermWithGuide("autostart"); } })
                 }),
                 jsx(Divider, {}),
                 /* Accessibility — optional, feeds the Doom scroll stopper */
                 jsx(CardRow, {
                   label: "Accessibility",
                   desc: permStatus.accessibility ? "Allowed — the Doom scroll stopper is counting" : "Not allowed — optional, for the Doom scroll stopper",
-                  children: jsx(PermStatusBadge, { on: !!permStatus.accessibility })
+                  children: jsx(PermStatusBadge, { on: !!permStatus.accessibility, onClick: function(){ openPermWithGuide("accessibility"); } })
                 })
               ]
             })
           }),
           jsx("p", {
             className: "px-1 mt-2.5 text-[11px] leading-relaxed text-muted-foreground",
-            children: "These show the real permission state. To change one, use the onboarding guide or your phone's settings."
+            children: "Tap On/Off to open the phone setting. The guide shows what to do."
           })
         ]
       }),
+
+      permGuide ? jsx(PermGuide, {
+        permKey: permGuide,
+        onClose: function () { setPermGuide(null); },
+        onOpen: function () {
+          try {
+            if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
+              window.AndroidBridge.openPermissionSetting(permGuide);
+            }
+          } catch (e) {}
+          setPermGuide(null);
+        }
+      }) : null,
 
       /* ─── Telegram Daily Reports ─── */
       isPro ? jsxs("div", {
