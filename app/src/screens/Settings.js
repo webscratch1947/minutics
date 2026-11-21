@@ -193,17 +193,29 @@ function PermGuide({ permKey, onClose, onOpen }) {
   , document.body);
 }
 
-function PermStatusBadge({ on, label, onClick }) {
-  return jsx("button", {
-    type: "button",
-    onClick: onClick,
+/* Status pill: shows the REAL state with an unambiguous word. */
+function PermStatusBadge({ granted, unknown }) {
+  var bg = unknown ? "#FEF3C7" : (granted ? "#DCFCE7" : "#FEE2E2");
+  var fg = unknown ? "#92400E" : (granted ? "#157347" : "#B91C1C");
+  return jsx("span", {
     style: {
-      borderRadius: 999, padding: "6px 13px", fontSize: 11, fontWeight: 800,
-      whiteSpace: "nowrap", cursor: "pointer", border: "0",
-      background: on ? "#FEE2E2" : "#DCFCE7",
-      color: on ? "#B91C1C" : "#157347"
+      borderRadius: 999, padding: "5px 11px", fontSize: 11, fontWeight: 800,
+      whiteSpace: "nowrap", background: bg, color: fg
     },
-    children: on ? "Off" : "On"
+    children: unknown ? "Can't check" : (granted ? "Allowed" : "Not allowed")
+  });
+}
+
+/* Direct-open button — no guide, jumps straight to the phone setting. */
+function PermOpenButton({ onClick }) {
+  return jsx("button", {
+    type: "button", onClick: onClick,
+    style: {
+      borderRadius: 999, padding: "6px 14px", fontSize: 11, fontWeight: 800,
+      whiteSpace: "nowrap", cursor: "pointer", border: "0",
+      background: "#14162E", color: "#fff"
+    },
+    children: "Open"
   });
 }
 
@@ -211,6 +223,7 @@ export function SettingsScreen() {
   var [permGuide, setPermGuide] = useState(null);
   var [deviceIsXiaomi, setDeviceIsXiaomi] = useState(false);
   var [deviceLabel, setDeviceLabel] = useState('');
+  var [permNames, setPermNames] = useState({ overlay: 'Display over other apps', popup: 'Pop-up in background', autostart: 'Auto Start' });
   useEffect(function () {
     try {
       var pr = (window.LTDeviceProfile && window.LTDeviceProfile())
@@ -218,8 +231,20 @@ export function SettingsScreen() {
             ? JSON.parse(window.AndroidBridge.getDeviceProfile()) : {});
       setDeviceIsXiaomi(!!pr.miui);
       if (pr.device) setDeviceLabel(pr.device);
+      setPermNames({
+        overlay: pr.overlayName || 'Display over other apps',
+        popup: pr.popupName || 'Pop-up in background',
+        autostart: pr.autostartName || 'Auto Start'
+      });
     } catch (e) {}
   }, []);
+  var openPermDirect = function (key) {
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
+        window.AndroidBridge.openPermissionSetting(key);
+      }
+    } catch (e) {}
+  };
   var openPermWithGuide = function (key) { setPermGuide(key); };
 
   /* ── plan re-render trigger ── */
@@ -925,76 +950,72 @@ export function SettingsScreen() {
           jsx(Card, {
             children: jsxs(Fragment, {
               children: [
-                /* Notifications — same switch style as every other row.
-                   ON switch = the phone-side permission is actually granted
-                   AND Minutics is allowed to use it. */
                 !window.AndroidBridge ? jsx(CardRow, {
-                  label: "Notifications",
-                  desc: "Please install our official app to use this feature"
-                }) : jsx(CardRow, {
-                  label: "Notifications",
-                  desc: notifPermission === "granted"
-                    ? "Allowed — reminders and your daily report"
-                    : "Not allowed — enable in system settings",
-                  children: jsx(PermStatusBadge, { on: notifPermission === "granted", onClick: function(){ openPermWithGuide("notifications"); } })
-                }),
-                jsx(Divider, {}),
-                /* Reminder popups — "Display over other apps".
-                   The switch shows ON only when Android has actually granted
-                   it AND Minutics is allowed to use it. */
-                jsx(CardRow, {
-                  label: "Reminder popups",
-                  desc: permStatus.overlay ? "Allowed — popups show above your other apps" : "Not allowed — enable Display over other apps",
-                  children: jsx(PermStatusBadge, { on: !!permStatus.overlay, onClick: function(){ openPermWithGuide("overlay"); } })
-                }),
-                /* MIUI/HyperOS only � this switch does not exist on LG/stock. */
-                deviceIsXiaomi ? jsx(CardRow, {
-                  label: "Background pop-ups",
-                  desc: permStatus.popup
-                    ? "Active — alerts can appear while Minutics is closed"
-                    : "Not active — enable \"Open new windows while running in the background\" in Other permissions",
-                  children: jsx(PermStatusBadge, { on: !!permStatus.popup, onClick: function(){ openPermWithGuide("popup"); } })
-                }) : null,
-                jsx(Divider, {}),
-                 /* Auto Start � Android has no read API for OEM autostart. */
-                 jsx(CardRow, {
-                   label: "Auto Start",
-                   desc: permStatus.autostartState === 1
-                     ? "Allowed � reminders restart after a reboot"
-                     : permStatus.autostartState === -1
-                       ? "Off � open the phone setting to turn it on"
-                       : "Can't verify on this phone � tap to open its setting",
-                   children: jsx(PermStatusBadge, { on: !!permStatus.autostart, onClick: function(){ openPermWithGuide("autostart"); } })
-                 }),
-                jsx(Divider, {}),
-                /* Accessibility — optional, feeds the Doom scroll stopper */
-                jsx(CardRow, {
-                  label: "Accessibility",
-                  desc: permStatus.accessibility ? "Allowed — the Doom scroll stopper is counting" : "Not allowed — optional, for the Doom scroll stopper",
-                  children: jsx(PermStatusBadge, { on: !!permStatus.accessibility, onClick: function(){ openPermWithGuide("accessibility"); } })
-                })
+                  label: "Permissions",
+                  desc: "Please install our official Android app to use these features"
+                }) : jsxs(Fragment, { children: [
+                  jsx(CardRow, {
+                    label: "Notifications",
+                    desc: notifPermission === "granted" ? "Granted � reminders reach you" : "Not granted � tap Open to allow",
+                    children: jsxs("div", { className: "flex items-center gap-2", children: [
+                      jsx(PermStatusBadge, { granted: !!permStatus.notifications }),
+                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("notifications"); } })
+                    ] })
+                  }),
+                  jsx(Divider, {}),
+                  jsx(CardRow, {
+                    label: permNames.overlay,
+                    desc: permStatus.overlay ? "Granted � popups show above other apps" : "Not granted � tap Open to allow",
+                    children: jsxs("div", { className: "flex items-center gap-2", children: [
+                      jsx(PermStatusBadge, { granted: !!permStatus.overlay }),
+                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("overlay"); } })
+                    ] })
+                  }),
+                  deviceIsXiaomi ? jsx(CardRow, {
+                    label: permNames.popup,
+                    desc: permStatus.popup ? "Granted � alerts show with the app closed" : "Not granted � tap Open to allow",
+                    children: jsxs("div", { className: "flex items-center gap-2", children: [
+                      jsx(PermStatusBadge, { granted: !!permStatus.popup }),
+                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("popup"); } })
+                    ] })
+                  }) : null,
+                  jsx(Divider, {}),
+                  jsx(CardRow, {
+                    label: permNames.autostart,
+                    desc: permStatus.autostartState === 1
+                      ? "Granted � app restarts after reboot"
+                      : permStatus.autostartState === -1
+                        ? "Not granted � tap Open to allow"
+                        : "State can't be read on this phone � tap Open to check",
+                    children: jsxs("div", { className: "flex items-center gap-2", children: [
+                      jsx(PermStatusBadge, { granted: permStatus.autostartState === 1, unknown: permStatus.autostartState === 0 }),
+                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("autostart"); } })
+                    ] })
+                  }),
+                  jsx(Divider, {}),
+                  jsx(CardRow, {
+                    label: "Accessibility",
+                    desc: permStatus.accessibility ? "Granted � reels are counted" : "Not granted � optional, for Doom scroll stopper",
+                    children: jsxs("div", { className: "flex items-center gap-2", children: [
+                      jsx(PermStatusBadge, { granted: !!permStatus.accessibility }),
+                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("accessibility"); } })
+                    ] })
+                  })
+                ] })
               ]
             })
           }),
           jsx("p", {
             className: "px-1 mt-2.5 text-[11px] leading-relaxed text-muted-foreground",
-            children: "Tap On/Off to open the phone setting. The guide shows what to do."
+            children: "Status is read live from your phone. Tap Open to change a setting."
+           }),
+           jsx("p", {
+             className: "px-1 mt-1 text-[9px] leading-relaxed text-muted-foreground/60",
+             children: "debug: N=" + (permStatus.notifications ? 1 : 0) + " O=" + (permStatus.overlay ? 1 : 0) + " P=" + (permStatus.popup ? 1 : 0) + " AUTOSTART=" + (permStatus.autostartState == null ? "?" : permStatus.autostartState) + " AC=" + (permStatus.accessibility ? 1 : 0)
           })
         ]
       }),
 
-      permGuide ? jsx(PermGuide, {
-        permKey: permGuide,
-        onClose: function () { setPermGuide(null); },
-        onOpen: function () {
-          try {
-            if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
-              window.AndroidBridge.openPermissionSetting(permGuide);
-            }
-          } catch (e) {}
-          setPermGuide(null);
-        }
-      }) : null,
 
       /* ─── Telegram Daily Reports ─── */
       isPro ? jsxs("div", {
