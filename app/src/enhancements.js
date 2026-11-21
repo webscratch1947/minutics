@@ -670,6 +670,30 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     "lt_extra_defaults_removed_v1", "lt_commute_renamed_v1",
     "lt_default_activities_seeded_v2", "lt_prod_toast_last_v1"
   ].forEach(function (k) { NATIVE_BRIDGE_KEYS[k] = true; });
+  /* Detect the phone ONCE at first launch (runs even behind the login/register
+     screen) and cache the full per-brand permission profile. Every screen
+     reads this single source so guides/paths never disagree. */
+  var DEVICE_PROFILE_KEY = "lt_device_profile_v1";
+  (function initDeviceProfile() {
+    try {
+      if (!window.AndroidBridge || !window.AndroidBridge.getDeviceProfile) return;
+      var raw = window.AndroidBridge.getDeviceProfile();
+      var p = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (p && p.ok) writeJson(DEVICE_PROFILE_KEY, p);
+    } catch (e) {}
+  })();
+  window.LTDeviceProfile = function () {
+    var p = readJson(DEVICE_PROFILE_KEY, null);
+    if (!p) {
+      try {
+        var raw = window.AndroidBridge && window.AndroidBridge.getDeviceProfile
+          ? window.AndroidBridge.getDeviceProfile() : null;
+        p = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
+      } catch (e) {}
+    }
+    return p || {};
+  };
+
   /* Exposed so dataTransfer.js can mirror Load-Data writes into native
      storage (readJson prefers the bridge — stale native = stale data). */
   window.LT_NATIVE_KEYS = NATIVE_BRIDGE_KEYS;

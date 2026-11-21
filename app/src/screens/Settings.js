@@ -165,37 +165,17 @@ var SETTINGS_GUIDES = {
 
 function PermGuide({ permKey, onClose, onOpen }) {
   var g = SETTINGS_GUIDES[permKey] || { title: 'Permission', steps: [] };
-  /* Per-brand guides: hide steps for permissions that don't exist on this
-     phone (e.g. Xiaomi "open new windows" on LG / stock Android). */
+  /* Use the SAME brand-specific guide the onboarding uses (native profile). */
   try {
-    if (window.AndroidBridge && window.AndroidBridge.getDeviceProfile) {
-      var pr = JSON.parse(window.AndroidBridge.getDeviceProfile());
-      var steps = g.steps.slice();
-      if (permKey === 'overlay' && pr.overlayName) {
-        steps = steps.map(function (s) { return s.replace('Display over other apps', pr.overlayName); });
-        g = { title: pr.overlayName, steps: steps };
-      } else if (permKey === 'popup' && pr.popupName) {
-        steps = steps.map(function (s) {
-          return s.replace('Open new windows while running in the background', pr.popupName)
-                  .replace('Other permissions', 'Other permissions');
-        });
-        g = { title: pr.popupName, steps: steps };
-      } else if (permKey === 'autostart') {
-        if (pr.miui) {
-          g = { title: 'Autostart', steps: [
-            'The Auto Start screen will open.',
-            'Find Minutics and turn Autostart ON.',
-            'Come back — we re-read the real state, nothing is assumed.'
-          ]};
-        } else {
-          g = { title: (pr.autostartName || 'Battery'), steps: [
-            'This phone has no Auto Start switch to read.',
-            'On the next screen open Battery / Battery optimization.',
-            'Set Minutics to Unrestricted / Do not optimize.',
-            'Come back — we re-read the real battery state.'
-          ]};
-        }
-      }
+    var pr = (window.LTDeviceProfile && window.LTDeviceProfile())
+      || (window.AndroidBridge && window.AndroidBridge.getDeviceProfile
+          ? JSON.parse(window.AndroidBridge.getDeviceProfile()) : {});
+    var keyMap = { notifications: null, overlay: 'overlaySteps', popup: 'popupSteps',
+                   autostart: 'autostartSteps', background: 'batterySteps' };
+    var nameMap = { overlay: 'overlayName', popup: 'popupName', autostart: 'autostartName' };
+    var stepKey = keyMap[permKey];
+    if (stepKey && pr[stepKey] && pr[stepKey].length) {
+      g = { title: (nameMap[permKey] && pr[nameMap[permKey]]) || g.title, steps: pr[stepKey] };
     }
   } catch (e) {}
   return createPortal(
@@ -230,12 +210,14 @@ function PermStatusBadge({ on, label, onClick }) {
 export function SettingsScreen() {
   var [permGuide, setPermGuide] = useState(null);
   var [deviceIsXiaomi, setDeviceIsXiaomi] = useState(false);
+  var [deviceLabel, setDeviceLabel] = useState('');
   useEffect(function () {
     try {
-      if (window.AndroidBridge && window.AndroidBridge.getDeviceProfile) {
-        var pr = JSON.parse(window.AndroidBridge.getDeviceProfile());
-        setDeviceIsXiaomi(!!pr.miui);
-      }
+      var pr = (window.LTDeviceProfile && window.LTDeviceProfile())
+        || (window.AndroidBridge && window.AndroidBridge.getDeviceProfile
+            ? JSON.parse(window.AndroidBridge.getDeviceProfile()) : {});
+      setDeviceIsXiaomi(!!pr.miui);
+      if (pr.device) setDeviceLabel(pr.device);
     } catch (e) {}
   }, []);
   var openPermWithGuide = function (key) { setPermGuide(key); };
@@ -939,6 +921,7 @@ export function SettingsScreen() {
         className: "mx-4",
         children: [
           jsx(SectionHeader, { children: "Permissions" }),
+          deviceLabel ? jsx('p', { className: 'px-1 -mb-1 text-[11px] font-semibold text-muted-foreground', children: 'Detected: ' + deviceLabel }) : null,
           jsx(Card, {
             children: jsxs(Fragment, {
               children: [

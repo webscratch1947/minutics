@@ -102,13 +102,38 @@ function readStatus() {
   } catch (e) { return {}; }
 }
 
+function deviceProfile() {
+  try { return (window.LTDeviceProfile && window.LTDeviceProfile()) || {}; } catch (e) { return {}; }
+}
+
 function visibleRows() {
-  var miui = false;
-  try {
-    miui = !!(window.AndroidBridge && window.AndroidBridge.isMiuiDevice
-      && window.AndroidBridge.isMiuiDevice());
-  } catch (e) {}
-  return PERMISSION_ROWS.filter(function (r) { return !r.miuiOnly || miui; });
+  var pr = deviceProfile();
+  var isXiaomi = !!pr.miui;
+  var hasAutostart = pr.hasAutostart !== false;
+  return PERMISSION_ROWS.filter(function (r) {
+    if (r.miuiOnly && !isXiaomi) return false;        /* popup on LG/stock: hidden */
+    if (r.key === 'autostart' && !hasAutostart) return false; /* no autostart on stock/LG/Samsung */
+    return true;
+  });
+}
+
+/* Brand-specific guide text, written natively per ROM. */
+function guideFor(key) {
+  var pr = deviceProfile();
+  if (key === 'overlay' && pr.overlaySteps && pr.overlaySteps.length) {
+    return { title: pr.overlayName || 'Display over other apps', steps: pr.overlaySteps };
+  }
+  if (key === 'popup' && pr.popupSteps && pr.popupSteps.length) {
+    return { title: pr.popupName || 'Pop-up in background', steps: pr.popupSteps };
+  }
+  if (key === 'autostart' && pr.autostartSteps && pr.autostartSteps.length) {
+    return { title: pr.autostartName || 'Auto Start', steps: pr.autostartSteps };
+  }
+  if (key === 'background' && pr.batterySteps && pr.batterySteps.length) {
+    return { title: 'Battery optimization', steps: pr.batterySteps };
+  }
+  var row = PERMISSION_ROWS.filter(function (r) { return r.key === key; })[0];
+  return row ? { title: row.title, steps: row.steps || [] } : { title: 'Permission', steps: [] };
 }
 
 function allGranted(s, rows) {
@@ -356,7 +381,7 @@ export function PermissionsStep({ onChange }) {
       className: 'text-[13px] text-[#5B6478] text-center leading-relaxed mb-3 px-1',
       children: [
         'Minutics needs these to remind you on time and to count your reels. ',
-        jsx('b', { children: grantedCount + ' of ' + PERMISSION_ROWS.length + ' done' })
+        jsx('b', { children: grantedCount + ' of ' + rows.length + ' done' })
       ]
     }),
     jsx('div', { children: rows.map(function (perm) {
@@ -387,9 +412,12 @@ export function PermissionsStep({ onChange }) {
     }) }),
     null,
     tutorial ? jsx(GuideSheet, {
-      perm: tutorial,
       index: rows.findIndex(function (r) { return r.key === tutorial.key; }),
       total: rows.length,
+      perm: (function () {
+        var g = guideFor(tutorial.key);
+        return { key: tutorial.key, title: g.title, icon: tutorial.icon, steps: g.steps };
+      })(),
       onOpenSettings: function () { openSettings(tutorial); },
       onClose: function () { setTutorial(null); }
     }) : null
