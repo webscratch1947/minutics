@@ -216,6 +216,15 @@ function PermStatusBadge({ on, label, onClick }) {
 
 export function SettingsScreen() {
   var [permGuide, setPermGuide] = useState(null);
+  var [deviceIsXiaomi, setDeviceIsXiaomi] = useState(false);
+  useEffect(function () {
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.getDeviceProfile) {
+        var pr = JSON.parse(window.AndroidBridge.getDeviceProfile());
+        setDeviceIsXiaomi(!!pr.miui);
+      }
+    } catch (e) {}
+  }, []);
   var openPermWithGuide = function (key) { setPermGuide(key); };
 
   /* ── plan re-render trigger ── */
@@ -942,15 +951,14 @@ export function SettingsScreen() {
                   desc: permStatus.overlay ? "Allowed — popups show above your other apps" : "Not allowed — enable Display over other apps",
                   children: jsx(PermStatusBadge, { on: !!permStatus.overlay, onClick: function(){ openPermWithGuide("overlay"); } })
                 }),
-                /* Real background-popup permission state (MIUI AppOps on Xiaomi,
-                   overlay grant elsewhere). No fake toggle. */
-                jsx(CardRow, {
+                /* MIUI/HyperOS only � this switch does not exist on LG/stock. */
+                deviceIsXiaomi ? jsx(CardRow, {
                   label: "Background pop-ups",
                   desc: permStatus.popup
                     ? "Active — alerts can appear while Minutics is closed"
                     : "Not active — enable \"Open new windows while running in the background\" in Other permissions",
                   children: jsx(PermStatusBadge, { on: !!permStatus.popup, onClick: function(){ openPermWithGuide("popup"); } })
-                }),
+                }) : null,
                 jsx(Divider, {}),
                 /* Auto Start */
                 jsx(CardRow, {
