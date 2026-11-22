@@ -388,7 +388,9 @@ function startSessionWatch() {
 function disconnectTelegramAll() {
   try {
     var b = window.AndroidBridge;
-    if (b && b.cancelReport) b.cancelReport();
+    /* Full wipe so no old-account report can fire for the next account. */
+    if (b && b.clearReportData) b.clearReportData();
+    else if (b && b.cancelReport) b.cancelReport();
   } catch (e) {}
   try { localStorage.removeItem("lifetime_telegram_settings_v1"); } catch (e) {}
   try { pushTelegramSchedule({ force: true }); } catch (e) {}
