@@ -206,14 +206,17 @@ function PermStatusBadge({ granted, unknown }) {
   });
 }
 
-/* Direct-open button — no guide, jumps straight to the phone setting. */
-function PermOpenButton({ onClick }) {
+/* Direct-open button — no guide, jumps straight to the phone setting.
+   Greyed out when the phone has no such settings screen. */
+function PermOpenButton({ onClick, disabled }) {
   return jsx("button", {
-    type: "button", onClick: onClick,
+    type: "button", onClick: disabled ? undefined : onClick, disabled: !!disabled,
     style: {
       borderRadius: 999, padding: "6px 14px", fontSize: 11, fontWeight: 800,
-      whiteSpace: "nowrap", cursor: "pointer", border: "0",
-      background: "#14162E", color: "#fff"
+      whiteSpace: "nowrap", cursor: disabled ? "not-allowed" : "pointer", border: "0",
+      background: disabled ? "#D1D5DB" : "#14162E",
+      color: disabled ? "#9CA3AF" : "#fff",
+      opacity: disabled ? 0.7 : 1
     },
     children: "Open"
   });
@@ -224,6 +227,14 @@ export function SettingsScreen() {
   var [deviceIsXiaomi, setDeviceIsXiaomi] = useState(false);
   var [deviceLabel, setDeviceLabel] = useState('');
   var [permNames, setPermNames] = useState({ overlay: 'Display over other apps', popup: 'Pop-up in background', autostart: 'Auto Start' });
+  var [canOpenAutostart, setCanOpenAutostart] = useState(true);
+  useEffect(function () {
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.canOpenPermissionSetting) {
+        setCanOpenAutostart(!!window.AndroidBridge.canOpenPermissionSetting("autostart"));
+      }
+    } catch (e) {}
+  }, []);
   useEffect(function () {
     try {
       var pr = (window.LTDeviceProfile && window.LTDeviceProfile())
@@ -990,7 +1001,7 @@ export function SettingsScreen() {
                         : "State can't be read on this phone - tap Open to check",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: permStatus.autostartState === 1, unknown: permStatus.autostartState === 0 }),
-                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("autostart"); } })
+                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("autostart"); }, disabled: !canOpenAutostart })
                     ] })
                   }),
                   jsx(Divider, {}),
