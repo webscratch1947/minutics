@@ -956,7 +956,7 @@ export function SettingsScreen() {
                 }) : jsxs(Fragment, { children: [
                   jsx(CardRow, {
                     label: "Notifications",
-                    desc: notifPermission === "granted" ? "Granted � reminders reach you" : "Not granted � tap Open to allow",
+                    desc: permStatus.notifications ? "Granted - reminders reach you" : "Not granted - tap Open to allow",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.notifications }),
                       jsx(PermOpenButton, { onClick: function(){ openPermDirect("notifications"); } })
@@ -965,7 +965,7 @@ export function SettingsScreen() {
                   jsx(Divider, {}),
                   jsx(CardRow, {
                     label: permNames.overlay,
-                    desc: permStatus.overlay ? "Granted � popups show above other apps" : "Not granted � tap Open to allow",
+                    desc: permStatus.overlay ? "Granted - popups show above other apps" : "Not granted - tap Open to allow",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.overlay }),
                       jsx(PermOpenButton, { onClick: function(){ openPermDirect("overlay"); } })
@@ -973,7 +973,7 @@ export function SettingsScreen() {
                   }),
                   deviceIsXiaomi ? jsx(CardRow, {
                     label: permNames.popup,
-                    desc: permStatus.popup ? "Granted � alerts show with the app closed" : "Not granted � tap Open to allow",
+                    desc: permStatus.popup ? "Granted - alerts show with the app closed" : "Not granted - tap Open to allow",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.popup }),
                       jsx(PermOpenButton, { onClick: function(){ openPermDirect("popup"); } })
@@ -986,7 +986,7 @@ export function SettingsScreen() {
                       ? "Granted � app restarts after reboot"
                       : permStatus.autostartState === -1
                         ? "Not granted � tap Open to allow"
-                        : "State can't be read on this phone � tap Open to check",
+                        : "State can't be read on this phone - tap Open to check",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: permStatus.autostartState === 1, unknown: permStatus.autostartState === 0 }),
                       jsx(PermOpenButton, { onClick: function(){ openPermDirect("autostart"); } })
@@ -995,7 +995,7 @@ export function SettingsScreen() {
                   jsx(Divider, {}),
                   jsx(CardRow, {
                     label: "Accessibility",
-                    desc: permStatus.accessibility ? "Granted � reels are counted" : "Not granted � optional, for Doom scroll stopper",
+                    desc: permStatus.accessibility ? "Granted - reels are counted" : "Not granted - optional, for Doom scroll stopper",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.accessibility }),
                       jsx(PermOpenButton, { onClick: function(){ openPermDirect("accessibility"); } })
