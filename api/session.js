@@ -6,11 +6,16 @@
 //   { mode: "check" }            → read back the stored device (no write);
 //                                  the caller signs itself out when another
 //                                  device owns the claim
-//   { mode: "plan", plan }       → record which subscription this account
-//                                  activated (purchase / cancel report)
+//   { mode: "plan", plan }       → DOWNGRADE ONLY (cancel -> "free").
+//                                  Upgrades are NEVER accepted from the
+//                                  client — that was a free-premium hole.
+//   { mode: "billing-verify",    → the ONLY upgrade path: the Play purchase
+//     productId, purchaseToken }   token is verified with Google's API
+//                                  first, then the ledger is written.
 //   { mode: "plan-get" }         → read the subscription back — AWS is the
 //                                  source of truth, so wiping the device's
-//                                  storage can't lose a purchase
+//                                  storage can't lose a purchase. Verified
+//                                  subscriptions auto-expire at expiryTime.
 //
 // POST /api/session  (NO Authorization — the user is locked out by
 //   definition; dispatched before the token gate)
@@ -57,6 +62,87 @@ const POOL_ID = process.env.COGNITO_POOL_ID || "ap-south-1_QAdugNxC2";
 const CLIENT_ID = process.env.COGNITO_CLIENT_ID || "8kq0askdobsj49crut3fg9akf";
 const ISS = "https://cognito-idp.ap-south-1.amazonaws.com/" + POOL_ID;
 const TABLE = process.env.MINUTICS_USERS_TABLE || "MinuticsUsers";
+
+/* ── Google Play purchase verification (server-side trust boundary) ──────
+   A plan must NEVER be granted from a client-supplied boolean/string. The
+   only upgrade path is this function: it exchanges a service-account JWT
+   for a Google API token, asks Google whether the submitted purchase token
+   is real / active / for OUR package + SKU, and only then writes the ledger.
+
+   Required Vercel env (never in the repo):
+     GOOGLE_PLAY_CLIENT_EMAIL  - service account email
+     GOOGLE_PLAY_PRIVATE_KEY   - that account's PEM private key (\n is fine)
+   The service account needs "Google Play Android Developer API" enabled and
+   must be linked in Play Console -> Users and permissions -> API access. */
+const PLAY_PACKAGE = process.env.PLAY_PACKAGE || "com.minutics.app";
+const PLAY_PRODUCTS = Object.freeze({
+  basic_monthly: { plan: "basic", type: "subs" },
+  yearly_annual: { plan: "yearly", type: "subs" },
+  lifetime_inapp: { plan: "lifetime", type: "inapp" },
+});
+const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_PLAY_CLIENT_EMAIL || "";
+const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_PLAY_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+const PLAY_CONFIGURED = Boolean(GOOGLE_CLIENT_EMAIL && GOOGLE_PRIVATE_KEY);
+let _googleToken = { value: "", exp: 0 };
+
+async function googleAccessToken() {
+  if (_googleToken.value && Date.now() < _googleToken.exp) return _googleToken.value;
+  const now = Math.floor(Date.now() / 1000);
+  const b64 = (v) => Buffer.from(v).toString("base64url");
+  const head = b64(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = b64(JSON.stringify({
+    iss: GOOGLE_CLIENT_EMAIL,
+    scope: "https://www.googleapis.com/auth/androidpublisher",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  }));
+  const input = head + "." + claim;
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(input);
+  signer.end();
+  const sig = signer.sign(GOOGLE_PRIVATE_KEY).toString("base64url");
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=" + encodeURIComponent(input + "." + sig),
+  });
+  if (!r.ok) throw new Error("google-oauth-" + r.status);
+  const d = await r.json();
+  if (!d.access_token) throw new Error("google-oauth-no-token");
+  _googleToken = { value: d.access_token, exp: Date.now() + (Number(d.expires_in || 3600) - 120) * 1000 };
+  return _googleToken.value;
+}
+
+/** Returns { plan, expiryTime, orderId } only for a REAL, active Play purchase. */
+async function verifyPlayPurchase(productId, purchaseToken) {
+  const product = PLAY_PRODUCTS[productId];
+  if (!product) throw new Error("unknown-play-product");
+  if (typeof purchaseToken !== "string" || !/^[A-Za-z0-9._~+=/-]{12,600}$/.test(purchaseToken)) {
+    throw new Error("invalid-purchase-token");
+  }
+  const access = await googleAccessToken();
+  const base = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"
+    + encodeURIComponent(PLAY_PACKAGE) + "/purchases/";
+  const path = product.type === "subs"
+    ? "subscriptionsv2/tokens/" + encodeURIComponent(purchaseToken)
+    : "products/" + encodeURIComponent(productId) + "/tokens/" + encodeURIComponent(purchaseToken);
+  const r = await fetch(base + path, { headers: { Authorization: "Bearer " + access } });
+  if (!r.ok) throw new Error("play-api-" + r.status);
+  const d = await r.json();
+  if (d.productId && d.productId !== productId) throw new Error("product-mismatch");
+  if (product.type === "inapp") {
+    /* 0 = purchased, 1 = cancelled, 2 = refunded */
+    if (Number(d.purchaseState) !== 0) throw new Error("purchase-not-active");
+    return { plan: product.plan, expiryTime: 0, orderId: d.orderId || "" };
+  }
+  /* 1 = ACTIVE, 3 = IN_GRACE_PERIOD. Everything else is expired/refunded. */
+  const state = Number(d.subscriptionState);
+  if (state !== 1 && state !== 3) throw new Error("subscription-not-active");
+  const expiry = Number(d.expiryTime || 0);
+  if (expiry && expiry <= Date.now()) throw new Error("subscription-expired");
+  return { plan: product.plan, expiryTime: expiry, orderId: d.orderId || d.latestOrderId || "" };
+}
 
 /* ── JWKS (the pool's public verification keys), cached per warm instance ── */
 let _jwks = null;
@@ -428,6 +514,58 @@ async function handleForgotVerify(body, res) {
   }
 }
 
+/* Writes a VERIFIED purchase to the ledger. Never called from a client-
+   supplied plan string — only from billing-verify after Google confirms. */
+async function grantVerifiedPlan(sub, email, verified, productId, purchaseToken, now) {
+  const PURCHASES_TABLE = process.env.AWS_TABLE_PURCHASES || "MinuticsPurchases";
+  const prevRow = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
+  const prevItem = prevRow.Item || null;
+  const prevPlan = prevItem && typeof prevItem.plan === "string" ? prevItem.plan : "";
+  const changed = prevPlan !== verified.plan;
+  const planSince = changed ? now : (prevItem && prevItem.planSince ? prevItem.planSince : now);
+  await docClient().send(new UpdateCommand({
+    TableName: TABLE,
+    Key: { uid: sub },
+    UpdateExpression:
+      "SET email = :e, #p = :p, planSince = :ps, updatedAt = :t, " +
+      "billingProductId = :bpid, billingPurchaseToken = :bpt, " +
+      "billingVerifiedAt = :bva, billingExpiryAt = :bexp, billingOrderId = :boid, " +
+      "#ifn = if_not_exists(#ifn, :t)",
+    ExpressionAttributeNames: { "#p": "plan", "#ifn": "createdAt" },
+    ExpressionAttributeValues: {
+      ":e": email, ":p": verified.plan, ":ps": planSince, ":t": now,
+      ":bpid": productId, ":bpt": purchaseToken, ":bva": now,
+      ":bexp": verified.expiryTime || 0, ":boid": verified.orderId || "",
+    },
+  }));
+  /* A real, Google-verified receipt — the old client-reported fake $99
+     receipt is gone. Best-effort: the plan write above is what matters. */
+  try {
+    const AMOUNTS = { basic: 1, yearly: 9, lifetime: 99, pro: 99 };
+    await docClient().send(new PutCommand({
+      TableName: PURCHASES_TABLE,
+      Item: {
+        uid: sub,
+        purchasedAt: new Date(now).toISOString(),
+        id: "play#" + sub + "#" + now,
+        userId: sub,
+        email,
+        plan: verified.plan,
+        productId,
+        purchaseToken,
+        orderId: verified.orderId || "",
+        amount: AMOUNTS[verified.plan] || 0,
+        createdAt: now,
+        status: "paid",
+        source: "google-play-verified",
+      },
+    }));
+  } catch (e) {
+    console.error("verified receipt write failed:", e && e.message);
+  }
+  return { plan: verified.plan, planSince };
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
   res.setHeader("Access-Control-Allow-Methods", "POST, DELETE, OPTIONS");
@@ -521,6 +659,7 @@ export default async function handler(req, res) {
   const mode = body.mode === "check" ? "check"
     : body.mode === "plan" ? "plan"
     : body.mode === "plan-get" ? "plan-get"
+    : body.mode === "billing-verify" ? "billing-verify"
     : body.mode === "cleanup" ? "cleanup"
     : "claim";
 
@@ -534,6 +673,10 @@ export default async function handler(req, res) {
 
   /* ── Legacy Firebase claim path (old APKs): unchanged behavior ─────── */
   if (!cognitoPayload) {
+    if (mode === "billing-verify") {
+      res.status(401).json({ ok: false, error: "Play purchases require an up-to-date app." });
+      return;
+    }
     if (deviceId && !/^[A-Za-z0-9_-]{8,64}$/.test(deviceId)) {
       res.status(400).json({ ok: false, error: "Invalid deviceId" });
       return;
@@ -631,34 +774,100 @@ export default async function handler(req, res) {
       return;
     }
 
+    /* billing-verify: the ONLY upgrade path. A Play purchase token is
+       checked with Google first; a forged "plan":"lifetime" can never
+       reach the ledger. Requires a Cognito session (legacy tokens below
+       are rejected before this point). */
+    if (mode === "billing-verify") {
+      if (!PLAY_CONFIGURED) {
+        res.status(503).json({ ok: false, error: "Play verification is not configured on the server yet." });
+        return;
+      }
+      let verified;
+      try {
+        verified = await verifyPlayPurchase(body.productId, body.purchaseToken);
+      } catch (e) {
+        console.error("play verification failed:", e && e.message);
+        res.status(403).json({ ok: false, error: "Google could not verify this purchase. If you were charged, contact support with your Play order number." });
+        return;
+      }
+      try {
+        const result = await grantVerifiedPlan(sub, email, verified, body.productId, body.purchaseToken, now);
+        res.status(200).json({ ok: true, plan: result.plan, planSince: result.planSince, verified: true });
+      } catch (e) {
+        console.error("verified plan write failed:", e && e.message);
+        res.status(200).json({ ok: false, degraded: true, error: "Purchase verified but the ledger is unavailable — it will be restored on next launch." });
+      }
+      return;
+    }
+
     /* plan-get: the client asks AWS what subscription this account owns —
        the source of truth, so wiping the device's storage can never lose
        a purchase. Read-only; null when the account never bought anything. */
     if (mode === "plan-get") {
       const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
       const item = got.Item || null;
-      res.status(200).json({
-        ok: true,
-        plan: item && typeof item.plan === "string" ? item.plan : null,
-        planSince: item && item.planSince ? item.planSince : null,
-      });
+      let plan = item && typeof item.plan === "string" ? item.plan : null;
+      let planSince = item && item.planSince ? item.planSince : null;
+      /* A verified subscription whose stored Play expiry has passed is
+         re-checked with Google before revoking: Play may simply have
+         RENEWED it, in which case we store the new expiry and keep the plan.
+         Only a genuinely expired/refunded subscription is downgraded, so
+         refunds revoke access even if the device never gets a notification.
+         Legacy/administrative plans have no billing token and are left alone. */
+      if ((plan === "basic" || plan === "yearly") && item && item.billingPurchaseToken
+          && item.billingProductId && item.billingExpiryAt && Number(item.billingExpiryAt) <= now) {
+        let renewed = false;
+        try {
+          if (PLAY_CONFIGURED) {
+            const fresh = await verifyPlayPurchase(item.billingProductId, item.billingPurchaseToken);
+            renewed = true;
+            await docClient().send(new UpdateCommand({
+              TableName: TABLE,
+              Key: { uid: sub },
+              UpdateExpression: "SET billingExpiryAt = :bexp, billingVerifiedAt = :t, updatedAt = :t",
+              ExpressionAttributeValues: { ":bexp": fresh.expiryTime || 0, ":t": now },
+            }));
+          }
+        } catch (e) {
+          console.error("renewal recheck failed:", e && e.message);
+        }
+        if (!renewed) {
+          try {
+            await docClient().send(new UpdateCommand({
+              TableName: TABLE,
+              Key: { uid: sub },
+              UpdateExpression: "SET #p = :free, planSince = :t, updatedAt = :t",
+              ExpressionAttributeNames: { "#p": "plan" },
+              ExpressionAttributeValues: { ":free": "free", ":t": now },
+            }));
+          } catch (e) {
+            console.error("expiry downgrade failed:", e && e.message);
+          }
+          plan = "free";
+          planSince = now;
+        }
+      }
+      res.status(200).json({ ok: true, plan, planSince, verified: !!(item && item.billingPurchaseToken) });
       return;
     }
 
-    /* plan: this device reports the plan it activated (purchases are
-       device-local by design — this ledger write is what the admin panel
-       shows and what plan-get restores after a storage wipe). Unknown
-       values collapse to "free"; planSince records when the plan changed
-       (kept across repeated reports of the same plan so expiry math stays
-       correct across devices/wipes). No deviceId involved.
+    /* plan: DOWNGRADE-ONLY (cancellation). Upgrades are never accepted
+       from here — see billing-verify above.
        NOTE: "plan" is a DynamoDB RESERVED WORD — it MUST be aliased
        (#plan) in the expression or every write dies with a
        ValidationException that the catch below would swallow as
        "degraded" (that is exactly how purchases silently never saved). */
     if (mode === "plan") {
-      const PLAN_IDS = ["free", "basic", "yearly", "lifetime", "pro"];
+      /* SECURITY: this mode used to accept ANY client-supplied plan, so a
+         single request with plan:"lifetime" granted premium for free and
+         even wrote a fake $99 receipt. It is now DOWNGRADE-ONLY. Upgrades
+         go exclusively through billing-verify (Google-verified). */
       let plan = typeof body.plan === "string" ? body.plan.toLowerCase() : "free";
-      if (!PLAN_IDS.includes(plan)) plan = "free";
+      if (plan !== "free") {
+        res.status(403).json({ ok: false, error: "Plans can only be activated by a verified Google Play purchase." });
+        return;
+      }
       const prevRow = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
       const prevItem = prevRow.Item || null;
       const prevPlan = prevItem && typeof prevItem.plan === "string" ? prevItem.plan : "";
@@ -669,33 +878,11 @@ export default async function handler(req, res) {
         UpdateExpression:
           "SET email = :e, #plan = :p, updatedAt = :t" +
           (changed ? ", planSince = :t" : ", planSince = if_not_exists(planSince, :t)") +
-          ", #ifn = if_not_exists(#ifn, :t)",
+          ", #ifn = if_not_exists(#ifn, :t)" +
+          " REMOVE billingProductId, billingPurchaseToken, billingExpiryAt, billingOrderId",
         ExpressionAttributeValues: { ":e": email, ":p": plan, ":t": now },
         ExpressionAttributeNames: { "#plan": "plan", "#ifn": "createdAt" },
       }));
-      /* An actual activation also lands in the Purchases ledger (what the
-         admin panel's Purchases card reads) — best-effort: the plan write
-         above is what matters, a receipt must never fail the response. */
-      if (changed && plan !== "free") {
-        try {
-          const PURCHASES_TABLE = process.env.AWS_TABLE_PURCHASES || "MinuticsPurchases";
-          const AMOUNTS = { basic: 1, yearly: 9, lifetime: 99, pro: 99 };
-          /* MinuticsPurchases key = uid (HASH) + purchasedAt (RANGE, string).
-             purchasedAt MUST be the ISO string — the table's sort key is type S. */
-          const purchaseId = "purchase#" + sub + "#" + now;
-          await docClient().send(new PutCommand({
-            TableName: PURCHASES_TABLE,
-            Item: {
-              uid: sub, purchasedAt: new Date(now).toISOString(),
-              id: purchaseId, userId: sub,
-              email, plan, amount: AMOUNTS[plan] || 0,
-              createdAt: now, status: "paid",
-            },
-          }));
-        } catch (e) {
-          console.error("purchase receipt failed (plan itself saved):", e && e.message);
-        }
-      }
       res.status(200).json({
         ok: true,
         plan,

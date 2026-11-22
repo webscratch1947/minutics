@@ -9758,6 +9758,37 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     if (!planId) return;
     setPlanFromPurchase(planId);
   };
+  /* THE ONLY WAY A PLAN GETS UNLOCKED ON ANDROID.
+     Native hands us Google's purchase token + product id. We do NOT touch
+     the local plan until app.minutics.com has verified that token with the
+     Google Play API and written the account's ledger row. A modified APK
+     calling onMinuticsPurchase / LTPlan.setPlan directly can only fake it
+     on that one device — it can never forge a server-side entitlement. */
+  window.onMinuticsPlayPurchase = function (productId, purchaseToken) {
+    if (!productId || !purchaseToken) {
+      window.onMinuticsPurchaseError && window.onMinuticsPurchaseError("", "Purchase details were incomplete — please try again.");
+      return Promise.resolve(null);
+    }
+    var origin = (window.LTAuth && window.LTAuth.apiOrigin) ? window.LTAuth.apiOrigin() : "";
+    var tp = (window.LTAuth && window.LTAuth.getToken) ? window.LTAuth.getToken(false) : Promise.resolve(null);
+    return Promise.resolve(tp).then(function (tok) {
+      if (!tok) throw new Error("Please log in again to confirm your purchase.");
+      return fetch(origin + "/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+        body: JSON.stringify({ mode: "billing-verify", productId: productId, purchaseToken: purchaseToken })
+      });
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.ok || !d.plan) throw new Error((d && d.error) || "Your purchase could not be confirmed.");
+      setPlan(d.plan); /* local cache of a SERVER-VERIFIED entitlement only */
+      try { refreshPlanGatedUI(); } catch (e) {}
+      try { showMinuticsPurchaseToast("Purchase complete — welcome to " + d.plan.charAt(0).toUpperCase() + d.plan.slice(1) + "!"); } catch (e) {}
+      return d;
+    }).catch(function (e) {
+      window.onMinuticsPurchaseError && window.onMinuticsPurchaseError("", (e && e.message) || "Purchase could not be verified.");
+      return null;
+    });
+  };
   window.onMinuticsPurchaseError = function (planId, message) {
     try { showUpgradePrompt(message || "Purchase could not be completed."); } catch (e) { alert(message || "Purchase failed."); }
   };
