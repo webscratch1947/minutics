@@ -365,7 +365,7 @@ export function getTelegramReportData() {
       "━━━━━━━━━━━━━━━━━━━━\n\n" +
       "📅 Date: " + dateStr + "\n" +
       "👤 Account: " + reportAccountLine() + "\n\n" +
-      "📈 Productivity: " + productivity + "%\n\n" +
+      "📈 Productivity Score: " + productivity + "%\n\n" +
       (activityLines.length > 0
         ? "📋 ACTIVITIES\n" + activityLines.join("\n") + "\n"
         : "📋 ACTIVITIES\nNo activity tracked today.\n") +
