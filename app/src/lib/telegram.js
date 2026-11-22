@@ -365,14 +365,10 @@ export function getTelegramReportData() {
       "━━━━━━━━━━━━━━━━━━━━\n\n" +
       "📅 Date: " + dateStr + "\n" +
       "👤 Account: " + reportAccountLine() + "\n\n" +
-      "⏱️ TIME SUMMARY\n\n" +
-      "🟢 Productive Time: " + fmtMinutes(productive) + "\n" +
-      "🟡 Time Wasted: " + fmtMinutes(wasted) + "\n" +
-      "⏳ Total Tracked: " + fmtMinutes(total) + "\n\n" +
       "📈 Productivity: " + productivity + "%\n\n" +
       (activityLines.length > 0
         ? "📋 ACTIVITIES\n" + activityLines.join("\n") + "\n"
-        : "") +
+        : "📋 ACTIVITIES\nNo activity tracked today.\n") +
       "━━━━━━━━━━━━━━━━━━━━";
 
     /* Routine tracker — only include if the user actually has routines. */
