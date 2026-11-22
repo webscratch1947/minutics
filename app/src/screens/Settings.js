@@ -499,7 +499,8 @@ export function SettingsScreen() {
         localStorage.setItem("lt_fcm_token", fcmToken);
 
         console.log("FCM: calling /api/fcm-send...");
-        var resp = await fetch("/api/fcm-send", {
+        var _apiOrigin = (window.LTAuth && window.LTAuth.apiOrigin) ? window.LTAuth.apiOrigin() : "";
+        var resp = await fetch(_apiOrigin + "/api/fcm-send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fcmToken: fcmToken })

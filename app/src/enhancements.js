@@ -7404,7 +7404,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             localStorage.setItem("lt_fcm_token", tok);
           } catch (e) {}
           if (tok === lastTok && now - subAt < 24 * 60 * 60 * 1000) return null;
-          return fetch("/api/fcm-send", {
+          var _apiOrigin = (window.LTAuth && window.LTAuth.apiOrigin) ? window.LTAuth.apiOrigin() : "";
+          return fetch(_apiOrigin + "/api/fcm-send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ fcmToken: tok, action: "subscribe" })
