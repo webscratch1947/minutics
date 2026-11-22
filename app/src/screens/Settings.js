@@ -997,9 +997,9 @@ export function SettingsScreen() {
                   jsx(CardRow, {
                     label: permNames.autostart,
                     desc: permStatus.autostartState === 1
-                      ? "Granted � app restarts after reboot"
+                      ? "Granted - app restarts after reboot"
                       : permStatus.autostartState === -1
-                        ? "Not granted � tap Open to allow"
+                        ? "Not granted - tap Open to allow"
                         : "State can't be read on this phone - tap Open to check",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: permStatus.autostartState === 1, unknown: permStatus.autostartState === 0 }),
