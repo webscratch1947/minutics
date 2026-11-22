@@ -982,15 +982,17 @@ export function SettingsScreen() {
                       jsx(PermOpenButton, { onClick: function(){ openPermDirect("overlay"); } })
                     ] })
                   }),
-                   jsx(Divider, {}),
-                  deviceIsXiaomi ? jsx(CardRow, {
+                  deviceIsXiaomi ? jsx(Fragment, { children: [
+                    jsx(Divider, {}),
+                    jsx(CardRow, {
                     label: permNames.popup,
                     desc: permStatus.popup ? "Granted - alerts show with the app closed" : "Not granted - tap Open to allow",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.popup }),
                       jsx(PermOpenButton, { onClick: function(){ openPermDirect("popup"); } })
                     ] })
-                  }) : null,
+                  })
+                  ] }) : null,
                   jsx(Divider, {}),
                   jsx(CardRow, {
                     label: permNames.autostart,
@@ -1019,7 +1021,7 @@ export function SettingsScreen() {
           }),
           jsx("p", {
             className: "px-1 mt-2.5 text-[11px] leading-relaxed text-muted-foreground",
-            children: "Status is read live from your phone. Tap Open to change a setting."
+            children: "If you clicked Open and it did not work, the setting might already be enabled. You can always open your phone Settings and check if Minutics is enabled there."
           })
         ]
       }),
