@@ -396,7 +396,57 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   }
 
+  /* Anti-tamper: a re-signed APK is a pirate clone. Native compares its
+     own signing certificate with the official one; if they differ, no
+     client-side "paid" flag is honoured. Cached because isPro() is called
+     constantly. On the normal website there is no bridge, so this is a
+     no-op there. */
+  var _officialApp = null;
+  var _integrityPassed = true; /* stays true until the server reports a fail */
+  function appIsOfficial() {
+    if (_officialApp === null) {
+      try {
+        var b = window.AndroidBridge;
+        _officialApp = !(b && typeof b.isOfficialApp === "function") || !!b.isOfficialApp();
+      } catch (e) { _officialApp = true; }
+    }
+    return _officialApp && _integrityPassed;
+  }
+
+  /* Play Integrity: native asks Google for a signed verdict, our server
+     decodes it, and a failing verdict revokes the local plan flag. The
+     server only enforces this when PLAY_INTEGRITY_ENFORCE=true, so sideloaded
+     test builds still work until the owner links Play Console + Cloud. */
+  function runIntegrityCheck() {
+    try {
+      if (!document.body || !document.body.classList.contains("lt-authed")) return;
+      var b = window.AndroidBridge;
+      if (!b || typeof b.requestIntegrityToken !== "function") return;
+      if (!window.LTAuth || !window.LTAuth.getToken) return;
+      window.onMinuticsIntegrity = function (token, nonce, error) {
+        if (!token || error) return;
+        var origin = window.LTAuth.apiOrigin ? window.LTAuth.apiOrigin() : "";
+        window.LTAuth.getToken(false).then(function (tok) {
+          if (!tok) return;
+          return fetch(origin + "/api/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok },
+            body: JSON.stringify({ mode: "integrity-check", integrityToken: token, nonce: nonce })
+          }).then(function (r) { return r.json(); }).then(function (d) {
+            if (d && d.ok && d.enforce) {
+              _integrityPassed = !!d.passed;
+              if (!_integrityPassed) { try { setPlan("free"); } catch (e) {} }
+            }
+          });
+        }).catch(function () {});
+      };
+      b.requestIntegrityToken();
+    } catch (e) {}
+  }
+  setTimeout(runIntegrityCheck, 3000);
+  setInterval(runIntegrityCheck, 2 * 60 * 1000);
   function isPro() {
+    if (!appIsOfficial()) return false;
     var p = readJson(PLAN_KEY, "free");
     return p === "basic" || p === "yearly" || p === "lifetime" || p === "pro";
   }
@@ -476,6 +526,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     showPlansScreen: showPlansScreen, refresh: refreshPlanGatedUI,
     restore: function (plan, since) {
       var p = (plan === "basic" || plan === "yearly" || plan === "lifetime" || plan === "pro") ? plan : "free";
+      if (!appIsOfficial()) p = "free";
       if (p === "pro") p = "lifetime";
       setPlan(p);
       if (p !== "free" && since) {

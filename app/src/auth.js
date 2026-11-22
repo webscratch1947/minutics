@@ -275,7 +275,7 @@ function readLocalPlan() {
    Reconcile rules:
      • AWS has a paid plan → AWS wins; it is restored onto the device with
        its original activation timestamp (expiry math stays correct).
-     • AWS has nothing paid but this device has one → push the device's
+     • AWS says free/null but this device claims paid - AWS wins; the local value is cleared so a hand-edited plan cannot survive a check. (old heal-legacy behavior removed) → push the device's
        purchase up (heals accounts bought before the ledger existed).
      • degraded/offline server → keep the device's plan; never destroy it. */
 function reconcilePlanWithServer(payload) {
@@ -291,9 +291,16 @@ function reconcilePlanWithServer(payload) {
       var server = typeof d.plan === "string" ? d.plan : "";
       var local = readLocalPlan();
       if (server && server !== "free") {
+        /* A paid ledger always wins — restore it onto this device. */
         if (server !== local) applyServerPlan(server, d.planSince || null);
       } else if (local && local !== "free") {
-        syncPlanNow(local);
+        /* The server answered CLEANLY and says there is no paid plan. It is
+           the trust boundary, so it wins in this direction too: a stale or
+           hand-edited local plan is cleared instead of being pushed up (the
+           old "heal legacy purchases" push is gone — upgrades now require
+           a Google-verified Play token). Degraded/offline responses were
+           already filtered out above, so a network hiccup never revokes. */
+        applyServerPlan("free");
       }
       return d;
     }).catch(function () { return null; });

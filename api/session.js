@@ -83,16 +83,17 @@ const PLAY_PRODUCTS = Object.freeze({
 const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_PLAY_CLIENT_EMAIL || "";
 const GOOGLE_PRIVATE_KEY = (process.env.GOOGLE_PLAY_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 const PLAY_CONFIGURED = Boolean(GOOGLE_CLIENT_EMAIL && GOOGLE_PRIVATE_KEY);
-let _googleToken = { value: "", exp: 0 };
+const _googleTokens = Object.create(null);
 
-async function googleAccessToken() {
-  if (_googleToken.value && Date.now() < _googleToken.exp) return _googleToken.value;
+async function googleAccessToken(scope) {
+  const hit = _googleTokens[scope];
+  if (hit && Date.now() < hit.exp) return hit.value;
   const now = Math.floor(Date.now() / 1000);
   const b64 = (v) => Buffer.from(v).toString("base64url");
   const head = b64(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claim = b64(JSON.stringify({
     iss: GOOGLE_CLIENT_EMAIL,
-    scope: "https://www.googleapis.com/auth/androidpublisher",
+    scope: scope,
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,
@@ -110,8 +111,8 @@ async function googleAccessToken() {
   if (!r.ok) throw new Error("google-oauth-" + r.status);
   const d = await r.json();
   if (!d.access_token) throw new Error("google-oauth-no-token");
-  _googleToken = { value: d.access_token, exp: Date.now() + (Number(d.expires_in || 3600) - 120) * 1000 };
-  return _googleToken.value;
+  _googleTokens[scope] = { value: d.access_token, exp: Date.now() + (Number(d.expires_in || 3600) - 120) * 1000 };
+  return d.access_token;
 }
 
 /** Returns { plan, expiryTime, orderId } only for a REAL, active Play purchase. */
@@ -121,7 +122,7 @@ async function verifyPlayPurchase(productId, purchaseToken) {
   if (typeof purchaseToken !== "string" || !/^[A-Za-z0-9._~+=/-]{12,600}$/.test(purchaseToken)) {
     throw new Error("invalid-purchase-token");
   }
-  const access = await googleAccessToken();
+  const access = await googleAccessToken("https://www.googleapis.com/auth/androidpublisher");
   const base = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"
     + encodeURIComponent(PLAY_PACKAGE) + "/purchases/";
   const path = product.type === "subs"
@@ -142,6 +143,45 @@ async function verifyPlayPurchase(productId, purchaseToken) {
   const expiry = Number(d.expiryTime || 0);
   if (expiry && expiry <= Date.now()) throw new Error("subscription-expired");
   return { plan: product.plan, expiryTime: expiry, orderId: d.orderId || d.latestOrderId || "" };
+}
+
+/* ── Play Integrity: app/device tamper verdict ───────────────────────────
+   Off by default (PLAY_INTEGRITY_ENFORCE=true) because Google only returns
+   PLAY_RECOGNIZED for apps installed from Play, so sideloaded test builds
+   would be locked out. Turn it on after the app + Cloud project are linked. */
+const PLAY_INTEGRITY_ENFORCE = process.env.PLAY_INTEGRITY_ENFORCE === "true";
+const OFFICIAL_CERT_B64 = process.env.PLAY_CERT_SHA256_B64
+  || "Y8rZQasZtefyFj3bCin+cIsm6RDFi0p/MJTlZNouKQ=="; /* release cert, base64 SHA-256 */
+
+async function verifyIntegrityToken(token, nonce) {
+  if (!PLAY_CONFIGURED) throw new Error("play-not-configured");
+  if (typeof token !== "string" || token.length < 20 || token.length > 20000) throw new Error("bad-token");
+  if (typeof nonce !== "string" || !/^[A-Za-z0-9+/=_-]{16,200}$/.test(nonce)) throw new Error("bad-nonce");
+  const access = await googleAccessToken("https://www.googleapis.com/auth/playintegrity");
+  const r = await fetch(
+    "https://playintegrity.googleapis.com/v1/" + encodeURIComponent(PLAY_PACKAGE) + ":decodeIntegrityToken",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + access },
+      body: JSON.stringify({ integrityToken: token }),
+    });
+  if (!r.ok) throw new Error("integrity-api-" + r.status);
+  const d = await r.json();
+  let p = d.tokenPayload;
+  if (typeof p === "string") { try { p = JSON.parse(p); } catch { throw new Error("bad-payload"); } }
+  p = p || {};
+  const norm = (s) => String(s || "").replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+  const returnedNonce = p.requestDetails && p.requestDetails.nonce;
+  if (!returnedNonce || norm(returnedNonce) !== norm(nonce)) throw new Error("nonce-mismatch");
+  const app = p.appIntegrity || {};
+  if (app.appRecognitionVerdict !== "PLAY_RECOGNIZED") return false;
+  if (app.packageName && app.packageName !== PLAY_PACKAGE) return false;
+  const certs = (app.certificateSha256Digest || []).map(norm);
+  if (certs.indexOf(norm(OFFICIAL_CERT_B64)) === -1) return false;
+  const verdicts = (p.deviceIntegrity && p.deviceIntegrity.deviceRecognitionVerdicts) || [];
+  if (verdicts.indexOf("MEETS_STRONG_INTEGRITY") === -1
+      && verdicts.indexOf("MEETS_BASIC_INTEGRITY") === -1) return false;
+  return true;
 }
 
 /* ── JWKS (the pool's public verification keys), cached per warm instance ── */
@@ -703,6 +743,7 @@ export default async function handler(req, res) {
     : body.mode === "plan" ? "plan"
     : body.mode === "plan-get" ? "plan-get"
     : body.mode === "billing-verify" ? "billing-verify"
+    : body.mode === "integrity-check" ? "integrity-check"
     : body.mode === "cleanup" ? "cleanup"
     : "claim";
 
@@ -815,6 +856,24 @@ export default async function handler(req, res) {
         plan: effective.plan,
         planSince: effective.planSince,
       });
+      return;
+    }
+
+    /* integrity-check: asks Google whether this is a genuine Play install.
+       The client refuses to honour a "paid" flag when enforcement is on
+       and this verdict fails. Off by default until the owner enables it. */
+    if (mode === "integrity-check") {
+      if (!PLAY_INTEGRITY_ENFORCE) {
+        res.status(200).json({ ok: true, enforce: false });
+        return;
+      }
+      let passed = false;
+      try {
+        passed = await verifyIntegrityToken(body.integrityToken, body.nonce);
+      } catch (e) {
+        console.error("integrity check failed:", e && e.message);
+      }
+      res.status(200).json({ ok: true, enforce: true, passed });
       return;
     }
 
