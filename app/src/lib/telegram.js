@@ -288,6 +288,20 @@ export async function sendTelegramReport(token, chatId, text) {
 }
 
 /** Generate formatted report text for today's activity (was: RC) */
+const REPORT_GAINS = ["work", "business", "study", "learn", "learning", "read", "write", "writing", "code", "coding", "project", "deep work", "exercise", "fitness", "gym", "walk", "run", "running", "meditat", "mindful", "yoga", "creat", "hobby", "skill", "develop", "practice", "research", "plan", "journal", "language"];
+const REPORT_LOSSES = ["waste", "doom", "scroll", "reel", "short", "instagram", "tiktok", "youtube", "facebook", "snapchat", "twitter", "x (twitter", "netflix", "prime video", "tv", "movie", "gaming", "game", "games", "nothing", "idle", "sleeping late", "binge"];
+
+function nameHas(name, list) {
+  const n = String(name || "").toLowerCase();
+  return list.some(k => n.indexOf(k) !== -1);
+}
+
+function fmtHM(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return (h > 0 ? h + "h " : "") + String(m).padStart(2, "0") + "m";
+}
+
 export function getTelegramReportData() {
   try {
     const store = JSON.parse(localStorage.getItem("lifetime_local_db_v1") || "{}");
@@ -296,8 +310,8 @@ export function getTelegramReportData() {
     const now = new Date();
     const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const dayEnd = dayStart + 86400000;
-    
-    const map = new Map();
+
+    const byName = new Map();
     for (const b of blocks) {
       const bStart = new Date(b.startTime).getTime();
       const bEnd = b.endTime ? new Date(b.endTime).getTime() : Date.now();
@@ -306,28 +320,61 @@ export function getTelegramReportData() {
       if (cEnd <= cStart) continue;
       const act = activities.find(a => a.id === b.activityId);
       if (!act) continue;
-      const entry = map.get(act.id) || { name: act.name, seconds: 0 };
-      entry.seconds += Math.round((cEnd - cStart) / 1000);
-      map.set(act.id, entry);
+      const name = act.name || "Activity";
+      byName.set(name, (byName.get(name) || 0) + Math.round((cEnd - cStart) / 1000));
     }
-    
-    const lines = [...map.values()]
-      .sort((a, b) => b.seconds - a.seconds)
-      .map(e => {
-        const h = Math.floor(e.seconds / 3600);
-        const m = Math.floor((e.seconds % 3600) / 60);
-        return `${e.name}: ${h > 0 ? h + "h " : ""}${m}m`;
-      });
-    
-    const total = [...map.values()].reduce((s, e) => s + e.seconds, 0);
-    const totalH = Math.floor(total / 3600);
-    const totalM = Math.floor((total % 3600) / 60);
-    
-    return `📊 Daily Report — ${now.toLocaleDateString("en-IN")}\n👤 Account: ${reportAccountLine()}\n\n` +
-      lines.join("\n") +
-      `\n\n⏱ Total: ${totalH}h ${totalM}m`;
+
+    let productive = 0, wasted = 0;
+    for (const [name, secs] of byName) {
+      if (nameHas(name, REPORT_LOSSES)) wasted += secs;
+      else if (nameHas(name, REPORT_GAINS)) productive += secs;
+    }
+    const total = productive + wasted;
+    const productivity = total > 0 ? ((productive / total) * 100).toFixed(1) : "0.0";
+
+    const dateStr = now.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    let out =
+      "📊 MINUTICS | DAILY REPORT\n" +
+      "━━━━━━━━━━━━━━━━━━━━\n\n" +
+      "📅 Date: " + dateStr + "\n" +
+      "👤 Account: " + reportAccountLine() + "\n\n" +
+      "⏱️ TIME SUMMARY\n\n" +
+      "🟢 Productive Time: " + fmtHM(productive) + "\n" +
+      "🟡 Time Wasted: " + fmtHM(wasted) + "\n" +
+      "⏳ Total Tracked: " + fmtHM(total) + "\n\n" +
+      "📈 Productivity: " + productivity + "%\n" +
+      "━━━━━━━━━━━━━━━━━━━━";
+
+    /* Routine tracker — only include if the user actually has routines. */
+    try {
+      const routines = JSON.parse(localStorage.getItem("lt_routine_items_v1") || "[]");
+      if (Array.isArray(routines) && routines.length > 0) {
+        const t = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+        const doneState = JSON.parse(localStorage.getItem("lt_routine_done_v1") || "{}");
+        const doneIds = (doneState && doneState.date === t && doneState.ids) ? doneState.ids : {};
+        const done = routines.filter(r => doneIds[r.id]);
+        const notDone = routines.filter(r => !doneIds[r.id]);
+        const pct = Math.round((done.length / routines.length) * 100);
+        out += "\n🎯 ROUTINE TRACKER\n\n";
+        out += "📊 Daily Completion: " + done.length + "/" + routines.length + " (" + pct + "%)\n\n";
+        if (done.length > 0) {
+          out += "✅ COMPLETED (" + done.length + ")\n";
+          done.forEach(r => { out += "• " + r.name + "\n"; });
+          out += "\n";
+        }
+        if (notDone.length > 0) {
+          out += "❌ NOT COMPLETED (" + notDone.length + ")\n";
+          notDone.forEach(r => { out += "• " + r.name + "\n"; });
+        }
+      }
+    } catch (e) {}
+
+    return out.trimEnd();
   } catch {
-    return `📊 Daily Report — No data available\n👤 Account: ${reportAccountLine()}`;
+    const d = new Date();
+    return "📊 MINUTICS | DAILY REPORT\n━━━━━━━━━━━━━━━━━━━━\n\n📅 Date: " +
+      d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) +
+      "\n👤 Account: " + reportAccountLine() + "\n\nNo data available.";
   }
 }
 
