@@ -514,6 +514,49 @@ async function handleForgotVerify(body, res) {
   }
 }
 
+/* Resolves a ledger row to the plan the user ACTUALLY owns right now.
+   Used by both "check" and "plan-get" so an expired/refunded subscription
+   can never be restored onto a device through either read path. A token
+   that Google says was renewed simply refreshes its stored expiry. */
+async function effectiveLedgerPlan(item, sub, now) {
+  let plan = item && typeof item.plan === "string" ? item.plan : null;
+  let planSince = item && item.planSince ? item.planSince : null;
+  if ((plan === "basic" || plan === "yearly") && item && item.billingPurchaseToken
+      && item.billingProductId && item.billingExpiryAt && Number(item.billingExpiryAt) <= now) {
+    let renewed = false;
+    try {
+      if (PLAY_CONFIGURED) {
+        const fresh = await verifyPlayPurchase(item.billingProductId, item.billingPurchaseToken);
+        renewed = true;
+        await docClient().send(new UpdateCommand({
+          TableName: TABLE,
+          Key: { uid: sub },
+          UpdateExpression: "SET billingExpiryAt = :bexp, billingVerifiedAt = :t, updatedAt = :t",
+          ExpressionAttributeValues: { ":bexp": fresh.expiryTime || 0, ":t": now },
+        }));
+      }
+    } catch (e) {
+      console.error("renewal recheck failed:", e && e.message);
+    }
+    if (!renewed) {
+      try {
+        await docClient().send(new UpdateCommand({
+          TableName: TABLE,
+          Key: { uid: sub },
+          UpdateExpression: "SET #p = :free, planSince = :t, updatedAt = :t",
+          ExpressionAttributeNames: { "#p": "plan" },
+          ExpressionAttributeValues: { ":free": "free", ":t": now },
+        }));
+      } catch (e) {
+        console.error("expiry downgrade failed:", e && e.message);
+      }
+      plan = "free";
+      planSince = now;
+    }
+  }
+  return { plan, planSince };
+}
+
 /* Writes a VERIFIED purchase to the ledger. Never called from a client-
    supplied plan string — only from billing-verify after Google confirms. */
 async function grantVerifiedPlan(sub, email, verified, productId, purchaseToken, now) {
@@ -752,6 +795,7 @@ export default async function handler(req, res) {
     if (mode === "check") {
       const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
       const item = got.Item || null;
+      const effective = await effectiveLedgerPlan(item, sub, now);
       /* Best-effort heartbeat so the admin panel's ledger shows activity. */
       try {
         await docClient().send(new UpdateCommand({
@@ -767,9 +811,9 @@ export default async function handler(req, res) {
         device: item && item.deviceId ? item.deviceId : null,
         /* The subscription rides along on every check so a paid plan heals
            (or is restored) within seconds of app open even if the one-shot
-           sign-in reconcile was missed. */
-        plan: item && typeof item.plan === "string" ? item.plan : null,
-        planSince: item && item.planSince ? item.planSince : null,
+           sign-in reconcile was missed. Same expiry enforcement as plan-get. */
+        plan: effective.plan,
+        planSince: effective.planSince,
       });
       return;
     }
@@ -807,48 +851,13 @@ export default async function handler(req, res) {
     if (mode === "plan-get") {
       const got = await docClient().send(new GetCommand({ TableName: TABLE, Key: { uid: sub } }));
       const item = got.Item || null;
-      let plan = item && typeof item.plan === "string" ? item.plan : null;
-      let planSince = item && item.planSince ? item.planSince : null;
-      /* A verified subscription whose stored Play expiry has passed is
-         re-checked with Google before revoking: Play may simply have
-         RENEWED it, in which case we store the new expiry and keep the plan.
-         Only a genuinely expired/refunded subscription is downgraded, so
-         refunds revoke access even if the device never gets a notification.
-         Legacy/administrative plans have no billing token and are left alone. */
-      if ((plan === "basic" || plan === "yearly") && item && item.billingPurchaseToken
-          && item.billingProductId && item.billingExpiryAt && Number(item.billingExpiryAt) <= now) {
-        let renewed = false;
-        try {
-          if (PLAY_CONFIGURED) {
-            const fresh = await verifyPlayPurchase(item.billingProductId, item.billingPurchaseToken);
-            renewed = true;
-            await docClient().send(new UpdateCommand({
-              TableName: TABLE,
-              Key: { uid: sub },
-              UpdateExpression: "SET billingExpiryAt = :bexp, billingVerifiedAt = :t, updatedAt = :t",
-              ExpressionAttributeValues: { ":bexp": fresh.expiryTime || 0, ":t": now },
-            }));
-          }
-        } catch (e) {
-          console.error("renewal recheck failed:", e && e.message);
-        }
-        if (!renewed) {
-          try {
-            await docClient().send(new UpdateCommand({
-              TableName: TABLE,
-              Key: { uid: sub },
-              UpdateExpression: "SET #p = :free, planSince = :t, updatedAt = :t",
-              ExpressionAttributeNames: { "#p": "plan" },
-              ExpressionAttributeValues: { ":free": "free", ":t": now },
-            }));
-          } catch (e) {
-            console.error("expiry downgrade failed:", e && e.message);
-          }
-          plan = "free";
-          planSince = now;
-        }
-      }
-      res.status(200).json({ ok: true, plan, planSince, verified: !!(item && item.billingPurchaseToken) });
+      const effective = await effectiveLedgerPlan(item, sub, now);
+      res.status(200).json({
+        ok: true,
+        plan: effective.plan,
+        planSince: effective.planSince,
+        verified: !!(item && item.billingPurchaseToken),
+      });
       return;
     }
 
