@@ -946,7 +946,7 @@ export function SettingsScreen() {
         className: "mx-4",
         children: [
           jsx(SectionHeader, { children: "Permissions" }),
-          deviceLabel ? jsx('p', { className: 'px-1 -mb-1 text-[11px] font-semibold text-muted-foreground', children: 'Detected: ' + deviceLabel }) : null,
+          deviceLabel ? jsx('p', { className: 'px-1 mt-1 mb-2 text-[11px] font-semibold text-muted-foreground', children: 'Detected: ' + deviceLabel }) : null,
           jsx(Card, {
             children: jsxs(Fragment, {
               children: [
@@ -1008,10 +1008,6 @@ export function SettingsScreen() {
           jsx("p", {
             className: "px-1 mt-2.5 text-[11px] leading-relaxed text-muted-foreground",
             children: "Status is read live from your phone. Tap Open to change a setting."
-           }),
-           jsx("p", {
-             className: "px-1 mt-1 text-[9px] leading-relaxed text-muted-foreground/60",
-             children: "debug: N=" + (permStatus.notifications ? 1 : 0) + " O=" + (permStatus.overlay ? 1 : 0) + " P=" + (permStatus.popup ? 1 : 0) + " AUTOSTART=" + (permStatus.autostartState == null ? "?" : permStatus.autostartState) + " AC=" + (permStatus.accessibility ? 1 : 0)
           })
         ]
       }),
