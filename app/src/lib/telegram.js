@@ -328,9 +328,36 @@ export function getTelegramReportData() {
     } catch (e) {}
 
     const total = productive + wasted;
-    /* The template's "Productivity" is the share of tracked time that was
-       productive — same ratio, now fed by the app's real minutes. */
-    const productivity = total > 0 ? ((productive / total) * 100).toFixed(1) : "0.0";
+    /* Use the REAL score the app shows (the tool's 0-100 value), never a
+       re-derived ratio. Fall back only if the app hasn't exposed it yet. */
+    const productivity = (score !== null && score !== undefined)
+      ? String(score)
+      : (total > 0 ? ((productive / total) * 100).toFixed(1) : "0.0");
+
+    /* Real activities tracked today, with names only — any per-activity
+       emoji is stripped for the MESSAGE (the app UI keeps its emojis). */
+    let activityLines = [];
+    try {
+      const store = JSON.parse(localStorage.getItem("lifetime_local_db_v1") || "{}");
+      const blocks = store.blocks || [];
+      const activities = store.activities || [];
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const dayEnd = dayStart + 86400000;
+      const byName = new Map();
+      for (const b of blocks) {
+        const bs = new Date(b.startTime).getTime();
+        const be = b.endTime ? new Date(b.endTime).getTime() : Date.now();
+        const cs = Math.max(bs, dayStart), ce = Math.min(be, dayEnd);
+        if (ce <= cs) continue;
+        const act = activities.find(a => a.id === b.activityId);
+        if (!act) continue;
+        const name = stripEmoji(act.name || "Activity");
+        byName.set(name, (byName.get(name) || 0) + Math.round((ce - cs) / 60000));
+      }
+      activityLines = [...byName.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, mins]) => "• " + name + ": " + fmtMinutes(mins));
+    } catch (e) {}
 
     const dateStr = now.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
     let out =
@@ -342,7 +369,10 @@ export function getTelegramReportData() {
       "🟢 Productive Time: " + fmtMinutes(productive) + "\n" +
       "🟡 Time Wasted: " + fmtMinutes(wasted) + "\n" +
       "⏳ Total Tracked: " + fmtMinutes(total) + "\n\n" +
-      "📈 Productivity: " + productivity + "%\n" +
+      "📈 Productivity: " + productivity + "%\n\n" +
+      (activityLines.length > 0
+        ? "📋 ACTIVITIES\n" + activityLines.join("\n") + "\n"
+        : "") +
       "━━━━━━━━━━━━━━━━━━━━";
 
     /* Routine tracker — only include if the user actually has routines. */
