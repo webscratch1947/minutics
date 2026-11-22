@@ -215,13 +215,14 @@ export default async function handler(req, res) {
           const due = nowMin >= Math.min(tMin + 1, 1439) && (tgs.sd !== date || tgs.st !== tgs.t);
           const inBackoff = tgs.fp && now - tgs.fp < 10 * 60 * 1000;
           const next = Object.assign({}, tgs); next.b = now;
-          /* Fresh date for the report: the client-generated text can sit in
-             claims for days (browser closed), which is how a "29/9" report kept
-             arriving on the 30th, 1st and 2nd. Rewrite the date line to today's
-             local date in the same d/M/yyyy format the client uses. */
-          const reportDate = local.getUTCDate() + "/" + (local.getUTCMonth() + 1) + "/" + local.getUTCFullYear();
-          let text = tgs.x || "\u{1F4CA} Daily Report — no data synced yet. Open Minutics once to refresh.";
-          text = text.replace(/^(\u{1F4CA} Daily Report — )\d{1,2}\/\d{1,2}\/\d{4}/, "$1" + reportDate);
+          /* Client text uses "📅 Date: 22 November 2026" — rewrite that line
+             to today's local date so a stale synced report can't arrive with
+             an old date. */
+          const reportDate = local.getUTCDate() + " " +
+            ["January","February","March","April","May","June","July","August","September","October","November","December"][local.getUTCMonth()] +
+            " " + local.getUTCFullYear();
+          let text = tgs.x || "📊 MINUTICS | DAILY REPORT — no data synced yet. Open Minutics once to refresh.";
+          text = text.replace(/^(📅 Date: ).*$/m, "$1" + reportDate);
           if (due && !inBackoff) {
             try {
               const tgRes = await fetch("https://api.telegram.org/bot" + tgs.k + "/sendMessage", {

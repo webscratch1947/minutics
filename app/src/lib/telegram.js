@@ -291,45 +291,45 @@ export async function sendTelegramReport(token, chatId, text) {
 const REPORT_GAINS = ["work", "business", "study", "learn", "learning", "read", "write", "writing", "code", "coding", "project", "deep work", "exercise", "fitness", "gym", "walk", "run", "running", "meditat", "mindful", "yoga", "creat", "hobby", "skill", "develop", "practice", "research", "plan", "journal", "language"];
 const REPORT_LOSSES = ["waste", "doom", "scroll", "reel", "short", "instagram", "tiktok", "youtube", "facebook", "snapchat", "twitter", "x (twitter", "netflix", "prime video", "tv", "movie", "gaming", "game", "games", "nothing", "idle", "sleeping late", "binge"];
 
+/* Strip any leading emoji from a name so report lines are text only. */
+function stripEmoji(s) {
+  return String(s || "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/gu, "").replace(/\s+/g, " ").trim();
+}
+
 function nameHas(name, list) {
   const n = String(name || "").toLowerCase();
   return list.some(k => n.indexOf(k) !== -1);
 }
 
-function fmtHM(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return (h > 0 ? h + "h " : "") + String(m).padStart(2, "0") + "m";
+function fmtMinutes(mins) {
+  const m = Math.max(0, Math.round(mins || 0));
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return (h > 0 ? h + "h " : "") + String(rem).padStart(2, "0") + "m";
 }
 
 export function getTelegramReportData() {
   try {
-    const store = JSON.parse(localStorage.getItem("lifetime_local_db_v1") || "{}");
-    const blocks = store.blocks || [];
-    const activities = store.activities || [];
     const now = new Date();
-    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const dayEnd = dayStart + 86400000;
+    /* Use the SAME computation the app's Productivity Score tool shows — no
+       separate keyword guessing here. boostMin = real productive minutes,
+       wasteMin = real Time Waste minutes, both from the live store. */
+    let productive = 0, wasted = 0, score = null;
+    try {
+      const fn = window.LTProductivityScoreToday;
+      if (typeof fn === "function") {
+        const idx = fn();
+        if (idx) {
+          productive = Math.round(idx.boostMin || 0);
+          wasted = Math.round(idx.wasteMin || 0);
+          score = idx.score;
+        }
+      }
+    } catch (e) {}
 
-    const byName = new Map();
-    for (const b of blocks) {
-      const bStart = new Date(b.startTime).getTime();
-      const bEnd = b.endTime ? new Date(b.endTime).getTime() : Date.now();
-      const cStart = Math.max(bStart, dayStart);
-      const cEnd = Math.min(bEnd, dayEnd);
-      if (cEnd <= cStart) continue;
-      const act = activities.find(a => a.id === b.activityId);
-      if (!act) continue;
-      const name = act.name || "Activity";
-      byName.set(name, (byName.get(name) || 0) + Math.round((cEnd - cStart) / 1000));
-    }
-
-    let productive = 0, wasted = 0;
-    for (const [name, secs] of byName) {
-      if (nameHas(name, REPORT_LOSSES)) wasted += secs;
-      else if (nameHas(name, REPORT_GAINS)) productive += secs;
-    }
     const total = productive + wasted;
+    /* The template's "Productivity" is the share of tracked time that was
+       productive — same ratio, now fed by the app's real minutes. */
     const productivity = total > 0 ? ((productive / total) * 100).toFixed(1) : "0.0";
 
     const dateStr = now.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -339,9 +339,9 @@ export function getTelegramReportData() {
       "📅 Date: " + dateStr + "\n" +
       "👤 Account: " + reportAccountLine() + "\n\n" +
       "⏱️ TIME SUMMARY\n\n" +
-      "🟢 Productive Time: " + fmtHM(productive) + "\n" +
-      "🟡 Time Wasted: " + fmtHM(wasted) + "\n" +
-      "⏳ Total Tracked: " + fmtHM(total) + "\n\n" +
+      "🟢 Productive Time: " + fmtMinutes(productive) + "\n" +
+      "🟡 Time Wasted: " + fmtMinutes(wasted) + "\n" +
+      "⏳ Total Tracked: " + fmtMinutes(total) + "\n\n" +
       "📈 Productivity: " + productivity + "%\n" +
       "━━━━━━━━━━━━━━━━━━━━";
 
@@ -359,12 +359,12 @@ export function getTelegramReportData() {
         out += "📊 Daily Completion: " + done.length + "/" + routines.length + " (" + pct + "%)\n\n";
         if (done.length > 0) {
           out += "✅ COMPLETED (" + done.length + ")\n";
-          done.forEach(r => { out += "• " + r.name + "\n"; });
+          done.forEach(r => { out += "• " + stripEmoji(r.name) + "\n"; });
           out += "\n";
         }
         if (notDone.length > 0) {
           out += "❌ NOT COMPLETED (" + notDone.length + ")\n";
-          notDone.forEach(r => { out += "• " + r.name + "\n"; });
+          notDone.forEach(r => { out += "• " + stripEmoji(r.name) + "\n"; });
         }
       }
     } catch (e) {}
