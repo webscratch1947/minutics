@@ -203,8 +203,10 @@
         if (last) {
           last.addEventListener('animationend', finish, { once: true });
         }
-        setTimeout(function () { if (!fired) { fired = true; dismiss(); } }, 3000);
-        setTimeout(dismiss, 3500);
+        /* Full animation: the emblem settles at ~3.65s. Let it play all the
+           way; release only after the final wordmark has finished. */
+        setTimeout(function () { if (!fired) { fired = true; dismiss(); } }, 4200);
+        setTimeout(dismiss, 5000);
       })();
     </script>
     <div id="root"></div>

@@ -971,6 +971,7 @@ export function SettingsScreen() {
                       jsx(PermOpenButton, { onClick: function(){ openPermDirect("overlay"); } })
                     ] })
                   }),
+                   jsx(Divider, {}),
                   deviceIsXiaomi ? jsx(CardRow, {
                     label: permNames.popup,
                     desc: permStatus.popup ? "Granted - alerts show with the app closed" : "Not granted - tap Open to allow",
