@@ -80,6 +80,8 @@ if (target === "piapp") {
   // directory from /app so the Android wrapper can still bundle /app as its
   // local WebView assets.
   copy(join(projectRoot, 'landing', 'index.html'), join(outDir, 'app-landing', 'index.html'));
+  copy(join(projectRoot, 'app', 'assets', 'logo.png'), join(outDir, 'app-landing', 'logo.png'));
+  copy(join(projectRoot, 'landing', 'google-play-badge.png'), join(outDir, 'app-landing', 'google-play-badge.png'));
 
   // Marketing website (served at the output root, i.e. minutics.com)
   copy(join(projectRoot, 'index.html'), join(outDir, 'index.html'));

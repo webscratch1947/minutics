@@ -129,7 +129,7 @@
       "has": [{ "type": "host", "value": "piapp.minutics.com" }]
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/|app-landing/).*)",
       "destination": "/app-landing/index.html",
       "has": [{ "type": "host", "value": "app.minutics.com" }]
     },
