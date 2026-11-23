@@ -317,7 +317,6 @@ export function HC() {
             mostName = a.name
           }
         }
-        b && b.updateWidgetData && b.updateWidgetData(String(trackedCount), String(totalCount), mostName, String(mostSeconds));
         b && b.syncActivitiesList && b.syncActivitiesList(JSON.stringify(act.map(x => ({
           id: x.id,
           name: x.name,
@@ -344,57 +343,4 @@ window.__lifetimeStopActivity = function(blockId) {
   } catch {}
 };
 
-window.__lifetimeStartActivityFromWidget = function(activityId, mode, minutes) {
-  try {
-    const data = getStore();
-    if (!data.activities || data.activities.length === 0) return;
-    const act = data.activities.find(a => String(a.id) === String(activityId)) || data.activities[0];
-    if (!act) return;
-    const now = new Date().toISOString();
-    const running = data.blocks.find(b => !b.endTime);
-    if (running) {
-      running.endTime = now
-    }
-    const newBlock = {
-      id: Date.now() % 1e9 | 0,
-      activityId: act.id,
-      name: act.name,
-      color: act.color || "#E8A838",
-      startTime: now,
-      endTime: null,
-      totalSeconds: 0
-    };
-    if (mode === "duration" && minutes > 0) {
-      newBlock.targetSeconds = Number(minutes) * 60;
-      setTimeout(function() {
-        try {
-          const d2 = getStore(),
-            b2 = d2.blocks.find(b => b.id === newBlock.id);
-          if (b2 && !b2.endTime) {
-            b2.endTime = new Date().toISOString();
-            b2.totalSeconds = Number(minutes) * 60;
-            setStore(d2)
-          }
-        } catch {}
-      }, Number(minutes) * 60 * 1000);
-    }
-    data.blocks.push(newBlock);
-    setStore(data);
-  } catch {}
-};
 
-window.__lifetimeAddActivityFromWidget = function(name, emoji) {
-  try {
-    if (!name || !String(name).trim()) return;
-    const data = getStore();
-    const id = nextId(data.activities);
-    const color = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
-    data.activities.push({
-      id: id,
-      name: String(name).trim(),
-      color: color,
-      emoji: emoji || "🙂"
-    });
-    setStore(data);
-  } catch {}
-};
