@@ -20,8 +20,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      once. This module only ADOPTS the element: dismissal + escape
      hatches. */
   (function showStartupSplash() {
-    var HARD_MS = 7000;  /* absolute escape hatch */
-    var END_MS  = 4400;  /* natural end: the animation settles at ~3.65s →
+    var HARD_MS = 3000;  /* absolute escape hatch */
+    var END_MS  = 2300;  /* natural end: the animation settles at ~3.65s →
                             release at 4.4s so the settled logo is never
                             cut short. */
 

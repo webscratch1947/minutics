@@ -203,10 +203,11 @@
         if (last) {
           last.addEventListener('animationend', finish, { once: true });
         }
-        /* Full animation: the emblem settles at ~3.65s. Let it play all the
-           way; release only after the final wordmark has finished. */
-        setTimeout(function () { if (!fired) { fired = true; dismiss(); } }, 4200);
-        setTimeout(dismiss, 5000);
+        /* The last keyframe (wordmark) ends at ~1.95s, sheen at ~2.05s.
+           Release just after that — the old 4.2s/5s timers left the FINISHED
+           splash frozen on screen for several extra seconds. */
+        setTimeout(function () { if (!fired) { fired = true; setTimeout(dismiss, 200); } }, 2200);
+        setTimeout(dismiss, 3000);
       })();
     </script>
     <div id="root"></div>
