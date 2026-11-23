@@ -20,10 +20,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      once. This module only ADOPTS the element: dismissal + escape
      hatches. */
   (function showStartupSplash() {
-    var HARD_MS = 3000;  /* absolute escape hatch */
-    var END_MS  = 2300;  /* natural end: the animation settles at ~3.65s →
-                            release at 4.4s so the settled logo is never
-                            cut short. */
+    var HARD_MS = 5000;  /* absolute escape hatch */
+    var END_MS  = 3900;  /* full coded animation: wordmark ends ~3.32s, sheen ~3.65s; backstop just after. */
 
     /* ── Review preview (?onboarding=new on localhost) ──────────────────
        The owner reviews the wizard directly: no emblem/boot splash may
