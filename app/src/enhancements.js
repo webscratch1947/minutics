@@ -3044,6 +3044,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     btn.type = "button";
     btn.setAttribute("data-lifetime-tool", tool);
     btn.setAttribute("data-lt-tile-injected", "1");
+    btn.setAttribute("data-lt-enh-tile", "1");
     btn.setAttribute("data-lt-category", category || "");
     btn.className = "flex flex-col items-start text-left";
     btn.style.cssText = LT_CARD_STYLE;
@@ -3144,7 +3145,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     if (activeOverlay) return;
     var grid = findTileGrid();
     if (!grid) {
-      var stray = document.querySelectorAll("[data-lt-tile-injected]");
+      var stray = document.querySelectorAll("[data-lt-enh-tile]");
       for (var i = 0; i < stray.length; i++) stray[i].remove();
       var searchWrap = document.getElementById("lt-hub-search-wrap");
       if (searchWrap) searchWrap.remove();
@@ -9514,6 +9515,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var card = document.createElement("div");
     card.id = "lt-account-card";
     card.setAttribute("data-lt-tile-injected", "1");
+    card.setAttribute("data-lt-enh-tile", "1");
     card.style.cssText = "background:#fff;border:1px solid hsl(220 13% 88%);margin:0 0 16px;font-family:'Inter',sans-serif;";
 
     function rowLabel(text) {
@@ -9945,7 +9947,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      React now owns the Settings UI — don't inject the compiled account card.
      Dispatch a custom event so React Settings re-renders with the new plan. */
   function refreshPlanGatedUI() {
-    document.querySelectorAll("[data-lt-tile-injected]").forEach(function (el) { el.remove(); });
+    /* Only remove tiles WE injected. React owns the real Life Hub tiles and
+       also marks them data-lt-tile-injected — deleting those left the
+       "Premium" heading on screen with no tiles under it. */
+    document.querySelectorAll("[data-lt-enh-tile]").forEach(function (el) { el.remove(); });
     var lp = document.getElementById("lt-life-progress");
     if (lp) lp.remove();
     try { window.dispatchEvent(new Event("lt-plan-changed")); } catch (e) {}
