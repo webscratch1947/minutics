@@ -442,7 +442,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     } catch (e) {}
   }
   setTimeout(runIntegrityCheck, 3000);
-  setInterval(runIntegrityCheck, 2 * 60 * 1000);
+  /* Play Integrity default quota is 10,000 requests/day TOTAL across all
+     installs. Check once per session (plus one retry for users who log in
+     just after launch) - never on a timer. ~2 calls/user/day, not 720. */
+  setTimeout(runIntegrityCheck, 20000);
   function isPro() {
     if (!appIsOfficial()) return false;
     var p = readJson(PLAN_KEY, "free");
