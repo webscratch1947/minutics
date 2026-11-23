@@ -1257,7 +1257,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       ".lt-hub-empty{text-align:center;padding:32px 16px;color:hsl(var(--muted-foreground));font-size:13px;grid-column:1/-1}",
       ".lt-hub-grid-2col{transition:opacity .3s ease}",
       ".lt-hub-grid-2col.lt-hub-ready{opacity:1}",
-      /* LifeHub tiles and search are now built in React — no CSS hacks needed. */
+      /* The enhancement's search/category filter must never hide the React
+         Premium tiles -- that left the heading + divider with no cards. */
+      "[data-lt-premium-section] [data-lt-tile-injected]{display:flex!important}",
+      /* LifeHub tiles and search are now built in React - no CSS hacks needed. */
       "#lt-lifehub-scroll-arrow{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:9999;background:#1a1a2e;color:#fff;border-radius:50%;width:42px;height:42px;display:none;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);pointer-events:none;animation:lt-lh-bounce 1.4s ease-in-out infinite}",
       "@keyframes lt-lh-bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(5px)}}",
       /* Activity's page (full design: title + date, 4 stat cards, section label) */
@@ -2976,7 +2979,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         try {
           var ds = window.getComputedStyle(cur).display;
           if (ds === "grid" || ds === "inline-grid" || ds === "flex" || ds === "inline-flex") {
-            if (cur.children.length >= 1 && !cur.closest("[data-lt-enhancement],[data-lt-tile-injected]")) {
+            if (cur.children.length >= 1
+                && !cur.closest("[data-lt-enhancement],[data-lt-tile-injected],[data-lt-premium-section]")) {
               return cur;
             }
           }
@@ -3244,6 +3248,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var cat = activeChip ? activeChip.getAttribute("data-cat") : "all";
     var visibleCount = 0;
     Array.prototype.slice.call(grid.children).forEach(function (tile) {
+      /* Never let the filter hide React's Premium cards. */
+      if (tile.closest("[data-lt-premium-section]")) return;
       var text = (tile.textContent || "").toLowerCase();
       var tcat = tile.getAttribute("data-lt-category") || "";
       var matchesQ = !q || text.indexOf(q) !== -1;

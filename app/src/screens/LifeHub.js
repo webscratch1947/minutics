@@ -1,6 +1,6 @@
 // Life Hub — Complete screen with 3 views: tool list, time value calculator, and life cost calculator
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { calcRemainingTime } from '../lib/lifeCalc.js';
 import { getCurrency, getCurrencySymbol } from '../lib/currency.js';
@@ -75,6 +75,25 @@ export function LifeHubScreen({ profile }) {
   var _searchState = useState("");
   var search = _searchState[0];
   var setSearch = _searchState[1];
+
+  /* Self-heal: the enhancement layer touches Life Hub tiles in the live DOM.
+     If a screen lock/unlock or plan refresh leaves the Premium heading with
+     no tiles, bumping this key remounts the section from React's own data. */
+  var _tileTick = useState(0);
+  var tileTick = _tileTick[0];
+  var bumpTiles = _tileTick[1];
+  useEffect(function () {
+    function onPlan() { bumpTiles(function (n) { return n + 1; }); }
+    function onVisible() {
+      if (document.visibilityState === "visible") setTimeout(onPlan, 200);
+    }
+    window.addEventListener("lt-plan-changed", onPlan);
+    document.addEventListener("visibilitychange", onVisible);
+    return function () {
+      window.removeEventListener("lt-plan-changed", onPlan);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   // ── Active category filter ("all", "time", "finance", "productivity")
   var _catState = useState("all");
@@ -494,6 +513,8 @@ export function LifeHubScreen({ profile }) {
 
         // ── Premium section (locked tools) ──
         filteredLocked.length > 0 && jsxs("div", {
+          key: "premium-" + tileTick,
+          "data-lt-premium-section": "1",
           className: "mt-5 pb-4",
           children: [
             jsxs("div", {
