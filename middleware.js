@@ -40,8 +40,11 @@ export default function middleware(request) {
     return rewrite(new URL('/piapp' + (url.pathname === '/' ? '/index.html' : url.pathname), url));
   }
 
-  // Normal app: /app/assets/... for static assets, /app/index.html for SPA routes
-  return rewrite(new URL('/app' + (url.pathname === '/' ? '/index.html' : url.pathname), url));
+  // app.minutics.com is now API-only + a small Android landing page. The
+  // web frontend is no longer served from this host (the Android app bundles
+  // it locally). /api/* was already returned above, so those functions are
+  // untouched by this rewrite.
+  return rewrite(new URL('/app-landing/index.html', url));
 }
 
 export const config = {

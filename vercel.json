@@ -130,7 +130,7 @@
     },
     {
       "source": "/((?!api/).*)",
-      "destination": "/app/index.html",
+      "destination": "/app-landing/index.html",
       "has": [{ "type": "host", "value": "app.minutics.com" }]
     },
     {

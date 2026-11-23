@@ -75,6 +75,12 @@ if (target === "piapp") {
     throw new Error(`[postbuild] expected build output at ${outDir} — did the Vite build run first?`);
   }
 
+  // Android landing page (app.minutics.com) — the web frontend is no longer
+  // served there; only /api/* lives on that host. It must be a SEPARATE
+  // directory from /app so the Android wrapper can still bundle /app as its
+  // local WebView assets.
+  copy(join(projectRoot, 'landing', 'index.html'), join(outDir, 'app-landing', 'index.html'));
+
   // Marketing website (served at the output root, i.e. minutics.com)
   copy(join(projectRoot, 'index.html'), join(outDir, 'index.html'));
   copy(join(projectRoot, 'favicon.svg'), join(outDir, 'favicon.svg'));
