@@ -418,6 +418,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   function runIntegrityCheck() {
     try {
       if (!document.body || !document.body.classList.contains("lt-authed")) return;
+      /* Only accounts that actually claim a paid plan need a verdict. Free
+         users generate ZERO Play Integrity calls, so the 10,000/day quota is
+         spent only where it protects revenue. A pirate's edited local plan
+         still triggers the check. */
+      try { if (readJson(PLAN_KEY, "free") === "free") return; } catch (e) {}
       var b = window.AndroidBridge;
       if (!b || typeof b.requestIntegrityToken !== "function") return;
       if (!window.LTAuth || !window.LTAuth.getToken) return;
