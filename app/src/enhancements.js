@@ -242,8 +242,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       gramLoadIds(function () {
         /* Warm the first few images into the browser cache so the reel opens
            with pictures already there instead of blank placeholders. */
-        GRAM_IDS.slice(0, 4).forEach(function (id) {
-          try { var im = new Image(); im.src = GRAM_BASE + id + ".jpg"; } catch (e) {}
+        /* Use the EXACT same URL the reel renders (?v=<10-min bucket>) so the
+           browser reuses the cached bytes instead of fetching again. */
+        GRAM_IDS.slice(0, 6).forEach(function (id) {
+          try { var im = new Image(); im.src = gramImageUrl(id); } catch (e) {}
         });
       });
     } catch (e) {}
@@ -4368,7 +4370,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
       return (
         '<div class="lt-gram-slide">' +
-          '<img class="lt-gram-img" src="' + GRAM_BASE + id + '.jpg?v=' + Math.floor(Date.now() / GRAM_CACHE_TTL) + '" loading="lazy" decoding="async" alt="Infographic ' + id + '">' +
+          '<img class="lt-gram-img" src="' + gramImageUrl(id) + '" decoding="async" alt="Infographic ' + id + '">' +
           '<div class="lt-gram-actions">' +
             /* Like button */
             '<div class="lt-gram-action">' +
@@ -10595,9 +10597,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       return true;
     }
     if (activeOverlay) {
-      /* Native Back already consumed the pushed history entry via popstate,
-         so don't call history.back() again here. */
-      closeOverlay(true);
+      /* Native Back calls US (LTHandleBack) and returns without touching WebView
+         history — so WE must pop the entry openOverlay() pushed. Otherwise one
+         dead entry remains per tool and Back needs an extra press to leave
+         Life Hub. (The popstate path passes true because there the entry was
+         already consumed — this path does not.) */
+      closeOverlay();
       return true;
     }
     /* Full View report/share overlays (they push their own history). */

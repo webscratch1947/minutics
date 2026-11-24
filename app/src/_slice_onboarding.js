@@ -871,11 +871,10 @@ export function mk({
                 type: "number", min: 0, max: 36500, step: 1,
                 value: goalDays,
                 onChange: g => {
+                  /* Days are independent of the slider — NEVER touch `l`
+                     here, or entering days collapses the slider to year 0. */
                   var raw = g.target.value;
-                  if (raw === "") { setGoalDays(""); a(_ageYears); return; }
-                  var days = Math.max(0, Math.min(36500, Number(raw) || 0));
-                  setGoalDays(days);
-                  a(Math.round((_ageYears + days / 365.25) * 100) / 100);
+                  setGoalDays(raw === "" ? "" : Math.max(0, Math.min(36500, Number(raw) || 0)));
                 },
                 className: "w-24 bg-[#F5F6F8] border border-black/10 rounded-lg px-2 py-1.5 text-sm font-bold text-gray-800 outline-none focus:border-[#157347]"
               }),
