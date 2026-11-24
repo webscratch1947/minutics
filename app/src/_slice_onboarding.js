@@ -305,13 +305,12 @@ export function mk({
       lived: Math.max(0, k)
     }
   })(), d = (() => {
-    if (u) { var gd = Number(goalDays) || 0; return `${yrs(Math.floor(gd / 365))} + ${gd % 365 | 0} days left`; }
-    if (s) {
-      const Hb = new Date(s);
-      const Ib = Math.floor((Date.now() - Hb.getTime()) / (365.25 * 24 * 3600 * 1e3));
-      return `${yrs(Math.max(0,l-Ib))} left`
-    }
-    return yrs(l)
+    /* Years come from the SLIDER (l), days from the user's own field.
+       They are independent — moving the slider no longer wipes the days. */
+    var age = s ? Math.floor((Date.now() - new Date(s).getTime()) / (365.25 * 24 * 3600 * 1e3)) : 0;
+    var yrsLeft = Math.max(0, Math.round(l - age));
+    var gd = Number(goalDays) || 0;
+    return `${yrs(yrsLeft)} + ${gd} days left`;
   })(), idx = STEPS.indexOf(t), sym = (() => {
     try { return getCurrencySymbol(getCurrency().code); } catch { return "Rs."; }
   })();
@@ -852,8 +851,8 @@ export function mk({
               /* Always show years AND days so a sub-year goal reads as a real
                  number instead of a bare "0 yrs". */
               jsx("span", { children: [
-                yrsShort(Math.floor((Number(goalDays)||0) / 365)), " ",
-                jsx("strong", { style: { color: GREEN }, children: ((Number(goalDays)||0) % 365).toLocaleString() }), " days"
+                yrsShort(Math.max(0, Math.round(l - _ageYears))), " ",
+                jsx("strong", { style: { color: GREEN }, children: (Number(goalDays)||0).toLocaleString() }), " days"
               ] })
             ]
           }),
