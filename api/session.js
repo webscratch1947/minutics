@@ -655,6 +655,29 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
+
+  /* Diagnostic (booleans + error strings ONLY, no secrets): tells the owner
+     whether the Play service-account env vars are present and whether Google
+     accepts the JWT. Open /api/session?mode=diag in a browser. */
+  if (req.method === "GET" && req.query && req.query.mode === "diag") {
+    const out = {
+      ok: true,
+      playConfigured: PLAY_CONFIGURED,
+      clientEmail: GOOGLE_CLIENT_EMAIL ? "set" : "missing",
+      privateKey: GOOGLE_PRIVATE_KEY ? (GOOGLE_PRIVATE_KEY.indexOf("BEGIN PRIVATE KEY") !== -1 ? "looks-valid" : "set-but-unexpected") : "missing",
+      package: PLAY_PACKAGE,
+      token: "not-tested",
+    };
+    try {
+      await googleAccessToken("https://www.googleapis.com/auth/androidpublisher");
+      out.token = "ok";
+    } catch (e) {
+      out.token = "fail: " + ((e && e.message) || String(e)).slice(0, 160);
+    }
+    res.status(200).json(out);
+    return;
+  }
+
   if (req.method !== "POST" && req.method !== "DELETE") { res.status(405).json({ ok: false, error: "Method not allowed" }); return; }
 
   /* Body first — the password reset runs WITHOUT a token (the whole
@@ -890,8 +913,9 @@ export default async function handler(req, res) {
       try {
         verified = await verifyPlayPurchase(body.productId, body.purchaseToken);
       } catch (e) {
-        console.error("play verification failed:", e && e.message);
-        res.status(403).json({ ok: false, error: "Google could not verify this purchase. If you were charged, contact support with your Play order number." });
+        const reason = ((e && e.message) || "unknown").slice(0, 80);
+        console.error("play verification failed:", reason);
+        res.status(403).json({ ok: false, error: "Google could not verify this purchase (" + reason + "). If you were charged, contact support with your Play order number." });
         return;
       }
       try {
