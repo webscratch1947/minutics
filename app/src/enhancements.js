@@ -8406,7 +8406,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var total = wasteBaseMinutesToday();
     var since = wasteRunningStart();
     if (since > 0) total += Math.max(0, (Date.now() - since) / 60000);
-    return Math.round(total);
+    /* FLOOR, not round: 47 seconds is still 0 full minutes, not 1. Rounding
+       made the Time Waste budget claim a minute at 47s and trip the alert
+       early. Only COMPLETE minutes count toward the budget. */
+    return Math.floor(total);
   }
 
   /* React screens (Home's startTimer gate) need the same number. */

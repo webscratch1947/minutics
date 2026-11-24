@@ -2525,7 +2525,7 @@ function EatTheFrog() {
               'Eat the Frog'
             ]}),
             jsx('p', { className: 'text-[19px] font-black text-foreground mt-1 leading-tight', children: activeCount > 0 ? 'Beat your ' + activeCount + ' top task' + (activeCount !== 1 ? 's' : '') : 'Add your top tasks' }),
-            jsx('p', { className: 'text-[11.5px] text-foreground/55 mt-0.5', children: 'Finish what matters before anything else' })
+            jsx('p', { className: 'text-[11.5px] text-foreground/55 mt-0.5', children: 'The rule: do your hardest, most important task first — then the rest is easier.' })
           ]}),
           jsxs('div', { className: 'flex items-center gap-2 shrink-0', children: [
             jsx('img', { src: './assets/eat-the-frog.png', alt: '', className: 'w-[74px] h-[74px] object-contain -mt-1 -mr-1 shrink-0' }),
@@ -2950,7 +2950,7 @@ export function ActivityScreen({ profile }) {
           jsx(StatCard, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
           jsx(StatCard, { icon: '📋', iconBg: '#FEF3C7', label: 'Day Streak', value: streakDays }),
           jsx(StatCard, { icon: '📊', iconBg: '#EEF2FF', label: 'Productivity Score', value: prodScore, suffix: '/100' }),
-          jsx(StatCard, { icon: '🔥', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
+          jsx(StatCard, { icon: '📒', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
         ]
       }),
 
