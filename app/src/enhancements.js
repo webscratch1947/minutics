@@ -1320,8 +1320,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       ".lt-tool-close,.lt-tool-primary,.lt-tool-secondary,.lt-tool-danger{border:1px solid rgba(17,17,20,.14);padding:10px 16px;font-weight:700;font-size:13px;cursor:pointer;border-radius:999px;background:#fff;color:#111114;white-space:nowrap;transition:transform .1s,box-shadow .15s;-webkit-tap-highlight-color:transparent}",
       ".lt-tool-close{flex-shrink:0;align-self:flex-start;border:1px solid rgba(17,17,20,.16);background:#fff;color:#111114;padding:9px 16px;border-radius:999px;font-weight:700;font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,.07);letter-spacing:.01em}",
       /* Clean circular back arrow — the old "← Back" pill read as a link. */
-      ".lt-tool-close,.lt-rlib-back{width:42px!important;height:42px!important;min-height:0!important;padding:0!important;border-radius:50%!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:0!important}",
-      ".lt-tool-close::before,.lt-rlib-back::before{content:'\\2190';font-size:21px;font-weight:600;line-height:1}",
+      ".lt-tool-close,.lt-rlib-back{width:46px!important;height:46px!important;min-height:0!important;padding:0!important;border-radius:50%!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:0!important;box-shadow:0 2px 6px rgba(0,0,0,.08)!important}",
+      /* Arrow drawn as a stroked SVG so it is bold and optically CENTRED in
+         the circle (a text arrow sits low and looks thin). */
+      ".lt-tool-close::before,.lt-rlib-back::before{content:''!important;display:block!important;width:22px!important;height:22px!important;background:center/contain no-repeat url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111114' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12H5M11 18l-6-6 6-6'/%3E%3C/svg%3E\")!important}",
       ".lt-tool-close:active,.lt-rlib-back:active{transform:scale(.93)}",
       ".lt-tool-primary{background:#111114;color:#fff;border-color:#111114;box-shadow:0 2px 6px rgba(17,17,20,.22)}",
       ".lt-tool-secondary{background:#fff;box-shadow:0 1px 2px rgba(17,17,20,.07)}",
@@ -1501,7 +1503,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       ".lt-tasks-fab:active{opacity:.85;transform:scale(.96)}",
       /* Add-task bottom sheet — styled like the Activity edit bottom sheet:
          soft grabber, icon+title header, rounded inputs, Cancel/Save pills. */
-      ".lt-tasks-sheet{position:fixed;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:26px 26px 0 0;padding:12px 20px calc(22px + env(safe-area-inset-bottom, 0px));box-shadow:0 -8px 34px rgba(0,0,0,.16);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:2147483100;box-sizing:border-box;max-width:480px;margin:0 auto}",
+      ".lt-tasks-sheet{position:fixed;bottom:0;left:0;right:0;background:hsl(var(--card));border-radius:26px 26px 0 0;padding:12px 20px calc(22px + env(safe-area-inset-bottom, 0px));box-shadow:0 -8px 34px rgba(0,0,0,.16);transform:translateY(110%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:2147483100;box-sizing:border-box;max-width:480px;margin:0 auto;border:1.5px solid rgba(17,17,20,.55);border-bottom:none}",
       ".lt-tasks-sheet-handle{width:42px;height:5px;background:rgba(17,17,20,.16);border-radius:3px;margin:0 auto 14px;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}",
       ".lt-sheet-head{display:flex;align-items:center;gap:12px;padding:2px 2px 16px}",
       ".lt-sheet-head-icon{width:46px;height:46px;border-radius:50%;background:hsl(var(--secondary));border:1px solid hsl(var(--border));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}",
@@ -5866,7 +5868,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           var s = document.getElementById("lt-tasks-sheet");
           if (s) s.style.transform = "translateY(0px)";
           var n = document.getElementById("lt-task-name");
-          if (n) n.focus();
+          if (n) {
+            n.focus();
+            /* Put the caret at the END of the existing text so editing can
+               continue (and backspace removes the last char) — not at index 0. */
+            try { var e2 = n.value.length; n.setSelectionRange(e2, e2); } catch (err) {}
+          }
         }, 30);
         return;
       }
@@ -8391,13 +8398,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     } catch (e) { return false; }
   }
   var _doomMode = "day";
+  /* Only these apps are counted/shown in the Doom scroll stopper.
+     LinkedIn, Snapchat and X/Twitter are intentionally excluded. */
   var DOOM_APPS = [
     { key: "instagram", name: "Instagram",   color: "#E1306C", bg: "#FCE7F3" },
-    { key: "snapchat",  name: "Snapchat",    color: "#D9A400", bg: "#FEF9C3" },
     { key: "youtube",   name: "YouTube",     color: "#FF0000", bg: "#FEE2E2" },
-    { key: "facebook",  name: "Facebook",    color: "#1877F2", bg: "#DBEAFE" },
-    { key: "linkedin",  name: "LinkedIn",    color: "#0A66C2", bg: "#DBEAFE" },
-    { key: "twitter",   name: "X (Twitter)", color: "#111827", bg: "#F3F4F6" }
+    { key: "facebook",  name: "Facebook",    color: "#1877F2", bg: "#DBEAFE" }
   ];
 
   function doomLogo(key, color) {

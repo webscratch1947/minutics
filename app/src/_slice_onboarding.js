@@ -823,7 +823,9 @@ export function mk({
             max: 100,
             step: 1,
             value: Math.min(100, Math.max(l, _ageYears)),
-            onChange: g => { var v = Number(g.target.value); a(v); setGoalDays(Math.max(0, Math.round((v - _ageYears) * 365.25))); },
+            /* Moving the slider changes only the years. Days are a separate,
+               user-entered value — don't auto-fill them. */
+            onChange: g => { a(Number(g.target.value)); },
             className: "w-full accent-[#157347]"
           }),
           jsxs("div", {
@@ -935,13 +937,12 @@ export function mk({
         jsx("button", {
           type: "button",
           onClick: () => finish(false),
-          /* Owner: small compact Skip — red bg, white text, different font
-             family, pill ends. */
+          /* Owner: small compact Skip — red bg, white text. */
           className: "self-center px-6 py-2 text-[12px] font-bold rounded-full transition-all active:scale-[.96]",
           style: {
-            background: "#FFFFFF",
-            color: "#157347",
-            border: "1px solid #BBF7D0",
+            background: "#DC2626",
+            color: "#FFFFFF",
+            border: "1px solid #DC2626",
             fontFamily: "Inter, system-ui, -apple-system, sans-serif",
             letterSpacing: "0",
             width: "auto"
