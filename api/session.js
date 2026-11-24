@@ -137,12 +137,19 @@ async function verifyPlayPurchase(productId, purchaseToken) {
     if (Number(d.purchaseState) !== 0) throw new Error("purchase-not-active");
     return { plan: product.plan, expiryTime: 0, orderId: d.orderId || "" };
   }
-  /* 1 = ACTIVE, 3 = IN_GRACE_PERIOD. Everything else is expired/refunded. */
-  const state = Number(d.subscriptionState);
-  if (state !== 1 && state !== 3) throw new Error("subscription-not-active");
-  const expiry = Number(d.expiryTime || 0);
+  /* Google returns a STRING enum, not a number — Number("SUBSCRIPTION_STATE_ACTIVE")
+     is NaN, which rejected every real subscription. Accept both forms. */
+  const st = d.subscriptionState;
+  const stateOk = st === "SUBSCRIPTION_STATE_ACTIVE"
+    || st === "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"
+    || st === 1 || st === 3;
+  if (!stateOk) throw new Error("subscription-not-active: " + String(st));
+  /* Product ID and expiry live inside lineItems[0], not at the top level. */
+  const line = (d.lineItems && d.lineItems[0]) || {};
+  if (line.productId && line.productId !== productId) throw new Error("product-mismatch");
+  const expiry = line.expiryTime ? Date.parse(line.expiryTime) : 0;
   if (expiry && expiry <= Date.now()) throw new Error("subscription-expired");
-  return { plan: product.plan, expiryTime: expiry, orderId: d.orderId || d.latestOrderId || "" };
+  return { plan: product.plan, expiryTime: expiry, orderId: d.latestOrderId || d.orderId || "" };
 }
 
 /* ── Play Integrity: app/device tamper verdict ───────────────────────────
@@ -655,6 +662,20 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
+
+  /* Verify a specific purchase token without spending again. The token can
+     be copied from Play Console -> Order -> "Copy purchase token". */
+  if (req.method === "GET" && req.query && req.query.mode === "verify") {
+    const pid = String(req.query.productId || "");
+    const tok = String(req.query.token || "");
+    try {
+      const v = await verifyPlayPurchase(pid, tok);
+      res.status(200).json({ ok: true, verified: v });
+    } catch (e) {
+      res.status(200).json({ ok: false, reason: String((e && e.message) || e) });
+    }
+    return;
+  }
 
   /* Diagnostic (booleans + error strings ONLY, no secrets): tells the owner
      whether the Play service-account env vars are present and whether Google
