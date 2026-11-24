@@ -8902,9 +8902,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             _wasteNotifiedLimit = cfg.minutes;
             writeJson(WASTE_NOTIFIED_DAY_KEY, day);
             writeJson(WASTE_NOTIFIED_LIMIT_KEY, cfg.minutes);
-            /* Prefer the native path: it shows the full-screen overlay AND the
-               notification in one shot, exactly like the background guard.
-               Falls back to a plain notification on web/desktop. */
             /* When the user is INSIDE Minutics, do NOT open a popup/Activity —
                that stole focus and closed the app. Only post the notification;
                the full-screen alert is reserved for when the app is in the
