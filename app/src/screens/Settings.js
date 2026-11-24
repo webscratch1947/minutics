@@ -277,6 +277,14 @@ export function SettingsScreen() {
   var _userEmailState = useState(_userEmailInit);
   var userEmail = _userEmailState[0];
   var setUserEmail = _userEmailState[1];
+
+  /* Profile picture: chosen locally, saved in localStorage so it survives
+     restarts and stays on this device only. */
+  var _photoState = useState(function () {
+    try { return localStorage.getItem("lt_profile_photo_v1") || ""; } catch (e) { return ""; }
+  });
+  var profilePhoto = _photoState[0];
+  var setProfilePhoto = _photoState[1];
   useEffect(function () {
     function refreshEmail() {
       try {
@@ -731,12 +739,48 @@ export function SettingsScreen() {
               jsxs("div", {
                 className: "flex items-center gap-4",
                 children: [
-                  jsx("div", {
-                    className: "w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0",
-                    children: jsx("span", {
-                      className: "text-lg font-black text-primary",
-                      children: getInitials(profileName)
-                    })
+                  jsxs("div", {
+                    className: "relative w-14 h-14 shrink-0",
+                    children: [
+                      jsx("div", {
+                        className: "w-full h-full rounded-full bg-primary/10 flex items-center justify-center overflow-hidden",
+                        children: profilePhoto
+                          ? jsx("img", { src: profilePhoto, alt: "", className: "w-full h-full object-cover" })
+                          : jsx("span", {
+                              className: "text-lg font-black text-primary",
+                              children: getInitials(profileName)
+                            })
+                      }),
+                      jsx("button", {
+                        type: "button",
+                        onClick: function () {
+                          var inp = document.getElementById("lt-profile-photo-input");
+                          if (inp) inp.click();
+                        },
+                        title: "Change profile picture",
+                        className: "absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary text-primary-foreground text-[11px] flex items-center justify-center border-2 border-background",
+                        children: "📷"
+                      }),
+                      jsx("input", {
+                        id: "lt-profile-photo-input",
+                        type: "file",
+                        accept: "image/*",
+                        style: { display: "none" },
+                        onChange: function (e) {
+                          var f = e.target.files && e.target.files[0];
+                          if (!f) return;
+                          var rd = new FileReader();
+                          rd.onload = function () {
+                            try {
+                              localStorage.setItem("lt_profile_photo_v1", String(rd.result));
+                              setProfilePhoto(String(rd.result));
+                            } catch (err) {}
+                          };
+                          rd.readAsDataURL(f);
+                          e.target.value = "";
+                        }
+                      })
+                    ]
                   }),
                   jsxs("div", {
                     className: "flex-1 min-w-0",

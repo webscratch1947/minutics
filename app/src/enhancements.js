@@ -1319,6 +1319,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       ".lt-tool-description{font-size:13.5px;line-height:1.55;color:hsl(var(--muted-foreground));margin:7px 0 0;max-width:460px}",
       ".lt-tool-close,.lt-tool-primary,.lt-tool-secondary,.lt-tool-danger{border:1px solid rgba(17,17,20,.14);padding:10px 16px;font-weight:700;font-size:13px;cursor:pointer;border-radius:999px;background:#fff;color:#111114;white-space:nowrap;transition:transform .1s,box-shadow .15s;-webkit-tap-highlight-color:transparent}",
       ".lt-tool-close{flex-shrink:0;align-self:flex-start;border:1px solid rgba(17,17,20,.16);background:#fff;color:#111114;padding:9px 16px;border-radius:999px;font-weight:700;font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,.07);letter-spacing:.01em}",
+      /* Clean circular back arrow — the old "← Back" pill read as a link. */
+      ".lt-tool-close,.lt-rlib-back{width:42px!important;height:42px!important;min-height:0!important;padding:0!important;border-radius:50%!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:0!important}",
+      ".lt-tool-close::before,.lt-rlib-back::before{content:'\\2190';font-size:21px;font-weight:600;line-height:1}",
+      ".lt-tool-close:active,.lt-rlib-back:active{transform:scale(.93)}",
       ".lt-tool-primary{background:#111114;color:#fff;border-color:#111114;box-shadow:0 2px 6px rgba(17,17,20,.22)}",
       ".lt-tool-secondary{background:#fff;box-shadow:0 1px 2px rgba(17,17,20,.07)}",
       ".lt-tool-danger{color:#DC2626;border-color:rgba(220,38,38,.35);background:#FEF2F2;box-shadow:0 1px 2px rgba(220,38,38,.1)}",
@@ -4499,6 +4503,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   }
 
   var MAX_STARRED_TASKS = 3;
+  var taskEditingId = null;   /* set when the Add Task sheet edits an existing task */
 
   function getStarredTasks() {
     return getAllTasks().filter(function (t) { return !!t.starred; });
@@ -4656,6 +4661,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         (hasLongText ? '<button class="lt-task-expand" data-task-expand="' + t.id + '" title="View full details"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></button>' : '') +
         '<button class="lt-task-star' + (t.starred ? ' lt-task-starred' : '') + '" data-task-star="' + t.id + '" title="' + (t.starred ? "Remove from Eat the Frog" : "Add to Eat the Frog") + '">' +
           '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + starFill + '" stroke="' + starStroke + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
+        '</button>' +
+        '<button class="lt-task-del" data-task-edit="' + t.id + '" aria-label="Edit task" title="Edit task">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
         '</button>' +
         '<button class="lt-task-del" data-task-del="' + t.id + '" aria-label="Delete task" title="Delete task">' +
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6M19 6l-1 13.5A1.5 1.5 0 0 1 16.5 21h-9A1.5 1.5 0 0 1 6 19.5L5 6M10 11v5.5M14 11v5.5"/></svg>' +
@@ -5692,6 +5700,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     activeOverlay.style.background = "";
 
     var all = getAllTasks();
+    var editingTask = taskEditingId ? all.find(function (t) { return t.id === taskEditingId; }) : null;
+    var etName = editingTask ? escapeHtml(editingTask.title || "") : "";
+    var etDate = editingTask && editingTask.date ? editingTask.date : "";
+    var etTime = editingTask && editingTask.time ? editingTask.time : "";
+    var etNotes = editingTask ? escapeHtml(editingTask.notes || "") : "";
     var buckets = { overdue:[], today:[], tomorrow:[], upcoming:[], nodate:[], done:[] };
     all.forEach(function (t) { buckets[sectionFor(t)].push(t); });
     /* sort upcoming by date */
@@ -5751,27 +5764,27 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<div class="lt-tasks-sheet-handle"></div>' +
         '<div class="lt-sheet-head">' +
           '<div class="lt-sheet-head-icon">\u270F\uFE0F</div>' +
-          '<div><p class="lt-sheet-head-title">New Task</p>' +
-          '<p class="lt-sheet-head-sub">Name it and set an optional deadline</p></div>' +
+          '<div><p class="lt-sheet-head-title">' + (editingTask ? 'Edit Task' : 'New Task') + '</p>' +
+          '<p class="lt-sheet-head-sub">' + (editingTask ? 'Change the details below' : 'Name it and set an optional deadline') + '</p></div>' +
         '</div>' +
-        '<input id="lt-task-name" class="lt-tasks-sheet-main" type="text" placeholder="Task name\u2026">' +
+        '<input id="lt-task-name" class="lt-tasks-sheet-main" type="text" placeholder="Task name\u2026" value="' + etName + '">' +
         '<div class="lt-sheet-group" id="lt-task-deadline-group">' +
           '<div class="lt-sheet-group-title"><span>Deadline</span><button type="button" class="lt-sheet-group-clear" id="lt-task-deadline-clear">Clear</button></div>' +
           '<div class="lt-tasks-sheet-row">' +
             '<span class="lt-tasks-sheet-row-label">Day</span>' +
-            '<input id="lt-task-date" class="lt-tasks-sheet-date" type="date" value="">' +
+            '<input id="lt-task-date" class="lt-tasks-sheet-date" type="date" value="' + etDate + '">' +
           '</div>' +
           '<div class="lt-tasks-sheet-row">' +
             '<span class="lt-tasks-sheet-row-label">Time</span>' +
-            clockButtonHtml("lt-task-time", "") +
+            clockButtonHtml("lt-task-time", etTime) +
           '</div>' +
         '</div>' +
         '<div class="lt-tasks-sheet-row" style="border-top:none;padding-top:0">' +
-          '<input id="lt-task-notes" class="lt-tasks-sheet-notes" type="text" placeholder="Optional notes\u2026">' +
+          '<input id="lt-task-notes" class="lt-tasks-sheet-notes" type="text" placeholder="Optional notes\u2026" value="' + etNotes + '">' +
         '</div>' +
         '<div class="lt-sheet-actions">' +
           '<button type="button" class="lt-sheet-cancel" id="lt-tasks-sheet-cancel">Cancel</button>' +
-          '<button class="lt-tasks-sheet-submit" id="lt-task-submit">Add Task</button>' +
+          '<button class="lt-tasks-sheet-submit" id="lt-task-submit">' + (editingTask ? 'Save Changes' : 'Add Task') + '</button>' +
         '</div>' +
       '</div>'
     );
@@ -5844,6 +5857,19 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         }
         return;
       }
+      /* Edit — prefill the same Add Task sheet with this task's values. */
+      var editBtn = e.target.closest("[data-task-edit]");
+      if (editBtn) {
+        taskEditingId = editBtn.getAttribute("data-task-edit");
+        renderTasks(); /* rebuilds the sheet with the task's values */
+        setTimeout(function () {
+          var s = document.getElementById("lt-tasks-sheet");
+          if (s) s.style.transform = "translateY(0px)";
+          var n = document.getElementById("lt-task-name");
+          if (n) n.focus();
+        }, 30);
+        return;
+      }
       /* Delete — proper confirm popup (the grey native confirm()/silent
          instant delete were both bad; one shared dialog, single-instance) */
       var delBtn = e.target.closest("[data-task-del]");
@@ -5871,6 +5897,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       }
       /* Cancel — slide the sheet away without adding anything */
       if (e.target.id === "lt-tasks-sheet-cancel") {
+        taskEditingId = null;
         var csheet = document.getElementById("lt-tasks-sheet");
         if (csheet) csheet.style.transform = "translateY(110%)";
         return;
@@ -5884,15 +5911,18 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         var dateEl  = document.getElementById("lt-task-date");
         var taskTimeVal = clockFieldValue("lt-task-time");
         var notesEl = document.getElementById("lt-task-notes");
+        var base = taskEditingId ? (getAllTasks().find(function (t) { return t.id === taskEditingId; }) || {}) : {};
         upsertTask({
-          id: genId(), title: title,
+          id: taskEditingId || genId(), title: title,
           date:  (dateEl && dateEl.value) ? dateEl.value : null,
           time:  taskTimeVal || null,
           notes: (notesEl && notesEl.value.trim()) || "",
-          completed: false,
-          createdAt: new Date().toISOString()
+          completed: !!base.completed,
+          starred: !!base.starred,
+          createdAt: base.createdAt || new Date().toISOString()
         });
-        renderTasks(); /* re-renders with new task and closes sheet */
+        taskEditingId = null;
+        renderTasks(); /* re-renders with saved task and closes sheet */
         return;
       }
       /* Collapse/expand completed */

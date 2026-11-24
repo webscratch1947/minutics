@@ -203,7 +203,7 @@ function SheetPicker({ title, display, value, options, onPick }) {
             role: "listbox",
             "aria-label": title,
             onClick: g => g.stopPropagation(),
-            className: "relative w-[calc(100vw-20px)] max-w-[560px] max-h-[74vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-3 pb-5",
+            className: "relative w-[calc(100vw-20px)] max-w-[560px] max-h-[74vh] overflow-y-auto overscroll-contain bg-white rounded-3xl p-3 pb-[calc(20px+env(safe-area-inset-bottom,0px))]",
             style: { animation: "ltPkIn .24s cubic-bezier(.2,.9,.3,1) both", boxShadow: "0 24px 60px rgba(2,32,72,.35)" },
             children: [
               jsx("div", { className: "px-1.5 pb-2.5 pt-1 text-[11px] font-black uppercase tracking-[.18em] text-gray-400", children: title }),
@@ -853,6 +853,25 @@ export function mk({
           u.left > 0 && jsxs("p", {
             className: "text-sm text-gray-500 mt-2 font-medium",
             children: ["You have ~", jsx("strong", { style: { color: GREEN }, children: Math.floor(u.left * 365.25).toLocaleString() }), " days left."]
+          }),
+          /* Sub-year goals: adjust the remaining DAYS directly. The slider
+             above stays in years, so without this a goal under 1 year always
+             snapped to 364/365 days. */
+          s && jsxs("div", {
+            className: "mt-3 flex items-center gap-2",
+            children: [
+              jsx("span", { className: "text-xs font-bold text-gray-500", children: "Adjust days left" }),
+              jsx("input", {
+                type: "number", min: 0, max: 36500, step: 1,
+                value: Math.max(0, Math.round(u.left * 365.25)),
+                onChange: g => {
+                  const days = Math.max(0, Number(g.target.value) || 0);
+                  a(Math.round((_ageYears + days / 365.25) * 100) / 100);
+                },
+                className: "w-24 bg-[#F5F6F8] border border-black/10 rounded-lg px-2 py-1.5 text-sm font-bold text-gray-800 outline-none focus:border-[#157347]"
+              }),
+              jsx("span", { className: "text-xs text-gray-400", children: "days" })
+            ]
           })
         ]})
       ]
