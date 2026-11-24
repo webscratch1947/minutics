@@ -663,6 +663,30 @@ export default async function handler(req, res) {
 
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
 
+  /* One-time repair: a REAL verified Play token can restore the entitlement
+     on the account that paid, without spending again. The token comes from
+     Play Console -> Order -> "Copy purchase token". */
+  if (req.method === "GET" && req.query && req.query.mode === "repair") {
+    const pid = String(req.query.productId || "");
+    const tok = String(req.query.token || "");
+    const email = String(req.query.email || "").trim().toLowerCase();
+    if (!pid || !tok || !email || !email.includes("@")) {
+      res.status(400).json({ ok: false, error: "productId, token and email required" });
+      return;
+    }
+    try {
+      const verified = await verifyPlayPurchase(pid, tok);
+      const got = await cog.send(new AdminGetUserCommand({ UserPoolId: POOL_ID, Username: email }));
+      const sub = (got.Attributes || []).find((a) => a.Name === "sub");
+      if (!sub) throw new Error("account-not-found");
+      const result = await grantVerifiedPlan(sub.Value, email, verified, pid, tok, Date.now());
+      res.status(200).json({ ok: true, repaired: true, plan: result.plan, email });
+    } catch (e) {
+      res.status(200).json({ ok: false, reason: String((e && e.message) || e) });
+    }
+    return;
+  }
+
   /* Verify a specific purchase token without spending again. The token can
      be copied from Play Console -> Order -> "Copy purchase token". */
   if (req.method === "GET" && req.query && req.query.mode === "verify") {
