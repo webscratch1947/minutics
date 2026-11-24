@@ -2549,6 +2549,12 @@ function EatTheFrog() {
           })
         ]
       }),
+      /* Make the PRO queue visible: extra starred tasks wait here and slide
+         into a slot when one opens (a task completes or is unstarred). */
+      incompleteStarred.length > MAX_FROG_TASKS && jsx('p', {
+        className: 'px-4 mt-2 text-[10.5px] font-bold text-[#B45309]',
+        children: '⭐ ' + (incompleteStarred.length - MAX_FROG_TASKS) + ' queued — next up when a slot opens'
+      }),
       jsx('div', {
         className: 'flex flex-col gap-2 px-4 pt-3 pb-4',
         children: slots.map((task, i) =>

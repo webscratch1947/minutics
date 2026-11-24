@@ -491,7 +491,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     dialog.id = "lt-cancel-subscription-dialog";
     dialog.style.cssText = "position:fixed;inset:0;z-index:2147483649;background:rgba(20,24,45,.6);display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Inter',sans-serif;";
     dialog.innerHTML = '<div style="width:100%;max-width:360px;background:#fff;border-radius:18px;padding:24px;box-shadow:0 25px 60px -12px rgba(0,0,0,.3)"><p style="margin:0 0 8px;color:hsl(230 40% 16%);font-size:18px;font-weight:800">Cancel subscription?</p><p style="margin:0 0 20px;color:hsl(220 10% 45%);font-size:14px;line-height:1.5">Premium features on this device will end immediately and the app will return to the Free plan.</p><div style="display:flex;gap:10px"><button id="lt-cancel-subscription-back" style="flex:1;background:#fff;border:1px solid hsl(220 13% 85%);border-radius:10px;padding:12px;font:inherit;font-weight:700;color:hsl(230 40% 16%)">Keep plan</button><button id="lt-cancel-subscription-confirm" style="flex:1;background:#c0392b;border:0;border-radius:10px;padding:12px;font:inherit;font-weight:700;color:#fff">Cancel plan</button></div></div>';
-    (activeOverlay || document.body).appendChild(dialog);
+    document.documentElement.appendChild(dialog);
     document.getElementById("lt-cancel-subscription-back").addEventListener("click", function () { dialog.remove(); });
     document.getElementById("lt-cancel-subscription-confirm").addEventListener("click", function () { dialog.remove(); onConfirm(); });
   }
@@ -2710,10 +2710,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<button type="button" id="lt-confirm-yes" style="width:100%;background:' + (danger ? '#DC2626' : '#1F2937') + ';color:#fff;border:none;border-radius:999px;padding:13.5px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit">' + escapeHtml(opts.confirmLabel || "Delete") + '</button>' +
         '<button type="button" id="lt-confirm-no" style="width:100%;background:transparent;color:#8A8578;border:none;padding:13px 0 2px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit">' + escapeHtml(opts.cancelLabel || "Cancel") + '</button>' +
       '</div>';
-    var host = (typeof activeOverlay !== "undefined" && activeOverlay && document.body.contains(activeOverlay))
-      ? activeOverlay
-      : document.body;
-    host.appendChild(root);
+    /* Always attach to <html>, never inside the full-screen tool overlay.
+       #lt-overlay-root creates its own stacking context at the max z-index,
+       so a dialog appended inside it rendered BEHIND tool content — you had
+       to close the tool before the confirm became visible. */
+    document.documentElement.appendChild(root);
     var openedAt = Date.now();
     var keyHandler = function (e) {
       if (e.key === "Escape") { e.stopPropagation(); close(false); }
@@ -2731,8 +2732,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       e.stopPropagation(); /* tool-overlay sheets/documents must not react to dialog taps */
       /* 300ms post-open guard: a ghost/queued click landing right after open
          can't cancel it or double-fire the confirm. */
-      if (Date.now() - openedAt < 300) return;
       var t = e.target;
+      /* The 300ms ghost-click guard must NOT swallow a real fast tap on the
+         Delete button — that was the "delete does nothing" bug. */
+      if (Date.now() - openedAt < 300 && t !== root
+          && (!t || (t.id !== "lt-confirm-yes" && t.id !== "lt-confirm-no"))) return;
       if (t === root || (t && t.id === "lt-confirm-no")) { close(false); return; }
       if (t && t.id === "lt-confirm-yes") { close(true); }
     });
@@ -4204,8 +4208,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
        share sheet inside it so it paints above the overlay content — both
        are position:fixed with the same z-index, but DOM order inside the
        same stacking context determines which paints on top. */
-    var host = activeOverlay || document.body;
-    host.appendChild(overlay);
+    document.documentElement.appendChild(overlay);
 
     /* Close on backdrop tap */
     overlay.addEventListener("click", function (e) {
@@ -4654,8 +4657,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<button class="lt-task-star' + (t.starred ? ' lt-task-starred' : '') + '" data-task-star="' + t.id + '" title="' + (t.starred ? "Remove from Eat the Frog" : "Add to Eat the Frog") + '">' +
           '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + starFill + '" stroke="' + starStroke + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' +
         '</button>' +
-        '<button class="lt-task-del" data-task-del="' + t.id + '">' +
-          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+        '<button class="lt-task-del" data-task-del="' + t.id + '" aria-label="Delete task" title="Delete task">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6M19 6l-1 13.5A1.5 1.5 0 0 1 16.5 21h-9A1.5 1.5 0 0 1 6 19.5L5 6M10 11v5.5M14 11v5.5"/></svg>' +
         '</button>' +
       '</div>'
     );
@@ -6365,8 +6368,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
        on some Android WebView renderers. */
     /* Never append into a detached overlay root — that renders nothing
        (activeOverlay can go stale if the overlay DOM was replaced). */
-    var host = activeOverlay && document.body.contains(activeOverlay) ? activeOverlay : document.body;
-    host.appendChild(modal);
+    document.documentElement.appendChild(modal);
     /* Ghost/double-tap guard: a rapid second tap landing right after the
        modal opened would instantly dismiss it (backdrop) or skip past it
        (CTA). Ignore every click in the first 450ms of the modal's life. */
@@ -9729,8 +9731,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">' + (window.AndroidBridge && typeof window.AndroidBridge.purchasePlan === "function" ? "Purchases are processed securely via Google Play Billing." : "Test mode — no real payment will be taken") + '</p>' +
         '</div>' +
       '</div>';
-    var plansHost = activeOverlay && document.body.contains(activeOverlay) ? activeOverlay : document.body;
-    plansHost.appendChild(modal);
+    document.documentElement.appendChild(modal);
     var plansOpenedAt = Date.now();
     function plansTap(e) {
       if (Date.now() - plansOpenedAt < 450) { e.stopPropagation(); e.preventDefault(); return false; }
@@ -9911,8 +9912,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           '<p style="color:hsl(220 10% 68%);font-size:9px;text-align:center;margin:10px 0 0">Test mode \u2014 no real payment will be taken</p>' +
         '</div>' +
       '</div>';
-    var checkoutHost = activeOverlay && document.body.contains(activeOverlay) ? activeOverlay : document.body;
-    checkoutHost.appendChild(modal);
+    document.documentElement.appendChild(modal);
     var checkoutOpenedAt = Date.now();
     function checkoutTap(e) {
       if (Date.now() - checkoutOpenedAt < 450) { e.stopPropagation(); e.preventDefault(); return false; }
