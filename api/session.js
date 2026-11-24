@@ -679,6 +679,16 @@ export default async function handler(req, res) {
         { headers: { Authorization: "Bearer " + access } });
       out.catalogApi = r.status;
       if (!r.ok) out.catalogBody = (await r.text()).slice(0, 200);
+
+      /* Dummy token: 404 means the purchase-verification API is reachable
+         (good); 403 means the service account lacks purchase access. */
+      const r2 = await fetch(
+        "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"
+        + encodeURIComponent(PLAY_PACKAGE)
+        + "/purchases/products/lifetime_inapp/tokens/not-a-real-token-0000000000",
+        { headers: { Authorization: "Bearer " + access } });
+      out.purchasesApi = r2.status;
+      if (r2.status === 403) out.purchasesBody = (await r2.text()).slice(0, 200);
     } catch (e) {
       out.token = "fail: " + ((e && e.message) || String(e)).slice(0, 160);
     }
