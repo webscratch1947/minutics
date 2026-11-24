@@ -1510,7 +1510,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       ".lt-rlib-name{margin:0;font-size:14px;font-weight:800;color:hsl(var(--foreground))}",
       ".lt-rlib-desc{margin:3px 0 0;font-size:11px;line-height:1.45;color:hsl(var(--muted-foreground));font-weight:500}",
       ".lt-rlib-slots{margin:11px 0 10px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#b45309;text-transform:uppercase}",
-      ".lt-rlib-apply{margin-top:auto;border:none;border-radius:999px;padding:11px 18px;font:inherit;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:#fff;background:#111114;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 20px -8px rgba(0,0,0,.35);transition:transform .08s ease,background .15s ease}",
+      ".lt-rlib-apply{margin-top:18px;border:none;border-radius:999px;padding:11px 18px;font:inherit;font-size:12.5px;font-weight:900;letter-spacing:.03em;color:#fff;background:#111114;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 20px -8px rgba(0,0,0,.35);transition:transform .08s ease,background .15s ease}",
       ".lt-rlib-apply:active{transform:scale(.96)}",
       ".lt-rlib-apply.applied{background:hsl(var(--muted));color:hsl(var(--muted-foreground));box-shadow:none;cursor:default}",
       /* Toast (library apply confirmation) */
@@ -1608,7 +1608,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       ".lt-routine-poll-name{font-size:15px;font-weight:700;color:#1a1a1a;margin:0;line-height:1.3}",
       ".lt-routine-poll-name.done{text-decoration:line-through;color:#7c9a72}",
       ".lt-routine-poll-time{font-size:11.5px;font-weight:700;color:#3f8f2d;margin:2px 0 0}",
-      ".lt-routine-poll-edit{flex-shrink:0;font-size:11px;color:#6b8f5c;font-weight:700;-webkit-tap-highlight-color:transparent}",
+      /* Routine Edit now mirrors the My Tasks icon button (same transparent
+         background, muted colour, tap scale) instead of a plain text link. */
+      ".lt-routine-poll-edit{background:none;border:none;color:hsl(var(--muted-foreground));cursor:pointer;padding:6px;flex-shrink:0;display:flex;align-items:center;-webkit-tap-highlight-color:transparent}",
+      ".lt-routine-poll-edit:active{color:hsl(var(--foreground));transform:scale(.9)}",
       ".lt-routine-draftlist{display:flex;flex-direction:column;gap:14px;max-height:48vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:6px;padding:2px 2px 4px}",
       ".lt-routine-draftrow{border:1px solid hsl(var(--border));border-radius:18px;padding:16px 16px 15px;position:relative;background:hsl(var(--card));box-shadow:0 2px 10px rgba(0,0,0,.05)}",
       ".lt-routine-draftrow-remove{position:absolute;top:9px;right:9px;width:26px;height:26px;z-index:3;display:flex;align-items:center;justify-content:center;background:hsl(var(--muted));border:1px solid hsl(var(--border));border-radius:50%;color:hsl(var(--muted-foreground));font-size:12px;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}",
@@ -5154,7 +5157,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<button type="button" class="lt-rlib-back" data-rlib-back aria-label="Back">← Back</button>' +
         '<div class="lt-rlib-headmeta"><p class="lt-rlib-title">Routine Library</p>' +
         '<p class="lt-rlib-sub">Profession-based day presets — tap Apply to make one your day</p></div>' +
-        '<span class="lt-rlib-badge">PRO</span>' +
       '</div>' +
       '<div class="lt-rlib-grid">' +
         ROUTINE_PRESETS.map(function (p) {
@@ -5459,7 +5461,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
                   '<p class="lt-routine-poll-name' + (done ? ' done' : '') + '">' + (item.emoji ? item.emoji + ' ' : '') + escapeHtml(item.name) + '</p>' +
                   '<p class="lt-routine-poll-time">' + formatRoutineRange(item.time, item.endTime) + '</p>' +
                 '</div>' +
-                '<span class="lt-routine-poll-edit" data-routine-edit="' + item.id + '">Edit</span>' +
+                '<button type="button" class="lt-routine-poll-edit" data-routine-edit="' + item.id + '" aria-label="Edit routine" title="Edit routine">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
+              '</button>' +
               '</div>'
             );
           }).join("") +
