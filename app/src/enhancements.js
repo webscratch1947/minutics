@@ -235,6 +235,20 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   var GRAM_CACHE_KEY = "lt_gram_ids_cache_v1";
   var GRAM_CACHE_TTL = 10 * 60 * 1000;
 
+  /* Preload the infographic ID list at app start so opening Knowledge Gram
+     is instant — the user doesn't wait for the GitHub call on first tap. */
+  setTimeout(function () {
+    try {
+      gramLoadIds(function () {
+        /* Warm the first few images into the browser cache so the reel opens
+           with pictures already there instead of blank placeholders. */
+        GRAM_IDS.slice(0, 4).forEach(function (id) {
+          try { var im = new Image(); im.src = GRAM_BASE + id + ".jpg"; } catch (e) {}
+        });
+      });
+    } catch (e) {}
+  }, 2000);
+
   function gramLoadIds(callback) {
     var cache = readJson(GRAM_CACHE_KEY, null);
     if (cache && Array.isArray(cache.ids) && cache.ids.length && (Date.now() - (cache.ts || 0) < GRAM_CACHE_TTL)) {
@@ -3320,7 +3334,21 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     return r;
   }
 
-  function closeOverlay() {
+  /* Track whether openOverlay() pushed a history entry that closeOverlay()
+     must pop. Without this, each opened tool left a dead entry and the user
+     had to press Android Back ~20 times to get past Life Hub. */
+  var overlayHistoryPushed = false;
+
+  function closeOverlay(fromPopstateOrReopen) {
+    /* If WE pushed a history entry and the close was user-initiated (a tap
+       on Back / ✕, not a popstate already consumed by Back), pop that entry
+       so the history stack doesn't accumulate one dead state per tool. */
+    if (overlayHistoryPushed && !fromPopstateOrReopen) {
+      overlayHistoryPushed = false;
+      try { history.back(); } catch (e) {}
+    } else if (fromPopstateOrReopen) {
+      overlayHistoryPushed = false;
+    }
     var r = document.getElementById("lt-overlay-root");
     if (r && !r.getAttribute("data-lt-closing")) {
       /* Slide OUT to the right (mirrors the slide-in) before teardown, so
@@ -3380,10 +3408,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   }
 
   function openOverlay(renderer) {
-    closeOverlay();
+    closeOverlay(true); /* silently drop any previous tool's history entry */
     /* Push a history state so the Android back button fires popstate and
        closes the overlay instead of closing the app or going back in SPA. */
     history.pushState({ ltOverlay: true }, "");
+    overlayHistoryPushed = true;
     var root = getOverlayRoot();
     /* Mobile browsers/WebViews sometimes replay a "ghost click" ~300ms
        after the tap that opened this overlay, landing on whatever now
@@ -10566,7 +10595,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       return true;
     }
     if (activeOverlay) {
-      closeOverlay();
+      /* Native Back already consumed the pushed history entry via popstate,
+         so don't call history.back() again here. */
+      closeOverlay(true);
       return true;
     }
     /* Full View report/share overlays (they push their own history). */
@@ -10599,7 +10630,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       return;
     }
     if (activeOverlay) {
-      closeOverlay();
+      closeOverlay(true); /* popstate already consumed the history entry */
       return;
     }
     /* Full View: a pop (← flow or Android back) closes the top overlay.
