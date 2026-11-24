@@ -5031,8 +5031,28 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      and there is never an overlap error). The active preset is remembered
      and its box shows an "✓ Applied" state. */
   var ROUTINE_PRESETS = [
-{ id: "mgr", name: "MGR Routine (Recommended)", emoji: "🧭", desc: "Daily productivity & business execution — dev, clients, growth and wrap-up.",
-      slots: [["Morning Startup","08:00","09:30","🌅"],["Core Development & Operations","10:00","13:30","💻"],["Lunch & Rest Break","13:30","14:30","🍽️"],["Client & Business Growth","15:00","17:30","📈"],["Evening Wrap-Up & Planning","18:00","19:00","🌙"]] },
+{ id: "mgr", name: "MGR Routine (Recommended)", emoji: "🧭", desc: "19 daily habits - morning, work and night, tracked slot by slot.",
+      slots: [
+        ["Wake Up","05:00","05:15","🌅"],
+        ["Morning Hydration","05:15","05:30","💧"],
+        ["Exercise / Workout","05:30","06:30","🏋️"],
+        ["Meditation","06:30","07:00","🧘"],
+        ["Bath & Grooming","07:00","07:45","🚿"],
+        ["Book Reading","07:45","08:15","📖"],
+        ["Healthy Breakfast","08:15","09:00","🥗"],
+        ["Rule of 3","09:00","09:15","🎯"],
+        ["Deep Work Block","09:15","12:00","💻"],
+        ["Delegation Check","12:00","12:30","✅"],
+        ["High-Value Business Action","12:30","13:30","📈"],
+        ["Day-Time Hydration","13:30","14:00","💧"],
+        ["Family Time (No Phone)","18:00","19:00","👨‍👩‍👧"],
+        ["Early Dinner","19:00","19:45","🍽️"],
+        ["Daily Accounts Audit","19:45","20:15","📊"],
+        ["Routine Tracker Review","20:15","20:45","📋"],
+        ["Tomorrow's Planning","20:45","21:15","🗓️"],
+        ["Screen Shutdown","21:30","22:00","📵"],
+        ["Sleep","22:00","06:00","😴"]
+      ] },
     { id: "businessman", name: "Businessman", emoji: "💼", desc: "Board meetings, client lunches and evening strategy — a classic corporate day.",
       slots: [["Morning workout","06:00","06:45","🏋️"],["Office & meetings","09:00","13:00","💼"],["Lunch break","13:00","14:00","🍽️"],["Deep work & planning","15:00","18:00","📊"],["Family time","20:00","21:30","👨‍👩‍👧"]] },
     { id: "realestate", name: "Real Estate Agent", emoji: "🏠", desc: "Site visits, client showings and same-day follow-ups keep the pipeline moving.",
