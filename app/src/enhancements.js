@@ -5164,7 +5164,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
               '<div class="lt-rlib-top"><span class="lt-rlib-emoji">' + p.emoji + '</span>' +
                 '<div class="lt-rlib-meta"><p class="lt-rlib-name">' + escapeHtml(p.name) + '</p>' +
                 '<p class="lt-rlib-desc">' + escapeHtml(p.desc) + '</p></div></div>' +
-              '<div class="lt-rlib-slots">' + p.slots.length + ' slots · ' + p.slots[0][1] + '–' + p.slots[p.slots.length - 1][2] + '</div>' +
+              /* Show the FIRST start and the last END that actually falls on
+                 the same day. The final "Sleep" slot ends at 06:00 next day,
+                 so using it made MGR read "05:00–06:00" (railway time). */
+              '<div class="lt-rlib-slots">' + p.slots.length + ' slots · '
+                + formatRoutineTime(p.slots[0][1]) + ' – '
+                + formatRoutineTime(p.slots[p.slots.length - 2][2]) + '</div>' +
               '<button type="button" class="lt-rlib-apply' + (isApplied ? ' applied' : '') + '" data-rlib-apply="' + p.id + '">' + (isApplied ? '✓ Applied' : 'Apply routine') + '</button>' +
             '</div>'
           );
