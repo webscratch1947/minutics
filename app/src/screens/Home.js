@@ -2505,7 +2505,7 @@ function EatTheFrog() {
     return jsx(LtMinStrip, {
       move: 'timer.frog',
       className: 'mx-4 mt-3',
-      label: 'Eat the Frog',
+      label: 'Eat the Frog Rule',
       detail: doneCount + '/' + progMax + ' done',
       onExpand: toggleFrogMin
     });
@@ -2522,7 +2522,7 @@ function EatTheFrog() {
           jsxs('div', { className: 'min-w-0', children: [
             jsxs('p', { className: 'flex items-center gap-1.5 text-[9.5px] font-extrabold uppercase tracking-[0.2em] text-foreground/55', children: [
               jsx('span', { className: 'inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse' }),
-              'Eat the Frog'
+              'Eat the Frog Rule'
             ]}),
             jsx('p', { className: 'text-[19px] font-black text-foreground mt-1 leading-tight', children: activeCount > 0 ? 'Beat your ' + activeCount + ' top task' + (activeCount !== 1 ? 's' : '') : 'Add your top tasks' }),
             jsx('p', { className: 'text-[11.5px] text-foreground/55 mt-0.5', children: 'The rule: do your hardest, most important task first — then the rest is easier.' })

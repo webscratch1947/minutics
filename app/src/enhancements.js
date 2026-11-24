@@ -3342,6 +3342,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   var overlayHistoryPushed = false;
 
   function closeOverlay(fromPopstateOrReopen) {
+    /* Clear the alert→tool deep-link markers on ANY close so the 600ms
+       watchOverlayOpenTool tick can't re-open the tool ~1s after Back. */
+    try {
+      localStorage.removeItem("lt_overlay_open_tool");
+      localStorage.removeItem("lt_overlay_open_tool_at");
+    } catch (e) {}
+    window.__ltDeepLinkOpen = false;
     /* If WE pushed a history entry and the close was user-initiated (a tap
        on Back / ✕, not a popstate already consumed by Back), pop that entry
        so the history stack doesn't accumulate one dead state per tool. */
@@ -8877,9 +8884,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             nativeLimit = Number(window.AndroidBridge.getNotificationLastWasteLimit()) || 0;
           }
         } catch (e) {}
+        /* Keep the native latch mirrored for the NOTIFICATION state shown in
+           Settings, but do NOT use it to suppress the in-app popup. The
+           background alarm's popup can be missed when the app was closed; the
+           crossing must still produce a popup when the user is looking at the
+           app and hits the limit. The JS popup latch (below) is authoritative
+           for the on-screen alert. */
         if (nativeDay >= day && nativeLimit > 0) {
-          _wasteNotifiedDay = nativeDay;
-          _wasteNotifiedLimit = nativeLimit;
           writeJson(WASTE_NOTIFIED_DAY_KEY, nativeDay);
           writeJson(WASTE_NOTIFIED_LIMIT_KEY, nativeLimit);
         }
@@ -8896,7 +8907,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
                Falls back to a plain notification on web/desktop. */
             var nativeFired = false;
             try {
-              if (window.AndroidBridge && typeof window.AndroidBridge.showWasteAlert === "function") {
+              if (window.AndroidBridge && typeof window.AndroidBridge.showWastePopupNow === "function") {
+                /* In-app crossing: ALWAYS show the on-screen popup, even if the
+                   background alarm already posted the notification. */
+                window.AndroidBridge.showWastePopupNow(mins, cfg.minutes);
+                nativeFired = true;
+              } else if (window.AndroidBridge && typeof window.AndroidBridge.showWasteAlert === "function") {
                 window.AndroidBridge.showWasteAlert(mins, cfg.minutes);
                 nativeFired = true;
               }
@@ -8961,6 +8977,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         if (window.__ltDeepLinkOpen) return true;
         window.__ltDeepLinkOpen = true;
         window.__ltDeepLinkUntil = Date.now() + 8000;
+        /* The alert can arrive within the first seconds of a cold start while
+           the coded splash is still animating. Dismiss it FIRST so opening the
+           tool never leaves a half-finished splash sitting behind (and so a
+           Back press can't reveal it again). */
+        try {
+          if (typeof window.__ltSplashDismiss === "function") window.__ltSplashDismiss();
+        } catch (e) {}
         openOverlay(renderWasteBudget);
         /* Keep the marker until the tool is CONFIRMED on screen. A reload or
            a late popstate can otherwise close it while we have already
