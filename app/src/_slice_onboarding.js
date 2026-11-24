@@ -293,7 +293,7 @@ export function mk({
     ? ["welcome", "permissions", "name", "dob", "salary"]
     : BASE_STEPS;
   const [permsReady, setPermsReady] = useState(!ANDROID_NATIVE);
-  const [t, n] = useState("welcome"), [r, o] = useState(""), [s, i] = useState(""), [l, a] = useState(85), [goalDays, setGoalDays] = useState(0), [dY, setDY] = useState(""), [dM, setDM] = useState(""), [dD, setDD] = useState(""), [sal, setSal] = useState(""), u = (() => {
+  const [t, n] = useState("welcome"), [r, o] = useState(""), [s, i] = useState(""), [l, a] = useState(85), [goalDays, setGoalDays] = useState(""), [dY, setDY] = useState(""), [dM, setDM] = useState(""), [dD, setDD] = useState(""), [sal, setSal] = useState(""), u = (() => {
     if (!s) return null;
     const g = new Date(s),
       v = new Date(g);
@@ -305,7 +305,7 @@ export function mk({
       lived: Math.max(0, k)
     }
   })(), d = (() => {
-    if (u) return `${yrs(Math.floor(goalDays / 365.25))} + ${goalDays % 365 | 0} days left`;
+    if (u) { var gd = Number(goalDays) || 0; return `${yrs(Math.floor(gd / 365))} + ${gd % 365 | 0} days left`; }
     if (s) {
       const Hb = new Date(s);
       const Ib = Math.floor((Date.now() - Hb.getTime()) / (365.25 * 24 * 3600 * 1e3));
@@ -829,7 +829,7 @@ export function mk({
           jsxs("div", {
             className: "flex justify-between text-xs text-gray-400 mt-1",
             children: [
-              jsx("span", { children: yrsShort(_ageYears) }),
+              jsx("span", { children: yrsShort(Math.max(1, _ageYears)) }),
               jsx("span", { children: "100 yrs" })
             ]
           })
@@ -850,14 +850,14 @@ export function mk({
               /* Always show years AND days so a sub-year goal reads as a real
                  number instead of a bare "0 yrs". */
               jsx("span", { children: [
-                yrsShort(Math.floor(goalDays / 365.25)), " ",
-                jsx("strong", { style: { color: GREEN }, children: goalDays.toLocaleString() }), " days"
+                yrsShort(Math.floor((Number(goalDays)||0) / 365)), " ",
+                jsx("strong", { style: { color: GREEN }, children: ((Number(goalDays)||0) % 365).toLocaleString() }), " days"
               ] })
             ]
           }),
           jsxs("p", {
             className: "text-sm text-gray-500 mt-2 font-medium",
-            children: ["You have ~", jsx("strong", { style: { color: GREEN }, children: goalDays.toLocaleString() }), " days left."]
+            children: ["You have ~", jsx("strong", { style: { color: GREEN }, children: (Number(goalDays)||0).toLocaleString() }), " days left."]
           }),
           /* Sub-year goals: adjust the remaining DAYS directly. The slider
              above stays in years, so without this a goal under 1 year always
@@ -871,7 +871,7 @@ export function mk({
                 value: goalDays,
                 onChange: g => {
                   var raw = g.target.value;
-                  if (raw === "") { setGoalDays(0); a(_ageYears); return; }
+                  if (raw === "") { setGoalDays(""); a(_ageYears); return; }
                   var days = Math.max(0, Math.min(36500, Number(raw) || 0));
                   setGoalDays(days);
                   a(Math.round((_ageYears + days / 365.25) * 100) / 100);
