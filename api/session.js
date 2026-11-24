@@ -933,7 +933,7 @@ export default async function handler(req, res) {
       } catch (e) {
         const reason = ((e && e.message) || "unknown").slice(0, 80);
         console.error("play verification failed:", reason);
-        res.status(403).json({ ok: false, error: "Google could not verify this purchase (" + reason + "). If you were charged, contact support with your Play order number." });
+        res.status(403).json({ ok: false, error: "VERIFY FAILED — CODE: " + reason + ". If you were charged, contact support with your Play order number." });
         return;
       }
       try {
