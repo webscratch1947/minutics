@@ -8905,19 +8905,14 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             /* Prefer the native path: it shows the full-screen overlay AND the
                notification in one shot, exactly like the background guard.
                Falls back to a plain notification on web/desktop. */
-            var nativeFired = false;
-            try {
-              if (window.AndroidBridge && typeof window.AndroidBridge.showWastePopupNow === "function") {
-                /* In-app crossing: ALWAYS show the on-screen popup, even if the
-                   background alarm already posted the notification. */
-                window.AndroidBridge.showWastePopupNow(mins, cfg.minutes);
-                nativeFired = true;
-              } else if (window.AndroidBridge && typeof window.AndroidBridge.showWasteAlert === "function") {
-                window.AndroidBridge.showWasteAlert(mins, cfg.minutes);
-                nativeFired = true;
-              }
-            } catch (e) {}
-            if (!nativeFired) notifyWasteOver(mins, cfg.minutes);
+            /* When the user is INSIDE Minutics, do NOT open a popup/Activity —
+               that stole focus and closed the app. Only post the notification;
+               the full-screen alert is reserved for when the app is in the
+               background/closed (native alarm path). Web/desktop has no native
+               popup, so it still uses the in-page notification there. */
+            var hasNative = false;
+            try { hasNative = !!(window.AndroidBridge && window.AndroidBridge.isOfficialApp); } catch (e) {}
+            if (!hasNative) notifyWasteOver(mins, cfg.minutes);
             syncNotifStateBridge(true);
           }
           /* If the popup grant is missing, say so in-app instead of letting
