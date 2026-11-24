@@ -669,8 +669,16 @@ export default async function handler(req, res) {
       token: "not-tested",
     };
     try {
-      await googleAccessToken("https://www.googleapis.com/auth/androidpublisher");
+      const access = await googleAccessToken("https://www.googleapis.com/auth/androidpublisher");
       out.token = "ok";
+      /* A harmless read-only call: 200 = Play Console permissions are good,
+         403 = service account needs access to this app. */
+      const r = await fetch(
+        "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/"
+        + encodeURIComponent(PLAY_PACKAGE) + "/inappproducts",
+        { headers: { Authorization: "Bearer " + access } });
+      out.catalogApi = r.status;
+      if (!r.ok) out.catalogBody = (await r.text()).slice(0, 200);
     } catch (e) {
       out.token = "fail: " + ((e && e.message) || String(e)).slice(0, 160);
     }
