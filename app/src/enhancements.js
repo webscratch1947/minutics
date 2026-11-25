@@ -4354,23 +4354,31 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   }
 
   function gramSaveImage(id, btn) {
+    /* Native URL-based save: downloads the image natively, no WebView canvas
+       or CORS — reliable on all devices. */
+    var b = window.AndroidBridge;
+    if (b && typeof b.saveImageUrl === "function") {
+      try { b.saveImageUrl(gramImageUrl(id), "minutics-" + id + ".jpg"); return; }
+      catch (e) {}
+    }
     gramSetBtnSaving(btn, true);
     gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
       if (!dataUrl) { ltAlert("Couldn't save this image. Please try again."); return; }
-      /* Single shared save helper — native bridge (Android) or a real blob
-         download (web). */
       ltSaveImage(dataUrl, "minutics-" + id + ".jpg");
     });
   }
 
   function gramShareImage(id, btn) {
+    var b = window.AndroidBridge;
+    if (b && typeof b.shareImageUrl === "function") {
+      try { b.shareImageUrl(gramImageUrl(id), "minutics-" + id + ".jpg", ""); return; }
+      catch (e) {}
+    }
     gramSetBtnSaving(btn, true);
     gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
       if (!dataUrl) { ltAlert("Couldn't load this image. Please try again."); return; }
-      /* Go straight to the real system share sheet — don't show our custom
-         app-picker first (that looked like a "coding share thing"). */
       if (nativeShareImage("")) return;          /* Android: real chooser */
       if (navigator.share) {
         blobToFile(dataUrl, "minutics-share.png", function (file) {

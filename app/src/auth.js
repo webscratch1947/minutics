@@ -837,7 +837,7 @@ function injectStyles() {
   style.textContent = `
     #lt-auth-gate {
       position: fixed; inset: 0; z-index: 999999;
-      background: #Fdfbf7; color: #111827;
+      background: hsl(230 40% 16%); color: #111827;
       display: flex; align-items: flex-start; justify-content: center;
       overflow-y: auto; overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
@@ -1252,7 +1252,7 @@ function renderGate(mode) {
   var gate = document.createElement("div");
   gate.id = "lt-auth-gate";
   // Ensure the gate is fully opaque immediately to prevent any flash of underlying content
-  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#FDFBF7;color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
+  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:hsl(230 40% 16%);color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
   gate.innerHTML =
     '<div class="lt-auth-darkbg" aria-hidden="true"></div>' +
     '<main class="lt-auth-scr">' +
@@ -1631,7 +1631,7 @@ function renderForgotGate() {
 
   var gate = document.createElement("div");
   gate.id = "lt-auth-gate";
-  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:#FDFBF7;color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
+  gate.style.cssText = "position:fixed;inset:0;z-index:999999;background:hsl(230 40% 16%);color:#111827;font-family:'Geist',-apple-system,sans-serif;opacity:1;visibility:visible;";
   gate.innerHTML =
     '<div class="lt-auth-darkbg" aria-hidden="true"></div>' +
     '<main class="lt-auth-scr">' +

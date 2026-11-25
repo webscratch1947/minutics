@@ -880,7 +880,7 @@ export function mk({
                 onChange: g => {
                   /* Days are independent of the slider — NEVER touch `l`
                      here, or entering days collapses the slider to year 0. */
-                  var raw = g.target.value.replace(/[^0-9]/g, "");
+                  var raw = g.target.value.replace(/[^0-9]/g, "").replace(/^0+/, "");
                   setGoalDays(raw === "" ? "" : Math.min(36500, Number(raw) || 0));
                 },
                 id: "lt-dob-days-input",
