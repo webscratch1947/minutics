@@ -871,15 +871,17 @@ export function mk({
             children: [
               jsx("span", { className: "text-xs font-bold text-gray-500", children: "Adjust days left" }),
               jsx("input", {
-                type: "number", min: 0, max: 36500, step: 1,
+                /* text + numeric keyboard: NO spinner arrows at all (number
+                   inputs show them in Android WebViews regardless of CSS). */
+                type: "text", inputMode: "numeric", pattern: "[0-9]*",
                 value: goalDays,
                 onChange: g => {
                   /* Days are independent of the slider — NEVER touch `l`
                      here, or entering days collapses the slider to year 0. */
-                  var raw = g.target.value;
-                  setGoalDays(raw === "" ? "" : Math.max(0, Math.min(36500, Number(raw) || 0)));
+                  var raw = g.target.value.replace(/[^0-9]/g, "");
+                  setGoalDays(raw === "" ? "" : Math.min(36500, Number(raw) || 0));
                 },
-                className: "w-24 bg-[#F5F6F8] border border-black/10 rounded-lg px-2 py-1.5 text-sm font-bold text-gray-800 outline-none focus:border-[#157347] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className: "w-24 bg-[#F5F6F8] border border-black/10 rounded-lg px-2 py-1.5 text-sm font-bold text-gray-800 outline-none focus:border-[#157347]"
               }),
               jsx("span", { className: "text-xs text-gray-400", children: "days" })
             ]
