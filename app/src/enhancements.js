@@ -9810,12 +9810,19 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var existing = document.getElementById("lt-plans-modal");
     if (existing) existing.remove();
 
+    /* Use the REAL localized prices from Play when available (₹99 in India,
+       $4.99 elsewhere). Fall back to text only on web / before Play loads. */
+    var playPrices = {};
+    try {
+      var b = window.AndroidBridge;
+      if (b && typeof b.getPlayPrices === "function") playPrices = JSON.parse(b.getPlayPrices() || "{}");
+    } catch (e) {}
     var plans = [
-      { id: "basic",    name: "Basic",    price: "$1",  period: "/month", desc: "Essential premium access for one month.",
+      { id: "basic",    name: "Basic",    price: playPrices.basic    || "$4.99",  period: "/month", desc: "Essential premium access for one month.",
         features: ["Budget Tracker", "Life Value Calculator", "Telegram daily reports", "Full journal history", "Queued Eat the Frog (unlimited starred tasks)", "All Minutics tools", "1 month access"] },
-      { id: "yearly",   name: "1 Year",   price: "$9",  period: "/year",  desc: "Full premium access for 12 months with one payment.",
+      { id: "yearly",   name: "1 Year",   price: playPrices.yearly   || "$29.99", period: "/year",  desc: "Full premium access for 12 months with one payment.",
         features: ["Budget Tracker", "Life Value Calculator", "Telegram daily reports", "Full journal history", "Queued Eat the Frog (unlimited starred tasks)", "All Minutics tools", "12 months access", "One payment"] },
-      { id: "lifetime", name: "Lifetime", price: "$99", period: "",       desc: "Premium access with no expiration.",
+      { id: "lifetime", name: "Lifetime", price: playPrices.lifetime || "$99",    period: "",       desc: "Premium access with no expiration.",
         features: ["Budget Tracker", "Life Value Calculator", "Telegram daily reports", "Full journal history", "Queued Eat the Frog (unlimited starred tasks)", "All Minutics tools", "Lifetime access", "No expiration"] },
     ];
 
