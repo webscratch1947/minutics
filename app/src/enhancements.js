@@ -415,16 +415,15 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      client-side "paid" flag is honoured. Cached because isPro() is called
      constantly. On the normal website there is no bridge, so this is a
      no-op there. */
-  var _officialApp = null;
+  /* The server ledger is the source of truth for paid plans. A locally
+     hardcoded signing-cert check is DISABLED: the Play-installed AAB is
+     re-signed by Play's app-signing key (different from our upload key), so
+     that check returned false for EVERY real user and made paid accounts
+     show as Free. Anti-tamper is handled server-side by Play Integrity. */
   var _integrityPassed = true; /* stays true until the server reports a fail */
   function appIsOfficial() {
-    if (_officialApp === null) {
-      try {
-        var b = window.AndroidBridge;
-        _officialApp = !(b && typeof b.isOfficialApp === "function") || !!b.isOfficialApp();
-      } catch (e) { _officialApp = true; }
-    }
-    return _officialApp && _integrityPassed;
+    /* Always allow the local plan through; Play Integrity still gates it. */
+    return _integrityPassed;
   }
 
   /* Play Integrity: native asks Google for a signed verdict, our server
@@ -4361,7 +4360,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     gramWatermarkedImage(gramImageUrl(id), function (dataUrl) {
       gramSetBtnSaving(btn, false);
       if (!dataUrl) { ltAlert("Couldn't load this image. Please try again."); return; }
-      /* Same pattern as Journal share — pass dataUrl directly to bridge */
+      /* Go straight to the real system share sheet — don't show our custom
+         app-picker first (that looked like a "coding share thing"). */
+      if (nativeShareImage("")) return;          /* Android: real chooser */
+      if (navigator.share) {
+        blobToFile(dataUrl, "minutics-share.png", function (file) {
+          if (file && navigator.canShare && navigator.canShare({ files: [file] }))
+            navigator.share({ files: [file], title: "Minutics", text: GRAM_SHARE_CAPTION }).catch(function () {});
+          else navigator.share({ title: "Minutics", text: GRAM_SHARE_CAPTION }).catch(function () {});
+        });
+        return;
+      }
       openShareSheet(dataUrl, GRAM_SHARE_CAPTION);
     });
   }
@@ -5489,7 +5498,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
          animation has fill:both) would capture position:fixed and pin the +
          to the content bottom instead of the screen. */
       '<button class="lt-tasks-fab" id="lt-routine-fab">+</button>' +
-      '<button class="lt-routine-lib-fab" id="lt-routine-lib-fab" aria-label="Open routine library">\uD83D\uDCDA</button>' +
+      (isPro() ? '<button class="lt-routine-lib-fab" id="lt-routine-lib-fab" aria-label="Open routine library">📚</button>' : '') +
 
       '<div class="lt-tasks-sheet" id="lt-routine-sheet">' +
         '<div class="lt-tasks-sheet-handle"></div>' +
@@ -8047,9 +8056,16 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       wasteMin = Math.max(wasteMin, tracked.wasteMin || 0);
     }
     var raw = 50 + boostMin * 0.5 - wasteMin * 0.5;
-    var score = Math.round(raw);
-    score = Math.min(100, Math.max(0, score));
-    return { score: score, boostMin: Math.round(boostMin), wasteMin: Math.round(wasteMin) };
+    /* Keep ONE decimal so a single productive minute reads as +0.5 (50.5),
+       not a rounded +1 (51). Display 50 when it's a whole number. */
+    var score = Math.max(0, Math.min(100, raw));
+    var display = (Math.round(score * 10) / 10);
+    return {
+      score: display,
+      scoreDisplay: (Number.isInteger(display) ? String(display) : display.toFixed(1)),
+      boostMin: Math.round(boostMin),
+      wasteMin: Math.round(wasteMin)
+    };
   }
 
   function computeTrackedMinutesToday() {
@@ -8109,7 +8125,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           toolHeader("Productivity Score", "Your score for today, based on time actually tracked.") +
           '<div class="lt-tool-card" style="text-align:center;">' +
             '<p class="lt-card-title">Today\u2019s score</p>' +
-            '<div style="font-size:48px;font-weight:800;color:' + color + ';">' + idx.score + '<span style="font-size:20px;color:#9CA3AF;">/100</span></div>' +
+            '<div style="font-size:48px;font-weight:800;color:' + color + ';">' + idx.scoreDisplay + '<span style="font-size:20px;color:#9CA3AF;">/100</span></div>' +
           '</div>' +
           '<div class="lt-tool-card">' +
             '<div class="lt-history-row"><span>Productive minutes</span><strong>+' + escapeHtml(String(idx.boostMin)) + '</strong></div>' +
@@ -9831,11 +9847,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             : (isPro()
                 ? '<div id="lt-plans-cta-wrap" style="text-align:center"><p style="color:#16A34A;font-size:13px;font-weight:700;margin:0">You have ' + getPlanName() + ' \u2014 no expiration</p></div>'
                 : '<div id="lt-plans-cta-wrap" style="text-align:center">' +
-                    '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:hsl(230 40% 16%);border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Continue with 1 Year</button>' +
+                    '<button id="lt-plans-cta" style="width:100%;max-width:280px;background:hsl(230 40% 16%);border:none;color:#fff;padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:10px;transition:opacity .15s">Continue with 1 Year</button>' +
                   '</div>'
               )
           ) +
-          '<button id="lt-plans-close" style="width:100%;background:#fff;border:1px solid hsl(220 13% 85%);border-radius:12px;color:hsl(230 40% 16%);padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;font-family:inherit;transition:background .15s">Close</button>' +
+          '<button id="lt-plans-close" style="width:100%;max-width:280px;display:block;margin:6px auto 0;background:#fff;border:1px solid hsl(220 13% 85%);border-radius:10px;color:hsl(230 40% 16%);padding:10px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;font-family:inherit;transition:background .15s">Close</button>' +
           '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">' + (window.AndroidBridge && typeof window.AndroidBridge.purchasePlan === "function" ? "Purchases are processed securely via Google Play Billing." : "Test mode — no real payment will be taken") + '</p>' +
         '</div>' +
       '</div>';

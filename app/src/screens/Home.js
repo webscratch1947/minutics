@@ -2948,7 +2948,7 @@ export function ActivityScreen({ profile }) {
         className: 'grid grid-cols-2 gap-3 px-4 pt-3.5 pb-1',
         children: [
           jsx(StatCard, { icon: '⏱', iconBg: '#DCFCE7', label: 'Time Tracked', value: fmtMins(totalMinutesTracked * 60) }),
-          jsx(StatCard, { icon: '📋', iconBg: '#FEF3C7', label: 'Day Streak', value: streakDays }),
+          jsx(StatCard, { icon: '🔥', iconBg: '#FEF3C7', label: 'Day Streak', value: streakDays }),
           jsx(StatCard, { icon: '📊', iconBg: '#EEF2FF', label: 'Productivity Score', value: prodScore, suffix: '/100' }),
           jsx(StatCard, { icon: '📒', iconBg: '#EDE9FE', label: 'Activities', value: freePlan ? activities.length + ' / ' + FREE_ACTIVITY_LIMIT : activities.length, danger: limitReached })
         ]

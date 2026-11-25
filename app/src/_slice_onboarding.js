@@ -876,7 +876,7 @@ export function mk({
                   var raw = g.target.value;
                   setGoalDays(raw === "" ? "" : Math.max(0, Math.min(36500, Number(raw) || 0)));
                 },
-                className: "w-24 bg-[#F5F6F8] border border-black/10 rounded-lg px-2 py-1.5 text-sm font-bold text-gray-800 outline-none focus:border-[#157347]"
+                className: "w-24 bg-[#F5F6F8] border border-black/10 rounded-lg px-2 py-1.5 text-sm font-bold text-gray-800 outline-none focus:border-[#157347] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               }),
               jsx("span", { className: "text-xs text-gray-400", children: "days" })
             ]
