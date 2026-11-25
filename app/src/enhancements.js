@@ -9632,6 +9632,14 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     targetEl.appendChild(chip);
   }
 
+  /* When Settings changes currency, re-run the global symbol sweep so any
+     rendered-but-static "Rs." / ₹ text updates immediately everywhere. */
+  try {
+    window.addEventListener("lt-currency-changed", function () {
+      setTimeout(function () { safeRun(replaceRupeeGlobally); }, 50);
+    });
+  } catch (e) {}
+
   /* Currency switcher only lives in Settings. */
   function injectCurrencyChipsIntoOverlays() {
     if (location.pathname === "/settings") {

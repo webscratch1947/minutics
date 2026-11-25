@@ -457,6 +457,9 @@ export function SettingsScreen() {
     setSelectedCurrencyCode(code);
     setCurrency(code);
     setShowPicker(false);
+    /* Tell every other screen (Home money timer, Time Value banner, etc.) to
+       re-read the currency so no hardcoded Rs. lingers after a change. */
+    try { window.dispatchEvent(new CustomEvent("lt-currency-changed", { detail: code })); } catch (e) {}
   }
 
   function handleGoalChange(type) {
