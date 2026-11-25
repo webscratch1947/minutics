@@ -863,7 +863,7 @@ export function mk({
           }),
           jsxs("p", {
             className: "text-sm text-gray-500 mt-2 font-medium",
-            children: ["You have ~", jsx("strong", { style: { color: GREEN }, children: (Number(goalDays)||0).toLocaleString() }), " days left."]
+            children: ["You have ", jsx("strong", { style: { color: GREEN }, children: (Number(goalDays)||0).toLocaleString() }), " days left."]
           }),
           /* Sub-year goals: adjust the remaining DAYS directly. The slider
              above stays in years, so without this a goal under 1 year always

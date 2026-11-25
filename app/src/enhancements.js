@@ -234,12 +234,17 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
      is blocked/slow on many Indian mobile networks — that made the reel black
      and broke canvas-based share/download. apiOrigin() is "" on the website
      and https://app.minutics.com inside the Android WebView. */
-  var GRAM_BASE = (function () {
+  /* Compute at CALL time, not module-load time: window.LTAuth is set by
+     auth.js AFTER this module loads, so an early read fell back to a
+     relative URL on the WebView origin (appassets...) which has no endpoint. */
+  function gramProxyBase() {
     try {
       var o = (window.LTAuth && window.LTAuth.apiOrigin) ? window.LTAuth.apiOrigin() : "";
+      if (!o && window.AndroidBridge) o = "https://app.minutics.com";
       return o + "/api/gram-image?id=";
-    } catch (e) { return "/api/gram-image?id="; }
-  })();
+    } catch (e) { return "https://app.minutics.com/api/gram-image?id="; }
+  }
+  var GRAM_BASE = ""; // set lazily in gramImageUrl
   var GRAM_IDS       = ["001","002","003","004","005","006","007","008","009","010","011","012","013","014","017","018","019","020","021","022","023","024"];
   var GRAM_CACHE_KEY = "lt_gram_ids_cache_v1";
   var GRAM_CACHE_TTL = 10 * 60 * 1000;
@@ -4193,7 +4198,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   }
 
   function gramImageUrl(id) {
-    return GRAM_BASE + id + "&v=" + Math.floor(Date.now() / GRAM_CACHE_TTL);
+    return gramProxyBase() + id + "&v=" + Math.floor(Date.now() / GRAM_CACHE_TTL);
   }
 
   var GRAM_SHARE_CAPTION = "Check this out on Minutics \u2014 make every minute count! \uD83D\uDCD6\u2728\nhttps://minutics.com";
@@ -7152,7 +7157,14 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     var shareBtn = document.getElementById("lt-fv-share-btn");
     if (shareBtn) shareBtn.addEventListener("click", function () {
-      /* Go straight to the real system share sheet, not our custom picker. */
+      /* Native share with image + caption together in one sheet. */
+      try {
+        var nb = window.AndroidBridge;
+        if (nb && typeof nb.shareImageWithText === "function") {
+          nb.shareImageWithText(dataUrl, "My day, tracked with Minutics. https://minutics.com");
+          return;
+        }
+      } catch (e) {}
       if (nativeShareImage("")) return;
       if (navigator.share) {
         blobToFile(dataUrl, "minutics-share.png", function (file) {
