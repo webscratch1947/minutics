@@ -608,7 +608,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   var GOAL_TYPE_DEFAULTS = {
     retirement: { word: "Retirement", dateLabel: "Retirement date" },
     age:        { word: "Age Goal",   dateLabel: "Target date" },
-    fire:       { word: "FIRE",       dateLabel: "FIRE date" }
+    fire:       { word: "Financial Freedom",       dateLabel: "Financial Freedom date" }
     /* "milestone" uses a custom label, handled in getGoalType() */
   };
 
@@ -3558,7 +3558,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var isEdit = !!budgetEditingId;
     /* Category = a real dropdown (not a free-text datalist). Existing used
        categories first, then a few sensible defaults so it's never empty. */
-    var DEFAULT_CATS = ["Food", "Groceries", "Travel", "Bills", "Shopping", "Health", "Other"];
+    var DEFAULT_CATS = ["Food", "Groceries", "Travel", "Transport", "Bills", "Rent", "Shopping", "Health", "Medical", "Education", "Entertainment", "Subscriptions", "Dining Out", "Coffee", "Fuel", "Insurance", "Investments", "Savings", "Gifts", "Charity", "Repairs", "Utilities", "Internet", "Phone", "Other"];
     var catOpts = Array.from(new Set(categories.concat(DEFAULT_CATS)));
     var catSelect =
       '<div class="lt-field">' +
@@ -9699,7 +9699,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var goalOptions = [
       { type: "retirement", label: "\uD83C\uDFD6\uFE0F Retirement" },
       { type: "age",        label: "\uD83C\uDF82 Age Goal" },
-      { type: "fire",       label: "\uD83D\uDD25 FIRE" },
+      { type: "fire",       label: "\uD83D\uDD25 Financial Freedom" },
       { type: "milestone",  label: "\uD83C\uDFAF Milestone" }
     ];
     var goalOptWrap = card.querySelector("#lt-goal-type-options");
@@ -9842,7 +9842,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<div style="flex-shrink:0;padding:20px 28px 28px;border-top:1px solid hsl(220 13% 92%);margin-top:16px">' +
           (isPro() && isSubscription()
             ? '<div id="lt-plans-cta-wrap" style="text-align:center">' +
-                '<button id="lt-plans-cta" style="width:100%;max-width:320px;background:#c0392b;border:none;color:#fff;padding:15px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:12px;transition:opacity .15s">Cancel Subscription</button>' +
+                '<button id="lt-plans-cta" style="width:100%;max-width:280px;display:block;margin:0 auto;background:#c0392b;border:none;color:#fff;padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;border-radius:10px;transition:opacity .15s">Cancel Subscription</button>' +
               '</div>'
             : (isPro()
                 ? '<div id="lt-plans-cta-wrap" style="text-align:center"><p style="color:#16A34A;font-size:13px;font-weight:700;margin:0">You have ' + getPlanName() + ' \u2014 no expiration</p></div>'

@@ -47,7 +47,7 @@ var CURRENCIES = [
 var GOAL_OPTIONS = [
   { type: "retirement", label: "\uD83C\uDFD6\uFE0F Retirement" },
   { type: "age", label: "\uD83C\uDF82 Age Goal" },
-  { type: "fire", label: "\uD83D\uDD25 FIRE" },
+  { type: "fire", label: "\uD83D\uDD25 Financial Freedom" },
   { type: "milestone", label: "\uD83C\uDFAF Milestone" }
 ];
 
