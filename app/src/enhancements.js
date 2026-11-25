@@ -9817,6 +9817,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       var b = window.AndroidBridge;
       if (b && typeof b.getPlayPrices === "function") playPrices = JSON.parse(b.getPlayPrices() || "{}");
     } catch (e) {}
+    var curCode = playPrices.currency || "";
     var plans = [
       { id: "basic",    name: "Basic",    price: playPrices.basic    || "$4.99",  period: "/month", desc: "Essential premium access for one month.",
         features: ["Budget Tracker", "Life Value Calculator", "Telegram daily reports", "Full journal history", "Queued Eat the Frog (unlimited starred tasks)", "All Minutics tools", "1 month access"] },
@@ -9877,7 +9878,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
               )
           ) +
           '<button id="lt-plans-close" style="width:100%;max-width:280px;display:block;margin:6px auto 0;background:#fff;border:1px solid hsl(220 13% 85%);border-radius:10px;color:hsl(230 40% 16%);padding:10px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;font-family:inherit;transition:background .15s">Close</button>' +
-          '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">' + (window.AndroidBridge && typeof window.AndroidBridge.purchasePlan === "function" ? "Purchases are processed securely via Google Play Billing." : "Test mode — no real payment will be taken") + '</p>' +
+          (curCode ? '<p style="color:hsl(220 10% 55%);font-size:10px;text-align:center;margin:8px 0 0">Prices shown in ' + escapeHtml(curCode) + ' (your Play country)</p>' : '') +
+        '<p style="color:hsl(220 10% 68%);font-size:10px;text-align:center;margin:8px 0 0">' + (window.AndroidBridge && typeof window.AndroidBridge.purchasePlan === "function" ? "Purchases are processed securely via Google Play Billing." : "Test mode — no real payment will be taken") + '</p>' +
         '</div>' +
       '</div>';
     document.documentElement.appendChild(modal);
