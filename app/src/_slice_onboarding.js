@@ -83,7 +83,10 @@ if (typeof document !== "undefined" && !document.getElementById(PICKER_STYLE_ID)
   st.id = PICKER_STYLE_ID;
   st.textContent =
     "@keyframes ltPkFade{from{opacity:0;}to{opacity:1;}}" +
-    "@keyframes ltPkIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}";
+    "@keyframes ltPkIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}" +
+    /* Hide the number-input stepper arrows (the jiggly up/down minus). */
+    "input[type=number]{-moz-appearance:textfield;}" +
+    "input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}";
   document.head.appendChild(st);
 }
 

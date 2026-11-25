@@ -608,7 +608,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   var GOAL_TYPE_DEFAULTS = {
     retirement: { word: "Retirement", dateLabel: "Retirement date" },
     age:        { word: "Age Goal",   dateLabel: "Target date" },
-    fire:       { word: "Financial Freedom",       dateLabel: "Financial Freedom date" }
+    fire:       { word: "Freedom",       dateLabel: "Freedom date" }
     /* "milestone" uses a custom label, handled in getGoalType() */
   };
 
@@ -7135,6 +7135,16 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
     var shareBtn = document.getElementById("lt-fv-share-btn");
     if (shareBtn) shareBtn.addEventListener("click", function () {
+      /* Go straight to the real system share sheet, not our custom picker. */
+      if (nativeShareImage("")) return;
+      if (navigator.share) {
+        blobToFile(dataUrl, "minutics-share.png", function (file) {
+          if (file && navigator.canShare && navigator.canShare({ files: [file] }))
+            navigator.share({ files: [file], title: "Minutics", text: "My day, tracked with Minutics." }).catch(function () {});
+          else navigator.share({ title: "Minutics", text: "My day, tracked with Minutics." }).catch(function () {});
+        });
+        return;
+      }
       openShareSheet(dataUrl, "My day, tracked with Minutics. https://minutics.com");
     });
 
@@ -9699,7 +9709,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var goalOptions = [
       { type: "retirement", label: "\uD83C\uDFD6\uFE0F Retirement" },
       { type: "age",        label: "\uD83C\uDF82 Age Goal" },
-      { type: "fire",       label: "\uD83D\uDD25 Financial Freedom" },
+      { type: "fire",       label: "\uD83D\uDD25 Freedom" },
       { type: "milestone",  label: "\uD83C\uDFAF Milestone" }
     ];
     var goalOptWrap = card.querySelector("#lt-goal-type-options");
@@ -10243,9 +10253,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   function replaceRupeeGlobally() {
     var cur = getCurrency();
     var target = cur.code === "INR" ? "Rs." : cur.symbol;
+    /* Both the ₹ glyph AND the literal "Rs." are hardcoded across screens.
+       Replace whichever is present with the user's chosen symbol. */
+    var hasOld = function (s) { return s && (s.indexOf("\u20B9") !== -1 || s.indexOf("Rs.") !== -1); };
+    var swap = function (s) { return s.split("\u20B9").join(target).split("Rs.").join(target); };
     var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
-        if (!node.nodeValue || node.nodeValue.indexOf("\u20B9") === -1) return NodeFilter.FILTER_REJECT;
+        if (!hasOld(node.nodeValue)) return NodeFilter.FILTER_REJECT;
         var p = node.parentNode;
         if (p && (p.tagName === "SCRIPT" || p.tagName === "STYLE" || p.isContentEditable)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
@@ -10253,11 +10267,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     });
     var node, hits = [];
     while ((node = walker.nextNode())) hits.push(node);
-    hits.forEach(function (n) {
-      n.nodeValue = n.nodeValue.split("\u20B9").join(target);
-    });
-    document.querySelectorAll('input[placeholder*="\u20B9"]').forEach(function (inp) {
-      inp.placeholder = inp.placeholder.split("\u20B9").join(target);
+    hits.forEach(function (n) { n.nodeValue = swap(n.nodeValue); });
+    document.querySelectorAll("input[placeholder], button, [title]").forEach(function (el) {
+      if (el.placeholder && hasOld(el.placeholder)) el.placeholder = swap(el.placeholder);
+      if (el.title && hasOld(el.title)) el.title = swap(el.title);
     });
   }
 
@@ -10279,7 +10292,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
   var JARS_DEFAULTS = [
     { id: "nec",  name: "Necessities",       pct: 55, color: "#22c55e", light: "#dcfce7" },
-    { id: "ffa",  name: "Financial Freedom", pct: 10, color: "#f59e0b", light: "#fef3c7" },
+    { id: "ffa",  name: "Freedom", pct: 10, color: "#f59e0b", light: "#fef3c7" },
     { id: "ltss", name: "Long-Term Savings", pct: 10, color: "#8b5cf6", light: "#ede9fe" },
     { id: "ent",  name: "Entertainment/Fun", pct: 10, color: "#ef4444", light: "#fee2e2" },
     { id: "edu",  name: "Education/Knowledge", pct: 10, color: "#3b82f6", light: "#dbeafe" },

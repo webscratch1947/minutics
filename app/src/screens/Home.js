@@ -1851,11 +1851,11 @@ function LifeProgressCard({ profile }) {
   const goalType = goal.type || 'retirement';
   const goalArc = goalType === 'milestone' ? 'TIME LEFT UNTIL MILESTONE'
     : goalType === 'age' ? 'TIME LEFT UNTIL AGE GOAL'
-    : goalType === 'fire' ? 'TIME LEFT UNTIL FIRE'
+    : goalType === 'fire' ? 'TIME LEFT UNTIL FREEDOM'
     : 'TIME LEFT UNTIL RETIREMENT';
   const goalLineLabel = goalType === 'milestone' ? 'Milestone'
     : goalType === 'age' ? 'Age Goal'
-    : goalType === 'fire' ? 'FIRE Goal'
+    : goalType === 'fire' ? 'Freedom Goal'
     : 'Retirement';
   const goalLineValue = (goalType === 'milestone' && goal.milestoneLabel) ? goal.milestoneLabel : retirementDateStr;
 
