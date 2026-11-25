@@ -86,7 +86,9 @@ if (typeof document !== "undefined" && !document.getElementById(PICKER_STYLE_ID)
     "@keyframes ltPkIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}" +
     /* Hide the number-input stepper arrows (the jiggly up/down minus). */
     "input[type=number]{-moz-appearance:textfield;}" +
-    "input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}";
+    "input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}" +
+    "#lt-dob-days-input,.lt-dob-days-input{-moz-appearance:textfield!important;}" +
+    "#lt-dob-days-input::-webkit-inner-spin-button,#lt-dob-days-input::-webkit-outer-spin-button,.lt-dob-days-input::-webkit-inner-spin-button,.lt-dob-days-input::-webkit-outer-spin-button{-webkit-appearance:none!important;appearance:none!important;margin:0!important;display:none!important;}";
   document.head.appendChild(st);
 }
 
@@ -881,7 +883,8 @@ export function mk({
                   var raw = g.target.value.replace(/[^0-9]/g, "");
                   setGoalDays(raw === "" ? "" : Math.min(36500, Number(raw) || 0));
                 },
-                className: "w-24 bg-[#F5F6F8] border border-black/10 rounded-lg px-2 py-1.5 text-sm font-bold text-gray-800 outline-none focus:border-[#157347]"
+                id: "lt-dob-days-input",
+                className: "w-24 bg-[#F5F6F8] border border-black/10 rounded-lg px-2 py-1.5 text-sm font-bold text-gray-800 outline-none focus:border-[#157347] lt-dob-days-input"
               }),
               jsx("span", { className: "text-xs text-gray-400", children: "days" })
             ]

@@ -463,7 +463,21 @@ function LTEmojiPicker({ value, onSelect, onClose }) {
 // "Rs.") and grouping follows the currency's own locale — en-IN for INR
 // (Rs. 5,55,666.00), en-US for USD ($555,666.00), etc.
 function curLocale() { return getCurrency().code === 'INR' ? 'en-IN' : 'en-US'; }
-function curSym() { return getCurrencySymbol(getCurrency().code); }
+/* Single source of truth for the symbol: read the saved code directly and
+   use the same full symbol table as Settings, so no screen can fall back to
+   a hardcoded "Rs." after a currency change. */
+const CURRENCY_SYMBOLS = {
+  INR:'Rs.', USD:'$', EUR:'€', GBP:'£', JPY:'¥', CNY:'¥', AED:'AED', SAR:'SAR',
+  AUD:'A$', CAD:'C$', SGD:'S$', CHF:'Fr', HKD:'HK$', NZD:'NZ$', MYR:'RM', IDR:'Rp',
+  PHP:'₱', THB:'฿', KRW:'₩', TRY:'₺', BRL:'R$', MXN:'MX$', ZAR:'R', NGN:'₦',
+  EGP:'£', PKR:'₨', BDT:'৳', LKR:'₨', NPR:'₨', SEK:'kr', NOK:'kr', DKK:'kr',
+  RUB:'₽', ILS:'₪', KWD:'د.ك', QAR:'ر.ق', OMR:'ر.ع', BHD:'.د.ب', MMK:'K', VND:'₫'
+};
+function curSym() {
+  let code = 'INR';
+  try { const s = JSON.parse(localStorage.getItem('lt_currency_v1') || '{}'); code = s.code || 'INR'; } catch (e) {}
+  return CURRENCY_SYMBOLS[code] || (getCurrencySymbol ? getCurrencySymbol(code) : code) || code;
+}
 function curFmt(v, d = 2) {
   return curSym() + Number(v || 0).toLocaleString(curLocale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 }
