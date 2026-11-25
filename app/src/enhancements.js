@@ -9833,7 +9833,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">' +
           '<div>' +
             '<p style="color:hsl(230 40% 16%);font-size:18px;font-weight:800;margin:0">' + p.name + (isCurrentPlan ? ' <span style="color:#16A34A;font-size:11px;font-weight:700">Current</span>' : '') + '</p>' +
-            '<p style="color:hsl(230 40% 16%);font-size:28px;font-weight:800;margin:4px 0 0;letter-spacing:-.02em">' + p.price + '<span style="font-size:14px;color:hsl(220 10% 55%);font-weight:600">' + p.period + '</span></p>' +
+            '<p style="color:hsl(230 40% 16%);font-size:' + (p.price.length > 14 ? '18px' : p.price.length > 10 ? '22px' : '28px') + ';font-weight:800;margin:4px 0 0;letter-spacing:-.02em;line-height:1.2;overflow-wrap:anywhere">' + escapeHtml(p.price) + '<span style="font-size:12px;color:hsl(220 10% 55%);font-weight:600">' + p.period + '</span></p>' +
           '</div>' +
           '<div class="lt-plan-check" style="width:26px;height:26px;border-radius:50%;border:2px solid ' + (isCurrentPlan ? "#16A34A" : (i === 1 ? "hsl(230 40% 16%)" : "hsl(220 13% 80%)")) + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:4px;transition:all .2s">' +
             (isCurrentPlan ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '') +
