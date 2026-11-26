@@ -212,7 +212,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   var budgetQuery     = "";
   var budgetCategory  = "";
   var budgetPayment   = "";
-  var gramCurrentId   = null;   /* which infographic's comments are open */
   var routineEditingId = null;  /* which routine item the sheet is editing, null = adding new */
   var routineEditingEmoji = ""; /* pending emoji picked in the edit sheet (kept until Save) */
   var _routineMidnightTimer = null; /* re-renders the tool if the date rolls over while it's open */
@@ -290,9 +289,9 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   }
 
   /* ── Shared likes/comments (visible to every device) ─────────────────────
-     Stored as likes.json / comments.json inside the SAME GitHub repo the
-     infographic images live in. Every device reads+writes those two files,
-     so a like or comment made on one phone shows up on all of them.
+     Stored as likes.json inside the SAME GitHub repo the infographic
+     images live in. Every device reads+writes that file, so a like made
+     on one phone shows up on all of them.
 
      Writes go through our own /api/gram-write serverless function, which
      holds the GitHub token server-side (GH_WRITE_TOKEN env var on Vercel) —
@@ -320,8 +319,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   var GRAM_DEVICE_ID       = null;
   var GRAM_LIKES_REMOTE    = null;  /* { "001": ["deviceA","deviceB"], ... } */
   var GRAM_LIKES_SHA       = null;
-  var GRAM_COMMENTS_REMOTE = null;  /* { "001": [{id,text,date,device}], ... } */
-  var GRAM_COMMENTS_SHA    = null;
   var GRAM_REMOTE_TS       = 0;
 
   function gramDeviceId() {
@@ -389,17 +386,13 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   }
 
   function gramSyncRemote(callback) {
-    if (GRAM_LIKES_REMOTE && GRAM_COMMENTS_REMOTE && (Date.now() - GRAM_REMOTE_TS < GRAM_REMOTE_TTL)) {
+    if (GRAM_LIKES_REMOTE && (Date.now() - GRAM_REMOTE_TS < GRAM_REMOTE_TTL)) {
       callback();
       return;
     }
-    var pending = 2;
-    function done() { pending--; if (pending === 0) { GRAM_REMOTE_TS = Date.now(); callback(); } }
     ghGetFile("likes.json", function (sha, json) {
-      GRAM_LIKES_SHA = sha; GRAM_LIKES_REMOTE = json || {}; done();
-    });
-    ghGetFile("comments.json", function (sha, json) {
-      GRAM_COMMENTS_SHA = sha; GRAM_COMMENTS_REMOTE = json || {}; done();
+      GRAM_LIKES_SHA = sha; GRAM_LIKES_REMOTE = json || {};
+      GRAM_REMOTE_TS = Date.now(); callback();
     });
   }
 
@@ -1440,25 +1433,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
          exported pixels first via canvas. Without this a long-press could
          save the original, un-watermarked file straight from the DOM. */
       ".lt-gram-img{-webkit-touch-callout:none}",
-      /* Comment panel */
-      ".lt-gram-cp{position:absolute;bottom:0;left:0;right:0;height:68%;background:#1c1c1e;border-radius:20px 20px 0 0;transform:translateY(100%);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:20;display:flex;flex-direction:column;overflow:hidden}",
-      ".lt-gram-cp-handle{width:36px;height:4px;background:#48484a;border-radius:2px;margin:10px auto 0;flex-shrink:0;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent}",
-      ".lt-gram-cp-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #2c2c2e;flex-shrink:0}",
-      ".lt-gram-cp-title{color:#fff;font-size:15px;font-weight:700}",
-      ".lt-gram-cp-close{background:none;border:none;color:#8e8e93;font-size:18px;cursor:pointer;padding:4px 8px;-webkit-tap-highlight-color:transparent}",
-      ".lt-gram-cp-list{flex:1;overflow-y:auto;padding:8px 0;-webkit-overflow-scrolling:touch}",
-      ".lt-gram-comment{display:flex;align-items:flex-start;gap:10px;padding:10px 16px;border-bottom:1px solid #2c2c2e}",
-      ".lt-gram-comment-avatar{width:32px;height:32px;border-radius:50%;background:#48484a;display:flex;align-items:center;justify-content:center;color:#ebebf5;font-size:14px;font-weight:700;flex-shrink:0}",
-      ".lt-gram-comment-body{flex:1;min-width:0}",
-      ".lt-gram-comment-text{color:#fff;font-size:14px;margin:0 0 3px;line-height:1.4;word-break:break-word}",
-      ".lt-gram-comment-date{color:#636366;font-size:11px}",
-      ".lt-gram-comment-del{background:none;border:none;color:#636366;font-size:14px;cursor:pointer;padding:4px;flex-shrink:0;align-self:center;-webkit-tap-highlight-color:transparent}",
-      ".lt-gram-cp-empty{text-align:center;padding:32px 16px;color:#636366;font-size:13px}",
-      ".lt-gram-cp-input-row{display:flex;gap:8px;padding:10px 12px;padding-bottom:max(10px, env(safe-area-inset-bottom,10px));border-top:1px solid #2c2c2e;background:#1c1c1e;flex-shrink:0}",
-      ".lt-gram-cp-input{flex:1;background:#2c2c2e;border:none;border-radius:20px;padding:10px 14px;color:#fff;font-size:14px;outline:none;font-family:inherit}",
-      ".lt-gram-cp-input::placeholder{color:#636366}",
-      ".lt-gram-cp-submit{background:#0a84ff;border:none;border-radius:20px;color:#fff;font-size:13px;font-weight:700;padding:10px 16px;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}",
-      ".lt-gram-cp-submit:active{opacity:.8}",
 
       /* ── Tasks ──────────────────────────────────────────────────────────── */
       ".lt-tasks-section{margin-bottom:8px}",
@@ -2245,7 +2219,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   /* ── Universal top-grabber drag-to-close ─────────────────────────────────
      Every bottom sheet shows the little grabber line at its top. This single
      delegated handler makes that line draggable on ALL of them (category
-     modal, routine sheet, new-task sheet, gram comments, share sheet,
+     modal, routine sheet, new-task sheet, share sheet,
      currency sheet). Drag down past ~90px and the sheet dismisses itself
      through the SAME mechanism it normally uses, so state stays consistent. */
   /* Opens a bottom sheet (.lt-tasks-sheet family) WITH its slide-up.
@@ -2276,7 +2250,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       return;
     }
     if (id === "lt-tasks-sheet") { panel.style.transform = "translateY(110%)"; return; }
-    if (id === "lt-gram-cp") { gramHideComments(); return; }
     if (panel.closest("#lt-curr-sheet")) {
       var cb = document.querySelector("#lt-curr-sheet-card h3 button");
       if (cb) { cb.click(); return; }
@@ -2295,8 +2268,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
   var _gripDrag = null;
   function ltUniversalGripDrag() {
-    var GRIPS = ".lt-sheet-grip, .lt-tasks-sheet-handle, .lt-gram-cp-handle, #lt-curr-grip, .lt-share-grip";
-    var PANELS = ".lt-tasks-sheet, .lt-gram-cp, #lt-curr-sheet-card, .lt-share-sheet, .lt-cat-modal";
+    var GRIPS = ".lt-sheet-grip, .lt-tasks-sheet-handle, #lt-curr-grip, .lt-share-grip";
+    var PANELS = ".lt-tasks-sheet, #lt-curr-sheet-card, .lt-share-sheet, .lt-cat-modal";
     document.addEventListener("pointerdown", function (e) {
       var grip = e.target && e.target.closest ? e.target.closest(GRIPS) : null;
       if (!grip) return;
@@ -3389,8 +3362,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     activeOverlay   = null;
     budgetEditingId = null;
     budgetAddingNew = false;
-    gramCurrentId   = null;
-    routineEditingId = null;
+      routineEditingId = null;
     /* Kill any stale modals that were appended to document.body and would
        otherwise persist over the newly-visible screen after the overlay
        is torn down (e.g. upgrade prompt, plans screen, checkout). */
@@ -4026,103 +3998,11 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
   /* ══════════════════════════════════════════════════════════════════════════
    * KNOWLEDGE GRAM
    * Instagram Reels-style vertical scroll through infographics.
-   * Likes and comments stored locally in localStorage.
+   * Likes are stored in our GitHub repo (see gramSyncRemote).
    * ══════════════════════════════════════════════════════════════════════════ */
 
   function gramIsLiked(id)   { var arr = (GRAM_LIKES_REMOTE && GRAM_LIKES_REMOTE[id]) || []; return arr.indexOf(gramDeviceId()) !== -1; }
   function gramLikeCount(id) { return ((GRAM_LIKES_REMOTE && GRAM_LIKES_REMOTE[id]) || []).length; }
-  function gramGetComments(id) { return (GRAM_COMMENTS_REMOTE && GRAM_COMMENTS_REMOTE[id]) || []; }
-
-  function gramToggleLike(id) {
-    if (!GRAM_LIKES_REMOTE) GRAM_LIKES_REMOTE = {};
-    var arr = (GRAM_LIKES_REMOTE[id] || []).slice();
-    var device = gramDeviceId();
-    var idx = arr.indexOf(device);
-    var nowLiked;
-    if (idx === -1) { arr.push(device); nowLiked = true; } else { arr.splice(idx, 1); nowLiked = false; }
-    GRAM_LIKES_REMOTE[id] = arr;
-    ghPutFile("likes.json", GRAM_LIKES_REMOTE, GRAM_LIKES_SHA, "like " + id, function (ok, newSha) {
-      if (ok && newSha) GRAM_LIKES_SHA = newSha;
-    });
-    return nowLiked;
-  }
-
-  function gramAddComment(gramId, text) {
-    if (!GRAM_COMMENTS_REMOTE) GRAM_COMMENTS_REMOTE = {};
-    if (!GRAM_COMMENTS_REMOTE[gramId]) GRAM_COMMENTS_REMOTE[gramId] = [];
-    GRAM_COMMENTS_REMOTE[gramId].push({ id: genId(), text: text, date: new Date().toISOString(), device: gramDeviceId() });
-    ghPutFile("comments.json", GRAM_COMMENTS_REMOTE, GRAM_COMMENTS_SHA, "comment " + gramId, function (ok, newSha) {
-      if (ok && newSha) GRAM_COMMENTS_SHA = newSha;
-    });
-  }
-
-  function gramDeleteComment(gramId, commentId) {
-    if (!GRAM_COMMENTS_REMOTE || !GRAM_COMMENTS_REMOTE[gramId]) return;
-    GRAM_COMMENTS_REMOTE[gramId] = GRAM_COMMENTS_REMOTE[gramId].filter(function (c) { return c.id !== commentId; });
-    ghPutFile("comments.json", GRAM_COMMENTS_REMOTE, GRAM_COMMENTS_SHA, "delete comment " + gramId, function (ok, newSha) {
-      if (ok && newSha) GRAM_COMMENTS_SHA = newSha;
-    });
-  }
-
-  function gramRenderCommentList(id) {
-    var list = document.getElementById("lt-gram-cp-list");
-    if (!list) return;
-    var comments = gramGetComments(id);
-    if (comments.length === 0) {
-      list.innerHTML = '<div class="lt-gram-cp-empty">No comments yet \u2014 be the first!</div>';
-      return;
-    }
-    list.innerHTML = comments.map(function (c) {
-      var d = new Date(c.date);
-      var ds = isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-      return (
-        '<div class="lt-gram-comment">' +
-          '<div class="lt-gram-comment-avatar">Y</div>' +
-          '<div class="lt-gram-comment-body">' +
-            '<p class="lt-gram-comment-text">' + escapeHtml(c.text) + '</p>' +
-            '<span class="lt-gram-comment-date">' + ds + '</span>' +
-          '</div>' +
-        '</div>'
-      );
-    }).join("");
-  }
-
-  function gramShowComments(id) {
-    gramCurrentId = id;
-    var cp = document.getElementById("lt-gram-cp");
-    if (!cp) return;
-    cp.style.transform = "translateY(0)";
-    gramRenderCommentList(id);
-    setTimeout(function () {
-      var inp = document.getElementById("lt-gram-cp-input");
-      if (inp) inp.focus();
-    }, 350);
-  }
-
-  function gramHideComments() {
-    var cp = document.getElementById("lt-gram-cp");
-    if (cp) cp.style.transform = "translateY(110%)";
-    gramCurrentId = null;
-  }
-
-  function gramSubmitComment() {
-    if (!gramCurrentId) return;
-    var inp = document.getElementById("lt-gram-cp-input");
-    if (!inp) return;
-    var text = (inp.value || "").trim();
-    if (!text) return;
-    gramAddComment(gramCurrentId, text);
-    inp.value = "";
-    gramRenderCommentList(gramCurrentId);
-    /* update the comment-count badge on the slide */
-    var btn = activeOverlay.querySelector('[data-gram-comment="' + gramCurrentId + '"]');
-    if (btn) {
-      var count = gramGetComments(gramCurrentId).length;
-      var badge = btn.querySelector(".lt-gram-action-count");
-      if (badge) badge.textContent = String(count);
-    }
-  }
-
   /* ── Watermarking, Save, Share ────────────────────────────────────────
      Every exported copy of a gram image (saved to the device OR shared
      out to another app) goes through this canvas pipeline first, which
@@ -4405,7 +4285,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var slides = GRAM_IDS.map(function (id) {
       var isLiked      = gramIsLiked(id);
       var likeCount     = gramLikeCount(id);
-      var commentCount = gramGetComments(id).length;
       var heartFill    = isLiked ? "#ff3b5c" : "none";
       var heartStroke  = isLiked ? "#ff3b5c" : "#fff";
 
@@ -4420,15 +4299,6 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
                   '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>' +
                 '</svg>' +
                 (likeCount > 0 ? '<span class="lt-gram-action-count">' + likeCount + '</span>' : '') +
-              '</button>' +
-            '</div>' +
-            /* Comment button */
-            '<div class="lt-gram-action">' +
-              '<button class="lt-gram-action-btn" data-gram-comment="' + id + '">' +
-                '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                  '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>' +
-                '</svg>' +
-                (commentCount > 0 ? '<span class="lt-gram-action-count">' + commentCount + '</span>' : '') +
               '</button>' +
             '</div>' +
             /* Share button */
@@ -4464,23 +4334,10 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       /* Feed */
       '<div class="lt-gram-feed" id="lt-gram-feed" style="height:100%;position:absolute;inset:0;">' +
         slides +
-      '</div>' +
-      /* Comment panel (bottom sheet, starts off-screen) */
-      '<div class="lt-gram-cp" id="lt-gram-cp">' +
-        '<div class="lt-gram-cp-handle"></div>' +
-        '<div class="lt-gram-cp-header">' +
-          '<span class="lt-gram-cp-title">Comments</span>' +
-          '<button class="lt-gram-cp-close" id="lt-gram-cp-close">\u2715</button>' +
-        '</div>' +
-        '<div class="lt-gram-cp-list" id="lt-gram-cp-list"></div>' +
-        '<div class="lt-gram-cp-input-row">' +
-          '<input id="lt-gram-cp-input" class="lt-gram-cp-input" type="text" placeholder="Write a comment\u2026">' +
-          '<button id="lt-gram-cp-submit" class="lt-gram-cp-submit">Post</button>' +
-        '</div>' +
       '</div>'
     );
 
-    /* Wire events: likes, comments, close panel, submit comment */
+    /* Wire events: likes, share, save */
     var overlay = activeOverlay;
     overlay.addEventListener("click", function (e) {
       /* Like */
@@ -4507,47 +4364,12 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         }
         return;
       }
-      /* Open comments */
-      var commentBtn = e.target.closest("[data-gram-comment]");
-      if (commentBtn && !e.target.closest("#lt-gram-cp")) {
-        gramShowComments(commentBtn.getAttribute("data-gram-comment"));
-        return;
-      }
       /* Share (watermarked) */
       var shareBtn = e.target.closest("[data-gram-share]");
       if (shareBtn) { gramShareImage(shareBtn.getAttribute("data-gram-share"), shareBtn); return; }
       /* Save to device (watermarked) */
       var saveBtn = e.target.closest("[data-gram-save]");
       if (saveBtn) { gramSaveImage(saveBtn.getAttribute("data-gram-save"), saveBtn); return; }
-      /* Close panel */
-      if (e.target.id === "lt-gram-cp-close") { gramHideComments(); return; }
-      /* Submit comment */
-      if (e.target.id === "lt-gram-cp-submit") { gramSubmitComment(); return; }
-      /* Delete comment */
-      var delBtn = e.target.closest("[data-gram-del]");
-      if (delBtn && gramCurrentId) {
-        gramDeleteComment(gramCurrentId, delBtn.getAttribute("data-gram-del"));
-        gramRenderCommentList(gramCurrentId);
-        /* update badge count on slide after deletion */
-        var delBadgeBtn = activeOverlay.querySelector('[data-gram-comment="' + gramCurrentId + '"]');
-        if (delBadgeBtn) {
-          var delCount = gramGetComments(gramCurrentId).length;
-          var delBadge = delBadgeBtn.querySelector(".lt-gram-action-count");
-          if (delCount > 0) {
-            if (delBadge) delBadge.textContent = String(delCount);
-            else { var sp = document.createElement('span'); sp.className = 'lt-gram-action-count'; sp.textContent = String(delCount); delBadgeBtn.appendChild(sp); }
-          } else {
-            if (delBadge) delBadge.parentNode.removeChild(delBadge);
-          }
-        }
-        return;
-      }
-    });
-
-    /* Enter key submits comment */
-    var inp = document.getElementById("lt-gram-cp-input");
-    if (inp) inp.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" || e.keyCode === 13) gramSubmitComment();
     });
 
     /* Block desktop right-click "Save image as\u2026" on the raw <img> —

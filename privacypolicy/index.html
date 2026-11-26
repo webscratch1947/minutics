@@ -101,7 +101,7 @@
   <ul>
     <li><strong>Telegram daily reports.</strong> If you connect a Telegram bot, the bot token and chat ID you enter are sent to our server so the daily report can be scheduled and sent even when the app is closed. The report contains your own on-device totals (Productivity Score, activities, routine checkmarks). We do not read your Telegram messages. You can disconnect at any time in Settings, which removes the stored schedule.</li>
     <li><strong>Push notifications.</strong> If you allow notifications, a Firebase Cloud Messaging (FCM) token is registered so we can deliver reminders and Time Waste alerts. You can revoke notification permission in Android settings at any time.</li>
-    <li><strong>Knowledge Gram likes and comments.</strong> If you like or comment on an infographic, the comment text and a display name you choose are written to our public GitHub content repository so all users can see them. Please do not post personal information in comments — they are not private.</li>
+    <li><strong>Knowledge Gram likes.</strong> If you tap Like on an infographic, an anonymous like marker is written to our public GitHub content repository so the count is shared across devices. No name or personal text is stored. We do not host user comments in the app.</li>
     <li><strong>Downloaded / shared images.</strong> Images you download or share are generated on your device and saved to your device's gallery. We do not retain copies.</li>
   </ul>
 
@@ -144,7 +144,7 @@
       <tr><td>Firebase / Google Cloud Messaging</td><td>Push notification delivery</td><td>FCM registration token</td></tr>
       <tr><td>Brevo (SMTP)</td><td>Sending the forgot-password code email</td><td>Your email address and the 6-digit code</td></tr>
       <tr><td>Telegram</td><td>Delivering the daily report you configured</td><td>The bot token/chat ID you entered and your report text, sent via Telegram's API</td></tr>
-      <tr><td>GitHub</td><td>Hosting infographic images and public likes/comments</td><td>Comment text and display name, only if you post a comment</td></tr>
+      <tr><td>GitHub</td><td>Hosting infographic images and public like counts</td><td>An anonymous like marker, only if you tap Like</td></tr>
       <tr><td>Vercel</td><td>Hosting this website and our API endpoints</td><td>Standard request metadata (IP, user agent) processed transiently</td></tr>
     </tbody>
   </table>
@@ -156,7 +156,6 @@
     <li><strong>Account and ledger data:</strong> kept while your account is active. Deleting your account via Settings removes the ledger row and marks the account deleted; Cognito deletion is requested at the same time.</li>
     <li><strong>Optional Telegram data:</strong> removed from our server when you disconnect the integration; report markers are kept only for the current day to prevent duplicates.</li>
     <li><strong>Reset-code hashes:</strong> expire after 10 minutes and are cleared after a successful reset.</li>
-    <li><strong>Comments:</strong> stored in our public content repository until removed on request.</li>
   </ul>
   <p>To request deletion of anything we hold, email <a href="mailto:info@minutics.com">info@minutics.com</a> from your account address. We will verify and delete it within 30 days.</p>
 
