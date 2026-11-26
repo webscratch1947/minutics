@@ -159,12 +159,14 @@ var SETTINGS_GUIDES = {
   },
   accessibility: {
     title: 'Accessibility',
+    disclosure: 'To count reels and shorts, Minutics uses the Accessibility service to detect when a video is on screen for at least 3 seconds. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
     steps: ['Tap "Downloaded apps" (or Installed services).', 'Tap Minutics.', 'Turn the service ON (or OFF) and confirm.']
   }
 };
 
 function PermGuide({ permKey, onClose, onOpen }) {
   var g = SETTINGS_GUIDES[permKey] || { title: 'Permission', steps: [] };
+  var [consent, setConsent] = useState(false);
   /* Use the SAME brand-specific guide the onboarding uses (native profile). */
   try {
     var pr = (window.LTDeviceProfile && window.LTDeviceProfile())
@@ -184,8 +186,27 @@ function PermGuide({ permKey, onClose, onOpen }) {
       jsxs(Fragment, { children: [
         jsx('div', { className: 'w-11 h-1 rounded-full bg-gray-300 mx-auto mb-4' }),
         jsx('h3', { className: 'text-lg font-extrabold text-[#14162E] m-0 mb-1', children: g.title }),
+        g.disclosure
+          ? jsxs('div', { style: { background:'#F0F7F2', border:'1px solid #BBF7D0', borderLeft:'4px solid #157347', borderRadius:14, padding:'12px 14px', marginBottom:12 }, children: [
+              jsx('b', { style: { display:'block', fontSize:12.5, color:'#14532D', marginBottom:4 }, children: 'How Minutics uses this access' }),
+              jsx('p', { style: { fontSize:12.5, color:'#3F5A48', lineHeight:1.5, margin:0 }, children: g.disclosure })
+            ] })
+          : null,
+        g.disclosure
+          ? jsx('label', { style: { display:'flex', gap:9, alignItems:'flex-start', fontSize:12.5, color:'#334155', margin:'0 2px 14px', cursor:'pointer' }, children: jsxs('span', { children: [
+              jsx('input', { type:'checkbox', 'data-settings-consent':'1', checked: consent, onChange: function(e){ setConsent(!!(e && e.target && e.target.checked)); }, style: { width:17, height:17, accentColor:'#157347', flexShrink:0, margin:'1px 0 0', cursor:'pointer' } }),
+              jsx('span', { children: 'I understand and agree to this use' })
+            ] }) })
+          : null,
         jsx('ol', { className: 'my-4 pl-5 text-sm text-[#5B6478] leading-6', children: g.steps.map(function(s,i){ return jsx('li', { children: s }, i); }) }),
-        jsx('button', { type: 'button', className: 'w-full rounded-full bg-[#157347] text-white font-bold py-3', onClick: onOpen, children: 'Open Android settings' }),
+        jsx('button', {
+          type: 'button',
+          'data-settings-open': '1',
+          className: 'w-full rounded-full text-white font-bold py-3 ' + (g.disclosure && !consent ? 'bg-[#B7C2B9] cursor-not-allowed' : 'bg-[#157347]'),
+          disabled: !!(g.disclosure && !consent),
+          onClick: function(){ if (g.disclosure && !consent) return; onOpen(); },
+          children: g.disclosure && !consent ? 'Agree above to continue' : 'Open Android settings'
+        }),
         jsx('button', { type: 'button', className: 'w-full bg-transparent text-[#8A8578] font-semibold py-3', onClick: onClose, children: 'Close' })
       ] })
     })
