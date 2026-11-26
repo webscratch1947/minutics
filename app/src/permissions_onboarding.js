@@ -324,8 +324,9 @@ function ensurePermStyles() {
     '.lt-guide-disclosure{background:#F0F7F2;border:1px solid #BBF7D0;border-left:4px solid #157347;border-radius:14px;padding:12px 14px;margin:0 0 12px}',
     '.lt-guide-disclosure b{display:block;font-size:12.5px;color:#14532D;margin-bottom:4px}',
     '.lt-guide-disclosure p{font-size:12.5px;color:#3F5A48;line-height:1.5;margin:0}',
-    '.lt-guide-consent{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:#334155;line-height:1.4;margin:0 2px 14px;cursor:pointer}',
-    '.lt-guide-consent input{width:17px;height:17px;accent-color:#157347;flex-shrink:0;margin:1px 0 0;cursor:pointer}',
+    '.lt-guide-consent{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:#334155;line-height:1.4;margin:0 2px 14px;cursor:pointer}',
+    '.lt-guide-consent span{display:flex;align-items:flex-start;gap:10px}',
+    '.lt-guide-consent input{width:14px;height:14px;accent-color:#157347;flex-shrink:0;margin:2px 0 0;cursor:pointer}',
 
     '.lt-guide-steps{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:8px;position:relative}',
     '.lt-guide-steps::before{content:"";position:absolute;left:19px;top:12px;bottom:12px;width:2px;background:linear-gradient(180deg,#E9E4D7,#E9E4D7);border-radius:2px}',

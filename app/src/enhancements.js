@@ -3544,7 +3544,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
     var isEdit = !!budgetEditingId;
     /* Category = a real dropdown (not a free-text datalist). Existing used
        categories first, then a few sensible defaults so it's never empty. */
-    var DEFAULT_CATS = ["Food", "Groceries", "Travel", "Transport", "Bills", "Rent", "Shopping", "Health", "Medical", "Education", "Entertainment", "Subscriptions", "Dining Out", "Coffee", "Fuel", "Insurance", "Investments", "Savings", "Gifts", "Charity", "Repairs", "Utilities", "Internet", "Phone", "Other"];
+    var DEFAULT_CATS = ["Food", "Groceries", "Travel", "Transport", "Bills", "Rent", "Shopping", "Health", "Medical", "Education", "Entertainment", "Subscriptions", "Dining Out", "Coffee", "Fuel", "Insurance", "Investments", "Savings", "Gifts", "Charity", "Repairs", "Utilities", "Internet", "Phone", "Electronics", "Mobile", "Laptop", "Appliances", "Furniture", "Clothing", "Fashion", "Beauty", "Books", "Sports", "Fitness", "Hobbies", "Gaming", "Tools", "Software", "Events", "Wedding", "Vacation", "Hotel", "Flights", "Taxes", "Fees", "Services", "Maintenance", "Cleaning", "Laundry", "Salon", "Dental", "Eyewear", "Pet", "Kids", "Baby", "Other"];
     var catOpts = Array.from(new Set(categories.concat(DEFAULT_CATS)));
     var catSelect =
       '<div class="lt-field">' +
@@ -3575,8 +3575,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
             '<input name="validUntil" data-lt-valid-input type="date" value="' + escapeHtml(item.validUntil || "") + '"' + (item.noValidation ? " disabled" : "") + '>' +
           '</div>' +
           '<label class="lt-check"><input type="checkbox" name="noValidation" data-lt-noval' + (item.noValidation ? " checked" : "") + '> No validation</label>' +
-          field("Phone number", "phone", item.phone, "Optional") +
-          field("Email", "email", item.email, "Optional", "email") +
+          field("Seller phone number", "phone", item.phone, "Optional") +
+          field("Seller email", "email", item.email, "Optional", "email") +
           field("Notes", "notes", item.notes, "Optional notes", "text", "full", "textarea") +
         '</div>' +
         '<div class="lt-form-actions">' +
@@ -3615,8 +3615,8 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       else if (i.validUntil) metaBits.push('<span class="lt-eb-meta-bit">Valid until ' + escapeHtml(formatDate(i.validUntil)) + '</span>');
       var extraBits = [];
       if (i.paymentDetails) extraBits.push(escapeHtml(i.paymentDetails));
-      if (i.phone) extraBits.push(escapeHtml(i.phone));
-      if (i.email) extraBits.push(escapeHtml(i.email));
+      if (i.phone) extraBits.push('Seller phone: ' + escapeHtml(i.phone));
+      if (i.email) extraBits.push('Seller email: ' + escapeHtml(i.email));
       if (i.notes) extraBits.push(escapeHtml(i.notes));
       return '' +
         '<div class="lt-eb-row">' +

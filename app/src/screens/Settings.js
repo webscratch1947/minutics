@@ -193,8 +193,8 @@ function PermGuide({ permKey, onClose, onOpen }) {
             ] })
           : null,
         g.disclosure
-          ? jsx('label', { style: { display:'flex', gap:9, alignItems:'flex-start', fontSize:12.5, color:'#334155', margin:'0 2px 14px', cursor:'pointer' }, children: jsxs('span', { children: [
-              jsx('input', { type:'checkbox', 'data-settings-consent':'1', checked: consent, onChange: function(e){ setConsent(!!(e && e.target && e.target.checked)); }, style: { width:17, height:17, accentColor:'#157347', flexShrink:0, margin:'1px 0 0', cursor:'pointer' } }),
+          ? jsx('label', { style: { display:'flex', gap:10, alignItems:'flex-start', fontSize:13, color:'#334155', margin:'0 2px 14px', cursor:'pointer' }, children: jsxs('span', { style: { display:'flex', gap:10, alignItems:'flex-start' }, children: [
+              jsx('input', { type:'checkbox', 'data-settings-consent':'1', checked: consent, onChange: function(e){ setConsent(!!(e && e.target && e.target.checked)); }, style: { width:14, height:14, accentColor:'#157347', flexShrink:0, margin:'2px 0 0', cursor:'pointer' } }),
               jsx('span', { children: 'I understand and agree to this use' })
             ] }) })
           : null,
