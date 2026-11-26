@@ -139,6 +139,14 @@
       "has": [{ "type": "host", "value": "piapp.minutics.com" }]
     },
     {
+      "source": "/deleteaccount",
+      "destination": "/deleteaccount/index.html"
+    },
+    {
+      "source": "/deleteaccount/",
+      "destination": "/deleteaccount/index.html"
+    },
+    {
       "source": "/privacypolicy",
       "destination": "/privacypolicy/index.html"
     },
@@ -147,7 +155,7 @@
       "destination": "/privacypolicy/index.html"
     },
     {
-      "source": "/((?!api/|privacypolicy).*)",
+      "source": "/((?!api/|privacypolicy|deleteaccount).*)",
       "destination": "/index.html"
     }
   ]
