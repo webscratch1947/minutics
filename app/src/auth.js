@@ -509,6 +509,8 @@ function demoTimeRemainingMs() {
        wrapped back to a fresh 30:00 after 30 minutes and the session looked
        immortal ("it faked it / loops back to 30 minutes"). Activity now
        keeps the APP alive (see bumpDemoSession) but never the DEADLINE. */
+    /* Reviewer demo never expires — Play reviewers need uninterrupted access. */
+    try { if (localStorage.getItem("lt_review_demo_v1") === "1") return 24 * 60 * 60 * 1000; } catch (e) {}
     var started = parseInt(localStorage.getItem(DEMO_SESSION_KEY) || "0", 10);
     if (!started) return 0;
     return DEMO_DURATION_MS - (Date.now() - started);
@@ -1435,7 +1437,27 @@ function cognitoSignUp(email, password) {
   }
 }
 
+/* Play Store reviewer demo account — a dummy email/password that is NOT a
+   real Cognito account. Enter it in the normal login form; it opens a full
+   demo session with all features so reviewers can test the whole app. */
+var REVIEW_EMAIL = "playstoretest@minutics.com";
+var REVIEW_PASSWORD = "Minutics@2026";
+
 function cognitoLogin(email, password) {
+  /* Reviewer demo login — no network, permanent session, full access. */
+  if (email && String(email).trim().toLowerCase() === REVIEW_EMAIL
+      && password === REVIEW_PASSWORD) {
+    try {
+      enterDemo(true);
+      /* Make the demo session permanent for reviewers (no 30-min expiry). */
+      try { localStorage.setItem("lt_review_demo_v1", "1"); } catch (e) {}
+      return;
+    } catch (e) {
+      gateSetLoading(false);
+      showError("Could not start the demo. Please try again.");
+      return;
+    }
+  }
   try {
     var cogUser = new CognitoUser({ Username: email, Pool: _cogPool });
     var details = new AuthenticationDetails({ Username: email, Password: password });
