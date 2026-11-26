@@ -487,6 +487,14 @@ function announceUserChanged() {
   try { window.dispatchEvent(new CustomEvent("lt-user-changed")); } catch (e) {}
 }
 
+/* Safe full reset on the Android WebView: location.reload() on a hash
+   route re-requests a URL the asset loader can't serve. Always navigate
+   to the known-good base asset URL with a clean hash. */
+function safePageReset() {
+  try { location.replace(location.protocol + "//" + location.host + "/index.html#/"); }
+  catch (e) { try { location.reload(); } catch (e2) {} }
+}
+
 /* ── Early Access Demo engine ──────────────────────────────────────────── */
 function isDemoActive() {
   try {
@@ -577,7 +585,9 @@ function endDemoSession() {
   if (wipedClean) {
     /* 400ms: also gives disconnectTelegramAll's schedule-purge fetch a
        moment to land before the page goes away. */
-    try { setTimeout(function () { location.reload(); }, 400); } catch (e) {}
+    /* Safe full reset — see safePageReset(): a raw reload on a hash route
+       breaks the WebView asset loader (ERR_INVALID_RESPONSE). */
+    setTimeout(safePageReset, 400);
   }
 }
 /* A real sign-in always beats a demo session: wipe the demo completely
@@ -2001,7 +2011,7 @@ function _authTryRecover(reason) {
   try { if (sessionStorage.getItem("lt_auth_recovered")) return false; } catch (e) {}
   try { sessionStorage.setItem("lt_auth_recovered", "1"); } catch (e) {}
   console.warn("AUTH SAFETY: " + reason + " — reloading once to recover storage (marker " + getMarker() + ")");
-  setTimeout(function () { try { location.reload(); } catch (e) {} }, 250);
+  setTimeout(safePageReset, 250);
   return true;
 }
 
@@ -2042,7 +2052,7 @@ setTimeout(function () {
    broken gate. */
 window.addEventListener("pageshow", function (e) {
   if (e.persisted && !_authStateChangedFired) {
-    try { location.reload(); } catch (err) {}
+    safePageReset();
   }
 });
 
