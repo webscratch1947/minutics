@@ -139,7 +139,15 @@
       "has": [{ "type": "host", "value": "piapp.minutics.com" }]
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/privacypolicy",
+      "destination": "/privacypolicy/index.html"
+    },
+    {
+      "source": "/privacypolicy/",
+      "destination": "/privacypolicy/index.html"
+    },
+    {
+      "source": "/((?!api/|privacypolicy).*)",
       "destination": "/index.html"
     }
   ]

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy — Minutics</title>
+  <meta name="description" content="How Minutics handles your data. Short version: your activity data stays on your device; we only use servers for accounts, purchases and delivery of reports you explicitly enable." />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    :root { --ink:#16213a; --muted:#5d6577; --cream:#FDFBF7; --gold:#F5A623; --green:#059669; --line:#e7e2d6; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--cream); color:var(--ink); font:16px/1.65 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+    .wrap { max-width:760px; margin:0 auto; padding:38px 22px 80px; }
+    header { display:flex; align-items:center; gap:14px; margin-bottom:30px; }
+    .logo { width:52px; height:52px; border-radius:16px; background:linear-gradient(145deg,#0a2043,#012553); display:flex; align-items:center; justify-content:center; flex:none; }
+    .logo svg { width:30px; height:30px; }
+    h1 { font-size:30px; line-height:1.15; margin:0; letter-spacing:-.02em; }
+    .updated { color:var(--muted); font-size:13px; margin-top:4px; }
+    .tldr { background:#fff; border:1px solid var(--line); border-left:4px solid var(--green); border-radius:16px; padding:18px 20px; margin:0 0 30px; }
+    .tldr b { color:var(--green); }
+    h2 { font-size:20px; margin:34px 0 10px; letter-spacing:-.01em; border-top:1px solid var(--line); padding-top:22px; }
+    h3 { font-size:16px; margin:22px 0 6px; }
+    p { margin:0 0 12px; }
+    ul, ol { margin:0 0 12px; padding-left:22px; }
+    li { margin-bottom:6px; }
+    a { color:#0a5c46; text-underline-offset:2px; }
+    code { background:#f1ede4; padding:1px 6px; border-radius:6px; font-size:14px; }
+    table { width:100%; border-collapse:collapse; margin:6px 0 16px; font-size:14.5px; }
+    th, td { text-align:left; padding:10px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px 20px; margin:14px 0; }
+    footer { margin-top:44px; padding-top:22px; border-top:1px solid var(--line); color:var(--muted); font-size:13.5px; }
+    @media (max-width:520px){ h1{font-size:25px;} .wrap{padding:24px 16px 60px;} }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2" stroke="#7CD9A0"/><path d="M3 20h18" stroke="#FDE68A"/></svg>
+    </div>
+    <div><h1>Privacy Policy</h1><div class="updated">Minutics · Last updated 26 November 2026 · Effective 26 November 2026</div></div>
+  </header>
+
+  <div class="tldr">
+    <p><b>The short version:</b> Minutics is a local-first time-tracking app. Your activities, tasks, routines, budget entries and doom-scroll counts are stored on your device, not on our servers. We use servers only for three things you explicitly trigger: (1) your account sign-in, (2) paid plans through Google Play, and (3) optional cloud features you switch on yourself — daily Telegram reports and push notifications. We do not sell your data, we do not run ads, and we do not track you across other apps or websites.</p>
+  </div>
+
+  <p>This policy explains what Minutics ("we", "us") collects, how we use it, who we share it with, and the choices you have. It applies to the Minutics Android app and to our website at <a href="https://minutics.com">minutics.com</a>. By using Minutics you agree to this policy.</p>
+
+  <h2>1. Who we are</h2>
+  <p>Minutics is operated by the Minutics team. For privacy questions, data requests, or to report a concern, contact <a href="mailto:minutics@gmail.com">minutics@gmail.com</a>. We respond to verifiable requests within 30 days.</p>
+
+  <h2>2. What we collect, and where it lives</h2>
+  <p>We deliberately separate on-device data from server data.</p>
+
+  <h3>2.1 Data that stays on your device</h3>
+  <p>The following are saved in your device's local storage and are <strong>not</strong> uploaded to us:</p>
+  <ul>
+    <li>Activity names, categories, timers, logged minutes and daily history</li>
+    <li>"Eat the Frog" starred tasks, tasks, notes and your free-plan limits</li>
+    <li>Routine Tracker items and daily checkmarks</li>
+    <li>Budget Tracker entries, EMI/compound calculations, Time Value salary figures and currency choice</li>
+    <li>Time Waste budget minutes, daily limits and alert history</li>
+    <li>Doom-scroll counter totals and per-app counts</li>
+    <li>Productivity Score inputs and your display/goal preferences</li>
+    <li>Your chosen profile picture (stored locally only)</li>
+  </ul>
+  <p>Because this data never leaves your phone, uninstalling the app or clearing its data removes it permanently. It does not carry over to another device or another account.</p>
+
+  <h3>2.2 Account data (stored with our identity provider)</h3>
+  <p>To sign in we use Amazon Web Services Cognito. When you register or log in we handle:</p>
+  <ul>
+    <li>Your email address and password. Passwords are never stored by us — Cognito handles authentication using a secure protocol (SRP), so your password is not sent in readable form.</li>
+    <li>A unique user identifier and session tokens used to keep you signed in.</li>
+    <li>A device identifier used for our single-device session rule (the last device you sign in on owns the session). This prevents account sharing and is stored in our database.</li>
+  </ul>
+  <p>We do not require real-name verification, phone numbers, or dates of birth for your account. Any date of birth you enter in the app’s onboarding is used only on-device to compute your "time left" view and is stored locally, not on our servers.</p>
+
+  <h3>2.3 Server-side app state (linked to your account)</h3>
+  <p>We store a small ledger row so paid features and account state survive a reinstall:</p>
+  <ul>
+    <li>Your email and the plan you hold (free / basic / yearly / lifetime), the date the plan started, and a purchase record containing the Google Play order ID, product ID and purchase token. This lets us restore your purchase and verify refunds.</li>
+    <li>Notification state such as the last date a Time Waste alert was sent, so we do not alert you repeatedly for the same crossing.</li>
+    <li>A one-way hash of your password-reset code when you use "Forgot password" — never the code itself — plus the time it was created and how many wrong attempts were made.</li>
+  </ul>
+
+  <h3>2.4 Optional cloud features (only if you enable them)</h3>
+  <ul>
+    <li><strong>Telegram daily reports.</strong> If you connect a Telegram bot, the bot token and chat ID you enter are sent to our server so the daily report can be scheduled and sent even when the app is closed. The report contains your own on-device totals (Productivity Score, activities, routine checkmarks). We do not read your Telegram messages. You can disconnect at any time in Settings, which removes the stored schedule.</li>
+    <li><strong>Push notifications.</strong> If you allow notifications, a Firebase Cloud Messaging (FCM) token is registered so we can deliver reminders and Time Waste alerts. You can revoke notification permission in Android settings at any time.</li>
+    <li><strong>Knowledge Gram likes and comments.</strong> If you like or comment on an infographic, the comment text and a display name you choose are written to our public GitHub content repository so all users can see them. Please do not post personal information in comments — they are not private.</li>
+    <li><strong>Downloaded / shared images.</strong> Images you download or share are generated on your device and saved to your device's gallery. We do not retain copies.</li>
+  </ul>
+
+  <h3>2.5 Information we do not collect</h3>
+  <ul>
+    <li>We do not collect your precise location, contacts, call logs, SMS, photo library contents, browsing history, or messages.</li>
+    <li>We do not use advertising identifiers, analytics SDKs, or cross-app tracking.</li>
+    <li>We do not knowingly collect personal information from children under 13. Minutics is not directed at children.</li>
+  </ul>
+
+  <h2>3. Android permissions we use</h2>
+  <table>
+    <thead><tr><th>Permission</th><th>Why we ask</th></tr></thead>
+    <tbody>
+      <tr><td>Internet</td><td>To sign you in, verify purchases, and deliver optional reports/notifications.</td></tr>
+      <tr><td>Notifications</td><td>To show "Still there?" reminders and Time Waste alerts (only if you enable them).</td></tr>
+      <tr><td>Display over other apps</td><td>To show the full-screen Time Waste alert on top of the app you are currently browsing when your limit is crossed.</td></tr>
+      <tr><td>Accessibility service</td><td>Optional. Counts how long a reel/short is visible (at least 3 seconds) so the Doom scroll counter can show a daily total. It reads only UI class/description metadata of visible feed items — never messages, passwords, form fields, or text you type. You can turn this off any time.</td></tr>
+      <tr><td>Ignore battery optimizations</td><td>Optional. Keeps the local guard and report scheduler alive so alerts are not missed. You can refuse it.</td></tr>
+      <tr><td>Exact alarms / boot receiver</td><td>To fire your daily Telegram report and re-arm it after a restart.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. How we use your information</h2>
+  <ul>
+    <li>To provide the app: authentication, restoring paid plans, syncing optional cloud features, and remembering your session.</li>
+    <li>To enforce free-plan limits and prevent abuse of sign-ups and purchases.</li>
+    <li>To send the notifications and Telegram reports <em>you</em> configured.</li>
+    <li>To diagnose failures (for example, why a popup or purchase did not go through) using short error strings — never your personal content.</li>
+  </ul>
+  <p>We do not use your data to train advertising models, build profiles, or make automated decisions that affect you legally.</p>
+
+  <h2>5. Who we share data with</h2>
+  <p>We share only what is necessary, with these service providers:</p>
+  <table>
+    <thead><tr><th>Provider</th><th>Purpose</th><th>Data</th></tr></thead>
+    <tbody>
+      <tr><td>Amazon Web Services (Cognito, DynamoDB, Lambda)</td><td>Identity, session enforcement, plan ledger, reset-code handling</td><td>Email, user ID, device ID, plan, purchase tokens, reset-code hash</td></tr>
+      <tr><td>Google Play</td><td>Processing purchases and subscription status</td><td>Purchase token and product ID; Google's payment details are handled by Google, not us</td></tr>
+      <tr><td>Firebase / Google Cloud Messaging</td><td>Push notification delivery</td><td>FCM registration token</td></tr>
+      <tr><td>Brevo (SMTP)</td><td>Sending the forgot-password code email</td><td>Your email address and the 6-digit code</td></tr>
+      <tr><td>Telegram</td><td>Delivering the daily report you configured</td><td>The bot token/chat ID you entered and your report text, sent via Telegram's API</td></tr>
+      <tr><td>GitHub</td><td>Hosting infographic images and public likes/comments</td><td>Comment text and display name, only if you post a comment</td></tr>
+      <tr><td>Vercel</td><td>Hosting this website and our API endpoints</td><td>Standard request metadata (IP, user agent) processed transiently</td></tr>
+    </tbody>
+  </table>
+  <p>We do not sell or rent your personal information to anyone. We do not share it with data brokers or advertisers.</p>
+
+  <h2>6. Data retention and deletion</h2>
+  <ul>
+    <li><strong>On-device data:</strong> kept until you delete it in the app or uninstall. Clearing app data removes it immediately.</li>
+    <li><strong>Account and ledger data:</strong> kept while your account is active. Deleting your account via Settings removes the ledger row and marks the account deleted; Cognito deletion is requested at the same time.</li>
+    <li><strong>Optional Telegram data:</strong> removed from our server when you disconnect the integration; report markers are kept only for the current day to prevent duplicates.</li>
+    <li><strong>Reset-code hashes:</strong> expire after 10 minutes and are cleared after a successful reset.</li>
+    <li><strong>Comments:</strong> stored in our public content repository until removed on request.</li>
+  </ul>
+  <p>To request deletion of anything we hold, email <a href="mailto:minutics@gmail.com">minutics@gmail.com</a> from your account address. We will verify and delete it within 30 days.</p>
+
+  <h2>7. Your choices and rights</h2>
+  <ul>
+    <li><strong>Access, correct, delete:</strong> request a copy, correction, or deletion of your server-side data by emailing us.</li>
+    <li><strong>Notifications:</strong> turn on/off in Android settings at any time.</li>
+    <li><strong>Accessibility / overlay / battery:</strong> all optional; revoke in Android settings. Core time tracking still works without them.</li>
+    <li><strong>Telegram reports:</strong> disconnect in Settings at any time.</li>
+    <li><strong>Account deletion:</strong> Settings → Delete account.</li>
+    <li><strong>Portability:</strong> use Settings → Download Data to export your on-device data to a file.</li>
+  </ul>
+  <p>Depending on where you live, you may also have rights under GDPR/UK GDPR, CCPA/CPRA, or similar laws, including the right to object to processing or lodge a complaint with your local regulator. We will honour valid requests.</p>
+
+  <h2>8. Security</h2>
+  <p>Passwords are handled by Cognito with SRP and are never stored in plain text. API endpoints use CORS allowlists, short-lived tokens, one-way hashes for reset codes, and server-side purchase verification with Google. We restrict admin tools behind a separate secret. No system is perfectly secure, but we design the app so the most sensitive data (your daily activities) never leaves your device.</p>
+
+  <h2>9. Links and third-party services</h2>
+  <p>Minutics may open external links (for example when you share to WhatsApp, Telegram, Instagram or Facebook) or fetch infographic images. Those services have their own privacy policies; once you leave or share to them, their rules apply, not ours.</p>
+
+  <h2>10. Changes to this policy</h2>
+  <p>We may update this policy as the app evolves. We will post the new version on this page and update the "Last updated" date. Material changes will be communicated in the app or on our website before they take effect.</p>
+
+  <h2>11. Contact</h2>
+  <div class="card">
+    <p><strong>Minutics — privacy requests</strong><br/>
+    Email: <a href="mailto:minutics@gmail.com">minutics@gmail.com</a><br/>
+    Website: <a href="https://minutics.com">https://minutics.com</a></p>
+  </div>
+
+  <footer>Minutics. Made to help you see where your time goes — without taking your data with it.</footer>
+</div>
+</body>
+</html>

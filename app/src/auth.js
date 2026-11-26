@@ -1437,27 +1437,37 @@ function cognitoSignUp(email, password) {
   }
 }
 
-/* Play Store reviewer demo account — a dummy email/password that is NOT a
-   real Cognito account. Enter it in the normal login form; it opens a full
-   demo session with all features so reviewers can test the whole app. */
-var REVIEW_EMAIL = "playstoretest@minutics.com";
-var REVIEW_PASSWORD = "Minutics@2026";
+/* Play Store reviewer demo sign-in. Credentials are NOT in this bundle —
+   they live in Vercel env vars and are checked by /api/reviewer. A match
+   opens a full local demo session so reviewers can test everything. */
+function tryReviewerLogin(email, password) {
+  try {
+    var origin = (window.LTAuth && window.LTAuth.apiOrigin) ? window.LTAuth.apiOrigin() : "";
+    return fetch(origin + "/api/reviewer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, password: password })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.ok) {
+        enterDemo(true);
+        try { localStorage.setItem("lt_review_demo_v1", "1"); } catch (e) {}
+        return true;
+      }
+      return false;
+    }).catch(function () { return false; });
+  } catch (e) { return Promise.resolve(false); }
+}
 
 function cognitoLogin(email, password) {
-  /* Reviewer demo login — no network, permanent session, full access. */
-  if (email && String(email).trim().toLowerCase() === REVIEW_EMAIL
-      && password === REVIEW_PASSWORD) {
-    try {
-      enterDemo(true);
-      /* Make the demo session permanent for reviewers (no 30-min expiry). */
-      try { localStorage.setItem("lt_review_demo_v1", "1"); } catch (e) {}
-      return;
-    } catch (e) {
-      gateSetLoading(false);
-      showError("Could not start the demo. Please try again.");
-      return;
-    }
-  }
+  gateSetLoading(true);
+  tryReviewerLogin(email, password).then(function (reviewer) {
+    if (reviewer) return; /* demo session opened */
+    /* Not the reviewer — normal Cognito login. */
+    doCognitoLogin(email, password);
+  });
+}
+
+function doCognitoLogin(email, password) {
   try {
     var cogUser = new CognitoUser({ Username: email, Pool: _cogPool });
     var details = new AuthenticationDetails({ Username: email, Password: password });
