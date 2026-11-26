@@ -4001,8 +4001,47 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
    * Likes are stored in our GitHub repo (see gramSyncRemote).
    * ══════════════════════════════════════════════════════════════════════════ */
 
-  function gramIsLiked(id)   { var arr = (GRAM_LIKES_REMOTE && GRAM_LIKES_REMOTE[id]) || []; return arr.indexOf(gramDeviceId()) !== -1; }
-  function gramLikeCount(id) { return ((GRAM_LIKES_REMOTE && GRAM_LIKES_REMOTE[id]) || []).length; }
+  /* Likes are kept in BOTH the shared GitHub file and a local mirror. The
+     mirror keeps the heart responsive even when the write endpoint or the
+     network is unavailable (common on Indian mobile networks). */
+  function gramLikesFor(id) {
+    var arr = [];
+    try {
+      var m = readJson("lt_gram_likes_v1", {}) || {};
+      arr = arr.concat(m[id] || []);
+    } catch (e) {}
+    arr = arr.concat((GRAM_LIKES_REMOTE && GRAM_LIKES_REMOTE[id]) || []);
+    return Array.from(new Set(arr));
+  }
+  function gramIsLiked(id)   { return gramLikesFor(id).indexOf(gramDeviceId()) !== -1; }
+  function gramLikeCount(id) { return gramLikesFor(id).length; }
+
+  function gramToggleLike(id) {
+    if (!GRAM_LIKES_REMOTE) GRAM_LIKES_REMOTE = {};
+    var device = gramDeviceId();
+    var wasLiked = gramIsLiked(id);
+    var nowLiked = !wasLiked;
+    /* Local mirror first — the UI must never wait on the network. */
+    try {
+      var m = readJson("lt_gram_likes_v1", {}) || {};
+      var arr = (m[id] || []).slice();
+      var i = arr.indexOf(device);
+      if (nowLiked && i === -1) arr.push(device);
+      if (!nowLiked && i !== -1) arr.splice(i, 1);
+      m[id] = arr;
+      writeJson("lt_gram_likes_v1", m);
+    } catch (e) {}
+    /* Shared copy too. */
+    var shared = ((GRAM_LIKES_REMOTE[id] || []).slice());
+    var j = shared.indexOf(device);
+    if (nowLiked && j === -1) shared.push(device);
+    if (!nowLiked && j !== -1) shared.splice(j, 1);
+    GRAM_LIKES_REMOTE[id] = shared;
+    ghPutFile("likes.json", GRAM_LIKES_REMOTE, GRAM_LIKES_SHA, "like " + id, function (ok, newSha) {
+      if (ok && newSha) GRAM_LIKES_SHA = newSha;
+    });
+    return nowLiked;
+  }
   /* ── Watermarking, Save, Share ────────────────────────────────────────
      Every exported copy of a gram image (saved to the device OR shared
      out to another app) goes through this canvas pipeline first, which
