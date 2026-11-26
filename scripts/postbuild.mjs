@@ -92,6 +92,8 @@ if (target === "piapp") {
   copy(join(projectRoot, 'deleteaccount', 'index.html'), join(outDir, 'deleteaccount', 'index.html'));
   // Terms and Conditions served at https://minutics.com/termsandcondition
   copy(join(projectRoot, 'termsandcondition', 'index.html'), join(outDir, 'termsandcondition', 'index.html'));
+  // Accessibility prominent-disclosure video for Play Console
+  copy(join(projectRoot, 'video', 'accessibility-disclosure.mp4'), join(outDir, 'video', 'accessibility-disclosure.mp4'));
   // Self-hosted Google Fonts for the marketing site (referenced as /fonts/...)
   copyDir(join(projectRoot, 'fonts'), join(outDir, 'fonts'));
   // Real app screenshots referenced by the Screens showcase section

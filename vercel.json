@@ -147,6 +147,10 @@
       "destination": "/deleteaccount/index.html"
     },
     {
+      "source": "/video/accessibility-disclosure.mp4",
+      "destination": "/video/accessibility-disclosure.mp4"
+    },
+    {
       "source": "/termsandcondition",
       "destination": "/termsandcondition/index.html"
     },
@@ -163,7 +167,7 @@
       "destination": "/privacypolicy/index.html"
     },
     {
-      "source": "/((?!api/|privacypolicy|deleteaccount|termsandcondition).*)",
+      "source": "/((?!api/|video/|privacypolicy|deleteaccount|termsandcondition).*)",
       "destination": "/index.html"
     }
   ]

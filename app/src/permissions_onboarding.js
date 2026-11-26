@@ -83,8 +83,9 @@ export const PERMISSION_ROWS = [
     key: 'accessibility',
     title: 'Accessibility',
     optional: true,
-    desc: 'Optional — only the Doom scroll stopper needs it, to count reels and shorts you watch.',
+    desc: 'Optional - only the Doom scroll stopper needs it, to count reels and shorts you watch.',
     icon: 'accessibility',
+    disclosure: 'To count reels and shorts, Minutics uses the Accessibility service to detect when a video is on screen for at least 3 seconds. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
     steps: [
       'This is optional. Skip it if you do not want the Doom scroll stopper.',
       'Want the counter? Tap Downloaded apps (or Installed services).',
@@ -182,6 +183,7 @@ function PermIcon({ name, size }) {
 function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
   var [dragY, setDragY] = useState(0);
   var [closing, setClosing] = useState(false);
+  var [consent, setConsent] = useState(false);
   var startY = useRef(null);
 
   useEffect(function () {
@@ -239,6 +241,22 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
             })
           ] }),
           jsx('p', { className: 'lt-guide-desc', children: perm.desc }),
+          perm.disclosure
+            ? jsxs('div', { className: 'lt-guide-disclosure', children: [
+                jsx('b', { children: 'How Minutics uses this access' }),
+                jsx('p', { children: perm.disclosure })
+              ] })
+            : null,
+          perm.disclosure
+            ? jsx('label', { className: 'lt-guide-consent', children: jsxs('span', { children: [
+                jsx('input', {
+                  type: 'checkbox', 'data-guide-consent': '1',
+                  checked: consent,
+                  onChange: function (e) { setConsent(!!(e && e.target && e.target.checked)); }
+                }),
+                jsx('span', { children: 'I understand and agree to this use' })
+              ] }) })
+            : null,
           jsx('ol', { className: 'lt-guide-steps', children: perm.steps.map(function (s, i) {
             return jsx('li', {
               children: jsxs('span', { children: [
@@ -248,8 +266,15 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
             }, i);
           }) }),
           jsx('button', {
-            type: 'button', className: 'lt-guide-primary', 'data-guide-open-settings': '1',
-            onClick: onOpenSettings, children: 'Open Android settings'
+            type: 'button',
+            className: 'lt-guide-primary' + (perm.disclosure && !consent ? ' is-disabled' : ''),
+            'data-guide-open-settings': '1',
+            disabled: !!(perm.disclosure && !consent),
+            onClick: function (e) {
+              if (perm.disclosure && !consent) return;
+              onOpenSettings(e);
+            },
+            children: perm.disclosure && !consent ? 'Agree above to continue' : 'Open Android settings'
           })
         ]
       })
@@ -296,6 +321,11 @@ function ensurePermStyles() {
     '.lt-guide-title h3{font-size:20px;font-weight:900;color:#14162E;margin:0;line-height:1.15}',
     '.lt-guide-x{width:34px;height:34px;border-radius:999px;background:#F1ECE0;border:none;font-size:17px;color:#9AA1AE;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}',
     '.lt-guide-desc{font-size:13.5px;color:#5B6478;line-height:1.5;margin:4px 0 14px;padding:0 2px}',
+    '.lt-guide-disclosure{background:#F0F7F2;border:1px solid #BBF7D0;border-left:4px solid #157347;border-radius:14px;padding:12px 14px;margin:0 0 12px}',
+    '.lt-guide-disclosure b{display:block;font-size:12.5px;color:#14532D;margin-bottom:4px}',
+    '.lt-guide-disclosure p{font-size:12.5px;color:#3F5A48;line-height:1.5;margin:0}',
+    '.lt-guide-consent{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:#334155;line-height:1.4;margin:0 2px 14px;cursor:pointer}',
+    '.lt-guide-consent input{width:17px;height:17px;accent-color:#157347;flex-shrink:0;margin:1px 0 0;cursor:pointer}',
 
     '.lt-guide-steps{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:8px;position:relative}',
     '.lt-guide-steps::before{content:"";position:absolute;left:19px;top:12px;bottom:12px;width:2px;background:linear-gradient(180deg,#E9E4D7,#E9E4D7);border-radius:2px}',
@@ -308,6 +338,7 @@ function ensurePermStyles() {
 
     '.lt-guide-primary{width:100%;border:none;border-radius:14px;padding:14px;background:linear-gradient(135deg,#157347,#1FA060);color:#fff;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 8px 20px -8px rgba(21,115,71,.7);margin-top:2px}',
     '.lt-guide-primary:active{transform:scale(.985)}',
+    '.lt-guide-primary.is-disabled{background:#B7C2B9;box-shadow:none;cursor:not-allowed}',
     '.lt-guide-secondary{width:100%;border:none;background:none;color:#7A8494;font-size:13px;font-weight:700;padding:10px 0 2px;cursor:pointer}',
 
     '.lt-perm-mini{position:fixed;left:12px;right:12px;bottom:86px;z-index:2147483200;display:flex;align-items:center;gap:9px;background:#14162E;color:#fff;border-radius:16px;padding:10px 11px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:ltPermMini .25s cubic-bezier(.22,.61,.36,1)}',
@@ -416,7 +447,7 @@ export function PermissionsStep({ onChange }) {
       total: rows.length,
       perm: (function () {
         var g = guideFor(tutorial.key);
-        return { key: tutorial.key, title: g.title, icon: tutorial.icon, steps: g.steps };
+        return { key: tutorial.key, title: g.title, icon: tutorial.icon, steps: g.steps, disclosure: tutorial.disclosure };
       })(),
       onOpenSettings: function () { openSettings(tutorial); },
       onClose: function () { setTutorial(null); }
