@@ -94,6 +94,8 @@ if (target === "piapp") {
   copy(join(projectRoot, 'termsandcondition', 'index.html'), join(outDir, 'termsandcondition', 'index.html'));
   // Accessibility prominent-disclosure video for Play Console
   copy(join(projectRoot, 'video', 'accessibility-disclosure.mp4'), join(outDir, 'video', 'accessibility-disclosure.mp4'));
+  // Foreground service permission demo video for Play Console
+  copy(join(projectRoot, 'video', 'foreground-service.mp4'), join(outDir, 'video', 'foreground-service.mp4'));
   // Self-hosted Google Fonts for the marketing site (referenced as /fonts/...)
   copyDir(join(projectRoot, 'fonts'), join(outDir, 'fonts'));
   // Real app screenshots referenced by the Screens showcase section
