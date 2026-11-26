@@ -1451,6 +1451,12 @@ function tryReviewerLogin(email, password) {
       if (d && d.ok) {
         enterDemo(true);
         try { localStorage.setItem("lt_review_demo_v1", "1"); } catch (e) {}
+        /* Guarantee FULL Lifetime access for the reviewer — no reliance on
+           purchase state, server ledger, or a real Google Play transaction. */
+        try { localStorage.setItem("lt_plan_v1", JSON.stringify("lifetime")); } catch (e) {}
+        try { localStorage.setItem("lt_plan_since_v1", JSON.stringify(Date.now())); } catch (e) {}
+        try { if (window.LTPlan && window.LTPlan.setPlan) window.LTPlan.setPlan("lifetime"); } catch (e) {}
+        try { window.dispatchEvent(new Event("lt-plan-changed")); } catch (e) {}
         return true;
       }
       return false;
@@ -2092,6 +2098,16 @@ function handleAuthUser(user) {
      it in full when the 30 minutes already ran out. Must run before the
      null-branch storage recovery below (a demo sets lt_active_uid, which
      would otherwise trigger a pointless reload loop). */
+  /* Reviewer demo (Play Store) resumes on boot independently of DEMO_MODE. */
+  if (!user) {
+    var isReview = false;
+    try { isReview = localStorage.getItem("lt_review_demo_v1") === "1"; } catch (e) {}
+    if (isReview && isDemoActive()) {
+      enterDemo(false);
+      try { localStorage.setItem("lt_plan_v1", JSON.stringify("lifetime")); } catch (e) {}
+      return;
+    }
+  }
   if (!user && DEMO_MODE && isDemoActive()) {
     if (demoTimeRemainingMs() > 0) enterDemo(false);
     else endDemoSession();
