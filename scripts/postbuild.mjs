@@ -90,6 +90,8 @@ if (target === "piapp") {
   copy(join(projectRoot, 'privacypolicy', 'index.html'), join(outDir, 'privacypolicy', 'index.html'));
   // Delete-account guide served at https://minutics.com/deleteaccount
   copy(join(projectRoot, 'deleteaccount', 'index.html'), join(outDir, 'deleteaccount', 'index.html'));
+  // Terms and Conditions served at https://minutics.com/termsandcondition
+  copy(join(projectRoot, 'termsandcondition', 'index.html'), join(outDir, 'termsandcondition', 'index.html'));
   // Self-hosted Google Fonts for the marketing site (referenced as /fonts/...)
   copyDir(join(projectRoot, 'fonts'), join(outDir, 'fonts'));
   // Real app screenshots referenced by the Screens showcase section

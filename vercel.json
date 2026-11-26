@@ -147,6 +147,14 @@
       "destination": "/deleteaccount/index.html"
     },
     {
+      "source": "/termsandcondition",
+      "destination": "/termsandcondition/index.html"
+    },
+    {
+      "source": "/termsandcondition/",
+      "destination": "/termsandcondition/index.html"
+    },
+    {
       "source": "/privacypolicy",
       "destination": "/privacypolicy/index.html"
     },
@@ -155,7 +163,7 @@
       "destination": "/privacypolicy/index.html"
     },
     {
-      "source": "/((?!api/|privacypolicy|deleteaccount).*)",
+      "source": "/((?!api/|privacypolicy|deleteaccount|termsandcondition).*)",
       "destination": "/index.html"
     }
   ]
