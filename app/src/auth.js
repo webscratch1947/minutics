@@ -714,8 +714,18 @@ window.LTDemo = {
 window.LTAuth = {
   logout: function () {
     /* Demo session: "Log out" ends the demo — full data wipe, back to
-       the welcome screen (never a Cognito signOut of a null user). */
-    if (DEMO_MODE && isDemoActive()) { disconnectTelegramAll(); endDemoSession(); return; }
+       the welcome screen (never a Cognito signOut of a null user).
+       Reviewer demo is ended here too (DEMO_MODE is false in production). */
+    var isReview = false;
+    try { isReview = localStorage.getItem("lt_review_demo_v1") === "1"; } catch (e) {}
+    if ((DEMO_MODE || isReview) && isDemoActive()) {
+      try { localStorage.removeItem("lt_review_demo_v1"); } catch (e) {}
+      try { localStorage.removeItem("lt_plan_v1"); } catch (e) {}
+      try { localStorage.removeItem("lt_plan_since_v1"); } catch (e) {}
+      disconnectTelegramAll();
+      endDemoSession();
+      return;
+    }
     /* IMPORTANT: do NOT clear localStorage here. */
     _logoutInProgress = true;
 
