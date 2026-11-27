@@ -475,6 +475,10 @@ export function SettingsScreen() {
           var raw = window.AndroidBridge.getPermissionStatus();
           var o = typeof raw === "string" ? JSON.parse(raw) : raw;
           if (o) setPermStatus(o);
+          /* Revoked in Android Settings -> consent must be collected again. */
+          if (o && o.accessibility === false) {
+            try { localStorage.removeItem('lt_a11y_consent_v1'); } catch (e) {}
+          }
         }
       } catch (e) {}
     }

@@ -420,6 +420,11 @@ export function PermissionsStep({ onChange }) {
   var update = function (next) {
     statusRef.current = next;
     setStatus(next);
+    /* If the user revokes Accessibility in Android Settings, the earlier
+       consent no longer covers a future request — show the disclosure again. */
+    if (next && next.accessibility === false) {
+      try { localStorage.removeItem("lt_a11y_consent_v1"); } catch (e) {}
+    }
     if (onChange) onChange(allGranted(next, rows));
   };
 
