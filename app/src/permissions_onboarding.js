@@ -230,7 +230,7 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
         if (!perm.disclosure && e.target === e.currentTarget) requestClose();
       },
       children: jsxs('div', {
-        className: 'lt-guide-sheet',
+        className: 'lt-guide-sheet' + (perm.disclosure ? ' is-consent' : ''),
         style: dragY ? { transform: 'translateY(' + dragY + 'px)', transition: 'none' } : undefined,
         children: [
           perm.disclosure ? null : jsx('span', {
@@ -250,7 +250,7 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
               'data-guide-close': '1', onClick: requestClose, children: '\u2715'
             })
           ] }),
-          jsx('p', { className: 'lt-guide-desc', children: perm.desc }),
+          perm.disclosure ? null : jsx('p', { className: 'lt-guide-desc', children: perm.desc }),
           perm.disclosure
             ? jsxs('div', { className: 'lt-guide-disclosure', children: [
                 jsx('b', { children: 'How Minutics uses this access' }),
@@ -267,7 +267,7 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
                 jsx('span', { children: 'I understand and agree to this use' })
               ] }) })
             : null,
-          !(perm.disclosure && stage === 1)
+          !perm.disclosure
             ? jsx('ol', { className: 'lt-guide-steps', children: perm.steps.map(function (s, i) {
                 return jsx('li', {
                   children: jsxs('span', { children: [
@@ -276,10 +276,12 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
                   ] })
                 }, i);
               }) })
-            : jsxs('div', { className: 'lt-guide-disclosure', children: [
+            : perm.disclosure && stage === 1
+              ? jsxs('div', { className: 'lt-guide-disclosure', children: [
                 jsx('b', { children: 'Confirm: turn on Accessibility for Minutics?' }),
                 jsx('p', { children: 'You agreed to the disclosure above. The next screen is Android Settings, where you can switch Minutics on. You can turn it off at any time.' })
-              ] }),
+              ] })
+              : null,
           perm.disclosure
             ? jsxs('div', { className: 'lt-guide-actions', children:
                 stage === 0
@@ -389,7 +391,21 @@ function ensurePermStyles() {
     '.lt-perm-mini-body b{display:block;font-size:12.5px;font-weight:800;line-height:1.2}',
     '.lt-perm-mini-body span{display:block;font-size:10.5px;color:rgba(255,255,255,.62);margin-top:1px}',
     '.lt-perm-mini-open{border:none;border-radius:999px;padding:7px 12px;background:#22C55E;color:#06230F;font-size:11px;font-weight:900;cursor:pointer;flex-shrink:0}',
-    '.lt-perm-mini-x{background:none;border:none;color:rgba(255,255,255,.5);font-size:15px;cursor:pointer;padding:3px;flex-shrink:0}'
+    '.lt-perm-mini-x{background:none;border:none;color:rgba(255,255,255,.5);font-size:15px;cursor:pointer;padding:3px;flex-shrink:0}',
+
+    /* Cleaner, dedicated Accessibility consent sheet */
+    '.lt-guide-sheet.is-consent{background:#FDFBF7;padding:24px 22px calc(24px + env(safe-area-inset-bottom,24px));border-radius:28px 28px 0 0}',
+    '.is-consent .lt-guide-head{gap:14px;margin-bottom:18px;align-items:center}',
+    '.is-consent .lt-guide-icon{width:50px;height:50px;border-radius:16px;background:linear-gradient(145deg,#012553,#0A3F7A);color:#7CD9A0;box-shadow:0 8px 20px -8px rgba(1,37,83,.5)}',
+    '.is-consent .lt-guide-eyebrow{font-size:10px;font-weight:900;letter-spacing:.16em;color:#059669;margin:0 0 3px}',
+    '.is-consent .lt-guide-title h3{font-size:22px;color:#012553;letter-spacing:-.02em}',
+    '.is-consent .lt-guide-disclosure{background:#fff;border:1px solid #E7E2D6;border-left:none;border-radius:18px;padding:18px;box-shadow:0 6px 20px rgba(1,37,83,.06);margin:0 0 16px}',
+    '.is-consent .lt-guide-disclosure b{font-size:14px;color:#012553;margin-bottom:8px;letter-spacing:-.01em}',
+    '.is-consent .lt-guide-disclosure p{font-size:13.5px;color:#4A5366;line-height:1.65}',
+    '.is-consent .lt-guide-consent{background:#fff;border:1px solid #E7E2D6;border-radius:14px;padding:14px 16px;margin:0 0 20px;box-shadow:0 4px 14px rgba(1,37,83,.04)}',
+    '.is-consent .lt-guide-consent span{font-size:13px;color:#263248;font-weight:600}',
+    '.is-consent .lt-guide-actions{gap:12px;margin-top:2px}',
+    '.is-consent .lt-guide-decline,.is-consent .lt-guide-actions .lt-guide-primary{border-radius:14px;padding:14px 8px;font-size:13px;font-weight:800}'
   ].join('');
   document.head.appendChild(st);
 }

@@ -184,28 +184,34 @@ function PermGuide({ permKey, onClose, onOpen }) {
   } catch (e) {}
   return createPortal(
     jsx('div', { className: 'fixed inset-0 z-[9999] flex items-end justify-center bg-black/60', onClick: onClose, children:
-    jsx('div', { className: 'w-full max-w-[430px] bg-white rounded-t-3xl p-5 pb-8', onClick: function(e){ e.stopPropagation(); }, children:
+    jsx('div', {
+      className: 'w-full max-w-[430px] bg-white rounded-t-3xl p-5 pb-8',
+      style: g.disclosure ? { background:'#FDFBF7', padding:'24px 22px calc(24px + env(safe-area-inset-bottom,24px))', borderRadius:'28px 28px 0 0' } : {},
+      onClick: function(e){ e.stopPropagation(); }, children:
       jsxs(Fragment, { children: [
-        jsx('div', { className: 'w-11 h-1 rounded-full bg-gray-300 mx-auto mb-4' }),
-        jsx('h3', { className: 'text-lg font-extrabold text-[#14162E] m-0 mb-1', children: g.title }),
+        g.disclosure ? null : jsx('div', { className: 'w-11 h-1 rounded-full bg-gray-300 mx-auto mb-4' }),
+        g.disclosure ? jsx('p', { style: { fontSize:10, fontWeight:900, letterSpacing:'0.16em', color:'#059669', margin:'0 0 4px' }, children: 'ACCESSIBILITY · OPTIONAL' }) : null,
+        jsx('h3', { className: 'text-lg font-extrabold text-[#14162E] m-0 mb-1', style: g.disclosure ? { fontSize:22, color:'#012553', letterSpacing:'-0.02em', marginBottom:18 } : {}, children: g.title }),
         g.disclosure
-          ? jsxs('div', { style: { background:'#F0F7F2', border:'1px solid #BBF7D0', borderLeft:'4px solid #157347', borderRadius:14, padding:'12px 14px', marginBottom:12 }, children: [
-              jsx('b', { style: { display:'block', fontSize:12.5, color:'#14532D', marginBottom:4 }, children: 'How Minutics uses this access' }),
-              jsx('p', { style: { fontSize:12.5, color:'#3F5A48', lineHeight:1.5, margin:0 }, children: g.disclosure })
+          ? jsxs('div', { style: { background:'#fff', border:'1px solid #E7E2D6', borderRadius:18, padding:18, boxShadow:'0 6px 20px rgba(1,37,83,.06)', marginBottom:16 }, children: [
+              jsx('b', { style: { display:'block', fontSize:14, color:'#012553', marginBottom:8, letterSpacing:'-0.01em' }, children: 'How Minutics uses this access' }),
+              jsx('p', { style: { fontSize:13.5, color:'#4A5366', lineHeight:1.65, margin:0 }, children: g.disclosure })
             ] })
           : null,
         g.disclosure && stage === 0
-          ? jsx('label', { style: { display:'flex', gap:10, alignItems:'flex-start', fontSize:13, color:'#334155', margin:'0 2px 14px', cursor:'pointer' }, children: jsxs('span', { style: { display:'flex', gap:10, alignItems:'flex-start' }, children: [
+          ? jsx('label', { style: { display:'flex', gap:10, alignItems:'flex-start', fontSize:13, color:'#263248', margin:'0 0 20px', padding:'14px 16px', background:'#fff', border:'1px solid #E7E2D6', borderRadius:14, cursor:'pointer', boxShadow:'0 4px 14px rgba(1,37,83,.04)' }, children: jsxs('span', { style: { display:'flex', gap:10, alignItems:'flex-start', fontWeight:600 }, children: [
               jsx('input', { type:'checkbox', 'data-settings-consent':'1', checked: consent, onChange: function(e){ setConsent(!!(e && e.target && e.target.checked)); }, style: { width:14, height:14, accentColor:'#157347', flexShrink:0, margin:'2px 0 0', cursor:'pointer' } }),
               jsx('span', { children: 'I understand and agree to this use' })
             ] }) })
           : null,
-        !(g.disclosure && stage === 1)
+        !g.disclosure
           ? jsx('ol', { className: 'my-4 pl-5 text-sm text-[#5B6478] leading-6', children: g.steps.map(function(s,i){ return jsx('li', { children: s }, i); }) })
-          : jsxs('div', { style: { background:'#F0F7F2', border:'1px solid #BBF7D0', borderRadius:14, padding:'12px 14px', marginBottom:12 }, children: [
-              jsx('b', { style: { display:'block', fontSize:12.5, color:'#14532D', marginBottom:4 }, children: 'Confirm: turn on Accessibility for Minutics?' }),
-              jsx('p', { style: { fontSize:12.5, color:'#3F5A48', lineHeight:1.5, margin:0 }, children: 'You agreed to the disclosure above. The next screen is Android Settings, where you can switch Minutics on. You can turn it off at any time.' })
-            ] }),
+          : stage === 1
+          ? jsxs('div', { style: { background:'#fff', border:'1px solid #E7E2D6', borderRadius:18, padding:18, marginBottom:16, boxShadow:'0 6px 20px rgba(1,37,83,.06)' }, children: [
+              jsx('b', { style: { display:'block', fontSize:14, color:'#012553', marginBottom:8 }, children: 'Confirm: turn on Accessibility for Minutics?' }),
+              jsx('p', { style: { fontSize:13.5, color:'#4A5366', lineHeight:1.65, margin:0 }, children: 'You agreed to the disclosure above. The next screen is Android Settings, where you can switch Minutics on. You can turn it off at any time.' })
+            ] })
+          : null,
         g.disclosure
           ? jsxs('div', { style: { display:'flex', gap:12, alignItems:'stretch', marginTop:4 }, children:
               stage === 0
