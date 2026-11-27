@@ -83,11 +83,11 @@ export const PERMISSION_ROWS = [
     key: 'accessibility',
     title: 'Accessibility',
     optional: true,
-    desc: 'Optional - needed by the Doom scroll stopper (counts reels and shorts) and Focus Mode (blocks distracting apps while your timer runs).',
+    desc: 'Optional - only the Doom scroll stopper needs it, to count reels and shorts you watch.',
     icon: 'accessibility',
-    disclosure: 'Minutics uses the Accessibility service for two features: the Doom scroll stopper detects when a reel or short is on screen for at least 3 seconds, and Focus Mode detects when you open a social app while your focus timer is running so it can show you a reminder. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
+    disclosure: 'To count reels and shorts, Minutics uses the Accessibility service to detect when a video is on screen for at least 3 seconds. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
     steps: [
-      'This is optional. Skip it if you do not want reel counting or Focus Mode app blocking.',
+      'This is optional. Skip it if you do not want the Doom scroll stopper.',
       'Want the counter? Tap Downloaded apps (or Installed services).',
       'Tap Minutics.',
       'Turn the service on, then tap Allow.'
@@ -198,9 +198,9 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
     setTimeout(function () { onClose(); }, 280);
   }
 
-  function onTouchStart(e) { try { startY.current = e.touches[0].clientY; } catch (err) {} }
+  function onTouchStart(e) { if (perm.disclosure) return; try { startY.current = e.touches[0].clientY; } catch (err) {} }
   function onTouchMove(e) {
-    if (startY.current == null) return;
+    if (perm.disclosure || startY.current == null) return;
     var dy = e.touches[0].clientY - startY.current;
     if (dy > 0) setDragY(dy);
   }
@@ -217,13 +217,13 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
       'aria-modal': 'true',
       'data-perm-tutorial': perm.key,
       onClick: function (e) {
-        if (e.target === e.currentTarget) requestClose();
+        if (!perm.disclosure && e.target === e.currentTarget) requestClose();
       },
       children: jsxs('div', {
         className: 'lt-guide-sheet',
         style: dragY ? { transform: 'translateY(' + dragY + 'px)', transition: 'none' } : undefined,
         children: [
-          jsx('span', {
+          perm.disclosure ? null : jsx('span', {
             className: 'lt-guide-grip',
             onTouchStart: onTouchStart,
             onTouchMove: onTouchMove,
@@ -235,7 +235,7 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
               jsx('p', { className: 'lt-guide-eyebrow', children: 'Permission ' + (index + 1) + ' of ' + (total || PERMISSION_ROWS.length) }),
               jsx('h3', { children: perm.title })
             ] }),
-            jsx('button', {
+            perm.disclosure ? null : jsx('button', {
               type: 'button', className: 'lt-guide-x', 'aria-label': 'Close tutorial',
               'data-guide-close': '1', onClick: requestClose, children: '\u2715'
             })
@@ -277,7 +277,7 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
                   'data-guide-open-settings': '1',
                   disabled: !consent,
                   onClick: function (e) { if (!consent) return; onOpenSettings(e); },
-                  children: 'Yes, I agree \u2014 continue'
+                  children: 'Yes, I agree'
                 })
               ] })
             : jsx('button', {
@@ -348,9 +348,9 @@ function ensurePermStyles() {
     '.lt-guide-primary{width:100%;border:none;border-radius:14px;padding:14px;background:linear-gradient(135deg,#157347,#1FA060);color:#fff;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 8px 20px -8px rgba(21,115,71,.7);margin-top:2px}',
     '.lt-guide-primary:active{transform:scale(.985)}',
     '.lt-guide-primary.is-disabled{background:#B7C2B9;box-shadow:none;cursor:not-allowed}',
-    '.lt-guide-actions{display:flex;gap:10px;align-items:stretch}',
-    '.lt-guide-decline{flex:1;border:1.5px solid #C9C2B2;border-radius:14px;padding:13px 8px;background:#fff;color:#5B6478;font-size:13px;font-weight:800;cursor:pointer}',
-    '.lt-guide-actions .lt-guide-primary{flex:1;margin-top:0;padding:13px 8px;font-size:13px}',
+    '.lt-guide-actions{display:flex;gap:12px;align-items:stretch;margin-top:4px}',
+    '.lt-guide-decline{flex:1;border:1.5px solid #C9C2B2;border-radius:14px;padding:13px 6px;background:#fff;color:#5B6478;font-size:12.5px;font-weight:800;cursor:pointer}',
+    '.lt-guide-actions .lt-guide-primary{flex:1;margin-top:0;padding:13px 6px;font-size:12.5px}',
     '.lt-guide-secondary{width:100%;border:none;background:none;color:#7A8494;font-size:13px;font-weight:700;padding:10px 0 2px;cursor:pointer}',
 
     '.lt-perm-mini{position:fixed;left:12px;right:12px;bottom:86px;z-index:2147483200;display:flex;align-items:center;gap:9px;background:#14162E;color:#fff;border-radius:16px;padding:10px 11px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:ltPermMini .25s cubic-bezier(.22,.61,.36,1)}',
@@ -423,7 +423,7 @@ export function PermissionsStep({ onChange }) {
     jsxs('p', {
       className: 'text-[13px] text-[#5B6478] text-center leading-relaxed mb-3 px-1',
       children: [
-        'Minutics needs these to remind you on time, count your reels and keep Focus Mode active. ',
+        'Minutics needs these to remind you on time and to count your reels. ',
         jsx('b', { children: grantedCount + ' of ' + rows.length + ' done' })
       ]
     }),

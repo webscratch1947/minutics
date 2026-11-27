@@ -159,7 +159,7 @@ var SETTINGS_GUIDES = {
   },
   accessibility: {
     title: 'Accessibility',
-    disclosure: 'Minutics uses the Accessibility service for two features: the Doom scroll stopper detects when a reel or short is on screen for at least 3 seconds, and Focus Mode detects when you open a social app while your focus timer is running so it can show you a reminder. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
+    disclosure: 'To count reels and shorts, Minutics uses the Accessibility service to detect when a video is on screen for at least 3 seconds. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
     steps: ['Tap "Downloaded apps" (or Installed services).', 'Tap Minutics.', 'Turn the service ON (or OFF) and confirm.']
   }
 };
@@ -200,7 +200,7 @@ function PermGuide({ permKey, onClose, onOpen }) {
           : null,
         jsx('ol', { className: 'my-4 pl-5 text-sm text-[#5B6478] leading-6', children: g.steps.map(function(s,i){ return jsx('li', { children: s }, i); }) }),
         g.disclosure
-          ? jsxs('div', { style: { display:'flex', gap:10, alignItems:'stretch' }, children: [
+          ? jsxs('div', { style: { display:'flex', gap:12, alignItems:'stretch', marginTop:4 }, children: [
               jsx('button', {
                 type: 'button', 'data-settings-decline': '1',
                 className: 'flex-1 rounded-full border border-[#C9C2B2] bg-white text-[#5B6478] font-bold py-3 text-[13px]',
@@ -211,7 +211,7 @@ function PermGuide({ permKey, onClose, onOpen }) {
                 className: 'flex-1 rounded-full text-white font-bold py-3 text-[13px] ' + (!consent ? 'bg-[#B7C2B9] cursor-not-allowed' : 'bg-[#157347]'),
                 disabled: !consent,
                 onClick: function(){ if (!consent) return; onOpen(); },
-                children: 'Yes, I agree \u2014 continue'
+                children: 'Yes, I agree'
               })
             ] })
           : jsx('button', {
@@ -1093,7 +1093,7 @@ export function SettingsScreen() {
                   jsx(Divider, {}),
                   jsx(CardRow, {
                     label: "Accessibility",
-                    desc: permStatus.accessibility ? "Granted - reels counted and Focus Mode active" : "Not granted - optional, for Doom scroll stopper and Focus Mode",
+                    desc: permStatus.accessibility ? "Granted - reels are counted" : "Not granted - optional, for Doom scroll stopper",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.accessibility }),
                       jsx(PermOpenButton, { onClick: function(){ openPermWithGuide("accessibility"); } })
