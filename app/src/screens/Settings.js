@@ -203,12 +203,12 @@ function PermGuide({ permKey, onClose, onOpen }) {
           ? jsxs('div', { style: { display:'flex', gap:10, alignItems:'stretch' }, children: [
               jsx('button', {
                 type: 'button', 'data-settings-decline': '1',
-                className: 'flex-1 rounded-full border border-[#C9C2B2] bg-white text-[#5B6478] font-bold py-3',
+                className: 'flex-1 rounded-full border border-[#C9C2B2] bg-white text-[#5B6478] font-bold py-3 text-[13px]',
                 onClick: onClose, children: 'No thanks'
               }),
               jsx('button', {
                 type: 'button', 'data-settings-open': '1',
-                className: 'flex-[1.4] rounded-full text-white font-bold py-3 ' + (!consent ? 'bg-[#B7C2B9] cursor-not-allowed' : 'bg-[#157347]'),
+                className: 'flex-1 rounded-full text-white font-bold py-3 text-[13px] ' + (!consent ? 'bg-[#B7C2B9] cursor-not-allowed' : 'bg-[#157347]'),
                 disabled: !consent,
                 onClick: function(){ if (!consent) return; onOpen(); },
                 children: 'Yes, I agree \u2014 continue'
@@ -1054,7 +1054,7 @@ export function SettingsScreen() {
                     desc: permStatus.notifications ? "Granted - reminders reach you" : "Not granted - tap Open to allow",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.notifications }),
-                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("notifications"); } })
+                      jsx(PermOpenButton, { onClick: function(){ openPermWithGuide("notifications"); } })
                     ] })
                   }),
                   jsx(Divider, {}),
@@ -1063,7 +1063,7 @@ export function SettingsScreen() {
                     desc: permStatus.overlay ? "Granted - popups show above other apps" : "Not granted - tap Open to allow",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.overlay }),
-                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("overlay"); } })
+                      jsx(PermOpenButton, { onClick: function(){ openPermWithGuide("overlay"); } })
                     ] })
                   }),
                   deviceIsXiaomi ? jsx(Fragment, { children: [
@@ -1073,7 +1073,7 @@ export function SettingsScreen() {
                     desc: permStatus.popup ? "Granted - alerts show with the app closed" : "Not granted - tap Open to allow",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.popup }),
-                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("popup"); } })
+                      jsx(PermOpenButton, { onClick: function(){ openPermWithGuide("popup"); } })
                     ] })
                   })
                   ] }) : null,
@@ -1087,7 +1087,7 @@ export function SettingsScreen() {
                         : "State can't be read on this phone - tap Open to check",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: permStatus.autostartState === 1, unknown: permStatus.autostartState === 0 }),
-                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("autostart"); }, disabled: !canOpenAutostart })
+                      jsx(PermOpenButton, { onClick: function(){ openPermWithGuide("autostart"); }, disabled: !canOpenAutostart })
                     ] })
                   }),
                   jsx(Divider, {}),
@@ -1265,7 +1265,21 @@ export function SettingsScreen() {
       jsx("p", {
         className: "text-center text-[11px] text-muted-foreground mt-2",
         children: "Minutics \u2022 Your time, your value"
-      })
+      }),
+      permGuide
+        ? jsx(PermGuide, {
+            permKey: permGuide,
+            onClose: function () { setPermGuide(null); },
+            onOpen: function () {
+              var key = permGuide;
+              setPermGuide(null);
+              try {
+                if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting)
+                  window.AndroidBridge.openPermissionSetting(key);
+              } catch (e) {}
+            }
+          })
+        : null
     ]
   });
 }

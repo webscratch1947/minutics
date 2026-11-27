@@ -349,8 +349,8 @@ function ensurePermStyles() {
     '.lt-guide-primary:active{transform:scale(.985)}',
     '.lt-guide-primary.is-disabled{background:#B7C2B9;box-shadow:none;cursor:not-allowed}',
     '.lt-guide-actions{display:flex;gap:10px;align-items:stretch}',
-    '.lt-guide-decline{flex:1;border:1.5px solid #C9C2B2;border-radius:14px;padding:14px 10px;background:#fff;color:#5B6478;font-size:14px;font-weight:800;cursor:pointer}',
-    '.lt-guide-actions .lt-guide-primary{flex:1.4;margin-top:0;font-size:14px}',
+    '.lt-guide-decline{flex:1;border:1.5px solid #C9C2B2;border-radius:14px;padding:13px 8px;background:#fff;color:#5B6478;font-size:13px;font-weight:800;cursor:pointer}',
+    '.lt-guide-actions .lt-guide-primary{flex:1;margin-top:0;padding:13px 8px;font-size:13px}',
     '.lt-guide-secondary{width:100%;border:none;background:none;color:#7A8494;font-size:13px;font-weight:700;padding:10px 0 2px;cursor:pointer}',
 
     '.lt-perm-mini{position:fixed;left:12px;right:12px;bottom:86px;z-index:2147483200;display:flex;align-items:center;gap:9px;background:#14162E;color:#fff;border-radius:16px;padding:10px 11px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:ltPermMini .25s cubic-bezier(.22,.61,.36,1)}',
