@@ -26,6 +26,19 @@ export function markA11yConsent() {
   try { localStorage.setItem("lt_a11y_consent_v1", "1"); } catch (e) {}
 }
 
+/* Only a REAL granted -> revoked transition clears consent. A plain "false"
+   reading (first install, or while the Android toggle is still settling)
+   must not wipe consent and cause the prompt to appear after approval. */
+export function syncA11yConsent(granted) {
+  try {
+    if (granted) { localStorage.setItem("lt_a11y_last_granted_v1", "1"); return; }
+    if (localStorage.getItem("lt_a11y_last_granted_v1") === "1") {
+      localStorage.removeItem("lt_a11y_consent_v1");
+      localStorage.setItem("lt_a11y_last_granted_v1", "0");
+    }
+  } catch (e) {}
+}
+
 const LOGO = './assets/icons/logo-192.png';
 
 export const PERMISSION_ROWS = [
@@ -420,11 +433,7 @@ export function PermissionsStep({ onChange }) {
   var update = function (next) {
     statusRef.current = next;
     setStatus(next);
-    /* If the user revokes Accessibility in Android Settings, the earlier
-       consent no longer covers a future request — show the disclosure again. */
-    if (next && next.accessibility === false) {
-      try { localStorage.removeItem("lt_a11y_consent_v1"); } catch (e) {}
-    }
+    syncA11yConsent(!!(next && next.accessibility));
     if (onChange) onChange(allGranted(next, rows));
   };
 
@@ -450,7 +459,8 @@ export function PermissionsStep({ onChange }) {
   }, []);
 
   var open = function (perm) {
-    if (perm.key === "accessibility" && a11yConsented()) {
+    if (perm.key === "accessibility"
+        && (a11yConsented() || !!(statusRef.current && statusRef.current.accessibility))) {
       try { window.AndroidBridge.openPermissionSetting(perm.key); } catch (e) {}
       return;
     }

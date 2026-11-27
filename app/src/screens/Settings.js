@@ -9,7 +9,7 @@ import { readJson, writeJson } from '../lib/settings.js';
 import { buildBackup, loadDataFile } from '../lib/dataTransfer.js';
 import { ltAlert, ltConfirmDanger } from '../ui_dialog.js';
 import { CircleCheckBig as eh } from 'lucide-react';
-import { a11yConsented, markA11yConsent } from '../permissions_onboarding.js';
+import { a11yConsented, markA11yConsent, syncA11yConsent } from '../permissions_onboarding.js';
 import { getApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
@@ -321,7 +321,13 @@ export function SettingsScreen() {
     } catch (e) {}
   };
   var openPermWithGuide = function (key) {
-    if (key === "accessibility" && a11yConsented()) { openPermDirect(key); return; }
+    /* Already granted (or already consented) -> go straight to Settings.
+       The disclosure is only for someone who has not given permission. */
+    if (key === "accessibility"
+        && (a11yConsented() || !!(permStatus && permStatus.accessibility))) {
+      openPermDirect(key);
+      return;
+    }
     setPermGuide(key);
   };
 
@@ -475,10 +481,8 @@ export function SettingsScreen() {
           var raw = window.AndroidBridge.getPermissionStatus();
           var o = typeof raw === "string" ? JSON.parse(raw) : raw;
           if (o) setPermStatus(o);
-          /* Revoked in Android Settings -> consent must be collected again. */
-          if (o && o.accessibility === false) {
-            try { localStorage.removeItem('lt_a11y_consent_v1'); } catch (e) {}
-          }
+          /* Clear consent only on a real granted -> revoked transition. */
+          syncA11yConsent(!!(o && o.accessibility));
         }
       } catch (e) {}
     }
