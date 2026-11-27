@@ -265,17 +265,25 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
               ] })
             }, i);
           }) }),
-          jsx('button', {
-            type: 'button',
-            className: 'lt-guide-primary' + (perm.disclosure && !consent ? ' is-disabled' : ''),
-            'data-guide-open-settings': '1',
-            disabled: !!(perm.disclosure && !consent),
-            onClick: function (e) {
-              if (perm.disclosure && !consent) return;
-              onOpenSettings(e);
-            },
-            children: perm.disclosure && !consent ? 'Agree above to continue' : 'Open Android settings'
-          })
+          perm.disclosure
+            ? jsxs('div', { className: 'lt-guide-actions', children: [
+                jsx('button', {
+                  type: 'button', className: 'lt-guide-decline', 'data-guide-decline': '1',
+                  onClick: requestClose, children: 'No thanks'
+                }),
+                jsx('button', {
+                  type: 'button',
+                  className: 'lt-guide-primary' + (!consent ? ' is-disabled' : ''),
+                  'data-guide-open-settings': '1',
+                  disabled: !consent,
+                  onClick: function (e) { if (!consent) return; onOpenSettings(e); },
+                  children: 'Yes, I agree \u2014 continue'
+                })
+              ] })
+            : jsx('button', {
+                type: 'button', className: 'lt-guide-primary', 'data-guide-open-settings': '1',
+                onClick: onOpenSettings, children: 'Open Android settings'
+              })
         ]
       })
     }),
@@ -340,6 +348,9 @@ function ensurePermStyles() {
     '.lt-guide-primary{width:100%;border:none;border-radius:14px;padding:14px;background:linear-gradient(135deg,#157347,#1FA060);color:#fff;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 8px 20px -8px rgba(21,115,71,.7);margin-top:2px}',
     '.lt-guide-primary:active{transform:scale(.985)}',
     '.lt-guide-primary.is-disabled{background:#B7C2B9;box-shadow:none;cursor:not-allowed}',
+    '.lt-guide-actions{display:flex;gap:10px;align-items:stretch}',
+    '.lt-guide-decline{flex:1;border:1.5px solid #C9C2B2;border-radius:14px;padding:14px 10px;background:#fff;color:#5B6478;font-size:14px;font-weight:800;cursor:pointer}',
+    '.lt-guide-actions .lt-guide-primary{flex:1.4;margin-top:0;font-size:14px}',
     '.lt-guide-secondary{width:100%;border:none;background:none;color:#7A8494;font-size:13px;font-weight:700;padding:10px 0 2px;cursor:pointer}',
 
     '.lt-perm-mini{position:fixed;left:12px;right:12px;bottom:86px;z-index:2147483200;display:flex;align-items:center;gap:9px;background:#14162E;color:#fff;border-radius:16px;padding:10px 11px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:ltPermMini .25s cubic-bezier(.22,.61,.36,1)}',

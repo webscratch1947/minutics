@@ -199,15 +199,29 @@ function PermGuide({ permKey, onClose, onOpen }) {
             ] }) })
           : null,
         jsx('ol', { className: 'my-4 pl-5 text-sm text-[#5B6478] leading-6', children: g.steps.map(function(s,i){ return jsx('li', { children: s }, i); }) }),
-        jsx('button', {
-          type: 'button',
-          'data-settings-open': '1',
-          className: 'w-full rounded-full text-white font-bold py-3 ' + (g.disclosure && !consent ? 'bg-[#B7C2B9] cursor-not-allowed' : 'bg-[#157347]'),
-          disabled: !!(g.disclosure && !consent),
-          onClick: function(){ if (g.disclosure && !consent) return; onOpen(); },
-          children: g.disclosure && !consent ? 'Agree above to continue' : 'Open Android settings'
-        }),
-        jsx('button', { type: 'button', className: 'w-full bg-transparent text-[#8A8578] font-semibold py-3', onClick: onClose, children: 'Close' })
+        g.disclosure
+          ? jsxs('div', { style: { display:'flex', gap:10, alignItems:'stretch' }, children: [
+              jsx('button', {
+                type: 'button', 'data-settings-decline': '1',
+                className: 'flex-1 rounded-full border border-[#C9C2B2] bg-white text-[#5B6478] font-bold py-3',
+                onClick: onClose, children: 'No thanks'
+              }),
+              jsx('button', {
+                type: 'button', 'data-settings-open': '1',
+                className: 'flex-[1.4] rounded-full text-white font-bold py-3 ' + (!consent ? 'bg-[#B7C2B9] cursor-not-allowed' : 'bg-[#157347]'),
+                disabled: !consent,
+                onClick: function(){ if (!consent) return; onOpen(); },
+                children: 'Yes, I agree \u2014 continue'
+              })
+            ] })
+          : jsx('button', {
+              type: 'button', 'data-settings-open': '1',
+              className: 'w-full rounded-full bg-[#157347] text-white font-bold py-3',
+              onClick: onOpen, children: 'Open Android settings'
+            }),
+        !g.disclosure
+          ? jsx('button', { type: 'button', className: 'w-full bg-transparent text-[#8A8578] font-semibold py-3', onClick: onClose, children: 'Close' })
+          : null
       ] })
     })
     })
@@ -461,6 +475,7 @@ export function SettingsScreen() {
       } catch (e) {}
     }
     if (!wasActive && !granted) {
+      if (key === 'accessibility') { openPermWithGuide(key); return; }
       try {
         if (window.AndroidBridge && window.AndroidBridge.openPermissionSetting) {
           window.AndroidBridge.openPermissionSetting(key);
@@ -1081,7 +1096,7 @@ export function SettingsScreen() {
                     desc: permStatus.accessibility ? "Granted - reels are counted" : "Not granted - optional, for Doom scroll stopper",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.accessibility }),
-                      jsx(PermOpenButton, { onClick: function(){ openPermDirect("accessibility"); } })
+                      jsx(PermOpenButton, { onClick: function(){ openPermWithGuide("accessibility"); } })
                     ] })
                   })
                 ] })
