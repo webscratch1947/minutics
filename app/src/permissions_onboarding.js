@@ -17,6 +17,15 @@ export function isAndroidNative() {
   try { return !!(window.AndroidBridge && window.AndroidBridge.getPermissionStatus); } catch { return false; }
 }
 
+/* Explicit Accessibility consent is remembered. Once the user has agreed,
+   later "Open" taps go straight to Android Settings. */
+export function a11yConsented() {
+  try { return localStorage.getItem("lt_a11y_consent_v1") === "1"; } catch (e) { return false; }
+}
+export function markA11yConsent() {
+  try { localStorage.setItem("lt_a11y_consent_v1", "1"); } catch (e) {}
+}
+
 const LOGO = './assets/icons/logo-192.png';
 
 export const PERMISSION_ROWS = [
@@ -184,6 +193,7 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
   var [dragY, setDragY] = useState(0);
   var [closing, setClosing] = useState(false);
   var [consent, setConsent] = useState(false);
+  var [stage, setStage] = useState(0);
   var startY = useRef(null);
 
   useEffect(function () {
@@ -247,7 +257,7 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
                 jsx('p', { children: perm.disclosure })
               ] })
             : null,
-          perm.disclosure
+          perm.disclosure && stage === 0
             ? jsx('label', { className: 'lt-guide-consent', children: jsxs('span', { children: [
                 jsx('input', {
                   type: 'checkbox', 'data-guide-consent': '1',
@@ -257,29 +267,48 @@ function GuideSheet({ perm, index, total, onOpenSettings, onClose }) {
                 jsx('span', { children: 'I understand and agree to this use' })
               ] }) })
             : null,
-          jsx('ol', { className: 'lt-guide-steps', children: perm.steps.map(function (s, i) {
-            return jsx('li', {
-              children: jsxs('span', { children: [
-                jsx('b', { children: String(i + 1) }),
-                jsx('span', { children: s })
-              ] })
-            }, i);
-          }) }),
+          !(perm.disclosure && stage === 1)
+            ? jsx('ol', { className: 'lt-guide-steps', children: perm.steps.map(function (s, i) {
+                return jsx('li', {
+                  children: jsxs('span', { children: [
+                    jsx('b', { children: String(i + 1) }),
+                    jsx('span', { children: s })
+                  ] })
+                }, i);
+              }) })
+            : jsxs('div', { className: 'lt-guide-disclosure', children: [
+                jsx('b', { children: 'Confirm: turn on Accessibility for Minutics?' }),
+                jsx('p', { children: 'You agreed to the disclosure above. The next screen is Android Settings, where you can switch Minutics on. You can turn it off at any time.' })
+              ] }),
           perm.disclosure
-            ? jsxs('div', { className: 'lt-guide-actions', children: [
-                jsx('button', {
-                  type: 'button', className: 'lt-guide-decline', 'data-guide-decline': '1',
-                  onClick: requestClose, children: 'No thanks'
-                }),
-                jsx('button', {
-                  type: 'button',
-                  className: 'lt-guide-primary' + (!consent ? ' is-disabled' : ''),
-                  'data-guide-open-settings': '1',
-                  disabled: !consent,
-                  onClick: function (e) { if (!consent) return; onOpenSettings(e); },
-                  children: 'Yes, I agree'
-                })
-              ] })
+            ? jsxs('div', { className: 'lt-guide-actions', children:
+                stage === 0
+                  ? [
+                      jsx('button', {
+                        type: 'button', className: 'lt-guide-decline', 'data-guide-decline': '1',
+                        onClick: requestClose, children: 'No thanks'
+                      }),
+                      jsx('button', {
+                        type: 'button',
+                        className: 'lt-guide-primary' + (!consent ? ' is-disabled' : ''),
+                        'data-guide-confirm': '1',
+                        disabled: !consent,
+                        onClick: function () { if (consent) setStage(1); },
+                        children: 'I understand'
+                      })
+                    ]
+                  : [
+                      jsx('button', {
+                        type: 'button', className: 'lt-guide-decline', 'data-guide-cancel': '1',
+                        onClick: function () { setStage(0); }, children: 'Cancel'
+                      }),
+                      jsx('button', {
+                        type: 'button', className: 'lt-guide-primary', 'data-guide-open-settings': '1',
+                        onClick: function (e) { markA11yConsent(); onOpenSettings(e); },
+                        children: 'Yes, open settings'
+                      })
+                    ]
+              })
             : jsx('button', {
                 type: 'button', className: 'lt-guide-primary', 'data-guide-open-settings': '1',
                 onClick: onOpenSettings, children: 'Open Android settings'
@@ -400,6 +429,10 @@ export function PermissionsStep({ onChange }) {
   }, []);
 
   var open = function (perm) {
+    if (perm.key === "accessibility" && a11yConsented()) {
+      try { window.AndroidBridge.openPermissionSetting(perm.key); } catch (e) {}
+      return;
+    }
     if (!needsGuide(perm.key)) {
       try { window.AndroidBridge.openPermissionSetting(perm.key); } catch (e) {}
       return;

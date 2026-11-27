@@ -9,6 +9,7 @@ import { readJson, writeJson } from '../lib/settings.js';
 import { buildBackup, loadDataFile } from '../lib/dataTransfer.js';
 import { ltAlert, ltConfirmDanger } from '../ui_dialog.js';
 import { CircleCheckBig as eh } from 'lucide-react';
+import { a11yConsented, markA11yConsent } from '../permissions_onboarding.js';
 import { getApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
@@ -167,6 +168,7 @@ var SETTINGS_GUIDES = {
 function PermGuide({ permKey, onClose, onOpen }) {
   var g = SETTINGS_GUIDES[permKey] || { title: 'Permission', steps: [] };
   var [consent, setConsent] = useState(false);
+  var [stage, setStage] = useState(0);
   /* Use the SAME brand-specific guide the onboarding uses (native profile). */
   try {
     var pr = (window.LTDeviceProfile && window.LTDeviceProfile())
@@ -192,28 +194,49 @@ function PermGuide({ permKey, onClose, onOpen }) {
               jsx('p', { style: { fontSize:12.5, color:'#3F5A48', lineHeight:1.5, margin:0 }, children: g.disclosure })
             ] })
           : null,
-        g.disclosure
+        g.disclosure && stage === 0
           ? jsx('label', { style: { display:'flex', gap:10, alignItems:'flex-start', fontSize:13, color:'#334155', margin:'0 2px 14px', cursor:'pointer' }, children: jsxs('span', { style: { display:'flex', gap:10, alignItems:'flex-start' }, children: [
               jsx('input', { type:'checkbox', 'data-settings-consent':'1', checked: consent, onChange: function(e){ setConsent(!!(e && e.target && e.target.checked)); }, style: { width:14, height:14, accentColor:'#157347', flexShrink:0, margin:'2px 0 0', cursor:'pointer' } }),
               jsx('span', { children: 'I understand and agree to this use' })
             ] }) })
           : null,
-        jsx('ol', { className: 'my-4 pl-5 text-sm text-[#5B6478] leading-6', children: g.steps.map(function(s,i){ return jsx('li', { children: s }, i); }) }),
+        !(g.disclosure && stage === 1)
+          ? jsx('ol', { className: 'my-4 pl-5 text-sm text-[#5B6478] leading-6', children: g.steps.map(function(s,i){ return jsx('li', { children: s }, i); }) })
+          : jsxs('div', { style: { background:'#F0F7F2', border:'1px solid #BBF7D0', borderRadius:14, padding:'12px 14px', marginBottom:12 }, children: [
+              jsx('b', { style: { display:'block', fontSize:12.5, color:'#14532D', marginBottom:4 }, children: 'Confirm: turn on Accessibility for Minutics?' }),
+              jsx('p', { style: { fontSize:12.5, color:'#3F5A48', lineHeight:1.5, margin:0 }, children: 'You agreed to the disclosure above. The next screen is Android Settings, where you can switch Minutics on. You can turn it off at any time.' })
+            ] }),
         g.disclosure
-          ? jsxs('div', { style: { display:'flex', gap:12, alignItems:'stretch', marginTop:4 }, children: [
-              jsx('button', {
-                type: 'button', 'data-settings-decline': '1',
-                className: 'flex-1 rounded-full border border-[#C9C2B2] bg-white text-[#5B6478] font-bold py-3 text-[13px]',
-                onClick: onClose, children: 'No thanks'
-              }),
-              jsx('button', {
-                type: 'button', 'data-settings-open': '1',
-                className: 'flex-1 rounded-full text-white font-bold py-3 text-[13px] ' + (!consent ? 'bg-[#B7C2B9] cursor-not-allowed' : 'bg-[#157347]'),
-                disabled: !consent,
-                onClick: function(){ if (!consent) return; onOpen(); },
-                children: 'Yes, I agree'
-              })
-            ] })
+          ? jsxs('div', { style: { display:'flex', gap:12, alignItems:'stretch', marginTop:4 }, children:
+              stage === 0
+                ? [
+                    jsx('button', {
+                      type: 'button', 'data-settings-decline': '1',
+                      className: 'flex-1 rounded-full border border-[#C9C2B2] bg-white text-[#5B6478] font-bold py-3 text-[13px]',
+                      onClick: onClose, children: 'No thanks'
+                    }),
+                    jsx('button', {
+                      type: 'button', 'data-settings-confirm': '1',
+                      className: 'flex-1 rounded-full text-white font-bold py-3 text-[13px] ' + (!consent ? 'bg-[#B7C2B9] cursor-not-allowed' : 'bg-[#157347]'),
+                      disabled: !consent,
+                      onClick: function(){ if (consent) setStage(1); },
+                      children: 'I understand'
+                    })
+                  ]
+                : [
+                    jsx('button', {
+                      type: 'button', 'data-settings-cancel': '1',
+                      className: 'flex-1 rounded-full border border-[#C9C2B2] bg-white text-[#5B6478] font-bold py-3 text-[13px]',
+                      onClick: function(){ setStage(0); }, children: 'Cancel'
+                    }),
+                    jsx('button', {
+                      type: 'button', 'data-settings-open': '1',
+                      className: 'flex-1 rounded-full bg-[#157347] text-white font-bold py-3 text-[13px]',
+                      onClick: function(){ markA11yConsent(); onOpen(); },
+                      children: 'Yes, open settings'
+                    })
+                  ]
+            })
           : jsx('button', {
               type: 'button', 'data-settings-open': '1',
               className: 'w-full rounded-full bg-[#157347] text-white font-bold py-3',
@@ -291,7 +314,10 @@ export function SettingsScreen() {
       }
     } catch (e) {}
   };
-  var openPermWithGuide = function (key) { setPermGuide(key); };
+  var openPermWithGuide = function (key) {
+    if (key === "accessibility" && a11yConsented()) { openPermDirect(key); return; }
+    setPermGuide(key);
+  };
 
   /* ── plan re-render trigger ── */
   var _planTick = useState(0);
@@ -458,6 +484,10 @@ export function SettingsScreen() {
          when the system-side grant is missing, jumps to the matching
          Android settings screen. Never the other way round. */
     var granted = !!permStatus[key];
+    /* Accessibility must NEVER be switched on by the toggle itself — Google
+       treats a toggle as insufficient consent. Show the two-step disclosure
+       first; only an explicit "Yes, open settings" may continue. */
+    if (key === "accessibility" && !granted) { openPermWithGuide(key); return; }
     var wasActive = granted && permUse[key] === true;
     var next = {};
     for (var k in permUse) next[k] = permUse[k];
