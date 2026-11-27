@@ -83,11 +83,11 @@ export const PERMISSION_ROWS = [
     key: 'accessibility',
     title: 'Accessibility',
     optional: true,
-    desc: 'Optional - only the Doom scroll stopper needs it, to count reels and shorts you watch.',
+    desc: 'Optional - needed by the Doom scroll stopper (counts reels and shorts) and Focus Mode (blocks distracting apps while your timer runs).',
     icon: 'accessibility',
-    disclosure: 'To count reels and shorts, Minutics uses the Accessibility service to detect when a video is on screen for at least 3 seconds. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
+    disclosure: 'Minutics uses the Accessibility service for two features: the Doom scroll stopper detects when a reel or short is on screen for at least 3 seconds, and Focus Mode detects when you open a social app while your focus timer is running so it can show you a reminder. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
     steps: [
-      'This is optional. Skip it if you do not want the Doom scroll stopper.',
+      'This is optional. Skip it if you do not want reel counting or Focus Mode app blocking.',
       'Want the counter? Tap Downloaded apps (or Installed services).',
       'Tap Minutics.',
       'Turn the service on, then tap Allow.'
@@ -423,7 +423,7 @@ export function PermissionsStep({ onChange }) {
     jsxs('p', {
       className: 'text-[13px] text-[#5B6478] text-center leading-relaxed mb-3 px-1',
       children: [
-        'Minutics needs these to remind you on time and to count your reels. ',
+        'Minutics needs these to remind you on time, count your reels and keep Focus Mode active. ',
         jsx('b', { children: grantedCount + ' of ' + rows.length + ' done' })
       ]
     }),

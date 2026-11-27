@@ -159,7 +159,7 @@ var SETTINGS_GUIDES = {
   },
   accessibility: {
     title: 'Accessibility',
-    disclosure: 'To count reels and shorts, Minutics uses the Accessibility service to detect when a video is on screen for at least 3 seconds. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
+    disclosure: 'Minutics uses the Accessibility service for two features: the Doom scroll stopper detects when a reel or short is on screen for at least 3 seconds, and Focus Mode detects when you open a social app while your focus timer is running so it can show you a reminder. We only see which app is open and the type of on-screen element. We do NOT read messages, passwords, form fields or anything you type, and nothing is sent off your device. This is optional and you can turn it off any time in Android Settings.',
     steps: ['Tap "Downloaded apps" (or Installed services).', 'Tap Minutics.', 'Turn the service ON (or OFF) and confirm.']
   }
 };
@@ -1093,7 +1093,7 @@ export function SettingsScreen() {
                   jsx(Divider, {}),
                   jsx(CardRow, {
                     label: "Accessibility",
-                    desc: permStatus.accessibility ? "Granted - reels are counted" : "Not granted - optional, for Doom scroll stopper",
+                    desc: permStatus.accessibility ? "Granted - reels counted and Focus Mode active" : "Not granted - optional, for Doom scroll stopper and Focus Mode",
                     children: jsxs("div", { className: "flex items-center gap-2", children: [
                       jsx(PermStatusBadge, { granted: !!permStatus.accessibility }),
                       jsx(PermOpenButton, { onClick: function(){ openPermWithGuide("accessibility"); } })

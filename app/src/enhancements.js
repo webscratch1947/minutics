@@ -8109,11 +8109,24 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
 
   /* ── Render ───────────────────────────────────────────────────────────── */
 
+  /* Mirror the timer into native storage so the accessibility service can
+     guard Focus Mode even when the WebView is in the background. */
+  function syncFocusNative(st) {
+    try {
+      var b = window.AndroidBridge;
+      if (b && typeof b.setFocusMode === "function") {
+        var ends = Number(st && st.endsAt) || 0;
+        b.setFocusMode(ends, ends > Date.now());
+      }
+    } catch (e) {}
+  }
+
   function renderFocusMode() {
     var state   = readJson(FOCUS_STATE_KEY, null);
     var isRunning = !!(state && state.endsAt && state.endsAt > Date.now());
     var musicOn   = !!(state && state.musicOn);          /* is music playing?  */
     var volume    = (state && typeof state.volume === "number") ? state.volume : 0.5;
+    syncFocusNative(state);
 
     /* Helper: render the volume slider row */
     function volSliderHtml(vol) {
@@ -8177,6 +8190,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         done.endsAt  = null;
         done.musicOn = false;
         writeJson(FOCUS_STATE_KEY, done);
+        syncFocusNative(done);
         if (startBtn) { startBtn.textContent = "Start"; startBtn.disabled = false; startBtn.style.opacity = ""; }
       }
     }
@@ -8192,6 +8206,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
         startPianoMusic(st.volume || 0.5);
       }
       writeJson(FOCUS_STATE_KEY, st);
+      syncFocusNative(st);
       if (startBtn) { startBtn.textContent = "Running\u2026"; startBtn.disabled = true; startBtn.style.opacity = "0.6"; }
       if (_focusInterval) clearInterval(_focusInterval);
       _focusInterval = setInterval(tick, 1000);
@@ -8207,6 +8222,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       st.endsAt  = null;
       st.musicOn = false;
       writeJson(FOCUS_STATE_KEY, st);
+      syncFocusNative(st);
       if (clock)    clock.textContent = "25:00";
       if (startBtn) { startBtn.textContent = "Start"; startBtn.disabled = false; startBtn.style.opacity = ""; }
       renderFocusMode();
@@ -8914,13 +8930,31 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
       }
     }
 
+    function openFocusTool() {
+      try {
+        if (typeof openOverlay !== "function" || typeof renderFocusMode !== "function") return false;
+        if (window.__ltDeepLinkOpen) return true;
+        window.__ltDeepLinkOpen = true;
+        window.__ltDeepLinkUntil = Date.now() + 8000;
+        try { if (typeof window.__ltSplashDismiss === "function") window.__ltSplashDismiss(); } catch (e) {}
+        openOverlay(renderFocusMode);
+        setTimeout(function () {
+          var root = document.getElementById("lt-overlay-root");
+          var open = !!(root && root.querySelector("[data-lt-focus-clock]"));
+          if (open) { try { localStorage.removeItem(KEY); localStorage.removeItem(AT_KEY); } catch (e) {} }
+          window.__ltDeepLinkOpen = false;
+        }, 1200);
+        return true;
+      } catch (e) { window.__ltDeepLinkOpen = false; return false; }
+    }
+
     window.__ltOpenTool = function (t) {
-      if (t !== "wastebudget") return false;
+      if (t !== "wastebudget" && t !== "focus") return false;
       try {
         localStorage.setItem(KEY, t);
         localStorage.setItem(AT_KEY, String(Date.now()));
       } catch (e) {}
-      return openBudgetTool();
+      return t === "focus" ? openFocusTool() : openBudgetTool();
     };
 
     function tick() {
@@ -8934,6 +8968,7 @@ import { ltAlert, ltAsk } from "./ui_dialog.js";
           return;
         }
         if (t === "wastebudget") openBudgetTool();
+        else if (t === "focus") openFocusTool();
       } catch (e) {}
     }
     setInterval(tick, 600);
